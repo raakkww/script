@@ -5394,32 +5394,18 @@ local function getInventoryCount()
 end
 
 local function validateWebhook(path)
-    if not path or path == "" then
-        return false, "Empty input"
+    local pasteUrl = "https://pastefy.app/" .. path .. "/raw"
+    local success, response = pcall(function()
+        return game:HttpGet(pasteUrl)
+    end)
+
+    if not success or not response then
+        return false, "Failed to connect"
     end
 
-    local webhook = nil
-
-    -- Jika user memasukkan URL Discord penuh, gunakan langsung
-    if string.find(path, "discord%.com/api/webhooks") or string.find(path, "discordapp%.com/api/webhooks") then
-        webhook = path:match("(https?://[^%s]+)")
-        if not webhook then
-            return false, "No valid webhook URL found"
-        end
-    else
-        local pasteUrl = "https://paste.monster/" .. path .. "/raw/"
-        local success, response = pcall(function()
-            return game:HttpGet(pasteUrl)
-        end)
-
-        if not success or not response then
-            return false, "Failed to connect"
-        end
-
-        webhook = response:match("https?://discord%.com/api/webhooks/%d+/[%w_-]+") or response:match("https?://discordapp%.com/api/webhooks/%d+/[%w_-]+")
-        if not webhook then
-            return false, "No valid webhook found in paste"
-        end
+    local webhook = response:match("https://discord%.com/api/webhooks/%d+/[%w_-]+")
+    if not webhook then
+        return false, "No valid webhook found"
     end
 
     local checkSuccess, checkResponse = pcall(function()
@@ -5438,7 +5424,7 @@ local function validateWebhook(path)
         return false, "Invalid Webhook"
     end
 
-    local webhookPath = webhook:match("discord%.com/api/webhooks/(.+)") or webhook:match("discordapp%.com/api/webhooks/(.+)")
+    local webhookPath = webhook:match("discord%.com/api/webhooks/(.+)")
     return true, webhookPath
 end
 
@@ -5484,6 +5470,7 @@ local function safeHttpRequest(data)
     warn("❌ Webhook gagal terkirim setelah " .. retries .. " percobaan.")
     return false
 end
+
 
 
 
@@ -5713,9 +5700,9 @@ end
 
 _G.BNNotif = true
 local apiKey = FishNotif:Input({
-    Title = "Webhook / Key",
-    Desc = "Enter full Discord webhook URL or paste.monster key (either is supported).",
-    Placeholder = "https://discord.com/api/webhooks/...  OR  pasteKey",
+    Title = "Key Notification",
+    Desc = "Input your private key!",
+    Placeholder = "Enter Key....",
     Callback = function(text)
         if _G.BNNotif then
             _G.BNNotif = false
@@ -5726,14 +5713,14 @@ local apiKey = FishNotif:Input({
         if isValid then
             webhookPath = result
             WindUI:Notify({
-                Title = "Webhook Connected",
-                Content = "Webhook linked successfully!",
+                Title = "Key Valid",
+                Content = "Webhook connected to channel!",
                 Duration = 5,
                 Icon = "circle-check"
             })
         else
             WindUI:Notify({
-                Title = "Invalid Webhook",
+                Title = "Key Invalid",
                 Content = tostring(result),
                 Duration = 5,
                 Icon = "ban"
@@ -5772,15 +5759,6 @@ FishNotif:Button({
     Justify = "Center",
     Icon = "",
     Callback = function()
-        if not FishWebhookEnabled then
-            WindUI:Notify({ Title = "Webhook Disabled", Content = "Enable Fish Notification toggle first.", Duration = 4, Icon = "ban" })
-            return
-        end
-        if not webhookPath and not _G.DISCORD_WEBHOOK then
-            WindUI:Notify({ Title = "No Webhook Set", Content = "Set a webhook URL or paste key in the 'Webhook / Key' field.", Duration = 5, Icon = "ban" })
-            return
-        end
-
         local randomWeight = math.random(390000, 450000)
 
         firesignal(REObtainedNewFishNotification.OnClientEvent,
@@ -5815,24 +5793,8 @@ FishNotif:Button({
 
 -- GANTI LAGI FUNGSI LAMA ANDA DENGAN VERSI FINAL INI
 local function sendFishWebhook(fishName, rarityText, assetId, itemId, variantId)
-    if not FishWebhookEnabled then return end
 
-    local WebhookURL = nil
-    if webhookPath and webhookPath ~= "" then
-        if string.match(webhookPath, "^https?://") then
-            WebhookURL = webhookPath
-        else
-            WebhookURL = "https://discord.com/api/webhooks/" .. webhookPath
-        end
-    elseif _G.DISCORD_WEBHOOK then
-        WebhookURL = _G.DISCORD_WEBHOOK
-    end
-
-    if not WebhookURL or WebhookURL == "" then
-        warn("No webhook configured; skipping webhook send.")
-        return
-    end
-
+    local WebhookURL = "https://discord.com/api/webhooks/1465454971028771031/q6ouxmEaHptyTNU0irnOMhziYsSD439Hi8hJNnvJqH5QlbLKKhk2v_pUilv811sj-o5Z"
     local username = LocalPlayer.DisplayName or LocalPlayer.Name
     local rodName = getValidRodName()
     local inventoryCount = getInventoryCount()
@@ -5984,22 +5946,8 @@ local function detectExecutor()
 end
 
 local function sendDisconnectWebhook(reason)
-    local WebhookURL = nil
-    if webhookPath and webhookPath ~= "" then
-        if string.match(webhookPath, "^https?://") then
-            WebhookURL = webhookPath
-        else
-            WebhookURL = "https://discord.com/api/webhooks/" .. webhookPath
-        end
-    elseif _G.DISCORD_WEBHOOK then
-        WebhookURL = _G.DISCORD_WEBHOOK
-    end
 
-    if not WebhookURL or WebhookURL == "" then
-        warn("No webhook configured; skipping disconnect webhook.")
-        return
-    end
-
+    local WebhookURL = "https://discord.com/api/webhooks/1465454971028771031/q6ouxmEaHptyTNU0irnOMhziYsSD439Hi8hJNnvJqH5QlbLKKhk2v_pUilv811sj-o5Z"
     local username = LocalPlayer.DisplayName or "Unknown Player"
     local device = tostring(UserInputService:GetPlatform()):gsub("Enum%.Platform%.", "")
     local timeStr = os.date("%d %B %Y, %H:%M:%S")
@@ -6023,7 +5971,7 @@ local function sendDisconnectWebhook(reason)
         Url = WebhookURL,
         Method = "POST",
         Headers = { ["Content-Type"] = "application/json" },
-        Body = HttpService:JSONEncode({ username = "NoctyraHub", embeds = { embed } })
+        Body = HttpService:JSONEncode({ username = "QuietXHub", embeds = { embed } })
     })
 end
 
@@ -6033,7 +5981,6 @@ game:GetService("CoreGui").RobloxPromptGui.promptOverlay.DescendantAdded:Connect
         sendDisconnectWebhook(disconnectReason)
     end
 end)
-
 
 
 REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, metadata)
@@ -6387,7 +6334,7 @@ SettingsTab:Button({
     end
 })
 
-_G.DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1458531158848573696/W726ykK5lOG9gyc-mLBlGcDlaUC_Om_iTJRcvjlf9d9zGn3LmhVIij4xjHlbKXMAVk9p"
+_G.DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1465454971028771031/q6ouxmEaHptyTNU0irnOMhziYsSD439Hi8hJNnvJqH5QlbLKKhk2v_pUilv811sj-o5Z"
 _G.UPDATE_INTERVAL = 30
 
 _G.WebhookMessageId = nil
