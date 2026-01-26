@@ -452,7 +452,7 @@ local function LookupDiscordInvite(inviteCode)
     end
 end
 
-local inviteCode = "nacepzPQKh"
+local inviteCode = "mEYNWDTXnM"
 local inviteData = LookupDiscordInvite(inviteCode)
 
 if inviteData then
