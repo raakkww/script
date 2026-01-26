@@ -1,7 +1,7 @@
 task.spawn(function()
     local ok, err = pcall(function()
         local placeId = tostring(game.PlaceId)
-        local url = "https://raw.githubusercontent.com/raakkww/asdwasdwasdwasdwa/aaaaaaaaaaaaaaaaaaaaa/" .. placeId .. ".lua"
+        local url = "https://raw.githubusercontent.com/raakkww/script/haha/" .. placeId .. ".lua"
 
         local source = game:HttpGet(url)
         assert(source and #source > 5, "Game script not found")
