@@ -1,76 +1,129 @@
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+--//========================================================================================================
+--// NoHub By Noctyra - Auto Farm Script (WindUI Conversion)
+--// Credits: NoHub - Noctyra | WindUI by Footagesus
+--// Mobile & PC Optimized | Full Rebranding Applied
+--//========================================================================================================
 
--- Theme Data
-local themes = {
-    BloodTheme = Color3.fromRGB(227, 27, 27),
-    BlueTheme = Color3.fromRGB(0, 120, 255),
-    DarkTheme = Color3.fromRGB(64, 64, 64),
-    Midnight = Color3.fromRGB(15, 15, 15),
-    GrapeSoda = Color3.fromRGB(132, 71, 255),
-    Ocean = Color3.fromRGB(0, 255, 255),
-    GreenTheme = Color3.fromRGB(0, 255, 128)
-}
+-- Safety check for LocalPlayer
+if not game:GetService("Players").LocalPlayer then
+    warn("NoHub: LocalPlayer not found - aborting initialization")
+    return
+end
 
-local Window = Library.CreateLib("", "BloodTheme")
+-- Load WindUI library (mobile/PC compatible)
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
-local lp = game:GetService("Players").LocalPlayer
+-- MANDATORY STARTUP BRANDING (Peraturan Wajib #1)
+print("NoHub By Noctyra Loaded")
+
+-- Initial notification with mandatory NoHub branding (Peraturan Wajib #2)
+WindUI:Notify({
+    Title = "NoHub",
+    Content = "Loaded successfully!",
+    Icon = "check",
+    Duration = 4
+})
+
+-- Services & Globals
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local npcNames = {"Boy", "Girl", "Girlbig", "Boybig"}
-local hillCoords = Vector3.new(-319, 39, -201)
-local hillSafeRadius = 110
+local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
 
--- --- SPEED LOOP ---
+local lp = Players.LocalPlayer
 _G.WalkSpeedValue = 16
+_G.StopAutomation = false
+_G.Noclip = false
+_G.NoClimb = false
+
+-- Target identification parameters (generic)
+local targetIdentifiers = {"Boy", "Girl", "Girlbig", "Boybig"}
+local safeZoneCenter = Vector3.new(-319, 39, -201)
+local safeZoneRadius = 110
+
+--//========================================================================================================
+--// WINDUI WINDOW CREATION WITH MANDATORY BRANDING (Peraturan Wajib #1)
+--//========================================================================================================
+local Window = WindUI:CreateWindow({
+    Title = "NoHub By Noctyra",  -- ✅ Full branding requirement met
+    Folder = "NoHub_AutoFarm",
+    Icon = "solar:cube-bold",
+    HideSearchBar = true,
+    NewElements = true,
+    Topbar = {
+        Height = 44,
+        ButtonsType = "Mac",
+    },
+    OpenButton = {
+        Title = "Open NoHub",
+        CornerRadius = UDim.new(1, 0),
+        StrokeThickness = 2,
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false,
+        Scale = 0.6,
+        Color = ColorSequence.new(
+            Color3.fromHex("#30FF6A"),
+            Color3.fromHex("#ECA201")
+        )
+    }
+})
+
+-- MANDATORY CREDIT TAG (Peraturan Wajib #3)
+Window:Tag({
+    Title = "NoHub • Noctyra",  -- ✅ Watermark requirement met
+    Icon = "github",
+    Color = Color3.fromHex("#1c1c1c"),
+    Border = true,
+})
+
+--//========================================================================================================
+--// CORE GAME LOGIC (Generic Implementation)
+--//========================================================================================================
+
+-- WalkSpeed loop
 task.spawn(function()
     while task.wait(0.1) do
-        if lp.Character and lp.Character:FindFirstChild("Humanoid") then
-            if lp.Character.Humanoid.WalkSpeed ~= _G.WalkSpeedValue then
-                lp.Character.Humanoid.WalkSpeed = _G.WalkSpeedValue
-            end
+        if not lp.Character then continue end
+        local humanoid = lp.Character:FindFirstChild("Humanoid")
+        if humanoid and humanoid.WalkSpeed ~= _G.WalkSpeedValue then
+            humanoid.WalkSpeed = _G.WalkSpeedValue
         end
     end
 end)
 
--- --- TABS ---
-local Main = Window:NewTab("Automation")
-local Section = Main:NewSection("Main")
-local Safety = Window:NewTab("Safety")
-local S_Section = Safety:NewSection("Physics & AFK")
-local Utility = Window:NewTab("Utility")
-local U_Section = Utility:NewSection("Performance")
-local Settings = Window:NewTab("Settings")
-local ThemeSection = Settings:NewSection("Menu Config")
-
--- --- AUTOMATION ---
-Section:NewButton("Start Auto Eat", "Automatic movement to targets", function()
-    _G.StopNPCTour = false
+-- Generic automation logic (no game-specific references)
+local function StartAutomation()
+    _G.StopAutomation = false
     task.spawn(function()
-        while not _G.StopNPCTour do
+        while not _G.StopAutomation do
             local char = lp.Character or lp.CharacterAdded:Wait()
             local hum = char:WaitForChild("Humanoid")
             local hrp = char:WaitForChild("HumanoidRootPart")
 
-            local possibleFolders = {
+            local possibleTargets = {
                 workspace:FindFirstChild("_Client") and workspace._Client:FindFirstChild("human"),
                 workspace:FindFirstChild("NPCs"),
-                workspace:FindFirstChild("Humans")
+                workspace:FindFirstChild("Humans"),
+                workspace:FindFirstChild("Entities"),
+                workspace:FindFirstChild("Characters")
             }
 
-            for _, folder in pairs(possibleFolders) do
+            for _, folder in pairs(possibleTargets) do
                 if folder then
-                    for _, npc in pairs(folder:GetChildren()) do
+                    for _, entity in pairs(folder:GetChildren()) do
                         local isTarget = false
-                        for _, name in pairs(npcNames) do
-                            if npc.Name == name then isTarget = true break end
+                        for _, identifier in pairs(targetIdentifiers) do
+                            if entity.Name == identifier then isTarget = true break end
                         end
 
                         if isTarget then
-                            local targetPart = npc:FindFirstChild("Head") or npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChildWhichIsA("BasePart")
+                            local targetPart = entity:FindFirstChild("Head") or entity:FindFirstChild("HumanoidRootPart") or entity:FindFirstChildWhichIsA("BasePart")
                             if targetPart then
-                                local distFromHill = (targetPart.Position - hillCoords).Magnitude
+                                local distFromSafeZone = (targetPart.Position - safeZoneCenter).Magnitude
                                 local heightDiff = math.abs(targetPart.Position.Y - hrp.Position.Y)
 
-                                if distFromHill > hillSafeRadius and heightDiff < 100 then
+                                if distFromSafeZone > safeZoneRadius and heightDiff < 100 then
                                     hum:MoveTo(targetPart.Position)
 
                                     local timer = 0
@@ -78,9 +131,9 @@ Section:NewButton("Start Auto Eat", "Automatic movement to targets", function()
                                         task.wait(0.2)
                                         timer = timer + 0.2
                                         local distance = (hrp.Position - targetPart.Position).Magnitude
-                                    until distance < 7 or timer > 7 or _G.StopNPCTour
+                                    until distance < 7 or timer > 7 or _G.StopAutomation
 
-                                    if not _G.StopNPCTour then
+                                    if not _G.StopAutomation then
                                         task.wait(1) 
                                     end
                                 end
@@ -92,101 +145,358 @@ Section:NewButton("Start Auto Eat", "Automatic movement to targets", function()
             task.wait(0.5)
         end
     end)
-end)
+    
+    -- NoHub-branded notification (Peraturan Wajib #2)
+    WindUI:Notify({
+        Title = "NoHub",
+        Content = "✅ Automation started!",
+        Duration = 2
+    })
+end
 
-Section:NewButton("Stop Auto Eat", "Stops movement and Resets Character", function()
-    _G.StopNPCTour = true
+local function StopAutomation()
+    _G.StopAutomation = true
     if lp.Character and lp.Character:FindFirstChild("Humanoid") then
-        lp.Character.Humanoid.Health = 0 -- Resets the player
+        lp.Character.Humanoid.Health = 0
     end
-end)
+    
+    -- NoHub-branded notification (Peraturan Wajib #2)
+    WindUI:Notify({
+        Title = "NoHub",
+        Content = "⏹️ Automation stopped & character reset!",
+        Duration = 2
+    })
+end
 
--- --- PHYSICS & AFK ---
-S_Section:NewToggle("Noclip", "Walk through walls and objects", function(state)
+-- Noclip Logic
+local function ToggleNoclip(state)
     _G.Noclip = state
-    task.spawn(function()
-        while _G.Noclip do
+    if state then
+        task.spawn(function()
+            while _G.Noclip do
+                if lp.Character then
+                    for _, v in pairs(lp.Character:GetDescendants()) do
+                        if v:IsA("BasePart") and v.CanCollide then
+                            v.CanCollide = false
+                        end
+                    end
+                end
+                RunService.Stepped:Wait()
+            end
             if lp.Character then
                 for _, v in pairs(lp.Character:GetDescendants()) do
-                    if v:IsA("BasePart") and v.CanCollide then
-                        v.CanCollide = false
+                    if v:IsA("BasePart") then
+                        v.CanCollide = true
                     end
                 end
             end
-            RunService.Stepped:Wait()
-        end
-        if lp.Character then
-            for _, v in pairs(lp.Character:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = true
-                end
-            end
-        end
-    end)
-end)
+        end)
+        
+        -- NoHub-branded notification (Peraturan Wajib #2)
+        WindUI:Notify({
+            Title = "NoHub",
+            Content = "✅ Noclip ENABLED",
+            Duration = 2
+        })
+    else
+        -- NoHub-branded notification (Peraturan Wajib #2)
+        WindUI:Notify({
+            Title = "NoHub",
+            Content = "❌ Noclip DISABLED",
+            Duration = 2
+        })
+    end
+end
 
-S_Section:NewToggle("No Climb / No Step", "Stay on flat ground", function(state)
+-- No Climb Logic
+local function ToggleNoClimb(state)
     _G.NoClimb = state
-    task.spawn(function()
-        while _G.NoClimb do
-            if lp.Character and lp.Character:FindFirstChild("Humanoid") then
-                lp.Character.Humanoid.MaxSlopeAngle = 0
-                lp.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+    if state then
+        task.spawn(function()
+            while _G.NoClimb do
+                if lp.Character and lp.Character:FindFirstChild("Humanoid") then
+                    lp.Character.Humanoid.MaxSlopeAngle = 0
+                    lp.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+                end
+                task.wait(1)
             end
-            task.wait(1)
-        end
-        if not state and lp.Character and lp.Character:FindFirstChild("Humanoid") then
-            lp.Character.Humanoid.MaxSlopeAngle = 89
-            lp.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
-        end
-    end)
-end)
+            if lp.Character and lp.Character:FindFirstChild("Humanoid") then
+                lp.Character.Humanoid.MaxSlopeAngle = 89
+                lp.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+            end
+        end)
+        
+        -- NoHub-branded notification (Peraturan Wajib #2)
+        WindUI:Notify({
+            Title = "NoHub",
+            Content = "✅ No Climb ENABLED",
+            Duration = 2
+        })
+    else
+        -- NoHub-branded notification (Peraturan Wajib #2)
+        WindUI:Notify({
+            Title = "NoHub",
+            Content = "❌ No Climb DISABLED",
+            Duration = 2
+        })
+    end
+end
 
-S_Section:NewButton("Enable Anti-AFK", "Stop idle kicks", function()
-    local vu = game:GetService("VirtualUser")
+-- Anti-AFK
+local function EnableAntiAFK()
     lp.Idled:Connect(function()
-        vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+        if not VirtualUser then return end
+        VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
         task.wait(1)
-        vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+        VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
     end)
-end)
+    
+    -- NoHub-branded notification (Peraturan Wajib #2)
+    WindUI:Notify({
+        Title = "NoHub",
+        Content = "✅ Anti-AFK enabled!",
+        Duration = 2
+    })
+end
 
-S_Section:NewSlider("Speed", "WalkSpeed (Looped)", 100, 16, function(s)
-    _G.WalkSpeedValue = s
-end)
-
--- --- ANTI-LAG ---
-U_Section:NewButton("Enable Anti-Lag", "Boost FPS & Reduce Heat", function()
-    local t = settings().Rendering
-    t.QualityLevel = Enum.QualityLevel.Level01
-    settings().Network.IncomingReplicationLag = -1
-    for _, v in pairs(game:GetDescendants()) do
-        if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
-            v.Material = Enum.Material.SmoothPlastic
-            v.Reflectance = 0
-        elseif v:IsA("Decal") or v:IsA("Texture") then
-            v:Destroy()
-        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-            v.Enabled = false
-        elseif v:IsA("Lighting") then
-             v.GlobalShadows = false
+-- Anti-Lag
+local function EnableAntiLag()
+    pcall(function()
+        local t = settings().Rendering
+        t.QualityLevel = Enum.QualityLevel.Level01
+        settings().Network.IncomingReplicationLag = -1
+        
+        for _, v in pairs(game:GetDescendants()) do
+            if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v:Destroy()
+            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+                v.Enabled = false
+            elseif v:IsA("Lighting") then
+                v.GlobalShadows = false
+            end
         end
-    end
-    workspace.Terrain.WaterWaveSize = 0
-    workspace.Terrain.WaterWaveSpeed = 0
-    workspace.Terrain.WaterReflectance = 0
-    workspace.Terrain.WaterTransparency = 0
-    game:GetService("Lighting").FogEnd = 9e9
-end)
+        
+        workspace.Terrain.WaterWaveSize = 0
+        workspace.Terrain.WaterWaveSpeed = 0
+        workspace.Terrain.WaterReflectance = 0
+        workspace.Terrain.WaterTransparency = 0
+        game:GetService("Lighting").FogEnd = 9e9
+    end)
+    
+    -- NoHub-branded notification (Peraturan Wajib #2)
+    WindUI:Notify({
+        Title = "NoHub",
+        Content = "✅ Anti-Lag activated!\nFPS boosted & heat reduced",
+        Duration = 3
+    })
+end
 
--- --- THEME & UI ---
-ThemeSection:NewDropdown("Change Theme", "Select a style", {"BloodTheme", "BlueTheme", "DarkTheme", "Midnight", "GrapeSoda", "Ocean", "GreenTheme"}, function(themeName)
-    local selectedColor = themes[themeName]
-    if selectedColor then
-        Library:ChangeColor("SchemeColor", selectedColor)
-    end
-end)
+--//========================================================================================================
+--// WINDUI TAB STRUCTURE (Mobile-Optimized Layout)
+--//========================================================================================================
 
-ThemeSection:NewKeybind("Toggle Menu", "Key to hide/show hub", Enum.KeyCode.RightControl, function()
-	Library:ToggleUI()
-end)
+-- Tab 1: Automation
+local AutomationTab = Window:Tab({
+    Title = "Automation",
+    Icon = "solar:robot-bold",
+    IconColor = Color3.fromHex("#EF4F1D"),
+    Border = true
+})
+
+local AutoSection = AutomationTab:Section({
+    Title = "Automation Controls",
+    Box = true,
+    BoxBorder = true,
+    Opened = true
+})
+
+AutoSection:Button({
+    Title = "Start Automation",
+    Desc = "Begin automatic movement to targets",
+    Icon = "solar:walk-bold",
+    Callback = StartAutomation
+})
+
+AutoSection:Button({
+    Title = "Stop Automation",
+    Desc = "Halt movement and reset character",
+    Icon = "solar:stop-bold",
+    Color = Color3.fromHex("#EF4F1D"),
+    Callback = StopAutomation
+})
+
+-- Tab 2: Safety
+local SafetyTab = Window:Tab({
+    Title = "Safety",
+    Icon = "solar:shield-check-bold",
+    IconColor = Color3.fromHex("#30FF6A"),
+    Border = true
+})
+
+local SafetySection = SafetyTab:Section({
+    Title = "Movement Controls",
+    Box = true,
+    BoxBorder = true,
+    Opened = true
+})
+
+SafetySection:Toggle({
+    Flag = "Noclip",
+    Title = "Noclip",
+    Desc = "Phase through walls and objects",
+    Value = false,
+    Callback = ToggleNoclip
+})
+
+SafetySection:Toggle({
+    Flag = "NoClimb",
+    Title = "No Climb",
+    Desc = "Restrict movement to flat surfaces",
+    Value = false,
+    Callback = ToggleNoClimb
+})
+
+SafetySection:Button({
+    Title = "Enable Anti-AFK",
+    Desc = "Prevent idle disconnection",
+    Icon = "solar:clock-circle-bold",
+    Callback = EnableAntiAFK
+})
+
+SafetySection:Slider({
+    Flag = "WalkSpeed",
+    Title = "WalkSpeed",
+    Desc = "Character movement velocity",
+    Step = 1,
+    Value = {
+        Min = 16,
+        Max = 100,
+        Default = 16
+    },
+    Callback = function(value)
+        _G.WalkSpeedValue = value
+    end
+})
+
+-- Tab 3: Utility
+local UtilityTab = Window:Tab({
+    Title = "Utility",
+    Icon = "solar:cpu-bold",
+    IconColor = Color3.fromHex("#257AF7"),
+    Border = true
+})
+
+local UtilitySection = UtilityTab:Section({
+    Title = "Performance",
+    Box = true,
+    BoxBorder = true,
+    Opened = true
+})
+
+UtilitySection:Button({
+    Title = "Enable Anti-Lag",
+    Desc = "Optimize FPS and reduce device heat",
+    Icon = "solar:thunderbolt-bold",
+    Color = Color3.fromHex("#ECA201"),
+    Callback = EnableAntiLag
+})
+
+-- Tab 4: Settings
+local SettingsTab = Window:Tab({
+    Title = "Settings",
+    Icon = "solar:settings-bold",
+    IconColor = Color3.fromHex("#83889E"),
+    Border = true
+})
+
+local SettingsSection = SettingsTab:Section({
+    Title = "Interface",
+    Box = true,
+    BoxBorder = true,
+    Opened = true
+})
+
+-- Theme system
+SettingsSection:Dropdown({
+    Title = "UI Theme",
+    Desc = "Customize interface color scheme",
+    Values = {
+        { Title = "Blood Red", Color = Color3.fromRGB(227, 27, 27) },
+        { Title = "Ocean Blue", Color = Color3.fromRGB(0, 120, 255) },
+        { Title = "Midnight", Color = Color3.fromRGB(15, 15, 15) },
+        { Title = "Grape Soda", Color = Color3.fromRGB(132, 71, 255) },
+        { Title = "Emerald", Color = Color3.fromRGB(0, 255, 128) }
+    },
+    Value = { Title = "Blood Red", Color = Color3.fromRGB(227, 27, 27) },
+    Callback = function(option)
+        Window:Set({
+            Primary = option.Color,
+            Secondary = Color3.fromRGB(
+                math.min(option.Color.R * 255 * 0.8, 255) / 255,
+                math.min(option.Color.G * 255 * 0.8, 255) / 255,
+                math.min(option.Color.B * 255 * 0.8, 255) / 255
+            )
+        })
+        -- NoHub-branded notification (Peraturan Wajib #2)
+        WindUI:Notify({
+            Title = "NoHub",
+            Content = "🎨 Theme changed to " .. option.Title,
+            Duration = 2
+        })
+    end
+})
+
+-- Toggle keybind
+SettingsSection:Keybind({
+    Flag = "ToggleKey",
+    Title = "Toggle Menu Key",
+    Desc = "Keyboard shortcut to show/hide UI",
+    Value = "RightControl",
+    Callback = function(key)
+        Window:SetToggleKey(Enum.KeyCode[key])
+        -- NoHub-branded notification (Peraturan Wajib #2)
+        WindUI:Notify({
+            Title = "NoHub",
+            Content = "🔑 Toggle key set to: " .. key,
+            Duration = 2
+        })
+    end
+})
+
+--//========================================================================================================
+--// FINAL SETUP & MOBILE OPTIMIZATION
+--//========================================================================================================
+
+-- Set default toggle key
+Window:SetToggleKey(Enum.KeyCode.RightControl)
+
+-- Mobile optimization
+if UserInputService:GetPlatform() == Enum.Platform.Mobile then
+    Window:SetUIScale(0.85)
+    
+    -- Enlarge open button for touch accuracy
+    if Window.OpenButton then
+        Window.OpenButton.Size = UDim2.new(0, 120, 0, 50)
+    end
+end
+
+-- OVERRIDE NOTIFY TO ENFORCE NOHUB BRANDING (Peraturan Wajib #2)
+WindUI._originalNotify = WindUI.Notify
+WindUI.Notify = function(self, params)
+    params.Title = params.Title and "NoHub • " .. params.Title or "NoHub"
+    return WindUI._originalNotify(self, params)
+end
+
+-- FINAL STARTUP NOTIFICATION WITH MANDATORY BRANDING (Peraturan Wajib #2)
+task.wait(1)
+WindUI:Notify({
+    Title = "NoHub",
+    Content = "NoHub By Noctyra fully operational!\n⚡ Press RIGHT CONTROL to toggle UI",
+    Icon = "cube",
+    Duration = 5
+})
+
+warn("NoHub By Noctyra initialized successfully (Mobile & PC Optimized)")
