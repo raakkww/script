@@ -1,7 +1,7 @@
 --//========================================================================================================
---// NoHub By Noctyra - Death Ball Pro (WindUI Conversion)
+--// NoHub By Noctyra - Universal Auto Features (WindUI)
 --// Credits: NoHub - Noctyra | WindUI by Footagesus
---// Mobile & PC Optimized | Full Rebranding Applied
+--// Mobile & PC Optimized | Zero Original Names Preserved
 --//========================================================================================================
 
 -- Safety check for LocalPlayer
@@ -13,57 +13,65 @@ end
 -- Load WindUI library (mobile/PC compatible)
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
--- Mandatory startup branding
+-- MANDATORY STARTUP BRANDING
 print("NoHub By Noctyra Loaded")
 WindUI:Notify({
     Title = "NoHub",
-    Content = "Death Ball Pro loaded successfully!",
+    Content = "Universal features loaded successfully!",
     Icon = "check",
     Duration = 4
 })
 
--- Services & Variables (preserved from original logic)
+-- Services & Core Variables
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputService")
 local UserInputService = game:GetService("UserInputService")
-
 local LP = Players.LocalPlayer
+
+--//========================================================================================================
+--// FEATURE 1: BALL PARRY SYSTEM (Death Ball)
+--//========================================================================================================
 local BallShadow, RealBall
 local WhiteColor = Color3.new(1, 1, 1)
 local LastBallPos
 local SpeedMulty = 3
 local AutoParryEnabled = true
-
--- Optimized Parry Settings (preserved)
 local ParryDistance = 15
 local ReactionTime = 0
 local SafetyMargin = 1.5
 local PredictionFrames = 0.5
-
 local AutoClickerEnabled = false
 local ClickSpeed = 1000
 local LastClickTime = 0
-
 local LastParryTime = 0
 local ParryCooldown = 0
 local IsParrying = false
-
 local VisualZoneEnabled = true
 local ZoneSphere = nil
 local DarkTheme = true
-
--- Ball velocity tracking (preserved)
 local BallVelocityHistory = {}
 local MaxVelocityHistory = 5
+
+--//========================================================================================================
+--// FEATURE 2: SAFE ZONE TELEPORT (New Feature)
+--//========================================================================================================
+local TP_Enabled = false
+local TP_ZonePos = Vector3.new(569.09, 284.59, -779.90) -- Default coordinates (configurable via UI)
+local TP_YOffset = 3
+local TP_CheckInterval = 0.8
+local TP_IntermissionDelay = 1.2
+local TP_PostJoinCooldown = 6
+local TP_LastJoinTime = 0
+local TP_LastPos = nil
 
 --//========================================================================================================
 --// WINDUI WINDOW CREATION WITH MANDATORY BRANDING
 --//========================================================================================================
 local Window = WindUI:CreateWindow({
-    Title = "NoHub | Death Ball",
-    Folder = "NoHub_DeathBall",
-    Icon = "solar:target-bold",
+    Title = "NoHub By Noctyra",
+    Folder = "NoHub_Universal",
+    Icon = "solar:cube-bold",
     HideSearchBar = true,
     NewElements = true,
     Topbar = {
@@ -85,7 +93,7 @@ local Window = WindUI:CreateWindow({
     }
 })
 
--- Mandatory credit tag (NoHub branding requirement)
+-- MANDATORY CREDIT TAG
 Window:Tag({
     Title = "NoHub • Noctyra",
     Icon = "github",
@@ -94,26 +102,26 @@ Window:Tag({
 })
 
 --//========================================================================================================
---// WINDUI TAB STRUCTURE (Mobile-Optimized Layout)
+--// TAB 1: BALL PARRY (Death Ball Features)
 --//========================================================================================================
-
--- Tab 1: Auto Parry Controls
 local ParryTab = Window:Tab({
-    Title = "Auto Parry",
-    Icon = "solar:shield-bold",
+    Title = "Ball Parry",
+    Icon = "solar:target-bold",
     IconColor = Color3.fromHex("#EF4F1D"),
     Border = true
 })
 
 local ParrySection = ParryTab:Section({
-    Title = "Parry Settings",
+    Title = "Parry Controls",
+    Box = true,
+    BoxBorder = true,
+    Opened = true
 })
 
--- Auto-Parry Toggle
-local ParryToggle = ParrySection:Toggle({
+ParrySection:Toggle({
     Flag = "AutoParry",
     Title = "Auto Parry",
-    Desc = "Automatically parry incoming balls",
+    Desc = "Automatically parry incoming projectiles",
     Value = AutoParryEnabled,
     Callback = function(state)
         AutoParryEnabled = state
@@ -125,11 +133,10 @@ local ParryToggle = ParrySection:Toggle({
     end
 })
 
--- Parry Distance Slider (5-25 range)
-local DistanceSlider = ParrySection:Slider({
+ParrySection:Slider({
     Flag = "ParryDistance",
     Title = "Parry Distance",
-    Desc = "Detection radius for incoming balls",
+    Desc = "Detection radius for projectiles",
     Step = 1,
     Value = {
         Min = 5,
@@ -144,38 +151,26 @@ local DistanceSlider = ParrySection:Slider({
     end
 })
 
--- Prediction Status (real-time updates using :Set())
-local PredictionStatus = ParrySection:Section({
-    Title = "Prediction Status",
-    Box = true,
-    BoxBorder = true,
-    Opened = true
+ParrySection:Toggle({
+    Flag = "AutoClicker",
+    Title = "Auto Clicker",
+    Desc = "Automatically press F key",
+    Value = AutoClickerEnabled,
+    Callback = function(state)
+        AutoClickerEnabled = state
+        WindUI:Notify({
+            Title = "NoHub",
+            Content = "Auto Clicker " .. (state and "ENABLED" or "DISABLED"),
+            Duration = 2
+        })
+    end
 })
 
-local PredictionLabel = PredictionStatus:Section({
-    Title = "⚡ Optimized Mode Active",
-    TextSize = 16,
-    TextTransparency = 0.2,
-    FontWeight = Enum.FontWeight.SemiBold
-})
-
--- Tab 2: Visuals & Zone
-local VisualsTab = Window:Tab({
-    Title = "Visuals",
-    Icon = "solar:eye-bold",
-    IconColor = Color3.fromHex("#30FF6A"),
-    Border = true
-})
-
-local VisualsSection = VisualsTab:Section({
-    Title = "Visual Settings",
-})
-
--- Visual Zone Toggle (sphere around player)
-local ZoneToggle = VisualsSection:Toggle({
+-- Visual Zone Toggle
+ParrySection:Toggle({
     Flag = "VisualZone",
-    Title = "Parry Zone",
-    Desc = "Show visual sphere for parry range",
+    Title = "Visual Zone",
+    Desc = "Show parry range sphere",
     Value = VisualZoneEnabled,
     Callback = function(state)
         VisualZoneEnabled = state
@@ -193,40 +188,145 @@ local ZoneToggle = VisualsSection:Toggle({
     end
 })
 
--- Theme Toggle (Dark/Light)
-VisualsSection:Button({
-    Title = "Toggle Theme",
-    Desc = "Switch between dark and light UI themes",
-    Icon = "solar:moon-bold",
-    Callback = function()
-        DarkTheme = not DarkTheme
-        if DarkTheme then
-            Window:Set({
-                Background = Color3.fromHex("#121212"),
-                PanelBackground = Color3.fromHex("#1a1a1a"),
-                TextColor = Color3.fromHex("#ffffff")
-            })
-            WindUI:Notify({
-                Title = "NoHub",
-                Content = "Dark theme activated",
-                Duration = 2
-            })
-        else
-            Window:Set({
-                Background = Color3.fromHex("#f5f5f5"),
-                PanelBackground = Color3.fromHex("#ffffff"),
-                TextColor = Color3.fromHex("#000000")
-            })
-            WindUI:Notify({
-                Title = "NoHub",
-                Content = "Light theme activated",
-                Duration = 2
-            })
-        end
+--//========================================================================================================
+--// TAB 2: SAFE ZONE TELEPORT (New Feature)
+--//========================================================================================================
+local TPTab = Window:Tab({
+    Title = "Safe Zone TP",
+    Icon = "solar:location-bold",
+    IconColor = Color3.fromHex("#30FF6A"),
+    Border = true
+})
+
+local TPSection = TPTab:Section({
+    Title = "Teleport Settings",
+    Box = true,
+    BoxBorder = true,
+    Opened = true
+})
+
+-- Auto TP Toggle
+TPSection:Toggle({
+    Flag = "AutoTP",
+    Title = "Auto Teleport",
+    Desc = "Teleport to safe zone during intermission",
+    Value = false,
+    Callback = function(state)
+        TP_Enabled = state
+        WindUI:Notify({
+            Title = "NoHub",
+            Content = "Auto TP " .. (state and "ENABLED" or "DISABLED"),
+            Duration = 2
+        })
     end
 })
 
--- Tab 3: Real-time Stats (using :Set() for live updates)
+-- Coordinate Inputs (using Flags for auto-save)
+TPSection:Input({
+    Flag = "TP_X",
+    Title = "Zone X Coordinate",
+    Desc = "Safe zone X position",
+    Value = "569.09",
+    Placeholder = "Enter number",
+    Callback = function(val)
+        local num = tonumber(val)
+        if num then TP_ZonePos = Vector3.new(num, TP_ZonePos.Y, TP_ZonePos.Z) end
+    end
+})
+
+TPSection:Input({
+    Flag = "TP_Y",
+    Title = "Zone Y Coordinate",
+    Desc = "Safe zone Y position",
+    Value = "284.59",
+    Placeholder = "Enter number",
+    Callback = function(val)
+        local num = tonumber(val)
+        if num then TP_ZonePos = Vector3.new(TP_ZonePos.X, num, TP_ZonePos.Z) end
+    end
+})
+
+TPSection:Input({
+    Flag = "TP_Z",
+    Title = "Zone Z Coordinate",
+    Desc = "Safe zone Z position",
+    Value = "-779.90",
+    Placeholder = "Enter number",
+    Callback = function(val)
+        local num = tonumber(val)
+        if num then TP_ZonePos = Vector3.new(TP_ZonePos.X, TP_ZonePos.Y, num) end
+    end
+})
+
+-- Y Offset Slider
+TPSection:Slider({
+    Flag = "TP_YOffset",
+    Title = "Y Offset",
+    Desc = "Height adjustment above zone",
+    Step = 0.1,
+    Value = {
+        Min = -10,
+        Max = 20,
+        Default = 3
+    },
+    Callback = function(val)
+        TP_YOffset = val
+    end
+})
+
+-- Cooldown Slider
+TPSection:Slider({
+    Flag = "TP_Cooldown",
+    Title = "Post-Join Cooldown",
+    Desc = "Seconds to wait after joining arena",
+    Step = 1,
+    Value = {
+        Min = 3,
+        Max = 15,
+        Default = 6
+    },
+    Callback = function(val)
+        TP_PostJoinCooldown = val
+    end
+})
+
+-- Manual Teleport Button
+TPSection:Button({
+    Title = "Teleport Now",
+    Desc = "Instantly teleport to safe zone",
+    Icon = "solar:arrow-right-bold",
+    Color = Color3.fromHex("#30FF6A"),
+    Callback = function()
+        if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then
+            WindUI:Notify({
+                Title = "NoHub",
+                Content = "⚠️ Character not loaded!",
+                Color = "Yellow",
+                Duration = 3
+            })
+            return
+        end
+        
+        pcall(function()
+            local hrp = LP.Character.HumanoidRootPart
+            hrp.CFrame = CFrame.new(TP_ZonePos + Vector3.new(0, TP_YOffset, 0))
+            hrp.Anchored = true
+            RunService.Heartbeat:Wait()
+            RunService.Heartbeat:Wait()
+            hrp.Anchored = false
+            
+            WindUI:Notify({
+                Title = "NoHub",
+                Content = "✅ Teleported to safe zone!",
+                Duration = 2
+            })
+        end)
+    end
+})
+
+--//========================================================================================================
+--// TAB 3: REAL-TIME STATS
+--//========================================================================================================
 local StatsTab = Window:Tab({
     Title = "Stats",
     Icon = "solar:graph-bold",
@@ -235,28 +335,28 @@ local StatsTab = Window:Tab({
 })
 
 local StatsSection = StatsTab:Section({
-    Title = "Ball Tracking",
+    Title = "Tracking Data",
     Box = true,
     BoxBorder = true,
     Opened = true
 })
 
--- Coordinates display (updated via :Set() in main loop)
 local CoordinatesDisplay = StatsSection:Section({
-    Title = "X: 0.0 | Y: 0.0 | Z: 0.0\nSpeed: 0.0 | Height: 0.0\nPrediction: Ready",
+    Title = "X: 0.0 | Y: 0.0 | Z: 0.0\nSpeed: 0.0 | Height: 0.0\nStatus: Ready",
     TextSize = 14,
     TextTransparency = 0.4
 })
 
--- Status display (updated via :Set() in main loop)
 local StatusDisplay = StatsSection:Section({
-    Title = "Searching for ball...",
+    Title = "System: Idle",
     TextSize = 16,
     TextTransparency = 0.2,
     FontWeight = Enum.FontWeight.SemiBold
 })
 
--- Tab 4: Controls Info
+--//========================================================================================================
+--// TAB 4: CONTROLS & INFO
+--//========================================================================================================
 local InfoTab = Window:Tab({
     Title = "Controls",
     Icon = "solar:keyboard-bold",
@@ -265,7 +365,7 @@ local InfoTab = Window:Tab({
 })
 
 InfoTab:Section({
-    Title = "Keybinds",
+    Title = "Ball Parry Controls",
     TextSize = 18,
     FontWeight = Enum.FontWeight.SemiBold
 })
@@ -279,29 +379,41 @@ InfoTab:Section({
 
 InfoTab:Section({
     Title = "E",
-    Desc = "Toggle Auto Clicker (F-spam)",
+    Desc = "Toggle Auto Clicker",
     Box = true,
     BoxBorder = true
 })
 
 InfoTab:Section({
     Title = "F",
-    Desc = "Manual parry (override auto-parry)",
+    Desc = "Manual parry",
+    Box = true,
+    BoxBorder = true
+})
+
+InfoTab:Divider()
+
+InfoTab:Section({
+    Title = "Teleport Controls",
+    TextSize = 18,
+    FontWeight = Enum.FontWeight.SemiBold
+})
+
+InfoTab:Section({
+    Title = "Manual TP",
+    Desc = "Use 'Teleport Now' button in Safe Zone TP tab",
     Box = true,
     BoxBorder = true
 })
 
 --//========================================================================================================
---// CORE GAME LOGIC (Preserved 100% from original script)
+--// CORE FUNCTIONS (Ball Parry)
 --//========================================================================================================
-
 local function CreateZoneSphere()
-    if ZoneSphere then
-        ZoneSphere:Destroy()
-    end
+    if ZoneSphere then ZoneSphere:Destroy() end
     
     ZoneSphere = Instance.new("Part")
-    ZoneSphere.Name = "ParryZoneSphere"
+    ZoneSphere.Name = "NoHub_ParryZone"
     ZoneSphere.Anchored = true
     ZoneSphere.CanCollide = false
     ZoneSphere.Material = Enum.Material.Neon
@@ -310,54 +422,36 @@ local function CreateZoneSphere()
     ZoneSphere.Shape = Enum.PartType.Ball
     ZoneSphere.Size = Vector3.new(ParryDistance * 2, ParryDistance * 2, ParryDistance * 2)
     ZoneSphere.Parent = workspace
-    
-    return ZoneSphere
 end
 
 local function UpdateZoneSphere()
     if not ZoneSphere or not VisualZoneEnabled then return end
+    if not LP.Character or not LP.Character.PrimaryPart then return end
     
-    if LP.Character and LP.Character.PrimaryPart then
-        local characterPos = LP.Character.PrimaryPart.Position
-        ZoneSphere.Position = characterPos
-        ZoneSphere.Size = Vector3.new(ParryDistance * 2, ParryDistance * 2, ParryDistance * 2)
-        
-        if AutoParryEnabled then
-            ZoneSphere.BrickColor = BrickColor.new("Bright green")
-        else
-            ZoneSphere.BrickColor = BrickColor.new("Bright red")
-        end
-    end
+    ZoneSphere.Position = LP.Character.PrimaryPart.Position
+    ZoneSphere.Size = Vector3.new(ParryDistance * 2, ParryDistance * 2, ParryDistance * 2)
+    ZoneSphere.BrickColor = AutoParryEnabled and BrickColor.new("Bright green") or BrickColor.new("Bright red")
 end
 
 local function GetBallColor()
     if not RealBall then return WhiteColor end
-    
     local highlight = RealBall:FindFirstChildOfClass("Highlight")
-    if highlight then
-        return highlight.FillColor
-    end
-    
+    if highlight then return highlight.FillColor end
     local surfaceGui = RealBall:FindFirstChildOfClass("SurfaceGui")
     if surfaceGui then
         local frame = surfaceGui:FindFirstChildOfClass("Frame")
-        if frame and frame.BackgroundColor3 then
-            return frame.BackgroundColor3
-        end
+        if frame and frame.BackgroundColor3 then return frame.BackgroundColor3 end
     end
-    
     if RealBall:IsA("Part") and RealBall.BrickColor ~= BrickColor.new("White") then
         return RealBall.Color
     end
-    
     return WhiteColor
 end
 
 local function UltraAutoClicker()
+    if not AutoClickerEnabled then return end
     local currentTime = tick()
-    local timeBetweenClicks = 1 / ClickSpeed
-    
-    if currentTime - LastClickTime >= timeBetweenClicks then
+    if currentTime - LastClickTime >= 1 / ClickSpeed then
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
         LastClickTime = currentTime
@@ -366,261 +460,257 @@ end
 
 local function Parry()
     if IsParrying then return end
-    
     IsParrying = true
-    local currentTime = tick()
-    
-    if currentTime - LastParryTime < ParryCooldown then
-        IsParrying = false
-        return
-    end
     
     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
     
-    LastParryTime = currentTime
-    task.spawn(function()
-        task.wait(0.05)
-        IsParrying = false
-    end)
+    LastParryTime = tick()
+    task.delay(0.05, function() IsParrying = false end)
     
-    -- Visual feedback via WindUI notification
-    PredictionLabel:Set("⚡ PARRY EXECUTED!")
-    task.delay(0.5, function()
-        if PredictionLabel.Destroy then
-            PredictionLabel:Set("⚡ Optimized Mode Active")
-        end
-    end)
+    -- Visual feedback
+    if StatusDisplay.Set then
+        StatusDisplay:Set("⚡ PARRY EXECUTED!")
+        task.delay(0.5, function() 
+            if StatusDisplay.Set then StatusDisplay:Set("System: Active") end 
+        end)
+    end
 end
 
--- Ball physics helpers (preserved)
 local function UpdateVelocityHistory(velocity)
     table.insert(BallVelocityHistory, velocity)
-    if #BallVelocityHistory > MaxVelocityHistory then
-        table.remove(BallVelocityHistory, 1)
-    end
+    if #BallVelocityHistory > MaxVelocityHistory then table.remove(BallVelocityHistory, 1) end
 end
 
 local function GetAverageVelocity()
     if #BallVelocityHistory == 0 then return Vector3.new(0, 0, 0) end
-    
     local sum = Vector3.new(0, 0, 0)
-    for _, v in ipairs(BallVelocityHistory) do
-        sum = sum + v
-    end
+    for _, v in ipairs(BallVelocityHistory) do sum = sum + v end
     return sum / #BallVelocityHistory
 end
 
 local function PredictBallPosition(currentPos, velocity, frames)
-    local deltaTime = 0.016667 * frames
-    return currentPos + (velocity * deltaTime)
+    return currentPos + (velocity * (0.016667 * frames))
 end
 
 local function CalculateBallHeight(shadowSize)
-    local baseShadowSize = 5
-    local heightMultiplier = 8
-    local shadowIncrease = math.max(0, shadowSize - baseShadowSize)
-    local estimatedHeight = shadowIncrease * heightMultiplier
-    return math.min(estimatedHeight, 50)
+    local base = 5
+    local mult = 8
+    return math.min(math.max(0, shadowSize - base) * mult, 50)
 end
 
-local function GetMaxHeightBySpeed(speedStuds)
-    return speedStuds < 10 and 225 or 240
+local function GetMaxHeightBySpeed(speed)
+    return speed < 10 and 225 or 240
 end
 
-local function CalculateOptimalParryDistance(speed, horizontalDistance, ballHeight, playerPosY, ballPosY)
-    local maxHeight = GetMaxHeightBySpeed(speed)
-    if (ballPosY - playerPosY) > maxHeight then
-        return math.huge
-    end
+local function CalculateOptimalParryDistance(speed, hDist, height, pY, bY)
+    local maxH = GetMaxHeightBySpeed(speed)
+    if bY - pY > maxH then return math.huge end
     
-    local baseDistance = ParryDistance
-    local reactionDistance = speed * ReactionTime * SafetyMargin
-    local optimalDistance = baseDistance + reactionDistance
+    local base = ParryDistance
+    local react = speed * ReactionTime * SafetyMargin
+    local opt = base + react
     
-    if speed > 25 then
-        optimalDistance = optimalDistance * 1.6
-    elseif speed > 20 then
-        optimalDistance = optimalDistance * 1.5
-    elseif speed > 15 then
-        optimalDistance = optimalDistance * 1.4
-    elseif speed > 12 then
-        optimalDistance = optimalDistance * 1.3
-    elseif speed > 8 then
-        optimalDistance = optimalDistance * 1.2
-    end
+    if speed > 25 then opt = opt * 1.6
+    elseif speed > 20 then opt = opt * 1.5
+    elseif speed > 15 then opt = opt * 1.4
+    elseif speed > 12 then opt = opt * 1.3
+    elseif speed > 8 then opt = opt * 1.2 end
     
-    return optimalDistance
+    return opt
 end
 
 local function IsBallComingTowardsPlayer(ballPos, lastPos, playerPos)
     if not lastPos then return true end
-    local ballToPlayer = (playerPos - ballPos).Unit
-    local ballMovement = (ballPos - lastPos).Unit
-    return ballToPlayer:Dot(ballMovement) > 0.05
+    local toPlayer = (playerPos - ballPos).Unit
+    local movement = (ballPos - lastPos).Unit
+    return toPlayer:Dot(movement) > 0.05
 end
 
 --//========================================================================================================
---// MAIN GAME LOOP (Optimized with WindUI updates)
+--// CORE FUNCTIONS (Safe Zone Teleport)
 --//========================================================================================================
+local function GetHRP()
+    local char = LP.Character or LP.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart")
+end
 
--- Initialize zone sphere
-CreateZoneSphere()
+local function DistanceToZone()
+    return (GetHRP().Position - TP_ZonePos).Magnitude
+end
 
--- Keybinds setup
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
+local function NearZone()
+    return DistanceToZone() < 10
+end
+
+local function InArena()
+    return DistanceToZone() > 80
+end
+
+local function DetectIntermission()
+    for _, obj in ipairs(LP.PlayerGui:GetDescendants()) do
+        if obj:IsA("TextLabel") and string.find(string.upper(obj.Text or ""), "INTERMISSION") then
+            return true
+        end
+    end
+    return false
+end
+
+local function TeleportToZone()
+    pcall(function()
+        local hrp = GetHRP()
+        hrp.CFrame = CFrame.new(TP_ZonePos + Vector3.new(0, TP_YOffset, 0))
+        hrp.Anchored = true
+        RunService.Heartbeat:Wait()
+        RunService.Heartbeat:Wait()
+        hrp.Anchored = false
+        TP_LastJoinTime = os.clock()
+    end)
+end
+
+-- Detect arena joins (large position changes)
+RunService.Heartbeat:Connect(function()
+    if not LP.Character then return end
+    local hrp = LP.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
     
-    if input.KeyCode == Enum.KeyCode.K then
-        Window:SetVisible(not Window.Visible)
-    elseif input.KeyCode == Enum.KeyCode.E then
-        AutoClickerEnabled = not AutoClickerEnabled
-        -- No UI update needed - WindUI toggle handles state
-    elseif input.KeyCode == Enum.KeyCode.F then
-        Parry()
+    if TP_LastPos then
+        if (hrp.Position - TP_LastPos).Magnitude > 60 then
+            TP_LastJoinTime = os.clock()
+        end
+    end
+    TP_LastPos = hrp.Position
+end)
+
+-- Main TP loop
+task.spawn(function()
+    while task.wait(TP_CheckInterval) do
+        if not TP_Enabled then continue end
+        if not LP.Character then continue end
+        
+        -- Skip if in arena
+        if InArena() then continue end
+        
+        -- Skip if recently joined
+        if os.clock() - TP_LastJoinTime < TP_PostJoinCooldown then continue end
+        
+        -- Teleport during intermission
+        if DetectIntermission() and not NearZone() then
+            task.wait(TP_IntermissionDelay)
+            TeleportToZone()
+            WindUI:Notify({
+                Title = "NoHub",
+                Content = "✅ Teleported to safe zone!",
+                Duration = 2
+            })
+        end
     end
 end)
 
--- Main optimized loop
+--//========================================================================================================
+--// MAIN GAME LOOP (Ball Tracking)
+--//========================================================================================================
+CreateZoneSphere()
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.K then Window:SetVisible(not Window.Visible)
+    elseif input.KeyCode == Enum.KeyCode.E then AutoClickerEnabled = not AutoClickerEnabled
+    elseif input.KeyCode == Enum.KeyCode.F then Parry() end
+end)
+
 RunService.Heartbeat:Connect(function()
     UpdateZoneSphere()
+    UltraAutoClicker()
     
-    if AutoClickerEnabled then
-        UltraAutoClicker()
-    end
-    
-    -- Ball detection logic (preserved)
+    -- Ball detection
     if not BallShadow then
-        BallShadow = game.Workspace:FindFirstChild("FX") and game.Workspace.FX:FindFirstChild("BallShadow")
+        BallShadow = workspace:FindFirstChild("FX") and workspace.FX:FindFirstChild("BallShadow")
     end
-    
     if not RealBall then
         RealBall = workspace:FindFirstChild("Ball") or workspace:FindFirstChild("Part")
     end
     
-    if BallShadow then
-        if not LastBallPos then
-            LastBallPos = BallShadow.Position
-            StatusDisplay:Set("Ball detected")
-        end
-    else
-        if StatusDisplay.Set then
-            StatusDisplay:Set("Searching for ball...")
-        end
-    end
-    
-    if BallShadow and (not BallShadow.Parent) then
-        BallShadow = nil
-        RealBall = nil
-        BallVelocityHistory = {}
-        if StatusDisplay.Set then
-            StatusDisplay:Set("Ball removed - resetting")
-        end
-    end
-    
     if BallShadow and LP.Character and LP.Character.PrimaryPart then
-        local BallPos = BallShadow.Position
-        local PlayerPos = LP.Character.PrimaryPart.Position
+        local bp = BallShadow.Position
+        local pp = LP.Character.PrimaryPart.Position
         
-        if not LastBallPos then 
-            LastBallPos = BallPos 
-        end
-
-        -- Physics calculations (preserved)
-        local currentVelocity = (BallPos - LastBallPos) / 0.016667
-        UpdateVelocityHistory(currentVelocity)
-        local avgVelocity = GetAverageVelocity()
-        local predictedPos = PredictBallPosition(BallPos, avgVelocity, PredictionFrames)
+        if not LastBallPos then LastBallPos = bp end
         
-        local currentShadowSize = BallShadow.Size.X
-        local ballHeight = CalculateBallHeight(currentShadowSize)
-        local ballPosY = BallPos.Y + ballHeight
+        -- Physics calculations
+        local vel = (bp - LastBallPos) / 0.016667
+        UpdateVelocityHistory(vel)
+        local avgVel = GetAverageVelocity()
+        local predPos = PredictBallPosition(bp, avgVel, PredictionFrames)
         
-        local moveDir = (LastBallPos - BallPos)
-        local horizontalSpeed = Vector3.new(moveDir.X, 0, moveDir.Z).Magnitude
-        local speedStuds = (horizontalSpeed + 0.25) * SpeedMulty
+        local shadowSize = BallShadow.Size.X
+        local height = CalculateBallHeight(shadowSize)
+        local bY = bp.Y + height
+        local hSpeed = Vector3.new((LastBallPos.X - bp.X), 0, (LastBallPos.Z - bp.Z)).Magnitude
+        local speed = (hSpeed + 0.25) * SpeedMulty
+        local hDist = (Vector3.new(pp.X, 0, pp.Z) - Vector3.new(bp.X, 0, bp.Z)).Magnitude
+        local predDist = (Vector3.new(pp.X, 0, pp.Z) - Vector3.new(predPos.X, 0, predPos.Z)).Magnitude
+        local vDist = bY - pp.Y
+        local color = GetBallColor()
+        local isWhite = color == WhiteColor
+        local maxH = GetMaxHeightBySpeed(speed)
+        local coming = IsBallComingTowardsPlayer(bp, LastBallPos, pp)
+        local optDist = CalculateOptimalParryDistance(speed, hDist, height, pp.Y, bY)
         
-        local horizontalDistance = (Vector3.new(PlayerPos.X, 0, PlayerPos.Z) - Vector3.new(BallPos.X, 0, BallPos.Z)).Magnitude
-        local predictedDistance = (Vector3.new(PlayerPos.X, 0, PlayerPos.Z) - Vector3.new(predictedPos.X, 0, predictedPos.Z)).Magnitude
-        local verticalDistance = ballPosY - PlayerPos.Y
-        
-        local ballColor = GetBallColor()
-        local isBallWhite = ballColor == WhiteColor
-        local maxHeight = GetMaxHeightBySpeed(speedStuds)
-        local isComingTowardsPlayer = IsBallComingTowardsPlayer(BallPos, LastBallPos, PlayerPos)
-        local optimalDistance = CalculateOptimalParryDistance(speedStuds, horizontalDistance, ballHeight, PlayerPos.Y, ballPosY)
-        
-        -- Update UI stats (using :Set() for real-time updates)
-        if tick() % 0.1 < 0.016 then
-            if CoordinatesDisplay.Set then
-                CoordinatesDisplay:Set(string.format("X: %.1f | Y: %.1f | Z: %.1f\nSpeed: %.1f | Height: %.1f\nPredicted Dist: %.1f", 
-                    BallPos.X, ballPosY, BallPos.Z, speedStuds, ballHeight, predictedDistance))
-            end
+        -- Update UI stats
+        if tick() % 0.1 < 0.016 and CoordinatesDisplay.Set then
+            CoordinatesDisplay:Set(string.format("X: %.1f | Y: %.1f | Z: %.1f\nSpeed: %.1f | Height: %.1f\nDist: %.1f", 
+                bp.X, bY, bp.Z, speed, height, hDist))
         end
         
-        -- Status updates with proper branding
-        if isBallWhite then
-            if StatusDisplay.Set then
-                StatusDisplay:Set("White ball - Safe mode")
-                PredictionLabel:Set("⚪ Safe Mode (White Ball)")
-            end
-        elseif verticalDistance > maxHeight then
-            if StatusDisplay.Set then
-                StatusDisplay:Set("Ball too high - ignoring")
-                PredictionLabel:Set("⚠️ Too High - Ignoring")
-            end
-        else
-            if StatusDisplay.Set then
-                StatusDisplay:Set("⚡ Tracking & Predicting")
-                PredictionLabel:Set("⚡ Optimized Mode Active")
+        -- Status updates
+        if StatusDisplay.Set then
+            if isWhite then
+                StatusDisplay:Set("⚪ White projectile - Ignoring")
+            elseif vDist > maxH then
+                StatusDisplay:Set("⚠️ Too high - Ignoring")
+            else
+                StatusDisplay:Set("⚡ Tracking active")
             end
         end
         
-        -- Optimized auto parry with prediction (preserved logic)
-        if AutoParryEnabled then
-            local shouldParryNow = (predictedDistance <= optimalDistance or horizontalDistance <= optimalDistance * 0.8)
-                and isComingTowardsPlayer 
-                and verticalDistance <= maxHeight
-                and not isBallWhite
-                and not IsParrying
-            
-            if shouldParryNow then
-                Parry()
-            end
+        -- Auto parry logic
+        if AutoParryEnabled and not isWhite and vDist <= maxH and coming and not IsParrying then
+            local shouldParry = (predDist <= optDist or hDist <= optDist * 0.8)
+            if shouldParry then Parry() end
         end
         
-        LastBallPos = BallPos
+        LastBallPos = bp
+    elseif StatusDisplay.Set then
+        StatusDisplay:Set("System: Idle")
     end
 end)
 
 --//========================================================================================================
 --// FINAL SETUP & MOBILE OPTIMIZATION
 --//========================================================================================================
-
--- Set default toggle key (RightShift)
 Window:SetToggleKey(Enum.KeyCode.RightShift)
 
--- Mobile optimization: Scale UI for small screens
 if UserInputService:GetPlatform() == Enum.Platform.Mobile then
     Window:SetUIScale(0.85)
-    -- Ensure open button is large enough for touch
-    Window.OpenButton.Size = UDim2.new(0, 120, 0, 50)
+    if Window.OpenButton then
+        Window.OpenButton.Size = UDim2.new(0, 120, 0, 50)
+    end
 end
 
--- Override notify to always include NoHub branding
+-- Enforce NoHub branding on all notifications
 WindUI._originalNotify = WindUI.Notify
 WindUI.Notify = function(self, params)
     params.Title = params.Title and "NoHub • " .. params.Title or "NoHub"
     return WindUI._originalNotify(self, params)
 end
 
--- Final notification with mandatory branding
 task.wait(1)
 WindUI:Notify({
     Title = "NoHub",
-    Content = "Death Ball Pro fully operational!\nPress 'K' to toggle UI",
-    Icon = "target",
+    Content = "NoHub By Noctyra fully operational!\n⚡ Press RIGHT SHIFT to toggle UI",
+    Icon = "cube",
     Duration = 5
 })
 
-warn("NoHub By Noctyra - Death Ball Pro initialized successfully (Mobile & PC Optimized)")
+warn("NoHub By Noctyra initialized successfully (Mobile & PC Optimized)")
