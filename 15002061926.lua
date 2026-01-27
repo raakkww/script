@@ -1,10 +1,4 @@
---//========================================================================================================
---// NoHub By Noctyra - Universal Auto Features (WindUI)
---// Credits: NoHub - Noctyra | WindUI by Footagesus
---// Mobile & PC Optimized | Zero Original Names Preserved
---//========================================================================================================
 
--- Safety check for LocalPlayer
 if not game:GetService("Players").LocalPlayer then
     warn("NoHub: LocalPlayer not found - aborting initialization")
     return
