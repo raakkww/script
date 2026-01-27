@@ -1,4 +1,3 @@
--- ⚠️ WARNING: DO NOT EDIT | Owner: 6day13
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
@@ -543,35 +542,42 @@ cooldownLabel.Text = "Ready"
 cooldownLabel.Parent = CooldownFrame
 
 -- Drag support untuk mobile
-local dragging, dragStart, startPos
+-- Drag support untuk mobile
+local dragging, dragInput, dragStart, startPos
+
+local function updateInput(input)
+    local delta = input.Position - dragStart
+    CooldownFrame.Position = UDim2.new(
+        startPos.X.Scale, startPos.X.Offset + delta.X,
+        startPos.Y.Scale, startPos.Y.Offset + delta.Y
+    )
+end
+
 CooldownFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
+        dragInput = input
         dragStart = input.Position
         startPos = CooldownFrame.Position
+        
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                dragInput = nil
+            end
         end)
     end
 end)
 
 CooldownFrame.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        CooldownFrame.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
+    if dragging and input == dragInput then
+        updateInput(input)
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and input == dragStart then
-        local delta = input.Position - dragStart
-        CooldownFrame.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
+    if dragging and input == dragInput then
+        updateInput(input)
     end
 end)
 
@@ -682,7 +688,7 @@ tabSkills:Dropdown({
     Value = selectedSkill1,
     Callback = function(opt)
         selectedSkill1 = opt
-        skillParagraph.Desc = "Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2
+        skillParagraph:Set({Desc = "Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
     end
 })
 
@@ -693,7 +699,7 @@ tabSkills:Dropdown({
     Value = selectedSkill2,
     Callback = function(opt)
         selectedSkill2 = opt
-        skillParagraph.Desc = "Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2
+        skillParagraph:Set({Desc = "Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
     end
 })
 
@@ -722,7 +728,8 @@ local function makeDraggable(frame, skillName)
         local delta = input.Position - dragStart
         frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
     end
-    frame.InputBegan:Connect(function(input)
+    
+    local function onInputBegan(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
@@ -735,12 +742,24 @@ local function makeDraggable(frame, skillName)
                 end
             end)
         end
-    end)
-    frame.InputChanged:Connect(function(input)
+    end
+    
+    local function onInputChanged(input)
         if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
             update(input)
         end
-    end)
+    end
+
+    frame.InputBegan:Connect(onInputBegan)
+    frame.InputChanged:Connect(onInputChanged)
+    
+    -- Connect to descendants for better touch/click handling
+    for _, child in ipairs(frame:GetDescendants()) do
+        if child:IsA("GuiObject") then
+            child.InputBegan:Connect(onInputBegan)
+            child.InputChanged:Connect(onInputChanged)
+        end
+    end
 end
 
 local function createSkillButton(skillName)
@@ -1206,7 +1225,10 @@ local function handleProximityPrompt(prompt)
     end
 end
 
-local otherFolder = Workspace:WaitForChild("GameAssets", 5) and Workspace.GameAssets:WaitForChild("Teams", 5) and Workspace.GameAssets.Teams:WaitForChild("Other", 5)
+local ga = Workspace:WaitForChild("GameAssets", 5)
+local teams = ga and ga:WaitForChild("Teams", 5)
+local otherFolder = teams and teams:WaitForChild("Other", 5)
+
 if otherFolder then
     for _, obj in pairs(otherFolder:GetDescendants()) do handleProximityPrompt(obj) end
     mainConns.workspaceDescendant = otherFolder.DescendantAdded:Connect(handleProximityPrompt)
