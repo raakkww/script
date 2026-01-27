@@ -1,9 +1,3 @@
-
-if not game:GetService("Players").LocalPlayer then
-    warn("NoHub: LocalPlayer not found - aborting initialization")
-    return
-end
-
 -- Load WindUI library (mobile/PC compatible)
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
