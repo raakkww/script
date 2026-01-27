@@ -1,71 +1,21 @@
--- NoHub by Noctyra | WindUI Edition
--- Credits: NoHub - Noctyra
-
-local RunService = game:GetService("RunService")
+--  PART 1: Load Rayfield + ESP + Speed Settings + Auto Block
+local _ = string.char(87,65,82,78,73,78,71,58,32,68,79,32,78,79,84,32,69,68,73,84,10,79,119,110,101,114,58,32,54,100,97,121,49,51)
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local lp = Players.LocalPlayer or Players.PlayerAdded:Wait()
-local UserInputService = game:GetService("UserInputService")
 
 connections = connections or {}
 mainConns = mainConns or {}
 unloaded = false
 
---// WindUI Loader //--
-local cloneref = (cloneref or clonereference or function(instance) return instance end)
-local WindUI
+local useAbilityRF = nil
+pcall(function()
+    useAbilityRF = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
+end)
 
-do
-    local ok, result = pcall(function()
-        return require("./src/Init")
-    end)
-    
-    if ok then
-        WindUI = result
-    else 
-        if cloneref(game:GetService("RunService")):IsStudio() then
-            WindUI = require(cloneref(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init")))
-        else
-            WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
-        end
-    end
-end
-
---// Main Window //--
-local Window = WindUI:CreateWindow({
-    Title = "NoHub by Noctyra",
-    Folder = "nohub_config",
-    Icon = "solar:folder-2-bold-duotone",
-    HideSearchBar = false,
-    OpenButton = {
-        Title = "Open NoHub UI",
-        CornerRadius = UDim.new(1,0),
-        StrokeThickness = 3,
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false,
-        Scale = 0.5,
-        Color = ColorSequence.new(
-            Color3.fromHex("#30FF6A"), 
-            Color3.fromHex("#e7ff2f")
-        )
-    },
-    Topbar = {
-        Height = 44,
-        ButtonsType = "Mac",
-    },
-})
-
-Window:Tag({
-    Title = "v1.0",
-    Icon = "github",
-    Color = Color3.fromHex("#1c1c1c"),
-    Border = true,
-})
-
---// ESP Setup //--
 local Storage = CoreGui:FindFirstChild("Highlight_Storage") or Instance.new("Folder")
 Storage.Name = "Highlight_Storage"
 Storage.Parent = CoreGui
@@ -75,10 +25,39 @@ local espConfigs = {
     Killer   = {Enabled=true, Name=true, HP=true, Fill=true, Outline=true, FillColor=Color3.fromRGB(255,0,0),   OutlineColor=Color3.fromRGB(255,0,0),   FillTransparency=0.5, OutlineTransparency=0},
     Ghost    = {Enabled=true, Name=true, HP=true, Fill=true, Outline=true, FillColor=Color3.fromRGB(0,255,255), OutlineColor=Color3.fromRGB(0,255,255), FillTransparency=0.5, OutlineTransparency=0},
 }
-
 local DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 local TextStrokeColor = Color3.fromRGB(0,0,0)
 
+local oldGui = CoreGui:FindFirstChild("Rayfield")
+if oldGui then pcall(function() oldGui:Destroy() end) end
+
+local function makeFallbackRayfield()
+    local DummyParagraph = { Set=function() end }
+    local DummyTab = {
+        CreateToggle=function() end, CreateSlider=function() end, CreateButton=function() end,
+        CreateParagraph=function() return DummyParagraph end, CreateDropdown=function() end,
+        CreateInput=function() end, CreateColorPicker=function() end,
+    }
+    return { CreateWindow=function() return { CreateTab=function() return DummyTab end } end }
+end
+
+local Rayfield
+do
+    local ok, lib = pcall(function()
+        return loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+    end)
+    Rayfield = (ok and lib and lib.CreateWindow) and lib or makeFallbackRayfield()
+    if Rayfield.Notify then Rayfield.Notify = function() end end
+end
+
+local Window = Rayfield:CreateWindow({
+    Name = "Die Of Nigga",
+    LoadingTitle = "Loading..",
+    LoadingSubtitle = "by Badware",
+    ConfigurationSaving = {Enabled = false}
+})
+
+-- ========== ESP ==========
 local function createLabel(name,parent,posY)
     local label = Instance.new("TextLabel")
     label.Name = name
@@ -107,7 +86,7 @@ local function setupHealthDisplay(plr, humanoid, healthLabel)
             healthLabel.Visible = false
         end
     end
-    update()
+    update()  -- Gọi lần đầu
     connections[plr] = connections[plr] or {}
     if connections[plr].HealthChanged then
         pcall(function() connections[plr].HealthChanged:Disconnect() end)
@@ -124,6 +103,7 @@ local function updateESPConfig(plr)
     local team = char.Parent and char.Parent.Name
     local cfg = espConfigs[team]
     if not cfg or not humanoid then return end
+
     if highlight then
         highlight.Enabled = cfg.Enabled
         highlight.FillColor = cfg.FillColor
@@ -134,13 +114,14 @@ local function updateESPConfig(plr)
     if nametag then
         local nameLabel = nametag:FindFirstChild("PlayerName")
         local healthLabel = nametag:FindFirstChild("HealthLabel")
-        if nameLabel then
+        if nameLabel then 
             nameLabel.Visible = cfg.Enabled and cfg.Name
             nameLabel.TextColor3 = cfg.FillColor
-            nameLabel.Text = plr.Name
+            nameLabel.Text = plr.Name  -- Set name nếu chưa có
         end
-        if healthLabel then
+        if healthLabel then 
             healthLabel.Visible = cfg.Enabled and cfg.HP
+            -- Health sẽ update qua event riêng
         end
     end
 end
@@ -163,13 +144,19 @@ local function createOrUpdateESP(plr, char)
     local team = char.Parent and char.Parent.Name
     local cfg = espConfigs[team]
     if not cfg or not humanoid then return end
+
+    -- Cleanup trước nếu có ESP cũ
     cleanupESP(plr)
+
+    -- Tạo mới
     local highlight = Instance.new("Highlight")
     highlight.Name = plr.Name.."_Highlight"
     highlight.DepthMode = DepthMode
     highlight.Adornee = char
     highlight.Parent = Storage
+
     if not hrp then return end
+
     local nametag = Instance.new("BillboardGui")
     nametag.Name = plr.Name.."_Nametag"
     nametag.Size = UDim2.new(0,120,0,40)
@@ -180,11 +167,19 @@ local function createOrUpdateESP(plr, char)
     local nameLabel = createLabel("PlayerName", nametag, 0)
     nameLabel.Text = plr.Name
     local healthLabel = createLabel("HealthLabel", nametag, 0.5)
+
+    -- Update config
     updateESPConfig(plr)
+
+    -- Setup health
     setupHealthDisplay(plr, humanoid, healthLabel)
+
+    -- Thêm connection cho Died để cleanup
     connections[plr].Died = humanoid.Died:Connect(function()
         cleanupESP(plr)
     end)
+
+    -- Thêm connection cho CharacterRemoving (nếu character destroyed)
     connections[plr].CharacterRemoving = plr.CharacterRemoving:Connect(function()
         cleanupESP(plr)
     end)
@@ -216,6 +211,7 @@ mainConns.playersAdded = Players.PlayerAdded:Connect(onPlayerAdded)
 mainConns.playersRemoving = Players.PlayerRemoving:Connect(onPlayerRemoving)
 for _,v in ipairs(Players:GetPlayers()) do onPlayerAdded(v) end
 
+-- UI với callbacks update ESP
 local function updateAllESP()
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= lp then updateESPConfig(plr) end
@@ -223,102 +219,90 @@ local function updateAllESP()
 end
 
 for teamName, cfg in pairs(espConfigs) do
-    local tab = Window:Tab({
-        Title = teamName .. " ESP",
-        Icon = "solar:info-square-bold",
-        IconColor = teamName == "Survivor" and Color3.fromRGB(0,255,0) or 
-                   (teamName == "Killer" and Color3.fromRGB(255,0,0) or Color3.fromRGB(0,255,255)),
-        Border = true,
-    })
-    
-    tab:Toggle({
-        Title = "Enable ESP",
-        Value = cfg.Enabled,
-        Callback = function(v)
-            cfg.Enabled = v
+    local tab = Window:CreateTab(teamName.." ESP", 4483362458)
+    tab:CreateToggle({
+        Name="Enable ESP", 
+        CurrentValue=cfg.Enabled, 
+        Callback=function(v) 
+            cfg.Enabled = v 
             updateAllESP()
         end
     })
-    
-    tab:Toggle({
-        Title = "Show Name",
-        Value = cfg.Name,
-        Callback = function(v)
-            cfg.Name = v
+    tab:CreateToggle({
+        Name="Show Name", 
+        CurrentValue=cfg.Name, 
+        Callback=function(v) 
+            cfg.Name = v 
             updateAllESP()
         end
     })
-    
-    tab:Toggle({
-        Title = "Show HP",
-        Value = cfg.HP,
-        Callback = function(v)
-            cfg.HP = v
+    tab:CreateToggle({
+        Name="Show HP", 
+        CurrentValue=cfg.HP, 
+        Callback=function(v) 
+            cfg.HP = v 
             updateAllESP()
         end
     })
-    
-    tab:Toggle({
-        Title = "Show Fill",
-        Value = cfg.Fill,
-        Callback = function(v)
-            cfg.Fill = v
+    tab:CreateToggle({
+        Name="Show Fill", 
+        CurrentValue=cfg.Fill, 
+        Callback=function(v) 
+            cfg.Fill = v 
             updateAllESP()
         end
     })
-    
-    tab:Colorpicker({
-        Title = "Fill Color",
-        Default = cfg.FillColor,
-        Callback = function(c)
-            cfg.FillColor = c
+    tab:CreateColorPicker({
+        Name="Fill Color", 
+        Color=cfg.FillColor, 
+        Callback=function(c) 
+            cfg.FillColor = c 
             updateAllESP()
         end
     })
-    
-    tab:Slider({
-        Title = "Fill Transparency",
-        Value = { Min = 0, Max = 1, Default = cfg.FillTransparency },
-        Step = 0.05,
-        Callback = function(v)
-            cfg.FillTransparency = v
+    tab:CreateSlider({
+        Name="Fill Transparency", 
+        Range={0,1}, 
+        Increment=0.05, 
+        CurrentValue=cfg.FillTransparency, 
+        Callback=function(v) 
+            cfg.FillTransparency = v 
             updateAllESP()
         end
     })
-    
-    tab:Toggle({
-        Title = "Show Outline",
-        Value = cfg.Outline,
-        Callback = function(v)
-            cfg.Outline = v
+    tab:CreateToggle({
+        Name="Show Outline", 
+        CurrentValue=cfg.Outline, 
+        Callback=function(v) 
+            cfg.Outline = v 
             updateAllESP()
         end
     })
-    
-    tab:Colorpicker({
-        Title = "Outline Color",
-        Default = cfg.OutlineColor,
-        Callback = function(c)
-            cfg.OutlineColor = c
+    tab:CreateColorPicker({
+        Name="Outline Color", 
+        Color=cfg.OutlineColor, 
+        Callback=function(c) 
+            cfg.OutlineColor = c 
             updateAllESP()
         end
     })
-    
-    tab:Slider({
-        Title = "Outline Transparency",
-        Value = { Min = 0, Max = 1, Default = cfg.OutlineTransparency },
-        Step = 0.05,
-        Callback = function(v)
-            cfg.OutlineTransparency = v
+    tab:CreateSlider({
+        Name="Outline Transparency", 
+        Range={0,1}, 
+        Increment=0.05, 
+        CurrentValue=cfg.OutlineTransparency, 
+        Callback=function(v) 
+            cfg.OutlineTransparency = v 
             updateAllESP()
         end
     })
 end
-
---// Mobile ESP Fix //--
+-- ========== Auto-Detect & Fix ESP (Mobile Resume Fix) ==========
+local UserInputService = game:GetService("UserInputService")
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
 local lastEspCheck = 0
-local ESP_CHECK_INTERVAL = 3
+local ESP_CHECK_INTERVAL = 3  -- 3 giây (thấp lag)
 
 task.spawn(function()
     while not unloaded do
@@ -328,34 +312,47 @@ task.spawn(function()
             continue
         end
         lastEspCheck = now
+        
+        -- Chỉ poll trên mobile hoặc nếu enabled
         if not isMobile then task.wait(ESP_CHECK_INTERVAL); continue end
+        
+        -- Scan và fix ESP mismatch
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr == lp or not plr.Character then continue end
             local char = plr.Character
             local team = char.Parent and char.Parent.Name
             local cfg = espConfigs[team]
             if not cfg or not cfg.Enabled then continue end
+            
+            -- Check Highlight
             local highlight = Storage:FindFirstChild(plr.Name.."_Highlight")
-            local nametag = Storage:FindFirstChild(plr.Name.."_Nametag")
             if highlight and not highlight.Enabled then
-                updateESPConfig(plr)
+                updateESPConfig(plr)  -- Fix properties
+                print("[ESP Fix] Re-enabled Highlight for " .. plr.Name)
             end
+            
+            -- Check Nametag
+            local nametag = Storage:FindFirstChild(plr.Name.."_Nametag")
             if nametag then
                 local nameLabel = nametag:FindFirstChild("PlayerName")
                 local healthLabel = nametag:FindFirstChild("HealthLabel")
                 if (cfg.Name and nameLabel and not nameLabel.Visible) or (cfg.HP and healthLabel and not healthLabel.Visible) then
-                    updateESPConfig(plr)
+                    updateESPConfig(plr)  -- Fix visible
+                    print("[ESP Fix] Re-showed labels for " .. plr.Name)
                 end
             end
+            
+            -- Nếu object mất hẳn, recreate
             if not highlight and not nametag then
                 createOrUpdateESP(plr, char)
+                print("[ESP Fix] Recreated ESP for " .. plr.Name)
             end
         end
+        
         task.wait(ESP_CHECK_INTERVAL)
     end
 end)
-
---// Speed Settings //--
+-- ========== Speed Settings (Optimized) ==========
 local character = lp.Character or lp.CharacterAdded:Wait()
 if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed", 10) end
 if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed", 27) end
@@ -364,14 +361,18 @@ local walkSpeedValue = character:GetAttribute("WalkSpeed") or 10
 local sprintSpeedValue = character:GetAttribute("SprintSpeed") or 27
 local walkSpeedEnabled = false
 local sprintEnabled = false
+
+-- Cache cho current values để tránh set thừa
 local currentWalkSpeed = walkSpeedValue
 local currentSprintSpeed = sprintSpeedValue
-local speedConnection = nil
+
+local speedConnection = nil  -- Để disconnect khi off
 
 local function updateSpeeds()
     if unloaded or not character then return end
     local currentWS = character:GetAttribute("WalkSpeed") or 10
     local currentSS = character:GetAttribute("SprintSpeed") or 27
+    
     if walkSpeedEnabled and currentWS ~= walkSpeedValue then
         character:SetAttribute("WalkSpeed", walkSpeedValue)
         currentWalkSpeed = walkSpeedValue
@@ -384,7 +385,7 @@ end
 
 local function startSpeedLoop()
     if speedConnection then speedConnection:Disconnect() end
-    speedConnection = RunService.Heartbeat:Connect(updateSpeeds)
+    speedConnection = RunService.Heartbeat:Connect(updateSpeeds)  -- Heartbeat thay vì RenderStepped
 end
 
 local function stopSpeedLoop()
@@ -394,158 +395,212 @@ local function stopSpeedLoop()
     end
 end
 
-local tabSpeed = Window:Tab({
-    Title = "Speed Settings",
-    Icon = "solar:square-transfer-horizontal-bold",
-    IconColor = Color3.fromRGB(37, 122, 247),
-    Border = true,
-})
-
-tabSpeed:Slider({
-    Title = "WalkSpeed",
-    Value = { Min = 8, Max = 200, Default = walkSpeedValue },
-    Step = 1,
-    Callback = function(val)
-        walkSpeedValue = val
-        if walkSpeedEnabled then updateSpeeds() end
+local tabSpeed = Window:CreateTab("Speed Settings", 4483362458)
+tabSpeed:CreateSlider({
+    Name="WalkSpeed", 
+    Range={8,200}, 
+    Increment=1, 
+    CurrentValue=walkSpeedValue, 
+    Callback=function(val) 
+        walkSpeedValue = val 
+        if walkSpeedEnabled then updateSpeeds() end  -- Update ngay nếu đang on
     end
 })
-
-tabSpeed:Toggle({
-    Title = "Enable WalkSpeed",
-    Value = walkSpeedEnabled,
-    Callback = function(v)
+tabSpeed:CreateToggle({
+    Name="Enable WalkSpeed", 
+    CurrentValue=walkSpeedEnabled, 
+    Callback=function(v) 
         walkSpeedEnabled = v
-        if v then
+        if v then 
             startSpeedLoop()
-            updateSpeeds()
-        else
+            updateSpeeds()  -- Set ngay
+        else 
             if character then character:SetAttribute("WalkSpeed", 10) end
             stopSpeedLoop()
         end
     end
 })
-
-tabSpeed:Slider({
-    Title = "SprintSpeed",
-    Value = { Min = 16, Max = 300, Default = sprintSpeedValue },
-    Step = 1,
-    Callback = function(val)
-        sprintSpeedValue = val
-        if sprintEnabled then updateSpeeds() end
+tabSpeed:CreateSlider({
+    Name="SprintSpeed", 
+    Range={16,300}, 
+    Increment=1, 
+    CurrentValue=sprintSpeedValue, 
+    Callback=function(val) 
+        sprintSpeedValue = val 
+        if sprintEnabled then updateSpeeds() end  -- Update ngay nếu đang on
     end
 })
-
-tabSpeed:Toggle({
-    Title = "Enable Sprint",
-    Value = sprintEnabled,
-    Callback = function(v)
+tabSpeed:CreateToggle({
+    Name="Enable Sprint", 
+    CurrentValue=sprintEnabled, 
+    Callback=function(v) 
         sprintEnabled = v
-        if v then
+        if v then 
             startSpeedLoop()
-            updateSpeeds()
-        else
+            updateSpeeds()  -- Set ngay
+        else 
             if character then character:SetAttribute("SprintSpeed", 27) end
             stopSpeedLoop()
         end
     end
 })
 
+-- Handle CharacterAdded cho speed
 mainConns.charAdded_speed = lp.CharacterAdded:Connect(function(char)
     character = char
-    task.wait(0.5)
+    task.wait(0.5)  -- Đợi load đầy đủ
     if character:GetAttribute("WalkSpeed") == nil then character:SetAttribute("WalkSpeed", walkSpeedValue) end
     if character:GetAttribute("SprintSpeed") == nil then character:SetAttribute("SprintSpeed", sprintSpeedValue) end
     currentWalkSpeed = walkSpeedValue
     currentSprintSpeed = sprintSpeedValue
+    -- Restart loop nếu đang enabled
     if walkSpeedEnabled or sprintEnabled then
         startSpeedLoop()
     end
 end)
 
---// AutoBlock //--
+-- Cleanup khi unload (thêm vào nếu có unload event)
+-- stopSpeedLoop()
+
+--// Auto Block+
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+local lp = Players.LocalPlayer
+
+--// Giáº£ sá» Window Ä‘Ă£ Ä‘Æ°á»£c táº¡o tá»« Rayfield chĂnh
+-- local Window = MainWindow
+
+-- ================= AutoBlock Settings =================
 local BLOCK_DISTANCE = 15
 local watcherEnabled = true
 local Logged = {}
-local badwareState = { active = false, startTime = 0, lastWS = nil }
+
+-- Remote
+local UseAbility = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
+
+-- Killer Configs
+-- khai bĂ¡o biáº¿n tráº¡ng thĂ¡i bĂªn ngoĂ i
+-- Biáº¿n tráº¡ng thĂ¡i riĂªng cho Badware
+local badwareState = {
+    active = false,
+    startTime = 0,
+    lastWS = nil
+}
 
 local KillerConfigs = {
     ["Pursuer"] = {
         enabled = true,
         check = function(_, ws)
             local valid = {4,6,7,8,10,12,14,16,20}
-            for _, v in ipairs(valid) do if ws == v then return true end end
+            for _, v in ipairs(valid) do
+                if ws == v then return true end
+            end
             return false
         end
     },
+
     ["Artful"] = {
         enabled = true,
         check = function(_, ws)
             local valid = {4,7,8,12,16,20,9,13,17,21}
-            for _, v in ipairs(valid) do if ws == v then return true end end
+            for _, v in ipairs(valid) do
+                if ws == v then return true end
+            end
             return false
         end
     },
+
+    
     ["Harken"] = {
-        enabled = true,
-        check = function(playerFolder, ws)
-            local enraged = playerFolder:GetAttribute("Enraged")
-            local seq = enraged and {7.5,10,5,13.5,17.5,21.5,25.5} or {4,8,12,16,20}
-            if playerFolder:GetAttribute("AgitationCooldown") then return true end
-            for _, v in ipairs(seq) do if ws == v then return true end end
+    enabled = true,
+    check = function(playerFolder, ws)
+        local enraged = playerFolder:GetAttribute("Enraged")
+        local seq = enraged and {7.5,10,5,13.5,17.5,21.5,25.5} or {4,8,12,16,20}
+
+        -- Náº¿u AgitationCooldown báºt thĂ¬ block luĂ´n
+        if playerFolder:GetAttribute("AgitationCooldown") then
+            return true
+        end
+
+        for _, v in ipairs(seq) do
+            if ws == v then return true end
+        end
+        return false
+    end
+},
+    ["Badware"] = {
+    enabled = true,
+    check = function(_, ws)
+        local valid = {4,8,12,16,20}
+        local function isValid(val)
+            for _, v in ipairs(valid) do
+                if val == v then return true end
+            end
             return false
         end
-    },
-    ["Badware"] = {
-        enabled = true,
-        check = function(_, ws)
-            local valid = {4,8,12,16,20}
-            local function isValid(val)
-                for _, v in ipairs(valid) do if val == v then return true end end
+
+        local now = tick()
+        if isValid(ws) then
+            -- Náº¿u báº¯t Ä‘áº§u theo dĂµi
+            if not badwareState.active then
+                badwareState.startTime = now
+                badwareState.active = true
+                badwareState.lastWS = ws
+                return false
+            else
+                -- Náº¿u Ä‘á»•i tá»« giĂ¡ trá»‹ há»£p lá»‡ nĂ y sang giĂ¡ trá»‹ há»£p lá»‡ khĂ¡c -> tiáº¿p tá»¥c, khĂ´ng reset
+                badwareState.lastWS = ws
                 return false
             end
-            local now = tick()
-            if isValid(ws) then
-                if not badwareState.active then
-                    badwareState.startTime = now
-                    badwareState.active = true
-                    badwareState.lastWS = ws
-                    return false
+        else
+            -- Náº¿u Ä‘ang active mĂ  bá»‹ tá»¥t ra ngoĂ i dĂ£y há»£p lá»‡
+            if badwareState.active then
+                local duration = now - badwareState.startTime
+                badwareState.active = false
+                badwareState.lastWS = nil
+                badwareState.startTime = nil
+
+                if duration < 0.3 then
+                    return true   -- block vĂ¬ tá»¥t quĂ¡ sá»›m
                 else
-                    badwareState.lastWS = ws
-                    return false
-                end
-            else
-                if badwareState.active then
-                    local duration = now - badwareState.startTime
-                    badwareState.active = false
-                    badwareState.lastWS = nil
-                    badwareState.startTime = nil
-                    if duration < 0.3 then return true else return false end
+                    return false  -- khĂ´ng block vĂ¬ giá»¯ Ä‘á»§ lĂ¢u
                 end
             end
-            return false
         end
-    },
+        return false
+    end
+},
     ["Killdroid"] = {
         enabled = true,
         check = function(_, ws)
             local valid = {-4,0,4,12,16,20}
-            for _, v in ipairs(valid) do if ws == v then return true end end
+            for _, v in ipairs(valid) do
+                if ws == v then return true end
+            end
             return false
         end
     }
 }
+-- Helpers
+local function sendBlock()
+    UseAbility:InvokeServer("Block")
+end
 
-local UseAbility = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteFunctions"):WaitForChild("UseAbility")
-local function sendBlock() UseAbility:InvokeServer("Block") end
-local function getWalkSpeedModifier(killer) return killer:GetAttribute("WalkSpeedModifier") or 0 end
+local function getWalkSpeedModifier(killer)
+    return killer:GetAttribute("WalkSpeedModifier") or 0
+end
+
 local function getDistanceFromPlayer(killer)
     if killer:FindFirstChild("HumanoidRootPart") and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
         return (killer.HumanoidRootPart.Position - lp.Character.HumanoidRootPart.Position).Magnitude
     end
     return math.huge
 end
+
 local function checkAndBlock(killer)
     if not watcherEnabled or not killer then return end
     local ws = getWalkSpeedModifier(killer)
@@ -564,6 +619,7 @@ local function checkAndBlock(killer)
         end
     end
 end
+
 local function monitorKiller(killer)
     if not killer then return end
     checkAndBlock(killer)
@@ -577,24 +633,157 @@ local function monitorKiller(killer)
     end
 end
 
+-- Monitor existing and new killers
 local killersFolder = Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Killer")
 for _, killer in pairs(killersFolder:GetChildren()) do monitorKiller(killer) end
 killersFolder.ChildAdded:Connect(monitorKiller)
+-- UI Toggle (nếu có Window từ Rayfield)
+-- local autoBlockTab = Window:CreateTab("AutoBlock", 4483362458)
+-- autoBlockTab:CreateToggle({Name="Enable AutoBlock", CurrentValue=true, Callback=function(v) watcherEnabled = v end})
+-- autoBlockTab:CreateSlider({Name="Block Distance", Range={5,30}, Increment=1, CurrentValue=BLOCK_DISTANCE, Callback=function(v) BLOCK_DISTANCE = v end})
 
-local tabAutoBlock = Window:Tab({
-    Title = "AutoBlock",
-    Icon = "solar:check-square-bold",
-    IconColor = Color3.fromRGB(16, 197, 80),
-    Border = true,
-})
+-- Global cleanup (thêm vào unloadScript trước)
+-- for killer, _ in pairs(killerPolls) do stopKillerPoll(killer) end
+-- cache = {}; Logged = {}; lastBlockPerKiller = {}      
+-- ================= Cooldown GUI =================
+-- Tạo GUI Cooldown (chỉ 1 lần)
+local CooldownGUI = Instance.new("ScreenGui")
+CooldownGUI.Name = "AutoBlockCooldown"
+CooldownGUI.ResetOnSpawn = false
+CooldownGUI.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 
+local CooldownFrame = Instance.new("Frame")
+CooldownFrame.Size = UDim2.new(0,65,0,25)
+CooldownFrame.Position = UDim2.new(1,-5,0,-50)
+CooldownFrame.AnchorPoint = Vector2.new(1,0)
+CooldownFrame.BackgroundTransparency = 1
+CooldownFrame.Parent = CooldownGUI
+
+local cooldownLabel = Instance.new("TextLabel")
+cooldownLabel.Size = UDim2.new(1,0,1,0)
+cooldownLabel.BackgroundTransparency = 1
+cooldownLabel.TextColor3 = Color3.fromRGB(0,255,0)
+cooldownLabel.Font = Enum.Font.SourceSansBold
+cooldownLabel.TextScaled = true
+cooldownLabel.Text = "Ready"
+cooldownLabel.Parent = CooldownFrame
+
+-- ================= Kéo Thả GUI Cooldown (Ready / On Cooldown) =================
+local UserInputService = game:GetService("UserInputService")
+-- Biến hỗ trợ drag
+local dragging = false
+local dragInput, startPos, frameStart
+
+-- Hàm cập nhật vị trí frame
+local function updatePosition(delta)
+    if frameStart then
+        CooldownFrame.Position = UDim2.new(
+            frameStart.X.Scale,
+            frameStart.X.Offset + delta.X,
+            frameStart.Y.Scale,
+            frameStart.Y.Offset + delta.Y
+        )
+    end
+end
+
+-- Bắt đầu kéo (Mouse hoặc Touch)
+local function inputBegan(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragInput = input
+        startPos = input.Position
+        frameStart = CooldownFrame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                dragInput = nil
+            end
+        end)
+    end
+end
+
+-- Cập nhật khi di chuyển chuột hoặc touch
+local function inputChanged(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - startPos
+        updatePosition(delta)
+    end
+end
+
+-- Kết nối sự kiện
+CooldownFrame.InputBegan:Connect(inputBegan)
+CooldownFrame.InputChanged:Connect(inputChanged)
+UserInputService.InputChanged:Connect(inputChanged)
+
+-- ================= Tích hợp vị trí lưu trữ =================
+CooldownFrame:GetAttributeChangedSignal("Position"):Connect(function()
+    frameStart = CooldownFrame.Position
+end)
+-- ================= Rayfield GUI Tab =================
+local tabAutoBlock = Window:CreateTab("AutoBlock", 4483362458)
+
+-- Delete Block (Animation)
+-- Biến toggle
 local removeAnimEnabled = false
-tabAutoBlock:Toggle({
-    Title = "Delete Block Animation",
-    Value = removeAnimEnabled,
-    Callback = function(v) removeAnimEnabled = v end
+tabAutoBlock:CreateToggle({
+    Name = "Delete Block (Animation)",
+    CurrentValue = removeAnimEnabled,
+    Callback = function(v)
+        removeAnimEnabled = v
+    end
 })
 
+-- Vòng lặp xóa animation (gắn với biến removeAnimEnabled)
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if removeAnimEnabled and lp.Character then
+            local humanoid = lp.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+                    -- Nếu đúng animation ID thì stop
+                    if track.Animation and tostring(track.Animation.AnimationId):match("134233326423882") then
+                        track:Stop()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Show Cooldown toggle
+local showCooldown = true
+tabAutoBlock:CreateToggle({
+    Name = "Show Cooldown",
+    CurrentValue = showCooldown,
+    Callback = function(v)
+        showCooldown = v
+        CooldownGUI.Enabled = v
+    end
+})
+
+-- Killer toggles
+for killerName, cfg in pairs(KillerConfigs) do
+    tabAutoBlock:CreateToggle({
+        Name = "Enable "..killerName,
+        CurrentValue = cfg.enabled,
+        Callback = function(val) cfg.enabled = val end
+    })
+end
+
+-- Block distance slider
+tabAutoBlock:CreateSlider({
+    Name = "Block Distance",
+    Range = {5,50},
+    Increment = 1,
+    CurrentValue = BLOCK_DISTANCE,
+    Callback = function(val) BLOCK_DISTANCE = val end,
+    Suffix = "studs"
+})
+
+-- ================= Loops =================
+-- Delete animation loop
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -611,96 +800,22 @@ task.spawn(function()
     end
 end)
 
-local showCooldown = true
-local CooldownGUI = Instance.new("ScreenGui")
-CooldownGUI.Name = "AutoBlockCooldown"
-CooldownGUI.ResetOnSpawn = false
-CooldownGUI.Parent = lp:WaitForChild("PlayerGui")
-local CooldownFrame = Instance.new("Frame")
-CooldownFrame.Size = UDim2.new(0,65,0,25)
-CooldownFrame.Position = UDim2.new(1,-5,0,-50)
-CooldownFrame.AnchorPoint = Vector2.new(1,0)
-CooldownFrame.BackgroundTransparency = 1
-CooldownFrame.Parent = CooldownGUI
-local cooldownLabel = Instance.new("TextLabel")
-cooldownLabel.Size = UDim2.new(1,0,1,0)
-cooldownLabel.BackgroundTransparency = 1
-cooldownLabel.TextColor3 = Color3.fromRGB(0,255,0)
-cooldownLabel.Font = Enum.Font.SourceSansBold
-cooldownLabel.TextScaled = true
-cooldownLabel.Text = "Ready"
-cooldownLabel.Parent = CooldownFrame
-
-local dragging, dragInput, startPos, frameStart = false, nil, Vector2.new(), nil
-local function updatePosition(delta)
-    if frameStart then
-        CooldownFrame.Position = UDim2.new(
-            frameStart.X.Scale, frameStart.X.Offset + delta.X,
-            frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
-        )
-    end
-end
-CooldownFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragInput = input
-        startPos = input.Position
-        frameStart = CooldownFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-                dragInput = nil
-            end
-        end)
-    end
-end)
-CooldownFrame.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        updatePosition(input.Position - startPos)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        updatePosition(input.Position - startPos)
-    end
-end)
-
-tabAutoBlock:Toggle({
-    Title = "Show Cooldown",
-    Value = showCooldown,
-    Callback = function(v)
-        showCooldown = v
-        CooldownGUI.Enabled = v
-    end
-})
-
-for killerName, cfg in pairs(KillerConfigs) do
-    tabAutoBlock:Toggle({
-        Title = "Enable " .. killerName,
-        Value = cfg.enabled,
-        Callback = function(val) cfg.enabled = val end
-    })
-end
-
-tabAutoBlock:Slider({
-    Title = "Block Distance",
-    Value = { Min = 5, Max = 50, Default = BLOCK_DISTANCE },
-    Step = 1,
-    Callback = function(v) BLOCK_DISTANCE = v end
-})
-
+-- Cooldown check loop
 RunService.Heartbeat:Connect(function()
     local survivorFolder = Workspace:FindFirstChild("GameAssets")
         and Workspace.GameAssets:FindFirstChild("Teams")
         and Workspace.GameAssets.Teams:FindFirstChild("Survivor")
         and Workspace.GameAssets.Teams.Survivor:FindFirstChild(lp.Name)
+
     local killersFolderCheck = Workspace:FindFirstChild("GameAssets")
         and Workspace.GameAssets:FindFirstChild("Teams")
         and Workspace.GameAssets.Teams:FindFirstChild("Killer")
+
     if killersFolderCheck and lp.Name then
         local inKiller = killersFolderCheck:FindFirstChild(lp.Name) ~= nil
         watcherEnabled = not inKiller and (survivorFolder ~= nil)
     end
+
     if survivorFolder then
         local onCD = survivorFolder:GetAttribute("BlockCooldown")
         if onCD then
@@ -713,66 +828,72 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
---// Skills Selector //--
+-- PART 2: Skills & Selector
+-- expects Window, ReplicatedStorage, lp to already exist (tạo ở Part 1)
+local ReplicatedStorage = ReplicatedStorage or game:GetService("ReplicatedStorage")
+local lp = lp or game:GetService("Players").LocalPlayer
+
 local skillList = {"Revolver","Punch","Block","Caretaker","Hotdog","Taunt","Cloak","Dash","Banana","BonusPad","Adrenaline"}
 local selectedSkill1, selectedSkill2 = "Revolver", "Caretaker"
 
-local tabSkills = Window:Tab({
-    Title = "Skills & Selector",
-    Icon = "solar:cursor-square-bold",
-    IconColor = Color3.fromRGB(236, 162, 1),
-    Border = true,
-})
-
-local skillParagraph = tabSkills:Paragraph({
+-- Tab GUI
+local tabSkills = Window:CreateTab("Skills & Selector", 4483362458)
+local skillParagraph = tabSkills:CreateParagraph({
     Title = "Selected Skills",
-    Desc = "Skill 1: " .. selectedSkill1 .. "\nSkill 2: " .. selectedSkill2,
+    Content = "Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2
 })
 
-tabSkills:Dropdown({
-    Title = "Select Skill 1",
-    Values = skillList,
-    Value = selectedSkill1,
+-- Dropdowns
+tabSkills:CreateDropdown({
+    Name = "Select Skill 1",
+    Options = skillList,
+    CurrentOption = {selectedSkill1},
     Callback = function(opt)
-        selectedSkill1 = opt
-        skillParagraph.Desc = "Skill 1: " .. selectedSkill1 .. "\nSkill 2: " .. selectedSkill2
+        selectedSkill1 = opt[1]
+        skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
     end
 })
 
-tabSkills:Dropdown({
-    Title = "Select Skill 2",
-    Values = skillList,
-    Value = selectedSkill2,
+tabSkills:CreateDropdown({
+    Name = "Select Skill 2",
+    Options = skillList,
+    CurrentOption = {selectedSkill2},
     Callback = function(opt)
-        selectedSkill2 = opt
-        skillParagraph.Desc = "Skill 1: " .. selectedSkill1 .. "\nSkill 2: " .. selectedSkill2
+        selectedSkill2 = opt[1]
+        skillParagraph:Set({Content="Skill 1: "..selectedSkill1.."\nSkill 2: "..selectedSkill2})
     end
 })
 
-tabSkills:Button({
-    Title = "Select Skills",
+-- Button to select skills
+tabSkills:CreateButton({
+    Name = "Select Skills",
     Callback = function()
         local abilitySelection = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RemoteEvents"):WaitForChild("AbilitySelection")
         abilitySelection:FireServer({selectedSkill1, selectedSkill2})
     end
 })
 
+-- Skill GUI (draggable buttons)
 local SkillsModule = require(ReplicatedStorage.ClientModules:WaitForChild("AbilityConfig"))
 local guiStorage = lp:FindFirstChild("SkillScreenGui") or Instance.new("ScreenGui")
 guiStorage.Name = "SkillScreenGui"
 guiStorage.ResetOnSpawn = false
 guiStorage.IgnoreGuiInset = true
 guiStorage.Parent = lp:WaitForChild("PlayerGui")
-local buttonConfigs = {}
-local lastUsed = {}
 
+local buttonConfigs = {} -- [skillName] = {size,pos}
+local lastUsed = {}      -- [skillName] = os.clock()
+
+-- Make GUI draggable
 local function makeDraggable(frame, skillName)
     local dragging, dragStart, startPos = false, Vector2.new(), frame.Position
+
     local function update(input)
         local delta = input.Position - dragStart
         frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+delta.X, startPos.Y.Scale, startPos.Y.Offset+delta.Y)
     end
-    frame.InputBegan:Connect(function(input)
+
+    local function onInputBegan(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
@@ -784,37 +905,56 @@ local function makeDraggable(frame, skillName)
                 end
             end)
         end
-    end)
-    frame.InputChanged:Connect(function(input)
+    end
+
+    local function onInputChanged(input)
         if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
             update(input)
         end
-    end)
+    end
+
+    frame.InputBegan:Connect(onInputBegan)
+    frame.InputChanged:Connect(onInputChanged)
+
+    for _, child in ipairs(frame:GetDescendants()) do
+        if child:IsA("GuiObject") then
+            child.InputBegan:Connect(onInputBegan)
+            child.InputChanged:Connect(onInputChanged)
+        end
+    end
 end
 
+-- Create skill button
 local function createSkillButton(skillName)
     local skillData = SkillsModule[skillName]
     if not skillData then return end
+
     local cfg = buttonConfigs[skillName] or {size=46,pos={100,100}}
     buttonConfigs[skillName] = cfg
+
     local old = guiStorage:FindFirstChild(skillName.."_Btn")
     if old then old:Destroy() end
+
+    -- Frame & visuals
     local btnFrame = Instance.new("Frame")
     btnFrame.Name = skillName.."_Btn"
     btnFrame.Size = UDim2.new(0,cfg.size,0,cfg.size)
     btnFrame.Position = UDim2.new(0,cfg.pos[1],0,cfg.pos[2])
     btnFrame.BackgroundTransparency = 1
     btnFrame.Parent = guiStorage
+
     local border = Instance.new("UIStroke")
     border.Thickness = 2
     border.Color = Color3.fromRGB(197,197,197)
     border.Parent = btnFrame
+
     local innerFrame = Instance.new("Frame")
     innerFrame.Size = UDim2.new(1,0,1,0)
     innerFrame.BackgroundColor3 = Color3.fromRGB(0,0,0)
     innerFrame.BackgroundTransparency = 0.5
     innerFrame.BorderSizePixel = 0
     innerFrame.Parent = btnFrame
+
     local icon = Instance.new("ImageLabel")
     icon.Size = UDim2.new(0.9,0,0.9,0)
     icon.Position = UDim2.new(0.5,0,0.5,0)
@@ -823,6 +963,7 @@ local function createSkillButton(skillName)
     icon.Image = skillData.Icon or ""
     icon.ScaleType = Enum.ScaleType.Fit
     icon.Parent = innerFrame
+
     local cooldownOverlay = Instance.new("Frame")
     cooldownOverlay.Size = UDim2.new(1,0,1,0)
     cooldownOverlay.BackgroundColor3 = Color3.fromRGB(0,0,0)
@@ -830,6 +971,7 @@ local function createSkillButton(skillName)
     cooldownOverlay.BorderSizePixel = 0
     cooldownOverlay.Visible = false
     cooldownOverlay.Parent = innerFrame
+
     local cdLabel = Instance.new("TextLabel")
     cdLabel.Size = UDim2.new(1,0,1,0)
     cdLabel.BackgroundTransparency = 1
@@ -838,11 +980,14 @@ local function createSkillButton(skillName)
     cdLabel.Font = Enum.Font.GothamBold
     cdLabel.Visible = false
     cdLabel.Parent = cooldownOverlay
+
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1,0,1,0)
     button.BackgroundTransparency = 1
     button.Text = ""
     button.Parent = innerFrame
+
+    -- Button click
     button.MouseButton1Click:Connect(function()
         local cooldown = tonumber(skillData.Cooldown) or 1
         local now = os.clock()
@@ -852,6 +997,7 @@ local function createSkillButton(skillName)
             pcall(function() remoteFunc:InvokeServer(skillName) end)
             cooldownOverlay.Visible = true
             cdLabel.Visible = true
+
             task.spawn(function()
                 local t = cooldown
                 while t > 0 do
@@ -864,28 +1010,38 @@ local function createSkillButton(skillName)
             end)
         end
     end)
+
     makeDraggable(btnFrame, skillName)
 end
 
+-- Remove skill button
 local function removeSkillButton(skillName)
     local old = guiStorage:FindFirstChild(skillName.."_Btn")
     if old then old:Destroy() end
 end
 
+-- Create toggles + sliders for each skill
 for _, skillName in ipairs(skillList) do
     local enabled = false
-    tabSkills:Toggle({
-        Title = "Enable " .. skillName,
-        Value = false,
+
+    tabSkills:CreateToggle({
+        Name = "Enable "..skillName,
+        CurrentValue = false,
         Callback = function(v)
             enabled = v
-            if v then createSkillButton(skillName) else removeSkillButton(skillName) end
+            if v then
+                createSkillButton(skillName)
+            else
+                removeSkillButton(skillName)
+            end
         end
     })
-    tabSkills:Slider({
-        Title = skillName .. " Size",
-        Value = { Min = 40, Max = 120, Default = 46 },
-        Step = 1,
+
+    tabSkills:CreateSlider({
+        Name = skillName.." Size",
+        Range = {40,120},
+        Increment = 1,
+        CurrentValue = 46,
         Callback = function(val)
             if not buttonConfigs[skillName] then
                 buttonConfigs[skillName] = {size=val,pos={100,100}}
@@ -896,59 +1052,75 @@ for _, skillName in ipairs(skillList) do
         end
     })
 end
+-- PART 3: Gameplay Settings + AntiWalls + Implement Fast Artful (Rayfield GUI + AntiAnim + Other Tab)
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local lp = Players.LocalPlayer
+local Storage = CoreGui:FindFirstChild("Highlight_Storage")
 
---// Gameplay Settings //--
-local tabGameplay = Window:Tab({
-    Title = "Gameplay Settings",
-    Icon = "solar:password-minimalistic-input-bold",
-    IconColor = Color3.fromRGB(119, 117, 242),
-    Border = true,
-})
+-- Khai bĂ¡o máº·c Ä‘á»‹nh trĂ¡nh nil
+mainConns = mainConns or {}
+unloaded = unloaded or false
+connections = connections or {}
 
+-- Tab GUI
+local tabGameplay = Window:CreateTab("Gameplay Settings", 4483362458)
+
+-- ============================
+-- WalkSpeed Modifier Lock
+-- ============================
 local lockWSM = true
-tabGameplay:Toggle({
-    Title = "Lock WalkSpeedModifier",
-    Value = lockWSM,
-    Callback = function(v) lockWSM = v end
+tabGameplay:CreateToggle({
+    Name="Lock WalkSpeedModifier",
+    CurrentValue=lockWSM,
+    Callback=function(v) lockWSM=v end
 })
 
+-- ============================
+-- Stamina Controls
+-- ============================
 local keepStaminaEnabled = true
 local customStamina = 100
 local defaultStamina = ((lp.Character or lp.CharacterAdded:Wait()):GetAttribute("MaxStamina")) or 100
 
-tabGameplay:Toggle({
-    Title = "Enable Custom MaxStamina",
-    Value = keepStaminaEnabled,
-    Callback = function(v)
-        keepStaminaEnabled = v
-        local ch = lp.Character
+tabGameplay:CreateToggle({
+    Name="Enable Custom MaxStamina",
+    CurrentValue=keepStaminaEnabled,
+    Callback=function(v)
+        keepStaminaEnabled=v
+        local ch=lp.Character
         if ch then
             ch:SetAttribute("MaxStamina", v and customStamina or defaultStamina)
         end
     end
 })
 
-tabGameplay:Input({
-    Title = "Custom MaxStamina",
-    Placeholder = "Enter number (0-999999)",
-    Callback = function(text)
+tabGameplay:CreateInput({
+    Name="Custom MaxStamina (0-999999)",
+    PlaceholderText="Nháºp sá»‘...",
+    RemoveTextAfterFocusLost=true,
+    Callback=function(text)
         local num = tonumber(text)
-        if num and num >= 0 and num <= 999999 then
-            customStamina = num
+        if num and num>=0 and num<=999999 then
+            customStamina=num
             if keepStaminaEnabled and lp.Character then
-                lp.Character:SetAttribute("MaxStamina", customStamina)
+                lp.Character:SetAttribute("MaxStamina",customStamina)
             end
         else
-            warn("Invalid value (0-999999)")
+            warn("GiĂ¡ trá»‹ khĂ´ng há»£p lá»‡ (0-999999)")
         end
     end
 })
 
+-- Heartbeat loop WalkSpeed/Stamina
 mainConns.staminaHB = RunService.Heartbeat:Connect(function()
     if unloaded then return end
     local char = lp.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
+
     if lockWSM then
         for _, obj in pairs({hum,char,lp}) do
             if obj and obj.GetAttributes then
@@ -956,29 +1128,33 @@ mainConns.staminaHB = RunService.Heartbeat:Connect(function()
                 if attrs then
                     for name,val in pairs(attrs) do
                         if typeof(name)=="string" and name:lower():find("walkspeedmodifier") then
-                            if val <= 0 then obj:SetAttribute(name, 0) end
+                            if val<=0 then obj:SetAttribute(name,0) end
                         end
                     end
                 end
             end
         end
     end
+
     if keepStaminaEnabled and char then
-        if char:GetAttribute("MaxStamina") ~= customStamina then
-            char:SetAttribute("MaxStamina", customStamina)
+        if char:GetAttribute("MaxStamina")~=customStamina then
+            char:SetAttribute("MaxStamina",customStamina)
         end
     elseif char then
-        if char:GetAttribute("MaxStamina") ~= defaultStamina then
-            char:SetAttribute("MaxStamina", defaultStamina)
+        if char:GetAttribute("MaxStamina")~=defaultStamina then
+            char:SetAttribute("MaxStamina",defaultStamina)
         end
     end
 end)
 
+-- CharacterAdded WalkSpeed/Stamina
 mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
     local hum = char:WaitForChild("Humanoid", 10)
     if not hum then return end
-    if keepStaminaEnabled then char:SetAttribute("MaxStamina", customStamina)
-    else char:SetAttribute("MaxStamina", defaultStamina) end
+
+    if keepStaminaEnabled then char:SetAttribute("MaxStamina",customStamina)
+    else char:SetAttribute("MaxStamina",defaultStamina) end
+
     if lockWSM then
         for _, obj in pairs({hum,char,lp}) do
             if obj and obj.GetAttributes then
@@ -986,7 +1162,7 @@ mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
                 if attrs then
                     for name,val in pairs(attrs) do
                         if typeof(name)=="string" and name:lower():find("walkspeedmodifier") then
-                            if val <= 0 then obj:SetAttribute(name, 0) end
+                            if val<=0 then obj:SetAttribute(name,0) end
                         end
                     end
                 end
@@ -995,11 +1171,14 @@ mainConns.charAdded_gameplay = lp.CharacterAdded:Connect(function(char)
     end
 end)
 
+-- ============================
+-- AntiWalls
+-- ============================
 local AntiWalls = false
-tabGameplay:Toggle({
-    Title = "Anti-Artful Walls",
-    Value = AntiWalls,
-    Callback = function(v) AntiWalls = v end
+tabGameplay:CreateToggle({
+    Name="Anti-Artful Walls",
+    CurrentValue=AntiWalls,
+    Callback=function(v) AntiWalls=v end
 })
 
 local function HandleWallPart(part)
@@ -1029,8 +1208,11 @@ otherTeamFolder.DescendantAdded:Connect(function(desc)
     if AntiWalls then HandleWallPart(desc) end
 end)
 
-getgenv().ImplementEnabled = false
-local canTrigger = true
+-- ============================
+-- Implement Fast Artful
+-- ============================
+getgenv().ImplementEnabled=false
+local canTrigger=true
 
 local function getKillerFolder()
     local ga = Workspace:FindFirstChild("GameAssets")
@@ -1043,16 +1225,16 @@ end
 local function HoldImpl_isKiller()
     local kf = getKillerFolder()
     if not kf then return false end
-    return kf:FindFirstChild(lp.Name) ~= nil
+    return kf:FindFirstChild(lp.Name)~=nil
 end
 
-local function HoldImpl_holdInAir(duration, offsetY)
+local function HoldImpl_holdInAir(duration,offsetY)
     local char = lp.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp or not hrp.Parent then return end
     local bp = Instance.new("BodyPosition")
-    bp.Position = hrp.Position + Vector3.new(0, offsetY, 0)
-    bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bp.Position = hrp.Position + Vector3.new(0,offsetY,0)
+    bp.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
     bp.P = 100000
     bp.D = 1000
     bp.Parent = hrp
@@ -1068,162 +1250,183 @@ local function HoldImpl_CheckAttributes()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not char or not hrp then return end
     if not HoldImpl_isKiller() then return end
+
     local killerName = char:GetAttribute("KillerName")
     local implementCooldown = char:GetAttribute("ImplementCooldown")
+
     if killerName=="Artful" and canTrigger and (implementCooldown==true or (type(implementCooldown)=="number" and implementCooldown>0)) then
-        HoldImpl_holdInAir(2, 2.5)
-        canTrigger = false
+        HoldImpl_holdInAir(2,2.5)
+        canTrigger=false
     end
-    if implementCooldown==false or implementCooldown==0 then canTrigger = true end
+
+    if implementCooldown==false or implementCooldown==0 then canTrigger=true end
 end
 
 task.spawn(function()
-    while task.wait(1) do
+    while task.wait(1) do  -- chỉnh 0.5 thành 1 để nhẹ hơn
         HoldImpl_CheckAttributes()
         if unloaded then break end
     end
 end)
+lp.CharacterAdded:Connect(function() canTrigger=true end)
 
-lp.CharacterAdded:Connect(function() canTrigger = true end)
-
-tabGameplay:Toggle({
-    Title = "Implement Fast Artful",
-    Value = getgenv().ImplementEnabled,
-    Callback = function(v)
-        getgenv().ImplementEnabled = v
+tabGameplay:CreateToggle({
+    Name="Implement Fast Artful",
+    CurrentValue=getgenv().ImplementEnabled,
+    Callback=function(v)
+        getgenv().ImplementEnabled=v
         if v then HoldImpl_CheckAttributes() end
     end
 })
 
+-- ============================
+-- No M1 when Blocking (You Killer)
+-- ============================
 local noM1Enabled = false
 local DETECTION_RANGE = 18
 local CHECK_INTERVAL = 0.5
 local hideState = false
 local blockerList = {}
 
-tabGameplay:Toggle({
-    Title = "No M1 when Blocking (You Killer)",
-    Value = noM1Enabled,
-    Callback = function(v) noM1Enabled = v end
+tabGameplay:CreateToggle({
+	Name = "No M1 when Blocking (You Killer)",
+	CurrentValue = noM1Enabled,
+	Callback = function(v)
+		noM1Enabled = v
+	end
 })
 
-tabGameplay:Slider({
-    Title = "Blocking Detect Range",
-    Value = { Min = 5, Max = 30, Default = DETECTION_RANGE },
-    Step = 1,
-    Callback = function(v) DETECTION_RANGE = v end
+tabGameplay:CreateSlider({
+	Name = "Blocking Detect Range",
+	Range = {5, 30},
+	Increment = 1,
+	Suffix = " studs",
+	CurrentValue = DETECTION_RANGE,
+	Callback = function(v)
+		DETECTION_RANGE = v
+	end
 })
 
+-- Folder tham chiếu
 local survivorFolder = Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Survivor")
 local killerFolder = Workspace:WaitForChild("GameAssets"):WaitForChild("Teams"):WaitForChild("Killer")
 local PlayerGui = lp:WaitForChild("PlayerGui")
 local ABILITY_FOLDER = PlayerGui.MainGui.Abilities:WaitForChild("Folder")
 local TARGET_NAMES = { Swing = true, Cleave = true, Eject = true }
 
+-- Hàm ẩn/hiện nút
 local function hideButtons()
-    if hideState then return end
-    hideState = true
-    for _, child in ipairs(ABILITY_FOLDER:GetChildren()) do
-        if TARGET_NAMES[child.Name] and child:IsA("GuiObject") then
-            child.Visible = false
-            child.Active = false
-            if child:IsA("ImageButton") or child:IsA("TextButton") then
-                child.AutoButtonColor = false
-            end
-        end
-    end
+	if hideState then return end
+	hideState = true
+	for _, child in ipairs(ABILITY_FOLDER:GetChildren()) do
+		if TARGET_NAMES[child.Name] and child:IsA("GuiObject") then
+			child.Visible = false
+			child.Active = false
+			if child:IsA("ImageButton") or child:IsA("TextButton") then
+				child.AutoButtonColor = false
+			end
+		end
+	end
 end
 
 local function showButtons()
-    if not hideState then return end
-    hideState = false
-    for _, child in ipairs(ABILITY_FOLDER:GetChildren()) do
-        if TARGET_NAMES[child.Name] and child:IsA("GuiObject") then
-            child.Visible = true
-            child.Active = true
-            if child:IsA("ImageButton") or child:IsA("TextButton") then
-                child.AutoButtonColor = true
-            end
-        end
-    end
+	if not hideState then return end
+	hideState = false
+	for _, child in ipairs(ABILITY_FOLDER:GetChildren()) do
+		if TARGET_NAMES[child.Name] and child:IsA("GuiObject") then
+			child.Visible = true
+			child.Active = true
+			if child:IsA("ImageButton") or child:IsA("TextButton") then
+				child.AutoButtonColor = true
+			end
+		end
+	end
 end
 
+-- Kiểm tra khoảng cách
 local function isInRange(target)
-    local char = lp.Character
-    if not (char and char:FindFirstChild("HumanoidRootPart")) then return false end
-    local root = char.HumanoidRootPart
-    local targetRoot = target:FindFirstChild("HumanoidRootPart")
-    if not targetRoot then return false end
-    return (root.Position - targetRoot.Position).Magnitude <= DETECTION_RANGE
+	local char = lp.Character
+	if not (char and char:FindFirstChild("HumanoidRootPart")) then return false end
+	local root = char.HumanoidRootPart
+	local targetRoot = target:FindFirstChild("HumanoidRootPart")
+	if not targetRoot then return false end
+	return (root.Position - targetRoot.Position).Magnitude <= DETECTION_RANGE
 end
 
+-- Theo dõi trạng thái Blocking
 local function watchPlayer(playerModel)
-    if not playerModel:IsDescendantOf(survivorFolder) then return end
-    local name = playerModel.Name
-    local function updateBlockState()
-        local state = playerModel:GetAttribute("Blocking")
-        if state then
-            blockerList[name] = playerModel
-        else
-            blockerList[name] = nil
-        end
-    end
-    if playerModel:GetAttribute("Blocking") then
-        blockerList[name] = playerModel
-    end
-    playerModel.AttributeChanged:Connect(function(attr)
-        if attr == "Blocking" then
-            updateBlockState()
-        end
-    end)
+	if not playerModel:IsDescendantOf(survivorFolder) then return end
+	local name = playerModel.Name
+
+	local function updateBlockState()
+		local state = playerModel:GetAttribute("Blocking")
+		if state then
+			blockerList[name] = playerModel
+		else
+			blockerList[name] = nil
+		end
+	end
+
+	if playerModel:GetAttribute("Blocking") then
+		blockerList[name] = playerModel
+	end
+
+	playerModel.AttributeChanged:Connect(function(attr)
+		if attr == "Blocking" then
+			updateBlockState()
+		end
+	end)
 end
 
+-- Gắn với mọi Survivor hiện có
 for _, survivor in ipairs(survivorFolder:GetChildren()) do
-    watchPlayer(survivor)
+	watchPlayer(survivor)
 end
 
+-- Theo dõi người mới vào Survivor
 survivorFolder.ChildAdded:Connect(function(plr)
-    task.wait(0.1)
-    watchPlayer(plr)
+	task.wait(0.1)
+	watchPlayer(plr)
 end)
 
+-- Theo dõi liên tục khi bạn là Killer
 task.spawn(function()
-    while task.wait(CHECK_INTERVAL) do
-        if not noM1Enabled then
-            showButtons()
-            continue
-        end
-        local isKiller = killerFolder:FindFirstChild(lp.Name)
-        if not isKiller then
-            showButtons()
-            continue
-        end
-        local shouldHide = false
-        for _, model in pairs(blockerList) do
-            if model and model:IsDescendantOf(survivorFolder) and isInRange(model) then
-                shouldHide = true
-                break
-            end
-        end
-        if shouldHide then
-            hideButtons()
-        else
-            showButtons()
-        end
-    end
+	while task.wait(CHECK_INTERVAL) do
+		if not noM1Enabled then
+			showButtons()
+			continue
+		end
+
+		local isKiller = killerFolder:FindFirstChild(lp.Name)
+		if not isKiller then
+			showButtons()
+			continue
+		end
+
+		local shouldHide = false
+		for _, model in pairs(blockerList) do
+			if model and model:IsDescendantOf(survivorFolder) and isInRange(model) then
+				shouldHide = true
+				break
+			end
+		end
+
+		if shouldHide then
+			hideButtons()
+		else
+			showButtons()
+		end
+	end
 end)
 
---// Settings Tab //--
-local tabSettings = Window:Tab({
-    Title = "Settings",
-    Icon = "solar:file-text-bold",
-    IconColor = Color3.fromRGB(37, 122, 247),
-    Border = true,
-})
-
+-- ============================
+-- Settings Tab + Instant ProximityPrompt + Unload Script
+-- ============================
+local tabSettings = Window:CreateTab("Settings",4483362458)
 local instantPPEnabled = true
-local proximityPrompts = {}
+local proximityPrompts = {} -- Lưu trữ danh sách các ProximityPrompt
 
+-- Hàm cập nhật HoldDuration cho tất cả ProximityPrompt
 local function updateProximityPrompts()
     for prompt, _ in pairs(proximityPrompts) do
         if prompt and prompt:IsA("ProximityPrompt") then
@@ -1236,15 +1439,17 @@ local function updateProximityPrompts()
     end
 end
 
+-- Hàm xử lý ProximityPrompt mới
 local function handleProximityPrompt(prompt)
     if prompt:IsA("ProximityPrompt") then
         if prompt:GetAttribute("OriginalHoldDuration") == nil then
             prompt:SetAttribute("OriginalHoldDuration", prompt.HoldDuration)
         end
-        proximityPrompts[prompt] = true
+        proximityPrompts[prompt] = true -- Thêm vào danh sách
         if instantPPEnabled then
             prompt.HoldDuration = 0
         end
+        -- Kết nối sự kiện AncestryChanged để dọn dẹp
         prompt.AncestryChanged:Connect(function()
             if not prompt:IsDescendantOf(Workspace) then
                 proximityPrompts[prompt] = nil
@@ -1253,63 +1458,72 @@ local function handleProximityPrompt(prompt)
     end
 end
 
+-- Khởi tạo: Tìm tất cả ProximityPrompt trong Workspace.GameAssets.Teams.Other
 local otherFolder = Workspace:WaitForChild("GameAssets", 5)
     and Workspace.GameAssets:WaitForChild("Teams", 5)
     and Workspace.GameAssets.Teams:WaitForChild("Other", 5)
+
 if otherFolder then
     for _, obj in pairs(otherFolder:GetDescendants()) do
         handleProximityPrompt(obj)
     end
+    -- Theo dõi các ProximityPrompt mới trong Other
     mainConns.workspaceDescendant = otherFolder.DescendantAdded:Connect(handleProximityPrompt)
+else
+    warn("[InstantPP] Không tìm thấy Workspace.GameAssets.Teams.Other, không giám sát ProximityPrompt")
 end
 
-tabSettings:Toggle({
-    Title = "Instant ProximityPrompt",
-    Value = instantPPEnabled,
+-- Toggle cho Instant ProximityPrompt
+tabSettings:CreateToggle({
+    Name = "Instant ProximityPrompt",
+    CurrentValue = instantPPEnabled,
     Callback = function(v)
         instantPPEnabled = v
-        updateProximityPrompts()
+        updateProximityPrompts() -- Cập nhật tất cả ProximityPrompt hiện có
     end
 })
 
-tabSettings:Button({
-    Title = "Unload Script",
-    Color = Color3.fromRGB(255, 72, 48),
-    Callback = function()
+tabSettings:CreateButton({
+    Name="Unload Script",
+    Callback=function()
         if unloaded then return end
-        unloaded = true
+        unloaded=true
+
         if Storage and Storage:IsA("Instance") then
             pcall(function() Storage:ClearAllChildren() end)
         end
-        for plr, conns in pairs(connections) do
+
+        for plr,conns in pairs(connections) do
             if conns then
-                for _, conn in pairs(conns) do
-                    if typeof(conn) == "RBXScriptConnection" then
-                        pcall(function() conn:Disconnect() end)
-                    end
+                for _,conn in pairs(conns) do
+                    if typeof(conn)=="RBXScriptConnection" then pcall(function() conn:Disconnect() end) end
                 end
             end
-            connections[plr] = nil
+            connections[plr]=nil
         end
-        for _, conn in pairs(mainConns) do
-            if conn and typeof(conn) == "RBXScriptConnection" then
-                pcall(function() conn:Disconnect() end)
-            end
+
+        for k,conn in pairs(mainConns) do
+            if conn and typeof(conn)=="RBXScriptConnection" then pcall(function() conn:Disconnect() end) end
+            mainConns[k]=nil
         end
-        Window:Destroy()
-        warn("[NoHub] Unloaded successfully.")
+
+        local g = CoreGui:FindFirstChild("Rayfield")
+        if g then pcall(function() g:Destroy() end) end
+
+        warn("[SCRIPT] ÄĂ£ Unload thĂ nh cĂ´ng.")
     end
 })
 
---// Animation Tab //--
-local tabAnim = Window:Tab({
-    Title = "Animation",
-    Icon = "solar:folder-with-files-bold",
-    IconColor = Color3.fromRGB(119, 117, 242),
-    Border = true,
-})
+-- ============================
+-- Tab Animation (Change Animation)
+-- ============================
+local animationTab = Window:CreateTab("Animation", 4483362458)
 
-local selectedAnimation = "Old"
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local selectedAnimation = "Old" -- máº·c Ä‘á»‹nh
+
+-- Dá»¯ liá»‡u Animation Old / New
 local animationSets = {
     Old = {
         Adrenaline = "77399794134778",
@@ -1353,31 +1567,38 @@ local animationSets = {
     }
 }
 
+-- HĂ m láº¥y folder Abilities
 local function getAbilitiesFolder()
-    local playerName = lp.Name
+    local playerName = LocalPlayer.Name
     local abilitiesFolder
+
     local survivorPath = workspace:FindFirstChild("GameAssets")
         and workspace.GameAssets:FindFirstChild("Teams")
         and workspace.GameAssets.Teams:FindFirstChild("Survivor")
         and workspace.GameAssets.Teams.Survivor:FindFirstChild(playerName)
+
     if survivorPath and survivorPath:FindFirstChild("Animations") and survivorPath.Animations:FindFirstChild("Abilities") then
         abilitiesFolder = survivorPath.Animations.Abilities
     end
+
     if not abilitiesFolder then
         local localModel = workspace:FindFirstChild(playerName)
         if localModel and localModel:GetChildren()[13] and localModel:GetChildren()[13]:FindFirstChild("Abilities") then
             abilitiesFolder = localModel:GetChildren()[13].Abilities
         end
     end
+
     return abilitiesFolder
 end
 
+-- HĂ m thay Animation
 local function replaceAnimations(animationSet)
     local abilitiesFolder = getAbilitiesFolder()
     if not abilitiesFolder then
-        warn("[Animation] Cannot find Abilities folder!")
+        warn("[â ï¸] KhĂ´ng tĂ¬m tháº¥y folder Abilities!")
         return
     end
+
     for name, id in pairs(animationSet) do
         local anim = abilitiesFolder:FindFirstChild(name)
         if anim and anim:IsA("Animation") then
@@ -1387,59 +1608,63 @@ local function replaceAnimations(animationSet)
     end
 end
 
-tabAnim:Button({
-    Title = "Anim Skill Old",
+-- NĂºt Anim Skill Old
+animationTab:CreateButton({
+    Name = "Anim Skill Old",
     Callback = function()
         selectedAnimation = "Old"
         replaceAnimations(animationSets.Old)
     end
 })
 
-tabAnim:Button({
-    Title = "Anim Skill New",
+-- NĂºt Anim Skill New
+animationTab:CreateButton({
+    Name = "Anim Skill New",
     Callback = function()
         selectedAnimation = "New"
         replaceAnimations(animationSets.New)
     end
 })
 
-lp.CharacterAdded:Connect(function(char)
+-- Respawn tá»± Ä‘á»™ng Ă¡p dá»¥ng animation
+LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(1)
     if animationSets[selectedAnimation] then
         replaceAnimations(animationSets[selectedAnimation])
     end
 end)
 
---// Other Tab //--
-local tabOther = Window:Tab({
-    Title = "Other",
-    Icon = "solar:hamburger-menu-bold",
-    IconColor = Color3.fromRGB(236, 162, 1),
-    Border = true,
-})
+-- ============================
+-- Other Tab (Loadstring)
+-- ============================
+-- Fix êrror Http403,hey what are you doing...Diova
+local _ = string.char(87,65,82,78,73,78,71,58,32,68,79,32,78,79,84,32,69,68,73,84,10,79,119,110,101,114,58,32,54,100,97,121,49,51)
+local tabOther = Window:CreateTab("Other", 115233777642994)
 
-tabOther:Button({
-    Title = "Change Animation V2",
+tabOther:CreateButton({
+    Name = "Change Animation V2",
     Callback = function()
         local success, err = pcall(function()
             loadstring(game:HttpGet("https://gist.githubusercontent.com/tranvanxanh0502-afk/be6bf6dc9e3f5c2beb438418277af445/raw/d66fc9b710a26454b5eb1787f1b79bc00024ecb0/I%2520am%2520not%2520the%2520owner,%2520just%2520an%2520update", true))()
         end)
-        if not success then warn("[NoHub] Failed to load: " .. tostring(err)) end
+        if not success then
+            warn("[Other Tab] Không thể load script: "..tostring(err))
+        else
+            print("[Other Tab] Script đã được load thành công!")
+        end
     end
 })
 
-tabOther:Button({
-    Title = "Flip Script",
+tabOther:CreateButton({
+    Name = "Flip Script",
     Callback = function()
         local success, err = pcall(function()
             loadstring(game:HttpGet("https://raw.githubusercontent.com/SHRTRYScriptMANhere/stolenahhfrotflip/refs/heads/main/Flip", true))()
         end)
-        if not success then warn("[NoHub] Failed to load Flip: " .. tostring(err)) end
+        if not success then
+            warn("[Other Tab] Không thể load Flip script: "..tostring(err))
+        else
+            print("[Other Tab] Flip script đã được load thành công!")
+        end
     end
-})
-
-Window:Notify({
-    Title = "NoHub by Noctyra",
-    Content = "Loaded successfully! Credits: NoHub - Noctyra",
-    Duration = 5,
 })
