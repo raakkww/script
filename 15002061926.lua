@@ -25,7 +25,7 @@ WindUI:Notify({
 -- Services & Core Variables
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
-local VirtualInputManager = game:GetService("VirtualInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local UserInputService = game:GetService("UserInputService")
 local LP = Players.LocalPlayer
 
@@ -452,8 +452,8 @@ local function UltraAutoClicker()
     if not AutoClickerEnabled then return end
     local currentTime = tick()
     if currentTime - LastClickTime >= 1 / ClickSpeed then
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, false)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, false)
         LastClickTime = currentTime
     end
 end
@@ -462,8 +462,8 @@ local function Parry()
     if IsParrying then return end
     IsParrying = true
     
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, false)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, false)
     
     LastParryTime = tick()
     task.delay(0.05, function() IsParrying = false end)
