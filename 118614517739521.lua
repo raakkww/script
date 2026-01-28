@@ -1,671 +1,500 @@
---//========================================================================================================
---// NoHub By Noctyra - Blind Shot Framework (WindUI Conversion)
---// Credits: NoHub - Noctyra | WindUI by Footagesus
---// Mobile & PC Optimized | Zero Original Names Preserved
---//========================================================================================================
+-- Hydra Blind Shot - Main + Settings with UI
+-- Adds toggles for auto-skip (claim cached rewards) and auto-buy spin
 
--- Safety check for LocalPlayer
-repeat task.wait() until game:IsLoaded()
-if not game:GetService("Players").LocalPlayer then return end
+-- Load UI Library
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
--- Load WindUI library (mobile/PC compatible) - NO KEY SYSTEM
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+local Options = Library.Options
+local Toggles = Library.Toggles
 
--- MANDATORY STARTUP BRANDING (Peraturan Wajib #1)
-print("NoHub By Noctyra Loaded")
-
--- Initial notification with mandatory NoHub branding (Peraturan Wajib #2)
-WindUI:Notify({
-    Title = "NoHub",
-    Content = "Blind Shot framework initializing...",
-    Icon = "loader",
-    Duration = 3,
-    CanClose = false
-})
-
--- Services & Core Setup
+-- Settings
+local settings = {
+	AutoSkipSpins = false,
+	AutoBuySpin = false,
+	SkipDelay = 0.5,
+	BuyDelay = 1.0,
+	PlayerESP = false,
+	HighlightPlayers = false,
+	RevealPlayers = false,
+	AimDetection = false,
+	UnanchorHRP = false,
+}
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local RS = game:GetService("ReplicatedStorage")
-
--- Feature Settings (cleaned of original branding)
-local Settings = {
-    AutoSkipSpins = false,
-    AutoBuySpin = false,
-    SkipDelay = 0.5,
-    BuyDelay = 1.0,
-    PlayerESP = false,
-    HighlightPlayers = false,
-    RevealPlayers = false,
-    AimDetection = false,
-    UnanchorHRP = false,
-}
 
 -- ESP Storage
-local ESPObjects = {}
-local HighlightObjects = {}
+local espObjects = {}
+local highlightObjects = {}
 
--- Remote References (with safety checks)
-local Net = RS:FindFirstChild("NetRayRemotes")
+-- Services
+local RS = game:GetService("ReplicatedStorage")
+local Net = RS:WaitForChild("NetRayRemotes")
 
--- Helper Functions (preserved functionality)
-local function ClaimCachedRewards()
-    if not Net or not Net:FindFirstChild("Spinner_RF") then return end
-    local args = { buffer and buffer.fromstring and buffer.fromstring("@\018ClaimCachedRewards") or nil }
-    if args[1] then
-        pcall(function()
-            Net.Spinner_RF:InvokeServer(unpack(args))
-        end)
-    end
+-- Helper functions
+local function claimCachedRewards()
+	local args = {
+		buffer.fromstring("@\018ClaimCachedRewards")
+	}
+	local ok, err = pcall(function()
+		Net:WaitForChild("Spinner_RF"):InvokeServer(unpack(args))
+	end)
+	if not ok then
+		warn("claimCachedRewards error:", err)
+	end
 end
 
-local function BuySpin()
-    if not Net or not Net:FindFirstChild("Shop_Purchase") then return end
-    local args = {
-        buffer and buffer.fromstring and buffer.fromstring("\241C\026\000\000\002\t\a\ashopKey\a\fCashCrate_1x\n") or nil,
-        {}
-    }
-    if args[1] then
-        pcall(function()
-            Net.Shop_Purchase:FireServer(unpack(args))
-        end)
-    end
+local function buySpin()
+	local args = {
+		buffer.fromstring("\241C\026\000\000\002\t\a\ashopKey\a\fCashCrate_1x\n"),
+		{}
+	}
+	local ok, err = pcall(function()
+		Net:WaitForChild("Shop_Purchase"):FireServer(unpack(args))
+	end)
+	if not ok then
+		warn("buySpin error:", err)
+	end
 end
 
--- ESP Functions (preserved logic, cleaned of original branding)
-local function CreateESP(player)
-    if not player.Character or ESPObjects[player] then return end
-    
-    local char = player.Character
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    local billboardGui = Instance.new("BillboardGui")
-    billboardGui.Name = "NoHub_ESP_" .. player.Name
-    billboardGui.Adornee = hrp
-    billboardGui.Size = UDim2.new(0, 100, 0, 50)
-    billboardGui.StudsOffset = Vector3.new(0, 3, 0)
-    billboardGui.AlwaysOnTop = true
-    billboardGui.Parent = hrp
-    
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = player.Name
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameLabel.TextStrokeTransparency = 0.5
-    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextSize = 14
-    nameLabel.Parent = billboardGui
-    
-    local distanceLabel = Instance.new("TextLabel")
-    distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
-    distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
-    distanceLabel.BackgroundTransparency = 1
-    distanceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    distanceLabel.TextStrokeTransparency = 0.5
-    distanceLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    distanceLabel.Font = Enum.Font.Gotham
-    distanceLabel.TextSize = 12
-    distanceLabel.Parent = billboardGui
-    
-    ESPObjects[player] = billboardGui
-    
-    -- Update distance loop
-    task.spawn(function()
-        while billboardGui and billboardGui.Parent and Settings.PlayerESP do
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and hrp then
-                local distance = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
-                distanceLabel.Text = string.format("%.1f studs", distance)
-            end
-            task.wait(0.1)
-        end
-        if billboardGui then billboardGui:Destroy() end
-    end)
-end
-
-local function CreateHighlight(player)
-    if not player.Character or HighlightObjects[player] then return end
-    
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "NoHub_Highlight_" .. player.Name
-    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
-    highlight.Parent = player.Character
-    
-    HighlightObjects[player] = highlight
-end
-
-local function RevealPlayers()
-    -- Move models from ReplicatedStorage to workspace (simplified safety check)
-    for _, obj in pairs(RS:GetChildren()) do
-        if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") then
-            pcall(function() obj.Parent = workspace end)
-        end
-    end
-end
-
--- Aim Detection System (preserved logic)
-local LastAimWarning = 0
-local function CheckAimDetection()
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    
-    local myPos = LocalPlayer.Character.HumanoidRootPart.Position
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            for _, tool in pairs(player.Character:GetChildren()) do
-                if tool:IsA("Tool") then
-                    local gunLaser = tool:FindFirstChild("GunLaser", true)
-                    
-                    if gunLaser and gunLaser:IsA("BasePart") then
-                        local laserPos = gunLaser.Position
-                        local laserForward = gunLaser.CFrame.LookVector
-                        local toMe = (myPos - laserPos)
-                        local distance = toMe.Magnitude
-                        local directionToMe = toMe.Unit
-                        local dotProduct = laserForward:Dot(directionToMe)
-                        
-                        if dotProduct > 0.98 and distance < 500 then
-                            local currentTime = tick()
-                            if currentTime - LastAimWarning > 3 then
-                                WindUI:Notify({
-                                    Title = "NoHub",
-                                    Content = "⚠️ " .. player.Name .. " is aiming at you!",
-                                    Color = "Yellow",
-                                    Duration = 3
-                                })
-                                LastAimWarning = currentTime
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
---//========================================================================================================
---// WINDUI WINDOW CREATION WITH MANDATORY BRANDING (Peraturan Wajib #3)
---//========================================================================================================
-local Window = WindUI:CreateWindow({
-    Title = "NoHub By Noctyra",  -- ✅ Full branding requirement met
-    Folder = "NoHub_BlindShot",
-    Icon = "solar:target-bold",
-    HideSearchBar = false,
-    NewElements = true,
-    Topbar = {
-        Height = 44,
-        ButtonsType = "Mac",
-    },
-    OpenButton = {
-        Title = "Open NoHub",
-        CornerRadius = UDim.new(1, 0),
-        StrokeThickness = 2,
-        Enabled = true,
-        Draggable = true,
-        OnlyMobile = false,
-        Scale = 0.6,
-        Color = ColorSequence.new(
-            Color3.fromHex("#30FF6A"),
-            Color3.fromHex("#ECA201")
-        )
-    }
+-- Create UI Window
+local Window = Library:CreateWindow({
+	Title = "Hydra Hub",
+	Footer = "Blind Shot",
+	NotifySide = "Right",
+	ShowCustomCursor = true,
 })
 
--- MANDATORY CREDIT TAG (Peraturan Wajib #4)
-Window:Tag({
-    Title = "NoHub • Noctyra",  -- ✅ Watermark requirement met
-    Icon = "github",
-    Color = Color3.fromHex("#1c1c1c"),
-    Border = true,
-})
+-- Add unload handler
+Library:OnUnload(function()
+	print("Hydra Hub unloaded!")
+	-- Clean up ESP
+	for _, obj in pairs(espObjects) do
+		if obj then obj:Destroy() end
+	end
+	for _, obj in pairs(highlightObjects) do
+		if obj then obj:Destroy() end
+	end
+end)
 
---//========================================================================================================
---// TAB 1: MAIN FEATURES
---//========================================================================================================
-local MainTab = Window:Tab({
-    Title = "Main",
-    Icon = "solar:target-bold",
-    IconColor = Color3.fromHex("#EF4F1D"),
-    Border = true
-})
+-- Create Tabs
+local Tabs = {
+	Main = Window:AddTab("Main", "target"),
+	Visuals = Window:AddTab("Visuals", "eye"),
+	["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
 
--- Auto Features Section
-local AutoSection = MainTab:Section({
-    Title = "Auto Features",
-    Box = true,
-    BoxBorder = true,
-    Opened = true
-})
+-- Main Group
+local MainGroup = Tabs.Main:AddLeftGroupbox("Auto Features")
 
 -- Auto Skip Spins Toggle
-local AutoSkipToggle = AutoSection:Toggle({
-    Flag = "AutoSkipSpins",
-    Title = "Auto Skip Spins",
-    Desc = "Automatically claim cached rewards",
-    Value = Settings.AutoSkipSpins,
-    Callback = function(state)
-        Settings.AutoSkipSpins = state
-        WindUI:Notify({
-            Title = "NoHub",
-            Content = "Auto Skip Spins " .. (state and "ENABLED" or "DISABLED"),
-            Duration = 2
-        })
-    end
+MainGroup:AddToggle("AutoSkipToggle", {
+	Text = "Auto Skip Spins",
+	Tooltip = "Automatically claims cached rewards",
+	Default = false,
+	Callback = function(Value)
+		settings.AutoSkipSpins = Value
+		print("Auto Skip Spins:", Value)
+	end,
 })
 
 -- Auto Buy Spin Toggle
-local AutoBuyToggle = AutoSection:Toggle({
-    Flag = "AutoBuySpin",
-    Title = "Auto Buy Spin",
-    Desc = "Automatically purchase spins",
-    Value = Settings.AutoBuySpin,
-    Callback = function(state)
-        Settings.AutoBuySpin = state
-        WindUI:Notify({
-            Title = "NoHub",
-            Content = "Auto Buy Spin " .. (state and "ENABLED" or "DISABLED"),
-            Duration = 2
-        })
-    end
+MainGroup:AddToggle("AutoBuyToggle", {
+	Text = "Auto Buy Spin",
+	Tooltip = "Automatically purchases spins",
+	Default = false,
+	Callback = function(Value)
+		settings.AutoBuySpin = Value
+		print("Auto Buy Spin:", Value)
+	end,
 })
 
--- Unanchor HRP Toggle (cleaned of "xeno was here" reference)
-local UnanchorToggle = AutoSection:Toggle({
-    Flag = "UnanchorHRP",
-    Title = "Unfreeze Character",
-    Desc = "Unanchors HRP during shooting stage",
-    Value = Settings.UnanchorHRP,
-    Callback = function(state)
-        Settings.UnanchorHRP = state
-        WindUI:Notify({
-            Title = "NoHub",
-            Content = "Character Unfreeze " .. (state and "ENABLED" or "DISABLED"),
-            Duration = 2
-        })
-    end
+-- Unanchor HRP Toggle
+MainGroup:AddToggle("UnanchorHRPToggle", {
+	Text = "Unfreeze character (IN SHOOTING STAGE)",
+	Tooltip = "xeno was here i think",
+	Default = false,
+	Callback = function(Value)
+		settings.UnanchorHRP = Value
+		print("Unanchor HRP:", Value)
+	end,
 })
 
-MainTab:Space()
+-- Settings Group
+local SettingsGroup = Tabs.Main:AddRightGroupbox("Settings")
 
--- Settings Section
-local SettingsSection = MainTab:Section({
-    Title = "Delays",
-    Box = true,
-    BoxBorder = true,
-    Opened = true
+-- Skip Delay Slider
+SettingsGroup:AddSlider("SkipDelay", {
+	Text = "Skip Delay (s)",
+	Tooltip = "Delay between auto skip attempts",
+	Default = 0.5,
+	Min = 0.1,
+	Max = 5,
+	Rounding = 2,
+	Callback = function(Value)
+		settings.SkipDelay = Value
+	end,
 })
 
-SettingsSection:Slider({
-    Flag = "SkipDelay",
-    Title = "Skip Delay",
-    Desc = "Seconds between reward claims",
-    Step = 0.1,
-    Value = {
-        Min = 0.1,
-        Max = 5,
-        Default = Settings.SkipDelay
-    },
-    Callback = function(value)
-        Settings.SkipDelay = value
-    end
+-- Buy Delay Slider
+SettingsGroup:AddSlider("BuyDelay", {
+	Text = "Buy Delay (s)",
+	Tooltip = "Delay between auto buy attempts",
+	Default = 1.0,
+	Min = 0.1,
+	Max = 10,
+	Rounding = 2,
+	Callback = function(Value)
+		settings.BuyDelay = Value
+	end,
 })
 
-SettingsSection:Slider({
-    Flag = "BuyDelay",
-    Title = "Buy Delay",
-    Desc = "Seconds between spin purchases",
-    Step = 0.1,
-    Value = {
-        Min = 0.1,
-        Max = 10,
-        Default = Settings.BuyDelay
-    },
-    Callback = function(value)
-        Settings.BuyDelay = value
-    end
+-- Visuals Group
+local VisualsGroup = Tabs.Visuals:AddLeftGroupbox("ESP & Visuals")
+
+-- Player ESP Toggle
+VisualsGroup:AddToggle("PlayerESPToggle", {
+	Text = "Player ESP",
+	Tooltip = "Shows player names and distance through walls",
+	Default = false,
+	Callback = function(Value)
+		settings.PlayerESP = Value
+		if not Value then
+			-- Clear ESP
+			for _, obj in pairs(espObjects) do
+				if obj then obj:Destroy() end
+			end
+			espObjects = {}
+		end
+	end,
 })
 
---//========================================================================================================
---// TAB 2: VISUALS (ESP & DETECTION)
---//========================================================================================================
-local VisualsTab = Window:Tab({
-    Title = "Visuals",
-    Icon = "solar:eye-bold",
-    IconColor = Color3.fromHex("#30FF6A"),
-    Border = true
+-- Highlight Players Toggle
+VisualsGroup:AddToggle("HighlightPlayersToggle", {
+	Text = "Highlight Players",
+	Tooltip = "Adds highlight effect to all players",
+	Default = false,
+	Callback = function(Value)
+		settings.HighlightPlayers = Value
+		if not Value then
+			-- Clear highlights
+			for _, obj in pairs(highlightObjects) do
+				if obj then obj:Destroy() end
+			end
+			highlightObjects = {}
+		end
+	end,
 })
 
--- ESP Section
-local ESPSection = VisualsTab:Section({
-    Title = "Player ESP",
-    Box = true,
-    BoxBorder = true,
-    Opened = true
+-- Reveal Players Toggle
+VisualsGroup:AddToggle("RevealPlayersToggle", {
+	Text = "Reveal Hidden Players",
+	Tooltip = "Finds and reveals players hidden",
+	Default = false,
+	Callback = function(Value)
+		settings.RevealPlayers = Value
+		print("Reveal Players:", Value)
+	end,
 })
 
-local ESPToggle = ESPSection:Toggle({
-    Flag = "PlayerESP",
-    Title = "Enable ESP",
-    Desc = "Show player names and distance through walls",
-    Value = Settings.PlayerESP,
-    Callback = function(state)
-        Settings.PlayerESP = state
-        if not state then
-            for player, obj in pairs(ESPObjects) do
-                if obj and obj.Parent then obj:Destroy() end
-                ESPObjects[player] = nil
-            end
-        end
-        WindUI:Notify({
-            Title = "NoHub",
-            Content = "Player ESP " .. (state and "ENABLED" or "DISABLED"),
-            Duration = 2
-        })
-    end
+-- Detection Group
+local DetectionGroup = Tabs.Visuals:AddRightGroupbox("Detection")
+
+-- Aim Detection Toggle
+DetectionGroup:AddToggle("AimDetectionToggle", {
+	Text = "Aim Warning",
+	Tooltip = "Notifies when someone is aiming at you",
+	Default = false,
+	Callback = function(Value)
+		settings.AimDetection = Value
+		print("Aim Detection:", Value)
+	end,
 })
 
-ESPSection:Toggle({
-    Flag = "HighlightPlayers",
-    Title = "Highlight Players",
-    Desc = "Red outline around all players",
-    Value = Settings.HighlightPlayers,
-    Callback = function(state)
-        Settings.HighlightPlayers = state
-        if not state then
-            for player, obj in pairs(HighlightObjects) do
-                if obj and obj.Parent then obj:Destroy() end
-                HighlightObjects[player] = nil
-            end
-        end
-        WindUI:Notify({
-            Title = "NoHub",
-            Content = "Player Highlights " .. (state and "ENABLED" or "DISABLED"),
-            Duration = 2
-        })
-    end
-})
+-- UI Settings
+Library:SetWatermarkVisibility(true)
 
-ESPSection:Toggle({
-    Flag = "RevealPlayers",
-    Title = "Reveal Hidden Players",
-    Desc = "Expose hidden player models",
-    Value = Settings.RevealPlayers,
-    Callback = function(state)
-        Settings.RevealPlayers = state
-        WindUI:Notify({
-            Title = "NoHub",
-            Content = "Player Reveal " .. (state and "ENABLED" or "DISABLED"),
-            Duration = 2
-        })
-    end
-})
+local FrameworkSettings = Tabs["UI Settings"]:AddLeftGroupbox("UI Settings")
+FrameworkSettings:AddToggle("KeybindFrameShow", { Text = "Keybind Frame", Default = false, Callback = function(Value) Library.KeybindFrame.Visible = Value end})
+FrameworkSettings:AddToggle("WatermarkFrameShow", {Text = "Watermark Frame", Default = true, Callback = function(Value) Library:SetWatermarkVisibility(Value) end})
+FrameworkSettings:AddButton({Text = "Unload UI", Func = function() Library:Unload() end})
+FrameworkSettings:AddDivider()
+FrameworkSettings:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu keybind" })
 
-VisualsTab:Space()
+Library.ToggleKeybind = Options.MenuKeybind
 
--- Detection Section
-local DetectionSection = VisualsTab:Section({
-    Title = "Detection",
-    Box = true,
-    BoxBorder = true,
-    Opened = true
-})
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({"MenuKeybind"})
+ThemeManager:SetFolder("HydraBlindShot")
+SaveManager:SetFolder("HydraBlindShot/configs")
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+SaveManager:LoadAutoloadConfig()
 
-DetectionSection:Toggle({
-    Flag = "AimDetection",
-    Title = "Aim Warning",
-    Desc = "Alert when players aim at you",
-    Value = Settings.AimDetection,
-    Callback = function(state)
-        Settings.AimDetection = state
-        WindUI:Notify({
-            Title = "NoHub",
-            Content = "Aim Detection " .. (state and "ENABLED" or "DISABLED"),
-            Duration = 2
-        })
-    end
-})
+-- ESP Functions
+local function createESP(player)
+	if not player.Character or espObjects[player] then return end
+	
+	local char = player.Character
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Name = "ESP_" .. player.Name
+	billboardGui.Adornee = hrp
+	billboardGui.Size = UDim2.new(0, 100, 0, 50)
+	billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+	billboardGui.AlwaysOnTop = true
+	billboardGui.Parent = hrp
+	
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = player.Name
+	nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	nameLabel.TextStrokeTransparency = 0.5
+	nameLabel.Font = Enum.Font.SourceSansBold
+	nameLabel.TextSize = 14
+	nameLabel.Parent = billboardGui
+	
+	local distanceLabel = Instance.new("TextLabel")
+	distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
+	distanceLabel.BackgroundTransparency = 1
+	distanceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+	distanceLabel.TextStrokeTransparency = 0.5
+	distanceLabel.Font = Enum.Font.SourceSans
+	distanceLabel.TextSize = 12
+	distanceLabel.Parent = billboardGui
+	
+	espObjects[player] = billboardGui
+	
+	-- Update distance
+	task.spawn(function()
+		while billboardGui and billboardGui.Parent and settings.PlayerESP do
+			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and hrp then
+				local distance = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
+				distanceLabel.Text = string.format("%.1f studs", distance)
+			end
+			task.wait(0.1)
+		end
+	end)
+end
 
---//========================================================================================================
---// TAB 3: UI SETTINGS & CONFIG
---//========================================================================================================
-local SettingsTab = Window:Tab({
-    Title = "Settings",
-    Icon = "solar:settings-bold",
-    IconColor = Color3.fromHex("#ECA201"),
-    Border = true
-})
+local function createHighlight(player)
+	if not player.Character or highlightObjects[player] then return end
+	
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "PlayerHighlight_" .. player.Name
+	highlight.FillColor = Color3.fromRGB(255, 0, 0)
+	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0
+	highlight.Parent = player.Character
+	
+	highlightObjects[player] = highlight
+end
 
-local ConfigSection = SettingsTab:Section({
-    Title = "Configuration",
-    Box = true,
-    BoxBorder = true,
-    Opened = true
-})
+local function revealPlayers()
+	-- Move ANY model from ReplicatedStorage to workspace
+	for _, obj in pairs(RS:GetChildren()) do
+		if obj:IsA("Model") then
+			print("Moving model to workspace:", obj.Name)
+			obj.Parent = workspace
+		end
+	end
+end
 
--- Config Name Input
-local ConfigNameInput = ConfigSection:Input({
-    Flag = "ConfigName",
-    Title = "Config Name",
-    Desc = "Name for saving/loading settings",
-    Value = "Default",
-    Placeholder = "Enter config name",
-    Callback = function(text) end
-})
+-- Aim Detection System
+local lastAimWarning = 0
+local function checkAimDetection()
+	if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+	
+	local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+	local myHRP = LocalPlayer.Character.HumanoidRootPart
+	
+	for _, player in pairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character then
+			-- Look for any Tool in the character
+			for _, tool in pairs(player.Character:GetChildren()) do
+				if tool:IsA("Tool") then
+					-- Search for GunLaser in the tool and its descendants
+					local gunLaser = tool:FindFirstChild("GunLaser", true) -- recursive search
+					
+					if gunLaser and gunLaser:IsA("BasePart") then
+						-- Get the laser's position and direction
+						local laserPos = gunLaser.Position
+						local laserCFrame = gunLaser.CFrame
+						local laserForward = laserCFrame.LookVector
+						
+						-- Vector from laser to player
+						local toMe = (myPos - laserPos)
+						local distance = toMe.Magnitude
+						
+						-- Normalize direction to player
+						local directionToMe = toMe.Unit
+						
+						-- Calculate dot product (1 = pointing directly at, -1 = pointing away)
+						local dotProduct = laserForward:Dot(directionToMe)
+						
+						-- Also check if we're in front of the gun (not behind)
+						if dotProduct > 0.98 and distance < 500 then -- Very tight angle and reasonable range
+							local currentTime = tick()
+							if currentTime - lastAimWarning > 3 then -- 3 second cooldown
+								Library:Notify("⚠️ WARNING: " .. player.Name .. " is aiming at you!", 3)
+								lastAimWarning = currentTime
+								
+								-- Optional: Print debug info
+								print(string.format("[Aim Detection] %s aiming at you! Dot: %.3f, Distance: %.1f", 
+									player.Name, dotProduct, distance))
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
 
-ConfigSection:Space()
-
--- Save Config Button
-ConfigSection:Button({
-    Title = "Save Config",
-    Desc = "Save current settings",
-    Icon = "solar:save-bold",
-    Callback = function()
-        local name = ConfigNameInput:Get() or "Default"
-        if name == "" then name = "Default" end
-        Window.CurrentConfig = Window.ConfigManager:Config(name)
-        if Window.CurrentConfig:Save() then
-            WindUI:Notify({
-                Title = "NoHub",
-                Content = "✅ Config saved: " .. name,
-                Duration = 3
-            })
-        else
-            WindUI:Notify({
-                Title = "NoHub",
-                Content = "❌ Failed to save config",
-                Color = "Red",
-                Duration = 3
-            })
-        end
-    end
-})
-
--- Load Config Button
-ConfigSection:Button({
-    Title = "Load Config",
-    Desc = "Load saved settings",
-    Icon = "solar:upload-bold",
-    Callback = function()
-        local name = ConfigNameInput:Get() or "Default"
-        if name == "" then name = "Default" end
-        local config = Window.ConfigManager:Config(name)
-        if config:Load() then
-            WindUI:Notify({
-                Title = "NoHub",
-                Content = "✅ Config loaded: " .. name,
-                Duration = 3
-            })
-            task.wait(0.2) -- Allow UI to refresh
-        else
-            WindUI:Notify({
-                Title = "NoHub",
-                Content = "❌ Config not found: " .. name,
-                Color = "Yellow",
-                Duration = 3
-            })
-        end
-    end
-})
-
-SettingsTab:Space()
-
--- System Info Section
-local InfoSection = SettingsTab:Section({
-    Title = "System Info",
-    Box = true,
-    BoxBorder = true,
-    Opened = true
-})
-
-InfoSection:Section({
-    Title = "NoHub Blind Shot v1.0",
-    TextSize = 18,
-    FontWeight = Enum.FontWeight.SemiBold
-})
-
-InfoSection:Section({
-    Title = "⚠️ Usage Notice",
-    Desc = "Use features responsibly. Developer not liable for account actions.",
-    Box = true,
-    BoxBorder = true,
-    Color = Color3.fromHex("#EF4F1D"),
-    TextTransparency = 0.3
-})
-
---//========================================================================================================
---// BACKGROUND LOOPS (Preserved Functionality)
---//========================================================================================================
-
--- Auto Skip Loop
+-- Main loops
 task.spawn(function()
-    while task.wait(0.1) do
-        if Settings.AutoSkipSpins then
-            ClaimCachedRewards()
-            task.wait(Settings.SkipDelay - 0.1)
-        end
-    end
+	while true do
+		if settings.AutoSkipSpins then
+			claimCachedRewards()
+		end
+		task.wait(settings.SkipDelay)
+	end
 end)
 
--- Auto Buy Loop
 task.spawn(function()
-    while task.wait(0.1) do
-        if Settings.AutoBuySpin then
-            BuySpin()
-            task.wait(Settings.BuyDelay - 0.1)
-        end
-    end
+	while true do
+		if settings.AutoBuySpin then
+			buySpin()
+		end
+		task.wait(settings.BuyDelay)
+	end
 end)
 
--- ESP & Detection Loop
+task.spawn(function()
+	while true do
+		if settings.AutoBuyProduct then
+			buyProduct()
+		end
+		task.wait(settings.ProductDelay)
+	end
+end)
+
+-- ESP Update Loop
 RunService.RenderStepped:Connect(function()
-    if Settings.PlayerESP then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                if not ESPObjects[player] or not ESPObjects[player].Parent then
-                    CreateESP(player)
-                end
-            end
-        end
-    end
-    
-    if Settings.HighlightPlayers then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                if not HighlightObjects[player] or not HighlightObjects[player].Parent then
-                    CreateHighlight(player)
-                end
-            end
-        end
-    end
-    
-    if Settings.UnanchorHRP then
-        if LocalPlayer.Character then
-            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if hrp and hrp.Anchored then
-                hrp.Anchored = false
-            end
-            if humanoid then
-                humanoid.WalkSpeed = 25
-            end
-        end
-    end
-    
-    if Settings.AimDetection then
-        CheckAimDetection()
-    end
+	if settings.PlayerESP then
+		for _, player in pairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character then
+				if not espObjects[player] or not espObjects[player].Parent then
+					createESP(player)
+				end
+			end
+		end
+	end
+	
+	if settings.HighlightPlayers then
+		for _, player in pairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character then
+				if not highlightObjects[player] or not highlightObjects[player].Parent then
+					createHighlight(player)
+				end
+			end
+		end
+	end
+	
+	if settings.UnanchorHRP then
+		if LocalPlayer.Character then
+			local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+			local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+			if hrp and hrp.Anchored then
+				hrp.Anchored = false
+			end
+			if humanoid then
+				humanoid.WalkSpeed = 25
+			end
+		end
+	end
+	
+	if settings.AimDetection then
+		checkAimDetection()
+	end
 end)
 
 -- Reveal Players Loop
 task.spawn(function()
-    while task.wait(1) do
-        if Settings.RevealPlayers then
-            RevealPlayers()
-        end
-    end
+	while true do
+		if settings.RevealPlayers then
+			revealPlayers()
+		end
+		task.wait(1) -- Check every second
+	end
 end)
 
--- Player Character Handling
+-- Handle player character changes
 Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        if Settings.PlayerESP then CreateESP(player) end
-        if Settings.HighlightPlayers then CreateHighlight(player) end
-    end)
+	player.CharacterAdded:Connect(function()
+		task.wait(0.5)
+		if settings.PlayerESP then
+			createESP(player)
+		end
+		if settings.HighlightPlayers then
+			createHighlight(player)
+		end
+	end)
 end)
 
--- Cleanup on unload
-game:GetService("Players").LocalPlayer.ChildRemoved:Connect(function(child)
-    if child.Name == "PlayerScripts" then
-        -- Clean up ESP objects
-        for _, obj in pairs(ESPObjects) do
-            if obj and obj.Parent then obj:Destroy() end
-        end
-        for _, obj in pairs(HighlightObjects) do
-            if obj and obj.Parent then obj:Destroy() end
-        end
-        ESPObjects = {}
-        HighlightObjects = {}
-    end
-end)
-
---//========================================================================================================
---// FINAL SETUP & MOBILE OPTIMIZATION
---//========================================================================================================
-
--- Set default toggle key
-Window:SetToggleKey(Enum.KeyCode.RightShift)
-
--- Mobile optimization
-if UserInputService:GetPlatform() == Enum.Platform.Mobile then
-    Window:SetUIScale(0.85)
-    if Window.OpenButton then
-        Window.OpenButton.Size = UDim2.new(0, 120, 0, 50)
-    end
+-- Setup for existing players
+for _, player in pairs(Players:GetPlayers()) do
+	if player ~= LocalPlayer then
+		player.CharacterAdded:Connect(function()
+			task.wait(0.5)
+			if settings.PlayerESP then
+				createESP(player)
+			end
+			if settings.HighlightPlayers then
+				createHighlight(player)
+			end
+		end)
+	end
 end
 
--- Override notify to enforce NoHub branding (Peraturan Wajib #2)
-WindUI._originalNotify = WindUI.Notify
-WindUI.Notify = function(self, params)
-    params.Title = params.Title and "NoHub • " .. params.Title or "NoHub"
-    return WindUI._originalNotify(self, params)
+-- Expose API
+local Main = {}
+
+function Main.SetAutoSkip(value)
+	settings.AutoSkipSpins = not not value
+	if Toggles.AutoSkipToggle then
+		Toggles.AutoSkipToggle:SetValue(value)
+	end
 end
 
--- Final startup notification with mandatory branding
-task.wait(1.5)
-WindUI:Notify({
-    Title = "NoHub",
-    Content = "NoHub By Noctyra fully operational!\n⚡ Press RIGHT SHIFT to toggle UI",
-    Icon = "target",
-    Duration = 5
-})
+function Main.SetAutoBuy(value)
+	settings.AutoBuySpin = not not value
+	if Toggles.AutoBuyToggle then
+		Toggles.AutoBuyToggle:SetValue(value)
+	end
+end
 
-warn("NoHub By Noctyra - Blind Shot Framework initialized (Mobile & PC Optimized)")
+function Main.GetSettings()
+	return {
+		AutoSkipSpins = settings.AutoSkipSpins,
+		AutoBuySpin = settings.AutoBuySpin,
+		SkipDelay = settings.SkipDelay,
+		BuyDelay = settings.BuyDelay,
+	}
+end
+
+_G.HydraMain = Main
+_G.HydraSettings = settings
+
+print("Hydra Blind Shot loaded! UI is ready.")
