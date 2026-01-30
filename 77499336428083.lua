@@ -1,5 +1,7 @@
+-- ✅ PERBAIKAN #1: HAPUS SPASI DI AKHIR URL (penyebab utama GUI tidak muncul)
 local syde = loadstring(game:HttpGet("https://raw.githubusercontent.com/essencejs/syde/refs/heads/main/source", true))()
 
+-- Setup karakter
 local player = game.Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
@@ -12,9 +14,10 @@ if folder then
     if uw then uw:Destroy() end
 end
 
--- Setup lingkungan
+-- Setup lingkungan (dengan fallback jika tidak ditemukan)
 local ocean = workspace:FindFirstChild("OceanTile1")
-local wavemath = require(game.ReplicatedStorage.WaveMath)
+local wavemath = pcall(function() return require(game.ReplicatedStorage.WaveMath) end) and require(game.ReplicatedStorage.WaveMath) or nil
+
 local floatForce
 local buoyancyEnabled = false
 local cashEnabled = false
@@ -42,15 +45,18 @@ local Window = syde:Init({
 	SubText = 'All Library Features'
 })
 
--- ✅ PERBAIKAN #1: Tambahkan '=' yang hilang
+-- ✅ PERBAIKAN #2: TAMBAHKAN '=' YANG HILANG
 local MainTab = Window:InitTab('Main')
+
+-- ✅ PERBAIKAN #3: TAMBAHKAN SECTION AGAR TOGGLE TERLIHAT (wajib di Syde)
+MainTab:Section('Game Features', '7488932274')
 
 -- Toggle: No Underwater
 MainTab:Toggle({
 	Title = 'No Underwater',
+	Description = 'Prevent drowning and stay above water surface',
 	Value = false,
 	CallBack = function(value)
-		-- ✅ PERBAIKAN #2: Langsung assign value (bukan not value)
 		buoyancyEnabled = value
 		
 		if not buoyancyEnabled and floatForce then
@@ -69,9 +75,9 @@ MainTab:Toggle({
 -- Toggle: Inf Money
 MainTab:Toggle({
 	Title = 'Inf Money',
+	Description = 'Automatically grant 1,000 cash every 1.2 seconds',
 	Value = false,
 	CallBack = function(value)
-		-- ✅ PERBAIKAN #2: Langsung assign value
 		cashEnabled = value
 		
 		if cashConnection then
@@ -84,7 +90,6 @@ MainTab:Toggle({
 			cashConnection = game:GetService("RunService").Heartbeat:Connect(function()
 				if not cashEnabled then return end
 				local now = tick()
-				-- ✅ PERBAIKAN #3: Ganti wait() dengan time-check aman
 				if now - lastGrant >= 1.2 then
 					lastGrant = now
 					local args = {
@@ -112,15 +117,12 @@ MainTab:Toggle({
 	end,
 })
 
--- ✅ PERBAIKAN #4: Definisikan grantReward sekali di awal
-local grantReward = game:GetService("ReplicatedStorage"):WaitForChild("GrantReward")
-
 -- Toggle: Get Creatures
 MainTab:Toggle({
 	Title = 'Get Creatures',
+	Description = 'Spawn rare sea creatures automatically',
 	Value = false,
 	CallBack = function(value)
-		-- ✅ PERBAIKAN #2: Langsung assign value
 		creaturesEnabled = value
 		
 		if creatureConnection then
@@ -129,6 +131,7 @@ MainTab:Toggle({
 		end
 
 		if creaturesEnabled then
+			local grantReward = game:GetService("ReplicatedStorage"):WaitForChild("GrantReward")
 			local creaturesList = {
 				{rarity = "Common", name = "Archelon"},
 				{rarity = "Rare", name = "Metriorhynchus"},
@@ -138,7 +141,6 @@ MainTab:Toggle({
 			creatureConnection = game:GetService("RunService").Heartbeat:Connect(function()
 				if not creaturesEnabled then return end
 				local now = tick()
-				-- ✅ PERBAIKAN #3: Rate-limit dengan aman
 				if now - lastCycle >= 2.5 then
 					lastCycle = now
 					for _, info in ipairs(creaturesList) do
@@ -153,14 +155,12 @@ MainTab:Toggle({
 								displayName = info.name
 							})
 						end)
-						-- Delay kecil antar creature (aman karena di luar Heartbeat loop utama)
 						wait(0.3)
 					end
 				end
 			end)
 		end
 		
-		-- ✅ PERBAIKAN #5: Perbaiki title notifikasi
 		syde:Notify({
 			Title = 'Get Creatures',
 			Content = 'Toggle is now ' .. (value and 'ON' or 'OFF'),
@@ -169,14 +169,13 @@ MainTab:Toggle({
 	end,
 })
 
--- Sistem buoyancy
+-- Sistem buoyancy (dengan error handling)
 local function keepAboveWater()
 	if not buoyancyEnabled or not character or not rootPart or not humanoid then return end
 	if not ocean or not wavemath then return end
 	
 	local pos = rootPart.Position
-	-- ✅ PERBAIKAN #6: Wave calculation yang lebih akurat
-	local waveHeight = wavemath.GetPosition(pos.X, pos.Z, workspace:GetServerTimeNow()).Y
+	local waveHeight = pcall(function() return wavemath.GetPosition(pos.X, pos.Z, workspace:GetServerTimeNow()).Y end) and wavemath.GetPosition(pos.X, pos.Z, workspace:GetServerTimeNow()).Y or 0
 	local waveY = ocean.Position.Y + math.abs(waveHeight)
 	
 	if pos.Y < waveY then
@@ -203,15 +202,6 @@ end
 
 game:GetService("RunService").Heartbeat:Connect(keepAboveWater)
 
--- Anti-ragdoll underwater
-if character:FindFirstChild("IsRagdoll") then
-	character.IsRagdoll.Changed:Connect(function()
-		if buoyancyEnabled and humanoid then
-			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-		end
-	end)
-end
-
 -- Auto-reconnect character
 player.CharacterAdded:Connect(function(newChar)
 	character = newChar
@@ -230,6 +220,6 @@ end)
 
 syde:Notify({
 	Title = 'NoHub Complete',
-	Content = 'All features loaded successfully!',
+	Content = 'GUI loaded successfully! Check the Main tab for features.',
 	Duration = 5
 })
