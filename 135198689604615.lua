@@ -238,7 +238,7 @@ local function CreateModernGui()
     local title = Instance.new("TextLabel", titleBar)
     title.Size = UDim2.new(1, 0, 1, 0)
     title.BackgroundTransparency = 1
-    title.Text = "🌀 VOID SLAP PRO"
+    title.Text = ""
     title.TextColor3 = Color3.new(1,1,1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
