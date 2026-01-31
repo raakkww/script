@@ -1,4 +1,4 @@
--- UI Settings 📱
+
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 local Frame = Instance.new("Frame", ScreenGui)
 local UIListLayout = Instance.new("UIListLayout", Frame)
@@ -80,5 +80,3 @@ mp5Btn.MouseButton1Click:Connect(function()
 end)
 
 exitBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
-
-print("English Menu with New Locations Loaded! 🚀🏴‍☠️✨")
