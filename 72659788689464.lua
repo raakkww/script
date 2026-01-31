@@ -350,7 +350,7 @@ local function createGUI()
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1,0,0,34)
     title.BackgroundTransparency = 1
-    title.Text = "Brave GUI LIP"
+    title.Text = ""
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
     title.TextColor3 = Color3.fromRGB(255,255,255)
@@ -660,5 +660,3 @@ local function createGUI()
 end
 
 createGUI()
-
-print("Brave GUI LIP v1.1 – statusy zależne od języka GUI")
