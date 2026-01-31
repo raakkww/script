@@ -4,7 +4,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
+local Mouse = LocalPlayer:GetMouse() 
 
 local binds = {
     aim           = {inputType = "KeyCode", value = Enum.KeyCode.E},
