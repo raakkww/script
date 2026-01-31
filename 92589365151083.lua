@@ -1,5 +1,3 @@
--- GZSSF SPLASH SCREEN
--- By GZSSF
 
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
