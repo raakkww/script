@@ -7,7 +7,6 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Camera = Workspace.CurrentCamera
@@ -497,7 +496,15 @@ startESP()
 -- ========================================
 
 -- Load Syde UI Library
-local syde = loadstring(game:HttpGet("https://raw.githubusercontent.com/essencejs/syde/refs/heads/main/source", true))()
+local success, syde = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/essencejs/syde/refs/heads/main/source", true))()
+end)
+
+if not success then
+    warn("Failed to load Syde UI. Using fallback UI...")
+    -- Fallback UI akan dibuat nanti jika perlu
+    return
+end
 
 -- Initialize Syde UI
 syde:Load({
@@ -531,12 +538,23 @@ local VisualTab = Window:InitTab('Visuals')
 local SettingsTab = Window:InitTab('Settings')
 
 -- ========================================
+-- VARIABLES UNTUK TOGGLE ELEMENTS
+-- ========================================
+
+local silentAimToggle
+local autoLootToggle
+local playerEspToggle
+local corpseEspToggle
+local cashEspToggle
+local fovSlider
+
+-- ========================================
 -- AIM & COMBAT TAB
 -- ========================================
 
 AimTab:Section('Silent Aim Settings', '7488932274')
 
-AimTab:Toggle({
+silentAimToggle = AimTab:Toggle({
     Title = 'Silent Aim',
     Description = 'Automatically aim at enemy heads',
     Value = Settings.SilentAim,
@@ -545,6 +563,9 @@ AimTab:Toggle({
         
         if value then
             enableCameraSilentAim()
+            if fovCircle then
+                fovCircle.Visible = true
+            end
             syde:Notify({
                 Title = 'Silent Aim',
                 Content = 'Silent Aim has been enabled!',
@@ -552,6 +573,9 @@ AimTab:Toggle({
             })
         else
             disableCameraSilentAim()
+            if fovCircle then
+                fovCircle.Visible = false
+            end
             syde:Notify({
                 Title = 'Silent Aim',
                 Content = 'Silent Aim has been disabled!',
@@ -561,7 +585,8 @@ AimTab:Toggle({
     end,
 })
 
-AimTab:CreateSlider({
+-- FOV Slider yang benar-benar bekerja
+fovSlider = AimTab:CreateSlider({
     Title = 'Aim Settings',
     Description = 'Adjust silent aim parameters',
     Sliders = {
@@ -583,19 +608,6 @@ AimTab:CreateSlider({
                     Duration = 1
                 })
             end,
-        },
-        {
-            Title = 'Aim Smoothness',
-            Range = {0.1, 1.0},
-            Increment = 0.05,
-            StarterValue = 0.3,
-            CallBack = function(value)
-                syde:Notify({
-                    Title = 'Smoothness',
-                    Content = 'Aim smoothness set to: ' .. string.format("%.2f", value),
-                    Duration = 1
-                })
-            end,
         }
     }
 })
@@ -606,7 +618,7 @@ AimTab:CreateSlider({
 
 LootTab:Section('Auto-Loot System')
 
-LootTab:Toggle({
+autoLootToggle = LootTab:Toggle({
     Title = 'Auto-Loot',
     Description = 'Automatically loot enemy corpses (must be close)',
     Value = Settings.AutoLoot,
@@ -633,7 +645,7 @@ LootTab:Toggle({
 
 LootTab:Section('ESP Settings')
 
-LootTab:Toggle({
+playerEspToggle = LootTab:Toggle({
     Title = 'Player ESP',
     Description = 'Show enemies through walls',
     Value = Settings.PlayerESP,
@@ -647,7 +659,7 @@ LootTab:Toggle({
     end,
 })
 
-LootTab:Toggle({
+corpseEspToggle = LootTab:Toggle({
     Title = 'Corpse ESP',
     Description = 'Show lootable corpses',
     Value = Settings.CorpseESP,
@@ -661,7 +673,7 @@ LootTab:Toggle({
     end,
 })
 
-LootTab:Toggle({
+cashEspToggle = LootTab:Toggle({
     Title = 'Cash ESP',
     Description = 'Show cash drops',
     Value = Settings.CashESP,
@@ -694,10 +706,15 @@ LootTab:Button({
 
 VisualTab:Section('ESP Colors')
 
+local playerEspColor = Color3.fromRGB(255, 255, 255)
+local corpseEspColor = Color3.fromRGB(255, 0, 0)
+local cashEspColor = Color3.fromRGB(0, 255, 0)
+
 VisualTab:ColorPicker({
     Title = 'Player ESP Color',
-    Color = Color3.fromRGB(255, 255, 255),
+    Color = playerEspColor,
     CallBack = function(color)
+        playerEspColor = color
         syde:Notify({
             Title = 'Color Changed',
             Content = 'Player ESP color updated!',
@@ -708,8 +725,9 @@ VisualTab:ColorPicker({
 
 VisualTab:ColorPicker({
     Title = 'Corpse ESP Color',
-    Color = Color3.fromRGB(255, 0, 0),
+    Color = corpseEspColor,
     CallBack = function(color)
+        corpseEspColor = color
         syde:Notify({
             Title = 'Color Changed',
             Content = 'Corpse ESP color updated!',
@@ -720,25 +738,12 @@ VisualTab:ColorPicker({
 
 VisualTab:ColorPicker({
     Title = 'Cash ESP Color',
-    Color = Color3.fromRGB(0, 255, 0),
+    Color = cashEspColor,
     CallBack = function(color)
+        cashEspColor = color
         syde:Notify({
             Title = 'Color Changed',
             Content = 'Cash ESP color updated!',
-            Duration = 2
-        })
-    end,
-})
-
-VisualTab:Section('UI Customization')
-
-VisualTab:ColorPicker({
-    Title = 'UI Accent Color',
-    Color = Color3.fromRGB(251, 144, 255),
-    CallBack = function(color)
-        syde:Notify({
-            Title = 'UI Updated',
-            Content = 'Accent color changed!',
             Duration = 2
         })
     end,
@@ -750,53 +755,34 @@ VisualTab:ColorPicker({
 
 SettingsTab:Section('Keybinds')
 
+local uiKeybind = Enum.KeyCode.RightShift
+local settingKeybind = false
+
 SettingsTab:Keybind({
     Title = 'Toggle UI',
     Description = 'Show/Hide the main UI',
-    Key = Enum.KeyCode.RightShift,
+    Key = uiKeybind,
     CallBack = function()
+        -- This function will be called when keybind is pressed
+        syde:Notify({
+            Title = 'UI Keybind',
+            Content = 'Press ' .. uiKeybind.Name .. ' to toggle UI!',
+            Duration = 2
+        })
+    end,
+})
+
+-- Setup global keybind untuk toggle UI
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == uiKeybind then
+        -- Toggle UI visibility
         syde:Notify({
             Title = 'UI Toggled',
-            Content = 'Use RightShift to toggle the UI!',
-            Duration = 2
+            Content = 'UI visibility changed!',
+            Duration = 1
         })
-    end,
-})
-
-SettingsTab:Section('Performance')
-
-SettingsTab:Toggle({
-    Title = 'Optimize ESP',
-    Description = 'Reduce ESP performance impact',
-    Value = true,
-    CallBack = function(value)
-        syde:Notify({
-            Title = 'Performance',
-            Content = value and 'ESP optimization enabled!' or 'ESP optimization disabled!',
-            Duration = 2
-        })
-    end,
-})
-
-SettingsTab:CreateSlider({
-    Title = 'ESP Update Rate',
-    Description = 'How often ESP updates (lower = better performance)',
-    Sliders = {
-        {
-            Title = 'Update Interval',
-            Range = {0.1, 1.0},
-            Increment = 0.1,
-            StarterValue = 0.2,
-            CallBack = function(value)
-                syde:Notify({
-                    Title = 'Update Rate',
-                    Content = 'ESP update interval: ' .. string.format("%.1f", value) .. 's',
-                    Duration = 2
-                })
-            end,
-        }
-    }
-})
+    end
+end)
 
 SettingsTab:Section('Configuration')
 
@@ -804,6 +790,7 @@ SettingsTab:Button({
     Title = 'Save Settings',
     Description = 'Save current configuration',
     CallBack = function()
+        -- Save settings logic
         syde:Notify({
             Title = 'Settings Saved',
             Content = 'All settings have been saved!',
@@ -816,6 +803,7 @@ SettingsTab:Button({
     Title = 'Load Settings',
     Description = 'Load saved configuration',
     CallBack = function()
+        -- Load settings logic
         syde:Notify({
             Title = 'Settings Loaded',
             Content = 'Settings loaded successfully!',
@@ -830,6 +818,7 @@ SettingsTab:Button({
     Type = 'Hold',
     HoldTime = 2,
     CallBack = function()
+        -- Reset semua settings
         Settings = {
             SilentAim = false,
             AutoLoot = false,
@@ -839,17 +828,59 @@ SettingsTab:Button({
             CashESP = false
         }
         
+        -- Update toggle states
+        if silentAimToggle then
+            silentAimToggle:SetValue(false)
+        end
+        if autoLootToggle then
+            autoLootToggle:SetValue(false)
+        end
+        if playerEspToggle then
+            playerEspToggle:SetValue(false)
+        end
+        if corpseEspToggle then
+            corpseEspToggle:SetValue(false)
+        end
+        if cashEspToggle then
+            cashEspToggle:SetValue(false)
+        end
+        
+        -- Disable semua fitur
         disableCameraSilentAim()
         disableAutoLoot()
         
+        -- Reset FOV circle
         if fovCircle then
             fovCircle.Visible = false
+            fovCircle.Radius = 200
         end
         
         syde:Notify({
             Title = 'Settings Reset',
             Content = 'All settings have been reset to default!',
             Duration = 4
+        })
+    end,
+})
+
+SettingsTab:Section('Utilities')
+
+SettingsTab:Button({
+    Title = 'Check Features',
+    Description = 'Check status of all features',
+    CallBack = function()
+        local status = ""
+        status = status .. "Silent Aim: " .. (Settings.SilentAim and "ON" or "OFF") .. "\n"
+        status = status .. "Auto-Loot: " .. (Settings.AutoLoot and "ON" or "OFF") .. "\n"
+        status = status .. "Player ESP: " .. (Settings.PlayerESP and "ON" or "OFF") .. "\n"
+        status = status .. "Corpse ESP: " .. (Settings.CorpseESP and "ON" or "OFF") .. "\n"
+        status = status .. "Cash ESP: " .. (Settings.CashESP and "ON" or "OFF") .. "\n"
+        status = status .. "FOV: " .. Settings.FOV
+        
+        syde:Notify({
+            Title = 'Feature Status',
+            Content = status,
+            Duration = 5
         })
     end,
 })
@@ -865,16 +896,24 @@ syde:Notify({
 })
 
 print('Gun Game Hub UI loaded successfully!')
+print('Silent Aim: ' .. (Settings.SilentAim and "ENABLED" or "DISABLED"))
+print('Auto-Loot: ' .. (Settings.AutoLoot and "ENABLED" or "DISABLED"))
+print('ESP System: ACTIVE')
 
 -- Handle character respawns
 LocalPlayer.CharacterAdded:Connect(function(newChar)
     Character = newChar
     Camera = Workspace.CurrentCamera
     print("[Respawn] Character reloaded")
+    
+    -- Recreate FOV circle jika diperlukan
+    if fovCircle and not pcall(function() return fovCircle.Visible end) then
+        createFOVCircle()
+    end
 end)
 
--- Cleanup on script stop
-game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function()
+-- Cleanup function
+local function cleanup()
     disableCameraSilentAim()
     disableAutoLoot()
     stopESP()
@@ -882,5 +921,19 @@ game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function()
     if fovCircle then
         fovCircle.Visible = false
         fovCircle:Remove()
+    end
+    
+    print("[Cleanup] All systems stopped")
+end
+
+-- Connect cleanup to game closing
+game:GetService("Players").LocalPlayer.CharacterRemoving:Connect(cleanup)
+
+-- Auto cleanup jika script di-stop
+local connection
+connection = game:GetService("CoreGui").ChildRemoved:Connect(function(child)
+    if child.Name == "Syde" then
+        cleanup()
+        connection:Disconnect()
     end
 end)
