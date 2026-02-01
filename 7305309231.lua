@@ -5,10 +5,10 @@ local VirtualUser = game:GetService("VirtualUser")
 local Workspace = game:GetService("Workspace")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
--- Load WindUI
+-- Load Library
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
 
--- // GLOBAL STATES (getfenv replacement) // --
+-- // GLOBAL STATES // --
 local State = {
     Candy = false,
     PartCollector = false,
@@ -51,12 +51,12 @@ Players.LocalPlayer.Idled:Connect(function()
     VirtualUser:Button2Up(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
 end)
 
--- Anti-Staff
+-- Anti-Staff Logic
 task.spawn(function()
     while task.wait(5) do
         for _, v in pairs(Players:GetPlayers()) do
             if v:GetRankInGroup(11987919) > 149 then
-                Players.LocalPlayer:Kick("Auto Kicked: Staff Member " .. v.Name .. " detected.")
+                Players.LocalPlayer:Kick("Staff member detected in server.")
             end
         end
     end
@@ -64,11 +64,9 @@ end)
 
 -- // WINDOW SETUP // --
 local Window = WindUI:CreateWindow({
-    Title = "Fixz Hub | Taxi Boss",
-    SubTitle = "by devfixz",
+    Title = "Taxi Boss", -- Nama GUI bersih
     Icon = "solar:car-bold",
-    Author = "devfixz",
-    Folder = "KoumalaHub_TaxiBoss",
+    Folder = "TaxiBoss_Settings", -- Nama folder config generic
 })
 
 -- // TABS // --
@@ -81,11 +79,11 @@ local Tabs = {
 }
 
 -- // FARM TAB // --
-Tabs.Farm:Section({ Title = "Farming Features" })
+Tabs.Farm:Section({ Title = "Farming" })
 
 Tabs.Farm:Toggle({
     Title = "Auto Destroy Pumpkins",
-    Desc = "Auto destroy pumpkins for candy",
+    Desc = "Collect candy automatically",
     Callback = function(v)
         State.Candy = v
         while State.Candy do
@@ -106,7 +104,7 @@ Tabs.Farm:Toggle({
 
 Tabs.Farm:Toggle({
     Title = "Auto Collect Parts",
-    Desc = "Auto teleport and collect vehicle parts",
+    Desc = "Collect vehicle parts across map",
     Callback = function(v)
         State.PartCollector = v
         while State.PartCollector do
@@ -131,11 +129,11 @@ Tabs.Farm:Toggle({
 })
 
 -- // MONEY TAB // --
-Tabs.Money:Section({ Title = "Money Farming" })
+Tabs.Money:Section({ Title = "Auto Income" })
 
 Tabs.Money:Toggle({
     Title = "Auto Money",
-    Desc = "Auto complete material contracts",
+    Desc = "Material contracts loop",
     Callback = function(v)
         State.AutoMoney = v
         pcall(function()
@@ -161,7 +159,7 @@ Tabs.Money:Toggle({
 
 Tabs.Money:Toggle({
     Title = "Auto Upgrade Office",
-    Desc = "Upgrade office to level 16",
+    Desc = "Reach office level 16",
     Callback = function(v)
         State.AutoOffice = v
         while State.AutoOffice do
@@ -179,7 +177,7 @@ Tabs.Money:Toggle({
 })
 
 -- // RACE TAB // --
-Tabs.Race:Section({ Title = "Racing Features" })
+Tabs.Race:Section({ Title = "Racing" })
 
 Tabs.Race:Toggle({
     Title = "Auto Trophies",
@@ -232,13 +230,13 @@ local locs = {
 }
 
 Tabs.Teleports:Dropdown({
-    Title = "Select Destination",
+    Title = "Teleport To",
     Values = locs,
     Callback = function(v) teleportTo(v) end
 })
 
 -- // MISC TAB // --
-Tabs.Misc:Section({ Title = "Utilities" })
+Tabs.Misc:Section({ Title = "Tools" })
 
 Tabs.Misc:Input({
     Title = "Purchase Car",
@@ -259,26 +257,7 @@ Tabs.Misc:Button({
 })
 
 Tabs.Misc:Button({
-    Title = "Show Player Stats (F9)",
-    Callback = function()
-        VirtualInputManager:SendKeyEvent(true, "F9", false, game)
-        for _, p in pairs(Players:GetPlayers()) do
-            print("--- " .. p.Name .. " Owned Cars ---")
-            local cars = {}
-            for _, b in pairs(p.Data.OwnedCars:GetChildren()) do
-                if b.Value == true then
-                    for _, d in pairs(require(ReplicatedStorage.ModuleLists.CarList)) do
-                        if d.id == tonumber(b.Name) then table.insert(cars, d.name) end
-                    end
-                end
-            end
-            warn(table.concat(cars, ", "))
-        end
-    end
-})
-
-Tabs.Misc:Button({
-    Title = "Remove AI & Barriers",
+    Title = "Remove Traffic & Barriers",
     Callback = function()
         if Workspace:FindFirstChild("Tracks") then Workspace.Tracks:Destroy() end
         if Workspace:FindFirstChild("AreaLocked") then Workspace.AreaLocked:Destroy() end
@@ -299,9 +278,9 @@ Tabs.Misc:Toggle({
     end
 })
 
--- Notify Load
+-- Final Notification
 WindUI:Notify({
-    Title = "Koumala Hub Ported!",
-    Content = "Semua fitur Fluent UI sekarang di WindUI.",
-    Duration = 5
+    Title = "Loaded",
+    Content = "Script is ready.",
+    Duration = 3
 })
