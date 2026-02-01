@@ -156,7 +156,7 @@ end
 -----------------------------------------
 
 local CheckData = {
-    pasteURL = "https://pastefy.app/TNZtzh3O/raw",
+    pasteURL = "https://raw.githubusercontent.com/quietxhub99/raul/refs/heads/main/upd.txt",
     interval = 30,
     kicked = false,
     notified = false
@@ -176,15 +176,15 @@ local function checkStatus()
     if response == "UPDATE" then
         if not CheckData.kicked then
             CheckData.kicked = true
-            LocalPlayer:Kick("NoctyraHub Premium Update Available!.")
+            LocalPlayer:Kick("QuietXHub Premium Update Available!.")
         end
     elseif response == "LATEST" then
         if not CheckData.notified then
             CheckData.notified = true
-            warn("[NoctyraHub] Status: Latest version")
+            warn("Status: Latest version")
         end
     else
-        warn("[NoctyraHub] Status unknown:", response)
+        warn("Status unknown:", response)
     end
 end
 
@@ -219,7 +219,7 @@ WindUI:AddTheme({
     Icon = Color3.fromHex("#2DD4FF")           -- Aqua Highlight
 })
 
-_G.THEME_RAW_URL = "https://pastefy.app/SZc0pFur/raw"
+_G.THEME_RAW_URL = "https://pastebin.com/raw/KfJ0jGmL"
 
 function LoadThemesFromRaw(url)
     local success, themes = pcall(function()
@@ -266,13 +266,13 @@ WindUI.TransparencyValue = 0.15
 
 local Window = WindUI:CreateWindow({
     Title = "Fish It",
-    Icon = "https://i.ibb.co.com/rGwcvBcS/1768006325-Photoroom.png",
+    Icon = "",
     IconSize = 18*2,
     Size = UDim2.fromOffset(580, 460),
-    Author = "by Noctyra",
-    Folder = "NoctyraHub",
+    Author = "",
+    Folder = "QuietXHub",
     Transparent = true,
-    Theme = "BloodAbyss",
+    Theme = "QuietOcean",
     ToggleKey = Enum.KeyCode.G,
     KeySystem = false,
     ScrollBarEnabled = true,
@@ -289,13 +289,13 @@ local Window = WindUI:CreateWindow({
 })
 
 Window:EditOpenButton({
-    Title = "NoctyraHub",
-    Icon = "https://i.ibb.co.com/rGwcvBcS/1768006325-Photoroom.png",
+    Title = "Open Menu",
+    Icon = "",
     IconSize = 18*2,
     CornerRadius = UDim.new(0, 28),
     StrokeThickness = 0.5,
     Color = ColorSequence.new(
-        Color3.fromHex("#bd1f8d"),
+        Color3.fromHex("#2DD4FF"),
         Color3.fromHex("#0A2E47")
     ),
     OnlyMobile = false,
@@ -305,7 +305,7 @@ Window:EditOpenButton({
 
 Window:Tag({
     Title = "PREMIUM",
-    Color = Color3.fromHex("#ff5e00") -- Gold Pearl
+    Color = Color3.fromHex("#F6D87B") -- Gold Pearl
 })
 
 local ConfigManager = Window.ConfigManager
@@ -313,7 +313,7 @@ local myConfig = ConfigManager:CreateConfig("QuietXConfig")
 
 
 WindUI:Notify({
-    Title = "NoctyraHub",
+    Title = "",
     Content = "All Features Loaded!",
     Duration = 5,
     Image = "square-check-big"
@@ -495,6 +495,13 @@ end
 
 Home:Divider()
 
+Home:Section({
+    Title = "Script Information",
+    TextSize = 22,
+    TextXAlignment = "Center",
+})
+
+Home:Divider()
 
 if getgenv().AutoRejoinConnection then
     getgenv().AutoRejoinConnection:Disconnect()
@@ -1703,6 +1710,24 @@ _G.HighFish = _G.FishSec:Toggle({
 })
 
 myConfig:Register("FishHigh", _G.HighFish)
+
+_G.Perfection = _G.FishSec:Toggle({
+    Title = "PERFECTION!",
+    Desc = "Need Enchant PERFECTION!\nDo Not Turn On Fish Legit",
+    Value = true,
+    Callback = function(state)
+        local Players = game:GetService("Players") 
+        local LocalPlayer = Players.LocalPlayer
+        if state then
+            LocalPlayer:SetAttribute("Loading", nil)
+            game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RF/UpdateAutoFishingState"):InvokeServer(true)
+
+        else
+            game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RF/UpdateAutoFishingState"):InvokeServer(false)
+            LocalPlayer:SetAttribute("Loading", true)
+        end
+    end
+})
 
 _G.FishLegit = _G.FishSec:Toggle({
     Title = "Auto Fish Legit",
@@ -3196,7 +3221,8 @@ local islandCodes = {
     ["15"] = "The Temple (Unlock First)",
     ["16"] = "Ancient Ruin",
     ["18"] = "Pirate Cove",
-    ["18"] = "Pirate Treasure Room"
+    ["18"] = "Pirate Treasure Room",
+    ["19"] = "Crystal Depths",
 }
 
 local farmLocations = {
@@ -3329,13 +3355,17 @@ local farmLocations = {
         CFrame.new(3469.79932, 4.19277096, 3496.23315, 0.598028243, -1.68198007e-08, 0.801475048, 3.59461581e-08, 1, -5.83551296e-09, -0.801475048, 3.22997487e-08, 0.598028243),
         CFrame.new(3423.27734, 4.19297075, 3433.854, -0.852984607, -4.74888253e-08, -0.521936059, -8.19830319e-08, 1, 4.29965361e-08, 0.521936059, 7.94652877e-08, -0.852984607)
     },
-
-        ["Pirate Treasure Room"] = {
+    ["Pirate Treasure Room"] = {
         CFrame.new(3342.62842, -303.497864, 3031.78931, -0.974473, 4.25567244e-08, 0.224504679, 2.92667632e-08, 1, -6.25245491e-08, -0.224504679, -5.43579617e-08, -0.974473),
         CFrame.new(3309.69922, -304.120056, 3031.46533, -0.833008647, 3.85916898e-08, -0.553259969, 1.32056241e-08, 1, 4.9870394e-08, 0.553259969, 3.42363258e-08, -0.833008647),
         CFrame.new(3338.89404, -302.507324, 3089.49756, 0.908972621, 1.19190865e-07, 0.416855842, -1.08876826e-07, 1, -4.85175207e-08, -0.416855842, -1.2848439e-09, 0.908972621)
     },
-
+    ["Crystal Depths"] = {
+        CFrame.new(5493.9292, -905.426758, 15388.6152, 0.988680065, 8.46355319e-10, 0.150039181, -6.88645307e-10, 1, -1.10308129e-09, -0.150039181, 9.8727071e-10, 0.988680065),
+        CFrame.new(5479.45117, -905.566101, 15311.2441, -0.689366877, 2.96502733e-08, -0.724412382, 1.44044519e-08, 1, 2.72225069e-08, 0.724412382, 8.33153102e-09, -0.689366877),
+        CFrame.new(5700.58936, -905.412964, 15329.3477, -0.967974067, -8.2060275e-08, 0.251050174, -8.28385538e-08, 1, 7.46743645e-09, -0.251050174, -1.35683482e-08, -0.967974067),
+        CFrame.new(5734.73975, -901.84314, 15324.0293, -0.882043004, -1.53820352e-08, 0.471168876, -7.74457554e-10, 1, 3.11967341e-08, -0.471168876, 2.71519607e-08, -0.882043004),
+    }
 }
 
 local function startAutoFarmLoop()
@@ -5043,7 +5073,9 @@ local islandCoords = {
     ["15"] = { name = "The Temple", position = Vector3.new(1477, -22, -631) },
     ["16"] = { name = "Underground Cellar", position = Vector3.new(2133, -91, -674) },
     ["17"] = {name = "Ancient Ruin", position = Vector3.new(6052, -546, 4427) },
-    ["21"] = {name = "Pirate Cove", position = Vector3.new(3497, 4, 3447) }
+    ["21"] = {name = "Pirate Cove", position = Vector3.new(3497, 4, 3447) },
+    ["83"] = {name = "Crystal Pessage", position = Vector3.new(3433, -299, 3365) },
+    ["72"] = {name = "Crystal Depths", position = Vector3.new(5494, -905, 15389) }
 }
 
 local islandNames = {}
@@ -5394,7 +5426,7 @@ local function getInventoryCount()
 end
 
 local function validateWebhook(path)
-    local pasteUrl = "https://pastefy.app/" .. path .. "/raw"
+    local pasteUrl = "https://paste.monster/" .. path .. "/raw/"
     local success, response = pcall(function()
         return game:HttpGet(pasteUrl)
     end)
@@ -5470,7 +5502,6 @@ local function safeHttpRequest(data)
     warn("❌ Webhook gagal terkirim setelah " .. retries .. " percobaan.")
     return false
 end
-
 
 
 
@@ -5981,6 +6012,7 @@ game:GetService("CoreGui").RobloxPromptGui.promptOverlay.DescendantAdded:Connect
         sendDisconnectWebhook(disconnectReason)
     end
 end)
+
 
 
 REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, metadata)
