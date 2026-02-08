@@ -1,0 +1,145 @@
+local a,b,c,d=game:GetService("Players"),game:GetService("Workspace"),game:GetService("Debris"),game:GetService("RunService")
+local e=a.LocalPlayer
+local f="FlingVelocity"
+local g,h=true,100
+local i=false
+local j=Instance.new("ScreenGui")
+j.Name="FG"
+j.ResetOnSpawn=false
+j.Parent=e:WaitForChild("PlayerGui")
+local k=Instance.new("Frame")
+k.Size=UDim2.fromOffset(300,350)
+k.Position=UDim2.fromOffset(50,50)
+k.BackgroundColor3=Color3.fromRGB(40,40,40)
+k.BorderSizePixel=0
+k.Visible=false
+k.Active=true
+k.Draggable=true
+k.Parent=j
+local l=Instance.new("TextLabel")
+l.Size=UDim2.new(1,0,0,50)
+l.BackgroundTransparency=1
+l.Text="Fling GUI"
+l.TextScaled=true
+l.TextColor3=Color3.fromRGB(255,0,0)
+l.Font=Enum.Font.SourceSansBold
+l.Parent=k
+
+local aa=Instance.new("TextLabel")
+aa.Size=UDim2.new(1,0,0,30)
+aa.Position=UDim2.fromOffset(0,50)
+aa.BackgroundTransparency=1
+aa.TextScaled=true
+aa.TextColor3=Color3.fromRGB(200,200,200)
+aa.Font=Enum.Font.SourceSans
+aa.Visible=false
+aa.Parent=k
+local ab={77,97,100,101,32,98,121,32,83,99,114,105,112,116,68,117,100,101,57,57,57}
+local ac=""
+for ad,ae in ipairs(ab)do ac=ac..string.char(ae)end
+aa.Text=ac
+
+local m=Instance.new("TextButton")
+m.Size=UDim2.fromOffset(250,50)
+m.Position=UDim2.fromOffset(25,90)
+m.BackgroundColor3=Color3.fromRGB(170,0,0)
+m.TextColor3=Color3.new(1,1,1)
+m.Text="Super:ON"
+m.TextScaled=true
+m.Parent=k
+m.MouseButton1Click:Connect(function()g=not g m.Text="Super:"..(g and"ON"or"OFF")end)
+
+local n=Instance.new("TextBox")
+n.Size=UDim2.fromOffset(250,50)
+n.Position=UDim2.fromOffset(25,150)
+n.PlaceholderText="Strength"
+n.Text=tostring(h)
+n.TextScaled=true
+n.ClearTextOnFocus=false
+n.BackgroundColor3=Color3.fromRGB(50,50,50)
+n.TextColor3=Color3.new(1,1,1)
+n.Parent=k
+n.FocusLost:Connect(function()local x=tonumber(n.Text)if x then h=x else n.Text=tostring(h)end end)
+
+local o={100,10000,1000000}
+for p,q in ipairs(o)do
+local r=Instance.new("TextButton")
+r.Size=UDim2.fromOffset(110,40)
+r.Position=UDim2.fromOffset(25+(p-1)*115,210)
+r.BackgroundColor3=Color3.fromRGB(50,50,50)
+r.TextColor3=Color3.new(1,1,1)
+r.Text="S:"..q
+r.TextScaled=true
+r.Parent=k
+r.MouseButton1Click:Connect(function()h=q n.Text=tostring(q)end)
+end
+
+local s=Instance.new("TextButton")
+s.Size=UDim2.fromOffset(250,50)
+s.Position=UDim2.fromOffset(25,270)
+s.BackgroundColor3=Color3.fromRGB(50,0,100)
+s.TextColor3=Color3.new(1,1,1)
+s.Text="Persistent:OFF"
+s.TextScaled=true
+s.Parent=k
+s.MouseButton1Click:Connect(function()i=not i s.Text="Persistent:"..(i and"ON"or"OFF")end)
+
+local t=Instance.new("TextButton")
+t.Size=UDim2.fromOffset(30,30)
+t.Position=UDim2.fromOffset(270,0)
+t.BackgroundColor3=Color3.fromRGB(200,0,0)
+t.Text="X"
+t.TextScaled=true
+t.TextColor3=Color3.new(1,1,1)
+t.Parent=k
+t.MouseButton1Click:Connect(function()k.Visible=false end)
+
+local u=Instance.new("TextButton")
+u.Size=UDim2.fromOffset(120,40)
+u.Position=UDim2.fromOffset(20,20)
+u.BackgroundColor3=Color3.fromRGB(170,0,0)
+u.TextColor3=Color3.new(1,1,1)
+u.Text="GUI"
+u.TextScaled=true
+u.BorderSizePixel=0
+u.Active=true
+u.Draggable=true
+u.Parent=j
+u.MouseButton1Click:Connect(function()
+k.Visible=not k.Visible
+if k.Visible then
+aa.Visible=true
+task.delay(2,function()aa.Visible=false end)
+end
+end)
+
+b.ChildAdded:Connect(function(v)
+if v.Name~="GrabParts"then return end
+local w,p=pcall(function()return v:WaitForChild("GrabPart",2):WaitForChild("WeldConstraint",2).Part1 end)
+if not w or not p then return end
+local y=Instance.new("BodyVelocity")
+y.Name=f
+y.Parent=p
+local z
+z=v:GetPropertyChangedSignal("Parent"):Connect(function()
+if v.Parent==nil then
+if g then
+y.MaxForce=Vector3.new(math.huge,math.huge,math.huge)
+y.Velocity=b.CurrentCamera.CFrame.LookVector*h
+else
+y.MaxForce=Vector3.zero
+end
+if i then
+local A=p.Velocity.Unit*h
+local B
+B=d.Heartbeat:Connect(function()
+if not p or not p.Parent then if B then B:Disconnect()end return end
+p.Velocity=A
+p.RotVelocity=Vector3.new(0,0,0)
+end)
+end
+c:AddItem(y,1)
+if z then z:Disconnect()end
+end
+end)
+end)
