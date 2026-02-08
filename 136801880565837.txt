@@ -1,0 +1,276 @@
+while not game:IsLoaded() do task.wait() end
+
+-- ================= SERVICES =================
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- ================= LIBRARY =================
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+
+-- ================= WINDOW =================
+local Window = Library:CreateWindow({
+	Title = "",
+	Footer = "",
+	Icon = 95816097006870,
+	NotifySide = "Right",
+	ShowCustomCursor = true,
+})
+
+-- ================= GLOW EFFECT =================
+task.spawn(function()
+	while task.wait(0.03) do
+		if Library.MainFrame then
+			local stroke = Library.MainFrame:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				stroke.Color = Color3.fromHSV(tick() % 6 / 6, 0.9, 1)
+				stroke.Thickness = 2.5
+			end
+		end
+	end
+end)
+
+-- ================= TABS =================
+local Tabs = {
+	Aim = Window:AddTab("Aim", "crosshair"),
+	Visuals = Window:AddTab("Visuals", "eye"),
+	Movement = Window:AddTab("Movement", "move"),
+	UI = Window:AddTab("UI Settings", "settings"),
+}
+
+-- ================= AIM =================
+local AimGroup = Tabs.Aim:AddLeftGroupbox("Silent Aim")
+
+AimGroup:AddToggle("AimEnabled", {
+	Text = "Enable Aim",
+	Default = false,
+})
+
+AimGroup:AddToggle("ShowFOV", {
+	Text = "Show FOV",
+	Default = true,
+})
+
+AimGroup:AddSlider("FOVRadius", {
+	Text = "FOV Radius",
+	Default = 150,
+	Min = 50,
+	Max = 400,
+	Rounding = 0,
+})
+
+AimGroup:AddDivider()
+
+AimGroup:AddButton({
+	Text = "📋 Copy Discord Invite",
+	Func = function()
+		if setclipboard then
+			setclipboard("https://discord.gg/FWFNBGFCa7")
+			Library:Notify("Discord", "Invite copied to clipboard!", 3)
+		end
+	end,
+})
+
+-- ================= FOV CIRCLE =================
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.fromRGB(0,255,120)
+FOVCircle.Thickness = 2
+FOVCircle.NumSides = 100
+FOVCircle.Filled = false
+
+RunService.RenderStepped:Connect(function()
+	FOVCircle.Visible = Toggles.ShowFOV.Value
+	if not FOVCircle.Visible then return end
+	FOVCircle.Position = Camera.ViewportSize / 2
+	FOVCircle.Radius = Options.FOVRadius.Value
+end)
+
+-- ================= AIM LOGIC =================
+local BulletHandler =
+	require(ReplicatedStorage.ModuleScripts.GunModules.BulletHandler)
+
+local function getClosestTarget(radius)
+	local closest, dist = nil, radius
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p == LocalPlayer then continue end
+		local c = p.Character
+		local h = c and c:FindFirstChild("Head")
+		local hum = c and c:FindFirstChildOfClass("Humanoid")
+		if not h or not hum or hum.Health <= 0 then continue end
+
+		local pos, onScreen = Camera:WorldToViewportPoint(h.Position)
+		if not onScreen then continue end
+
+		local d = (Vector2.new(pos.X,pos.Y) - Camera.ViewportSize/2).Magnitude
+		if d < dist then
+			dist = d
+			closest = h
+		end
+	end
+	return closest
+end
+
+local oldFire = BulletHandler.Fire
+BulletHandler.Fire = function(data)
+	if Toggles.AimEnabled.Value then
+		local target = getClosestTarget(Options.FOVRadius.Value)
+		if target then
+			data.Direction = (target.Position - data.Origin).Unit
+		end
+	end
+	return oldFire(data)
+end
+
+-- ================= ESP =================
+local VisualGroup = Tabs.Visuals:AddLeftGroupbox("ESP")
+
+VisualGroup:AddToggle("ESPEnabled", {
+	Text = "Enable ESP",
+	Default = false,
+})
+
+RunService.Heartbeat:Connect(function()
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character then
+			local hum = p.Character:FindFirstChildOfClass("Humanoid")
+			if not hum or hum.Health <= 0 then continue end
+
+			local h = p.Character:FindFirstChild("ESPHighlight")
+			if Toggles.ESPEnabled.Value then
+				if not h then
+					h = Instance.new("Highlight")
+					h.Name = "ESPHighlight"
+					h.FillColor = Color3.fromRGB(0,255,0)
+					h.FillTransparency = 0.5
+					h.OutlineColor = Color3.new(0,0,0)
+					h.Parent = p.Character
+				end
+			elseif h then
+				h:Destroy()
+			end
+		end
+	end
+end)
+
+-- ================= WALL CLIMB =================
+local MoveGroup = Tabs.Movement:AddLeftGroupbox("Wall Climb")
+
+MoveGroup:AddToggle("WallClimbEnabled", {
+	Text = "Enable Wall Climb",
+	Default = false,
+})
+
+MoveGroup:AddSlider("WallClimbSpeed", {
+	Text = "Climb Speed",
+	Default = 25,
+	Min = 5,
+	Max = 60,
+	Rounding = 0,
+})
+
+local climbing = false
+
+local function getHRP()
+	local c = LocalPlayer.Character
+	return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHum()
+	local c = LocalPlayer.Character
+	return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function touchingWall()
+	local hrp = getHRP()
+	if not hrp then return false end
+
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = {LocalPlayer.Character}
+	params.FilterType = Enum.RaycastFilterType.Blacklist
+
+	return Workspace:Raycast(
+		hrp.Position,
+		hrp.CFrame.LookVector * 2.5,
+		params
+	) ~= nil
+end
+
+RunService.RenderStepped:Connect(function(dt)
+	if not Toggles.WallClimbEnabled.Value then return end
+
+	local hrp = getHRP()
+	local hum = getHum()
+	if not hrp or not hum then return end
+
+	if touchingWall() then
+		if not climbing then
+			climbing = true
+			hum:ChangeState(Enum.HumanoidStateType.Climbing)
+			hum.AutoRotate = false
+		end
+
+		hrp.AssemblyLinearVelocity = Vector3.zero
+		hrp.CFrame += Vector3.new(0, Options.WallClimbSpeed.Value * dt, 0)
+	else
+		if climbing then
+			climbing = false
+			hum.AutoRotate = true
+		end
+	end
+end)
+
+-- ================= GUN TRACKER (ONLY ADDITION) =================
+local TrackerGroup = Tabs.Aim:AddRightGroupbox("Weapon Tracker")
+
+TrackerGroup:AddToggle("GunTrackerEnabled", {
+	Text = "Enable Tracker",
+	Default = false,
+})
+
+local GunTracker = Drawing.new("Line")
+GunTracker.Thickness = 2
+GunTracker.Color = Color3.fromRGB(0,255,0)
+GunTracker.Visible = false
+
+RunService.RenderStepped:Connect(function()
+	if not Toggles.GunTrackerEnabled.Value then
+		GunTracker.Visible = false
+		return
+	end
+
+	local target = getClosestTarget(Options.FOVRadius.Value)
+	if not target then
+		GunTracker.Visible = false
+		return
+	end
+
+	local center = Camera.ViewportSize / 2
+	local pos = Camera:WorldToViewportPoint(target.Position)
+
+	GunTracker.From = center
+	GunTracker.To = Vector2.new(pos.X, pos.Y)
+	GunTracker.Visible = true
+end)
+
+-- ================= UI SETTINGS =================
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+ThemeManager:SetFolder("mspaint")
+SaveManager:SetFolder("mspaint")
+
+SaveManager:BuildConfigSection(Tabs.UI)
+ThemeManager:ApplyToTab(Tabs.UI)
+SaveManager:LoadAutoloadConfig()
