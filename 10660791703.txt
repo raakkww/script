@@ -1,0 +1,143 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local player = Players.LocalPlayer
+
+local DEFAULT_GRAVITY = 50
+local HIGH_GRAVITY = 1000
+local RADIUS = 18
+local TRACK_NAMES = {"Wheel", "Flange"}
+
+-- ================= GUI =================
+local gui = Instance.new("ScreenGui")
+gui.Name = "CartMagnetGui"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 200, 0, 100)
+frame.Position = UDim2.new(0, 20, 0, 120)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "Cart Magnet"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+
+local toggleBtn = Instance.new("TextButton", frame)
+toggleBtn.Size = UDim2.new(1, -20, 0, 40)
+toggleBtn.Position = UDim2.new(0, 10, 0, 50)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(120, 70, 70) -- Red = OFF
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 16
+toggleBtn.Text = "Off"
+
+-- ================= Selection System =================
+local selectedParts = {}
+local highlights = {}
+local isOn = false
+
+local function clearHighlights()
+    for _, h in pairs(highlights) do
+        h:Destroy()
+    end
+    highlights = {}
+    selectedParts = {}
+end
+
+local function highlightPart(part)
+    if highlights[part] then return end
+    local hl = Instance.new("Highlight")
+    hl.Adornee = part
+    hl.FillColor = Color3.fromRGB(0, 255, 0)
+    hl.OutlineColor = Color3.fromRGB(0, 200, 0)
+    hl.Parent = part
+    highlights[part] = hl
+end
+
+local function applyPartGravity(part, g)
+    local att = part:FindFirstChild("GravityAttachment")
+    if not att then
+        att = Instance.new("Attachment")
+        att.Name = "GravityAttachment"
+        att.Parent = part
+    end
+
+    local vf = part:FindFirstChild("CustomGravity")
+    if not vf then
+        vf = Instance.new("VectorForce")
+        vf.Name = "CustomGravity"
+        vf.Attachment0 = att
+        vf.RelativeTo = Enum.ActuatorRelativeTo.World
+        vf.Parent = part
+    end
+
+    vf.Force = Vector3.new(0, -part:GetMass() * g, 0)
+end
+
+local function resetPartGravity(part)
+    local vf = part:FindFirstChild("CustomGravity")
+    if vf then vf:Destroy() end
+    local att = part:FindFirstChild("GravityAttachment")
+    if att then att:Destroy() end
+end
+
+-- ================= Auto Selection =================
+local function scanParts()
+    clearHighlights()
+    local nearbyParts = Workspace:GetPartBoundsInRadius(player.Character.HumanoidRootPart.Position, RADIUS)
+    for _, part in pairs(nearbyParts) do
+        if part:IsA("BasePart") then
+            for _, name in pairs(TRACK_NAMES) do
+                if part.Name == name then
+                    selectedParts[part] = true
+                    highlightPart(part)
+                    if isOn then
+                        applyPartGravity(part, HIGH_GRAVITY)
+                    else
+                        resetPartGravity(part)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ================= Toggle Button =================
+toggleBtn.MouseButton1Click:Connect(function()
+    isOn = not isOn
+    if isOn then
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        toggleBtn.Text = "On"
+    else
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(120, 70, 70)
+        toggleBtn.Text = "Off"
+    end
+    for part in pairs(selectedParts) do
+        if isOn then
+            applyPartGravity(part, HIGH_GRAVITY)
+        else
+            resetPartGravity(part)
+        end
+    end
+end)
+
+-- ================= Loop =================
+RunService.Heartbeat:Connect(function()
+    scanParts()
+end)
+
+-- Cleanup on respawn
+Players.LocalPlayer.CharacterAdded:Connect(function()
+    clearHighlights()
+end)

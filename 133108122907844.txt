@@ -1,0 +1,38 @@
+local partsTable = {
+	workspace.TouchPart1, 
+	workspace.TouchPart2, 
+	workspace.TouchPart3,
+	workspace.TouchPart4,
+	workspace.TouchPart5,
+	workspace.TouchPart6,
+	workspace.TouchPart7
+}
+local teleportDelay = 1
+
+for _, object in pairs(workspace:GetDescendants()) do
+    if object.Name == "TouchPart" and object:IsA("BasePart") then
+        table.insert(partsTable, object)
+    end
+end
+
+while task.wait(2) do
+local function teleportToTableParts()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+    for i, targetPart in ipairs(partsTable) do
+        
+        rootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0) 
+        print("Teleported to part: " .. i)
+        task.wait(teleportDelay)
+    end
+end
+
+
+if #partsTable > 0 then
+    teleportToTableParts()
+else
+    warn("No parts found to teleport to!")
+end
+end

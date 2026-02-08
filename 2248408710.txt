@@ -1,0 +1,143 @@
+
+-- [2] DATA & FOLDER SYSTEM (Session tetap dipakai untuk keperluan lain jika diperlukan)
+local MapID = tostring(game.PlaceId)
+local MainFolder = "PoPoPoo_Data"
+local MapFolder = MainFolder .. "/" .. MapID
+
+if not isfolder(MainFolder) then makefolder(MainFolder) end
+if not isfolder(MapFolder) then makefolder(MapFolder) end
+
+-- [3] UI LIBRARY (KeySystem DIHAPUS - akses langsung)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield  '))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "",
+    LoadingTitle = "",
+    LoadingSubtitle = "",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false  -- ✅ KeySystem dinonaktifkan permanen
+})
+
+-- [4] TABS
+local MainTab = Window:CreateTab("🏠 Main", 4483362458)
+local BoostTab = Window:CreateTab("🔥 Auto Boost", 4483345998)
+local VisualTab = Window:CreateTab("👁️ Visuals", 4483345998)
+
+-- [5] INITIAL DATA
+local lp = game.Players.LocalPlayer
+_G.TargetSpeed = 16
+_G.AutoBoost = false
+_G.GodMode = false
+_G.ESP_Enabled = false
+
+-- [[ MAIN TAB ]]
+MainTab:CreateSection("[ CHARACTER ]")
+MainTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 300},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(Value) _G.TargetSpeed = Value end,
+})
+
+MainTab:CreateToggle({
+    Name = "God Mode",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.GodMode = Value
+        if Value then
+            task.spawn(function()
+                while _G.GodMode do
+                    pcall(function()
+                        if lp.Character and lp.Character:FindFirstChild("Humanoid") then
+                            lp.Character.Humanoid.Health = 100
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end,
+})
+
+-- [[ BOOST TAB ]]
+BoostTab:CreateSection("[ MONEY & LEVEL EXPLOIT ]")
+BoostTab:CreateToggle({
+    Name = "Enable Auto Levels/Coins",
+    CurrentValue = false,
+    Callback = function(Value) _G.AutoBoost = Value end,
+})
+
+-- [[ VISUAL TAB - ESP ]]
+VisualTab:CreateSection("[ PLAYER ESP ]")
+VisualTab:CreateToggle({
+    Name = "Player ESP (Box & Name)",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.ESP_Enabled = Value
+    end,
+})
+
+-- [6] ESP SYSTEM LOGIC
+local function CreateESP(plr)
+    local Highlight = Instance.new("Highlight")
+    Highlight.Name = "PoPoPoo_ESP"
+    Highlight.FillTransparency = 0.5
+    Highlight.OutlineTransparency = 0
+    Highlight.FillColor = Color3.fromRGB(150, 50, 255)
+    Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    
+    task.spawn(function()
+        while task.wait(0.5) do
+            if not _G.ESP_Enabled then 
+                Highlight:Destroy()
+                break 
+            end
+            if plr.Character then
+                Highlight.Parent = plr.Character
+            end
+        end
+    end)
+end
+
+game.Players.PlayerAdded:Connect(function(plr)
+    if _G.ESP_Enabled then CreateESP(plr) end
+end)
+
+task.spawn(function()
+    while task.wait(1) do
+        if _G.ESP_Enabled then
+            for _, v in pairs(game.Players:GetPlayers()) do
+                if v ~= lp and v.Character and not v.Character:FindFirstChild("PoPoPoo_ESP") then
+                    CreateESP(v)
+                end
+            end
+        end
+    end
+end)
+
+-- [7] BACKGROUND LOOPS
+task.spawn(function()
+    -- Loop boost
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if _G.AutoBoost then
+            local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game:GetService("ReplicatedStorage").Remotes:FindFirstChild("generateBoost")
+            if remote then
+                pcall(function()
+                    remote:FireServer("Levels", 480, 10)
+                    remote:FireServer("Coins", 480, 99999999)
+                end)
+            end
+        end
+    end)
+
+    -- Loop walkspeed
+    while true do
+        pcall(function()
+            if lp.Character and lp.Character:FindFirstChild("Humanoid") then
+                lp.Character.Humanoid.WalkSpeed = _G.TargetSpeed
+            end
+        end)
+        task.wait(0.1)
+    end
+end)

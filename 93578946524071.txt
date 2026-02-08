@@ -1,0 +1,349 @@
+-- Dangerous Scooter - Refactored & Optimized Script
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Configuration
+local WIN_POS = Vector3.new(-3370, 303, 1368)
+local COIN_SIZE_THRESHOLD = 0.5
+local SEARCH_INTERVAL = 5 -- Seconds between full workspace scans for new coins
+
+-- State
+local collectedCoins = 0
+local coinsFound = 0
+local guiCreated = false
+local isAutoCollecting = false
+local autoWinEnabled = false
+local coinCache = {}
+local lastScanTime = 0
+
+-- UI Theme
+local THEME = {
+    Background = Color3.fromRGB(35, 35, 40),
+    Header = Color3.fromRGB(255, 170, 0),
+    Button = Color3.fromRGB(60, 60, 65),
+    ButtonHover = Color3.fromRGB(70, 70, 75),
+    Text = Color3.fromRGB(240, 240, 240),
+    AccentGreen = Color3.fromRGB(76, 175, 80),
+    AccentBlue = Color3.fromRGB(33, 150, 243),
+    AccentRed = Color3.fromRGB(200, 50, 50)
+}
+
+-- Utility Functions
+local function tweenModel(modelRoot, targetCFrame)
+    local info = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(modelRoot, info, {CFrame = targetCFrame})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+local function teleportTo(pos)
+    if not rootPart then return false end
+    local targetCF = CFrame.new(pos + Vector3.new(0, 5, 0))
+    tweenModel(rootPart, targetCF)
+    return true
+end
+
+local function isCoin(obj)
+    if not obj:IsA("BasePart") then return false end
+    local name = obj.Name:lower()
+    local pName = obj.Parent and obj.Parent.Name:lower() or ""
+    
+    local isCoinName = (name == "coin" or name == "collectible")
+    local isCoinParent = (pName == "collectibles" or pName == "coins")
+    
+    if (isCoinName or isCoinParent) and obj.Size.X > COIN_SIZE_THRESHOLD and obj.Size.Z > COIN_SIZE_THRESHOLD then
+        return true
+    end
+    return false
+end
+
+local function scanForCoins()
+    local now = tick()
+    if now - lastScanTime < SEARCH_INTERVAL and #coinCache > 0 then
+        return coinCache
+    end
+    
+    lastScanTime = now
+    local newCache = {}
+    
+    -- Optimization: Check common containers first
+    local containers = {workspace:FindFirstChild("Collectibles"), workspace:FindFirstChild("Coins")}
+    local foundContainer = false
+    
+    for _, container in ipairs(containers) do
+        if container then
+            foundContainer = true
+            for _, child in ipairs(container:GetDescendants()) do
+                if isCoin(child) then
+                    table.insert(newCache, child)
+                end
+            end
+        end
+    end
+    
+    -- Fallback: Scan workspace if no containers found, but be careful
+    if not foundContainer then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if isCoin(obj) then
+                table.insert(newCache, obj)
+            end
+        end
+    end
+    
+    coinCache = newCache
+    coinsFound = #newCache
+    return newCache
+end
+
+local function findNearestCoin()
+    local coins = scanForCoins()
+    local nearest = nil
+    local minDist = math.huge
+    local myPos = rootPart.Position
+    
+    for _, coin in ipairs(coins) do
+        if coin and coin.Parent then
+            local dist = (coin.Position - myPos).Magnitude
+            if dist < minDist then
+                minDist = dist
+                nearest = coin
+            end
+        end
+    end
+    return nearest
+end
+
+-- UI Construction
+local function createCorner(parent, radius)
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, radius or 8)
+    uiCorner.Parent = parent
+    return uiCorner
+end
+
+local function createGUI()
+    if guiCreated then return end
+    
+    -- Cleanup existing
+    for _, g in ipairs(player.PlayerGui:GetChildren()) do
+        if g.Name == "DSScript_Refined" then g:Destroy() end
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "DSScript_Refined"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 280, 0, 360)
+    mainFrame.Position = UDim2.new(0.5, -140, 0.5, -180)
+    mainFrame.BackgroundColor3 = THEME.Background
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    mainFrame.Parent = screenGui
+    createCorner(mainFrame, 10)
+
+    -- Header
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 40)
+    header.BackgroundColor3 = THEME.Header
+    header.BorderSizePixel = 0
+    header.Parent = mainFrame
+    local hCorner = createCorner(header, 10)
+    
+    -- Fix bottom corners of header to be square
+    local hCover = Instance.new("Frame")
+    hCover.Size = UDim2.new(1, 0, 0, 10)
+    hCover.Position = UDim2.new(0, 0, 1, -10)
+    hCover.BackgroundColor3 = THEME.Header
+    hCover.BorderSizePixel = 0
+    hCover.Parent = header
+
+    local titleParams = Instance.new("TextLabel")
+    titleParams.Text = "Dangerous Scooter"
+    titleParams.Font = Enum.Font.GothamBold
+    titleParams.TextSize = 18
+    titleParams.TextColor3 = Color3.new(1,1,1)
+    titleParams.Size = UDim2.new(1, -50, 1, 0)
+    titleParams.Position = UDim2.new(0, 15, 0, 0)
+    titleParams.BackgroundTransparency = 1
+    titleParams.TextXAlignment = Enum.TextXAlignment.Left
+    titleParams.Parent = header
+
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextColor3 = Color3.new(1,1,1)
+    closeBtn.BackgroundColor3 = THEME.AccentRed
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.Parent = header
+    createCorner(closeBtn, 6)
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        isAutoCollecting = false
+        screenGui:Destroy()
+        guiCreated = false
+    end)
+
+    -- Content Container
+    local contentParams = Instance.new("UIListLayout")
+    contentParams.Padding = UDim.new(0, 10)
+    contentParams.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    contentParams.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    local contentFrame = Instance.new("Frame")
+    contentFrame.Size = UDim2.new(1, 0, 1, -50)
+    contentFrame.Position = UDim2.new(0, 0, 0, 50)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.Parent = mainFrame
+    contentParams.Parent = contentFrame
+
+    -- Helper to create buttons
+    local function createStyledButton(text, color, order)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.9, 0, 0, 40)
+        btn.BackgroundColor3 = color
+        btn.Text = text
+        btn.Font = Enum.Font.GothamBold
+        btn.TextColor3 = THEME.Text
+        btn.TextSize = 14
+        btn.LayoutOrder = order
+        btn.Parent = contentFrame
+        createCorner(btn, 8)
+        return btn
+    end
+
+    -- Status
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(0.9, 0, 0, 30)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "Coins: " .. collectedCoins .. " | Found: " .. coinsFound
+    statusLabel.TextColor3 = THEME.Text
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.LayoutOrder = 1
+    statusLabel.Parent = contentFrame
+
+    -- Buttons
+    local winBtn = createStyledButton("TELEPORT TO WIN", THEME.AccentGreen, 2)
+    local coinBtn = createStyledButton("Teleport to  Nearest Coin", THEME.AccentBlue, 3)
+    local refreshBtn = createStyledButton("Refresh & Scan", THEME.Button, 4)
+    
+    -- Auto Collect Toggle
+    local autoFrame = Instance.new("Frame")
+    autoFrame.Size = UDim2.new(0.9, 0, 0, 40)
+    autoFrame.BackgroundColor3 = THEME.Button
+    autoFrame.LayoutOrder = 5
+    autoFrame.Parent = contentFrame
+    createCorner(autoFrame, 8)
+    
+    local autoText = Instance.new("TextLabel")
+    autoText.Size = UDim2.new(0.6, 0, 1, 0)
+    autoText.Position = UDim2.new(0, 10, 0, 0)
+    autoText.BackgroundTransparency = 1
+    autoText.Text = "Auto Collect"
+    autoText.TextColor3 = THEME.Text
+    autoText.Font = Enum.Font.GothamBold
+    autoText.TextXAlignment = Enum.TextXAlignment.Left
+    autoText.Parent = autoFrame
+    
+    local autoToggleBtn = Instance.new("TextButton")
+    autoToggleBtn.Size = UDim2.new(0, 60, 0, 30)
+    autoToggleBtn.Position = UDim2.new(1, -70, 0, 5)
+    autoToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    autoToggleBtn.Text = "OFF"
+    autoToggleBtn.TextColor3 = Color3.new(1,1,1)
+    autoToggleBtn.Font = Enum.Font.GothamBold
+    autoToggleBtn.Parent = autoFrame
+    createCorner(autoToggleBtn, 6)
+
+    -- Auto Win Toggle
+    local autoWinToggle = createStyledButton("Auto-Win on Death: OFF", THEME.Button, 6)
+
+    -- Connections
+    winBtn.MouseButton1Click:Connect(function()
+        if teleportTo(WIN_POS) then
+            statusLabel.Text = "Teleported to WIN!"
+        end
+    end)
+
+    coinBtn.MouseButton1Click:Connect(function()
+        local coin = findNearestCoin()
+        if coin then
+            teleportTo(coin.Position)
+            collectedCoins += 1
+            statusLabel.Text = "Collected: " .. collectedCoins
+        else
+            statusLabel.Text = "No coins found!"
+        end
+    end)
+
+    refreshBtn.MouseButton1Click:Connect(function()
+        scanForCoins()
+        statusLabel.Text = "Refreshed! Found: " .. coinsFound
+    end)
+
+    autoToggleBtn.MouseButton1Click:Connect(function()
+        isAutoCollecting = not isAutoCollecting
+        if isAutoCollecting then
+            autoToggleBtn.BackgroundColor3 = THEME.AccentGreen
+            autoToggleBtn.Text = "ON"
+            
+            task.spawn(function()
+                while isAutoCollecting do
+                    local coin = findNearestCoin()
+                    if coin then
+                        teleportTo(coin.Position)
+                        collectedCoins += 1
+                        statusLabel.Text = "Auto: " .. collectedCoins
+                    end
+                    task.wait(0.5) -- Throttled
+                end
+            end)
+        else
+            autoToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            autoToggleBtn.Text = "OFF"
+        end
+    end)
+
+    autoWinToggle.MouseButton1Click:Connect(function()
+        autoWinEnabled = not autoWinEnabled
+        if autoWinEnabled then
+            autoWinToggle.Text = "Auto-Win on Death: ON"
+            autoWinToggle.BackgroundColor3 = THEME.AccentGreen
+        else
+            autoWinToggle.Text = "Auto-Win on Death: OFF"
+            autoWinToggle.BackgroundColor3 = THEME.Button
+        end
+    end)
+    
+    guiCreated = true
+end
+
+-- Auto Win Logic
+local function checkRespawn()
+    if autoWinEnabled then
+        print("Respawn detected...")
+        task.wait(2)
+        teleportTo(WIN_POS)
+    end
+    createGUI()
+end
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    checkRespawn()
+end)
+
+-- Initialize
+scanForCoins()
+createGUI()
+print("Refactored Script Loaded")

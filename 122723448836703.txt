@@ -1,0 +1,664 @@
+--[[
+BLEACH-OS-FACILITY Script
+only those who have the script executed will see it! 
+If I'm right, thanks and have fun!
+Credit:Breezipsettings on ScriptBlox
+]]
+if _G.BleachLoaded then
+    game:GetService("StarterGui"):SetCore(
+        "SendNotification",
+        {
+            Title = "⚠️ Warning!! ALREADY RUNNING",
+            Text = "Bleach-OS is already active!",
+            Duration = 5
+        }
+    )
+    return
+end
+_G.BleachLoaded = true
+
+local P = game:GetService("Players")
+local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local H = game:GetService("HttpService")
+local S = game:GetService("StarterGui")
+local C = game:GetService("Chat")
+local lp = P.LocalPlayer
+local kw = "DevHatSync"
+local dh = game:GetService("ReplicatedStorage"):FindFirstChild("DevHats")
+local ws = WebSocket.connect("wss://bridgeserver1.onrender.com")
+local nc = false
+local ncloop
+local fl_tool = nil
+local lastMsg = ""
+local dbTime = 0.5
+
+-- [SHARED TOOL GRAB LOGIC] (Ooooh what you doing you checking my code haha, i see you! :D)
+local function grabAllItems()
+    local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if not root then
+        return
+    end
+    local items = {
+        "E.S.P Key",
+        "Elevator Key",
+        "Exit Elevator Key",
+        "Lab Key",
+        "Maintenance Key",
+        "Observatory Key",
+        "Office Key",
+        "Screwdriver",
+        "Screwdriver Head",
+        "Master Key",
+        "Keycard"
+    }
+    for _, name in pairs(items) do
+        local target = workspace:FindFirstChild(name, true)
+        if target then
+            local handle = target:IsA("BasePart") and target or target:FindFirstChild("Handle")
+            if handle then
+                firetouchinterest(root, handle, 0)
+                task.wait(0.05)
+                firetouchinterest(root, handle, 1)
+            end
+        end
+    end
+end
+
+S:SetCore(
+    "SendNotification",
+    {
+        Title = "Menu Loaded Successfully!",
+        Text = "Press 'M' to Toggle. Global Sync Active.",
+        Button1 = "OK",
+        Duration = 5
+    }
+)
+
+local function al(ch, ht)
+    local head = ch:FindFirstChild("Head")
+    if not head or not ht then
+        return
+    end
+    local han = ht:FindFirstChild("Handle") or ht:FindFirstChildWhichIsA("BasePart")
+    if not han then
+        return
+    end
+    han.CanCollide = false
+    local w = Instance.new("Weld", han)
+    w.Name = "AccessoryWeld"
+    w.Part0 = head
+    w.Part1 = han
+    local ha = han:FindFirstChildWhichIsA("Attachment")
+    local hea = ha and head:FindFirstChild(ha.Name)
+    w.C0 = (ha and hea) and hea.CFrame or CFrame.new(0, 0.6, 0)
+    w.C1 = ha and ha.CFrame or CFrame.new(0, 0, 0)
+    w.Parent = han
+    ht.Parent = ch
+end
+
+local function giveFL()
+    if lp.Backpack:FindFirstChild("Facility Flashlight") or lp.Character:FindFirstChild("Facility Flashlight") then
+        return
+    end
+    local tool = Instance.new("Tool")
+    tool.Name = "Facility Flashlight"
+    tool.RequiresHandle = true
+    tool.CanBeDropped = false
+    local handle = Instance.new("Part")
+    handle.Name = "Handle"
+    handle.Size = Vector3.new(0.4, 0.4, 1.5)
+    handle.Color = Color3.fromRGB(15, 15, 15)
+    local light = Instance.new("SpotLight", handle)
+    light.Brightness = 2.5
+    light.Range = 75
+    light.Enabled = false
+    tool.Equipped:Connect(
+        function()
+            light.Enabled = true
+            ws:Send(H:JSONEncode({keyword = kw, sender = lp.Name, command = "FLASHLIGHT_ON"}))
+        end
+    )
+    tool.Unequipped:Connect(
+        function()
+            light.Enabled = false
+            ws:Send(H:JSONEncode({keyword = kw, sender = lp.Name, command = "FLASHLIGHT_OFF"}))
+        end
+    )
+    handle.Parent = tool
+    tool.Parent = lp.Backpack
+    return tool
+end
+
+local g = Instance.new("ScreenGui", lp.PlayerGui)
+g.Name = "B_RAW"
+g.ResetOnSpawn = false
+local m = Instance.new("Frame", g)
+m.Size = UDim2.new(0, 320, 0, 420)
+m.Position = UDim2.new(0.5, -160, 0.3, 0)
+m.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+m.BorderSizePixel = 0
+Instance.new("UICorner", m)
+
+local tm = Instance.new("Frame", g)
+tm.Size = UDim2.new(0, 200, 0, 150)
+tm.Position = UDim2.new(0.5, 170, 0.3, 0)
+tm.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+tm.Visible = false
+Instance.new("UICorner", tm)
+local tmt = Instance.new("TextLabel", tm)
+tmt.Size = UDim2.new(1, 0, 0, 30)
+tmt.Text = "ITEM GRABBER"
+tmt.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+tmt.TextColor3 = Color3.new(1, 1, 1)
+local gtBtn = Instance.new("TextButton", tm)
+gtBtn.Size = UDim2.new(0.9, 0, 0, 50)
+gtBtn.Position = UDim2.new(0.05, 0, 0.4, 0)
+gtBtn.Text = "GIVE ALL TOOLS"
+gtBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+gtBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", gtBtn)
+local tmc = Instance.new("TextButton", tm)
+tmc.Size = UDim2.new(0, 20, 0, 20)
+tmc.Position = UDim2.new(1, -25, 0, 5)
+tmc.Text = "X"
+tmc.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+tmc.TextColor3 = Color3.new(1, 1, 1)
+tmc.Activated:Connect(
+    function()
+        tm.Visible = false
+    end
+)
+
+gtBtn.Activated:Connect(
+    function()
+        -- Tell the bridge to make everyone else trigger the giver
+        ws:Send(H:JSONEncode({keyword = kw, sender = lp.Name, command = "SYNC_GIVE_TOOLS"}))
+
+        -- Local Execution: Trigger the ClickDetector and grab loose items
+        local tg = workspace:FindFirstChild("Tool Giver", true)
+        if tg then
+            local cd = tg:FindFirstChildWhichIsA("ClickDetector")
+            if cd then
+                fireclickdetector(cd)
+            end
+        end
+        grabAllItems()
+
+        task.wait(0.5)
+        local hasTools =
+            #lp.Backpack:GetChildren() > 0 or (lp.Character and lp.Character:FindFirstChildWhichIsA("Tool"))
+        if hasTools then
+            S:SetCore(
+                "SendNotification",
+                {
+                    Title = "Success!",
+                    Text = "Triggered Tool Giver for everyone synced!",
+                    Duration = 10
+                }
+            )
+        else
+            S:SetCore(
+                "SendNotification",
+                {
+                    Title = "⚠️ Partial Success",
+                    Text = "Sync sent, but no tools found in your inventory.",
+                    Duration = 10
+                }
+            )
+        end
+    end
+)
+local t = Instance.new("Frame", m)
+t.Size = UDim2.new(1, 0, 0, 30)
+t.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+local dl = Instance.new("TextLabel", t)
+dl.Size = UDim2.new(1, 0, 1, 0)
+dl.Text = "DRAG HERE (M to Hide)"
+dl.TextColor3 = Color3.fromRGB(150, 150, 150)
+dl.BackgroundTransparency = 1
+dl.TextSize = 14
+Instance.new("UICorner", t)
+local q = Instance.new("TextButton", t)
+q.Size = UDim2.new(0, 30, 0, 30)
+q.Position = UDim2.new(1, -30, 0, 0)
+q.Text = "X"
+q.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+q.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", q)
+
+local tabs = {"HATS", "OTHERS", "CHAT", "CLEAR"}
+local btns = {}
+for i, name in pairs(tabs) do
+    local b = Instance.new("TextButton", m)
+    b.Size = UDim2.new(0.24, -2, 0, 35)
+    b.Position = UDim2.new((i - 1) * 0.25, 2, 0, 35)
+    b.Text = name
+    b.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.BorderSizePixel = 0
+    Instance.new("UICorner", b)
+    if name == "CLEAR" then
+        b.TextColor3 = Color3.fromRGB(200, 80, 80)
+    end
+    btns[name] = b
+end
+
+local function mkP()
+    local p = Instance.new("ScrollingFrame", m)
+    p.Size = UDim2.new(1, -10, 0, 335)
+    p.Position = UDim2.new(0, 5, 0, 75)
+    p.BackgroundTransparency = 1
+    p.BorderSizePixel = 0
+    p.Visible = false
+    p.AutomaticCanvasSize = "Y"
+    p.ScrollBarThickness = 2
+    Instance.new("UIListLayout", p).Padding = UDim.new(0, 5)
+    return p
+end
+local hpg, opg = mkP(), mkP()
+hpg.Visible = true
+
+local chatPage = Instance.new("Frame", m)
+chatPage.Size = UDim2.new(1, -10, 0, 335)
+chatPage.Position = UDim2.new(0, 5, 0, 75)
+chatPage.BackgroundTransparency = 1
+chatPage.Visible = false
+local ChatDisplay = Instance.new("ScrollingFrame", chatPage)
+ChatDisplay.Size = UDim2.new(1, 0, 0, 255)
+ChatDisplay.BackgroundColor3 = Color3.new(1, 1, 1)
+ChatDisplay.CanvasSize = UDim2.new(0, 0, 0, 0)
+ChatDisplay.AutomaticCanvasSize = "Y"
+ChatDisplay.ScrollBarThickness = 2
+Instance.new("UIListLayout", ChatDisplay).Padding = UDim.new(0, 2)
+local ChatInput = Instance.new("TextBox", chatPage)
+ChatInput.Size = UDim2.new(1, 0, 0, 35)
+ChatInput.Position = UDim2.new(0, 0, 0, 260)
+ChatInput.BackgroundColor3 = Color3.new(1, 1, 1)
+ChatInput.TextColor3 = Color3.new(0, 0, 0)
+ChatInput.PlaceholderText = "Press '/' to start Chatting..."
+ChatInput.Text = ""
+ChatInput.TextScaled = true
+ChatInput.ClearTextOnFocus = true
+local clrChat = Instance.new("TextButton", chatPage)
+clrChat.Size = UDim2.new(1, 0, 0, 30)
+clrChat.Position = UDim2.new(0, 0, 0, 300)
+clrChat.Text = "CLEAR CHAT LOG"
+clrChat.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
+clrChat.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", clrChat)
+
+btns["HATS"].Activated:Connect(
+    function()
+        hpg.Visible = true
+        opg.Visible = false
+        chatPage.Visible = false
+    end
+)
+btns["OTHERS"].Activated:Connect(
+    function()
+        hpg.Visible = false
+        opg.Visible = true
+        chatPage.Visible = false
+    end
+)
+btns["CHAT"].Activated:Connect(
+    function()
+        hpg.Visible = false
+        opg.Visible = false
+        chatPage.Visible = true
+    end
+)
+
+local openTools = Instance.new("TextButton", opg)
+openTools.Size = UDim2.new(1, 0, 0, 40)
+openTools.Text = "GIVE TOOLS (ITEMS)"
+openTools.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+openTools.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", openTools)
+openTools.Activated:Connect(
+    function()
+        tm.Visible = not tm.Visible
+    end
+)
+
+local fl_btn = Instance.new("TextButton", opg)
+fl_btn.Size = UDim2.new(1, 0, 0, 40)
+fl_btn.Text = "GET FLASHLIGHT"
+fl_btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+fl_btn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", fl_btn)
+fl_btn.Activated:Connect(
+    function()
+        fl_tool = giveFL()
+        fl_btn.Text = "FLASHLIGHT OBTAINED"
+        fl_btn.TextColor3 = Color3.new(0.5, 0.5, 0.5)
+    end
+)
+
+local ncb = Instance.new("TextButton", opg)
+ncb.Size = UDim2.new(1, 0, 0, 40)
+ncb.Text = "NOCLIP: OFF"
+ncb.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ncb.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", ncb)
+ncb.Activated:Connect(
+    function()
+        nc = not nc
+        ncb.Text = nc and "NOCLIP: ON" or "NOCLIP: OFF"
+        ncb.TextColor3 = nc and Color3.new(0, 1, 0) or Color3.new(1, 1, 1)
+        if nc then
+            ncloop =
+                RS.Stepped:Connect(
+                function()
+                    if lp.Character then
+                        for _, v in pairs(lp.Character:GetDescendants()) do
+                            if v:IsA("BasePart") then
+                                v.CanCollide = false
+                            end
+                        end
+                    end
+                end
+            )
+        else
+            if ncloop then
+                ncloop:Disconnect()
+                ncloop = nil
+            end
+            if lp.Character then
+                for _, v in pairs(lp.Character:GetDescendants()) do
+                    if v:IsA("BasePart") then
+                        v.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+)
+
+local function addToLog(sName, msg)
+    local COLORS = {
+        Color3.new(1, 0.16, 0.26),
+        Color3.new(0, 0.63, 1),
+        Color3.new(0, 0.72, 0.34),
+        Color3.fromRGB(180, 0, 255),
+        Color3.fromRGB(255, 145, 0)
+    }
+    local function gv(n)
+        local v = 0
+        for i = 1, #n do
+            v = v + string.byte(n:sub(i, i))
+        end
+        return v
+    end
+    local hex = COLORS[(gv(sName) % #COLORS) + 1]:ToHex()
+    local row = Instance.new("Frame", ChatDisplay)
+    row.Size = UDim2.new(1, 0, 0, 0)
+    row.AutomaticSize = "Y"
+    row.BackgroundTransparency = 1
+    local l = Instance.new("TextLabel", row)
+    l.Size = UDim2.new(1, -45, 0, 0)
+    l.AutomaticSize = "Y"
+    l.BackgroundTransparency = 1
+    l.TextColor3 = Color3.new(0, 0, 0)
+    l.RichText = true
+    l.TextWrapped = true
+    l.TextXAlignment = "Left"
+    l.TextSize = 14
+    l.RichText = true
+    l.Text = "<b>[<font color='#" .. hex .. "'>" .. sName .. "</font>]</b>: " .. msg
+    local cp = Instance.new("TextButton", row)
+    cp.Text = "Copy"
+    cp.Size = UDim2.new(0, 35, 0, 18)
+    cp.Position = UDim2.new(1, -40, 0, 0)
+    cp.Activated:Connect(
+        function()
+            (set_clipboard or print)(msg)
+        end
+    )
+    ChatDisplay.CanvasPosition = Vector2.new(0, 9999)
+end
+
+ws.OnMessage:Connect(
+    function(msg)
+        local s, d =
+            pcall(
+            function()
+                return H:JSONDecode(msg)
+            end
+        )
+        if not s then
+            local n, content = msg:match("^(.-):%s*(.*)$")
+            if n then
+                addToLog(n, content)
+                local p = P:FindFirstChild(n)
+                if p and p.Character then
+                    C:Chat(p.Character.Head, content, "White")
+                end
+            end
+            return
+        end
+        if d.keyword == kw and d.sender ~= lp.Name then
+            local tp = P:FindFirstChild(d.sender)
+
+            -- [NEW SYNC COMMAND HANDLER] (Ooooh what you doing you checking my code haha, i see you! :D also this is just Give all Tools Sync to all players who have the script.)
+            if d.command == "SYNC_GIVE_TOOLS" then
+                grabAllItems()
+                return
+            end
+
+            if not tp or not tp.Character then
+                return
+            end
+            if d.command == "FLASHLIGHT_ON" then
+                local hand = tp.Character:FindFirstChild("RightHand") or tp.Character:FindFirstChild("Right Arm")
+                if hand then
+                    if tp.Character:FindFirstChild("SyncFL") then
+                        tp.Character.SyncFL:Destroy()
+                    end
+                    local f = Instance.new("Part", tp.Character)
+                    f.Name = "SyncFL"
+                    f.Size = Vector3.new(0.4, 0.4, 1.5)
+                    f.Color = Color3.new(0, 0, 0)
+                    f.CanCollide = false
+                    local l = Instance.new("SpotLight", f)
+                    l.Brightness = 2.5
+                    l.Range = 75
+                    local w = Instance.new("Weld", f)
+                    w.Part0 = hand
+                    w.Part1 = f
+                    w.C0 = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+                end
+            elseif d.command == "FLASHLIGHT_OFF" then
+                if tp.Character:FindFirstChild("SyncFL") then
+                    tp.Character.SyncFL:Destroy()
+                end
+            elseif d.command == "CLEAR" then
+                for _, v in pairs(tp.Character:GetDescendants()) do
+                    if v.Name == "AccessoryWeld" then
+                        v.Parent.Parent:Destroy()
+                    elseif v.Name == "SyncFL" then
+                        v:Destroy()
+                    end
+                end
+            elseif d.hatName then
+                local h = dh:FindFirstChild(d.hatName)
+                if h then
+                    al(tp.Character, h:Clone())
+                end
+            end
+        end
+    end
+)
+
+ChatInput.FocusLost:Connect(
+    function(e)
+        if e and ChatInput.Text ~= "" then
+            local currentMessage = ChatInput.Text
+            if currentMessage == lastMsg then
+                S:SetCore(
+                    "SendNotification",
+                    {Title = "⚠️ DON'T SPAM", Text = "Duplicate message detected!", Duration = 3}
+                )
+                task.wait(dbTime)
+                ChatInput.Text = ""
+                return
+            end
+            ws:Send(lp.Name .. ": " .. currentMessage)
+            addToLog(lp.Name, currentMessage)
+            if lp.Character then
+                C:Chat(lp.Character.Head, currentMessage, "White")
+            end
+            lastMsg = currentMessage
+            ChatInput.Text = ""
+        end
+    end
+)
+
+clrChat.Activated:Connect(
+    function()
+        for _, v in pairs(ChatDisplay:GetChildren()) do
+            if v:IsA("Frame") then
+                v:Destroy()
+            end
+        end
+    end
+)
+
+btns["CLEAR"].Activated:Connect(
+    function()
+        if lp.Character then
+            for _, v in pairs(lp.Character:GetDescendants()) do
+                if v.Name == "AccessoryWeld" then
+                    v.Parent.Parent:Destroy()
+                end
+            end
+        end
+        ws:Send(H:JSONEncode({keyword = kw, sender = lp.Name, command = "CLEAR"}))
+    end
+)
+
+if dh then
+    for _, hat in pairs(dh:GetChildren()) do
+        local hb = Instance.new("TextButton", hpg)
+        hb.Size = UDim2.new(1, 0, 0, 30)
+        hb.Text = hat.Name
+        hb.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        hb.TextColor3 = Color3.new(1, 1, 1)
+        Instance.new("UICorner", hb)
+        hb.Activated:Connect(
+            function()
+                ws:Send(H:JSONEncode({keyword = kw, sender = lp.Name, hatName = hat.Name}))
+                al(lp.Character, hat:Clone())
+            end
+        )
+    end
+end
+
+local ds, sp, drg
+t.InputBegan:Connect(
+    function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            drg = true
+            ds = i.Position
+            sp = m.Position
+        end
+    end
+)
+UIS.InputChanged:Connect(
+    function(i)
+        if drg and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local d = i.Position - ds
+            m.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
+        end
+    end
+)
+UIS.InputEnded:Connect(
+    function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            drg = false
+        end
+    end
+)
+
+local function Terminate(keepHats)
+    if not keepHats then
+        ws:Send(H:JSONEncode({keyword = kw, sender = lp.Name, command = "CLEAR"}))
+        if lp.Character then
+            for _, v in pairs(lp.Character:GetDescendants()) do
+                if v.Name == "AccessoryWeld" then
+                    v.Parent.Parent:Destroy()
+                end
+            end
+        end
+    end
+    if ncloop then
+        ncloop:Disconnect()
+    end
+    if lp.Character then
+        for _, v in pairs(lp.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = true
+            end
+        end
+    end
+    if fl_tool then
+        fl_tool:Destroy()
+    end
+    _G.BleachLoaded = nil
+    g:Destroy()
+end
+
+local bind = Instance.new("BindableFunction")
+bind.OnInvoke = function(choice)
+    if choice == "Yes" then
+        Terminate(true)
+    else
+        Terminate(false)
+    end
+end
+
+q.Activated:Connect(
+    function()
+        local hasHats = false
+        if lp.Character then
+            for _, v in pairs(lp.Character:GetDescendants()) do
+                if v.Name == "AccessoryWeld" then
+                    hasHats = true
+                    break
+                end
+            end
+        end
+        if hasHats then
+            S:SetCore(
+                "SendNotification",
+                {
+                    Title = "⚠️ Closing!!",
+                    Text = "Keep your Hat(s)?",
+                    Button1 = "Yes",
+                    Button2 = "No",
+                    Duration = 10,
+                    Callback = bind
+                }
+            )
+        else
+            S:SetCore("SendNotification", {Title = "Menu Terminated.", Text = "Bleach-OS Closed.", Duration = 5})
+            Terminate(false)
+        end
+    end
+)
+
+UIS.InputBegan:Connect(
+    function(i, gp)
+        if not gp and i.KeyCode == Enum.KeyCode.M then
+            m.Visible = not m.Visible
+            if tm.Visible then
+                tm.Visible = false
+            end
+        end
+        if not gp and i.KeyCode == Enum.KeyCode.Slash and chatPage.Visible then
+            task.wait()
+            ChatInput:CaptureFocus()
+        end
+    end
+)

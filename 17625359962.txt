@@ -1,0 +1,1015 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local VirtualUser = game:GetService("VirtualUser")
+local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+-- // Master Control //
+local ScriptRunning = true
+
+-- // Localization Data //
+local CurrentLanguage = "RU" -- Default to Russian
+local Translations = {
+    EN = {
+        Title = "",
+        -- Sections
+        Sec_Combat = "-- COMBAT / RAGE --",
+        Sec_Visuals = "-- VISUALS --",
+        Sec_Movement = "-- MOVEMENT --",
+        Sec_Misc = "-- MISC --",
+        Sec_Beta = "-- BETA TEST --",
+        -- Combat
+        Aimbot = "Legit Aimbot",
+        RageBot = "RAGE Aimbot (Closest)",
+        AutoShoot = "Auto Shoot",
+        WallCheck = "Wall Check",
+        TeamCheck = "Team Check",
+        HitboxExpander = "Hitbox Expander (Big Head)",
+        NoRecoil = "No Recoil",
+        SilentAim = "Silent Aim (Visual)",
+        -- Visuals
+        ESP = "Enable ESP",
+        Boxes = "Boxes",
+        Tracers = "Tracers",
+        Names = "Names & Health",
+        Chams = "Chams (Highlight)",
+        Crosshair = "Custom Crosshair",
+        FOV = "Show FOV Circle",
+        -- Movement
+        Speed = "Speed Hack (CFrame)",
+        Fly = "Fly Mode",
+        Noclip = "Noclip (Walk Through Walls)",
+        InfJump = "Infinite Jump",
+        BunnyHop = "Bunny Hop",
+        SpinBot = "SpinBot (Anti-Aim)",
+        -- Misc
+        InvisVisual = "Invisibility (Visual/Client)",
+        InvisUnder = "Invisibility (Under Map)",
+        FullBright = "Full Bright",
+        BlastProt = "Blast Protection",
+        ServerHop = "Server Hop",
+        Rejoin = "Rejoin Server",
+        LangSwitch = "Switch Language (RU/EN)",
+        -- Beta
+        TinyChar = "Tiny Character (Small Hitbox)",
+        GodHitbox = "God Mode (No Hitbox)",
+        -- Warnings
+        Warn_Title = "WARNING: BETA FEATURE",
+        Warn_Text = "This feature is experimental.\nIt may cause bugs, glitches, or kick you from the game.\nProceed at your own risk.",
+        Btn_Confirm = "I UNDERSTAND",
+        Btn_Cancel = "CANCEL"
+    },
+    RU = {
+        Title = "",
+        -- Sections
+        Sec_Combat = "-- БОЙ / RAGE --",
+        Sec_Visuals = "-- ВИЗУАЛЫ --",
+        Sec_Movement = "-- ДВИЖЕНИЕ --",
+        Sec_Misc = "-- РАЗНОЕ --",
+        Sec_Beta = "-- БЕТА ТЕСТ --",
+        -- Combat
+        Aimbot = "Легит Аимбот",
+        RageBot = "RAGE Аимбот (Ближайший)",
+        AutoShoot = "Авто Выстрел",
+        WallCheck = "Проверка Стен",
+        TeamCheck = "Проверка Команды",
+        HitboxExpander = "Расширить Хитбоксы (Голова)",
+        NoRecoil = "Нет Отдачи",
+        SilentAim = "Сайлент Аим (Визуал)",
+        -- Visuals
+        ESP = "Включить ЕСП",
+        Boxes = "Коробки",
+        Tracers = "Линии (Трейсеры)",
+        Names = "Имена и Здоровье",
+        Chams = "Чамсы (Подсветка)",
+        Crosshair = "Прицел",
+        FOV = "Показать Круг FOV",
+        -- Movement
+        Speed = "Скорость (CFrame)",
+        Fly = "Полет",
+        Noclip = "Ноклип (Сквозь Стены)",
+        InfJump = "Бесконечный Прыжок",
+        BunnyHop = "Банни Хоп",
+        SpinBot = "СпинБот (Крутилка)",
+        -- Misc
+        InvisVisual = "Невидимость (Для себя)",
+        InvisUnder = "Невидимость (Под картой)",
+        FullBright = "Яркость (Фонарик)",
+        BlastProt = "Защита от Взрывов",
+        ServerHop = "Сменить Сервер",
+        Rejoin = "Перезайти",
+        LangSwitch = "Сменить Язык (RU/EN)",
+        -- Beta
+        TinyChar = "Мелкий Персонаж (Мин. Хитбокс)",
+        GodHitbox = "Год Мод (Нет Хитбокса)",
+        -- Warnings
+        Warn_Title = "ВНИМАНИЕ: БЕТА ФУНКЦИЯ",
+        Warn_Text = "Эта функция экспериментальная.\nОна может вызвать баги, глюки или кикнуть вас.\nВы используете её на свой страх и риск.",
+        Btn_Confirm = "Я ПОНИМАЮ",
+        Btn_Cancel = "ОТМЕНА"
+    }
+}
+
+local function T(key)
+    return Translations[CurrentLanguage][key] or key
+end
+
+-- // Configuration //
+local Config = {
+    Combat = {
+        Enabled = false,
+        RageMode = false,
+        AimKey = Enum.UserInputType.MouseButton2,
+        Smoothing = 0.2,
+        FOV = 120,
+        ShowFOV = false,
+        AutoShoot = false,
+        TeamCheck = false,
+        WallCheck = false,
+        HitboxSize = 10,
+        HitboxExpanded = false,
+        NoRecoil = false,
+        SilentAim = false
+    },
+    Visuals = {
+        Enabled = false,
+        Boxes = false,
+        Tracers = false,
+        Names = false,
+        Chams = false,
+        Crosshair = false,
+        TeamColor = false,
+        EnemyColor = Color3.fromRGB(255, 50, 50),
+        TeamMateColor = Color3.fromRGB(50, 255, 50)
+    },
+    Movement = {
+        SpeedEnabled = false,
+        SpeedVal = 1,
+        FlyEnabled = false,
+        FlySpeed = 50,
+        Noclip = false,
+        InfJump = false,
+        BunnyHop = false,
+        SpinBot = false
+    },
+    Misc = {
+        InvisVisual = false,
+        InvisUnder = false,
+        FullBright = false,
+        BlastProtection = false
+    },
+    Beta = {
+        TinyChar = false,
+        GodHitbox = false
+    }
+}
+
+-- // UI Setup //
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "KuzqV2"
+ScreenGui.ResetOnSpawn = false
+if game:GetService("CoreGui"):FindFirstChild("RobloxGui") then
+    ScreenGui.Parent = game:GetService("CoreGui")
+else
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- // Warning Overlay //
+local WarningFrame = Instance.new("Frame")
+WarningFrame.Name = "WarningFrame"
+WarningFrame.Size = UDim2.new(0, 400, 0, 200)
+WarningFrame.Position = UDim2.new(0.5, -200, 0.5, -100)
+WarningFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+WarningFrame.BorderSizePixel = 0
+WarningFrame.ZIndex = 200
+WarningFrame.Visible = false
+WarningFrame.Parent = ScreenGui
+
+local WarnCorner = Instance.new("UICorner")
+WarnCorner.CornerRadius = UDim.new(0, 10)
+WarnCorner.Parent = WarningFrame
+
+local WarnTitle = Instance.new("TextLabel")
+WarnTitle.Size = UDim2.new(1, 0, 0, 40)
+WarnTitle.BackgroundTransparency = 1
+WarnTitle.Text = T("Warn_Title")
+WarnTitle.TextColor3 = Color3.fromRGB(255, 50, 50)
+WarnTitle.Font = Enum.Font.GothamBlack
+WarnTitle.TextSize = 18
+WarnTitle.ZIndex = 201
+WarnTitle.Parent = WarningFrame
+
+local WarnText = Instance.new("TextLabel")
+WarnText.Size = UDim2.new(1, -20, 0, 80)
+WarnText.Position = UDim2.new(0, 10, 0, 40)
+WarnText.BackgroundTransparency = 1
+WarnText.Text = T("Warn_Text")
+WarnText.TextColor3 = Color3.fromRGB(200, 200, 200)
+WarnText.Font = Enum.Font.GothamBold
+WarnText.TextSize = 14
+WarnText.TextWrapped = true
+WarnText.ZIndex = 201
+WarnText.Parent = WarningFrame
+
+local ConfirmBtn = Instance.new("TextButton")
+ConfirmBtn.Size = UDim2.new(0, 140, 0, 35)
+ConfirmBtn.Position = UDim2.new(0, 20, 1, -50)
+ConfirmBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ConfirmBtn.Text = T("Btn_Confirm")
+ConfirmBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+ConfirmBtn.Font = Enum.Font.GothamBold
+ConfirmBtn.TextSize = 12
+ConfirmBtn.ZIndex = 201
+ConfirmBtn.Parent = WarningFrame
+Instance.new("UICorner", ConfirmBtn).CornerRadius = UDim.new(0, 6)
+
+local CancelBtn = Instance.new("TextButton")
+CancelBtn.Size = UDim2.new(0, 140, 0, 35)
+CancelBtn.Position = UDim2.new(1, -160, 1, -50)
+CancelBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+CancelBtn.Text = T("Btn_Cancel")
+CancelBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+CancelBtn.Font = Enum.Font.GothamBold
+CancelBtn.TextSize = 12
+CancelBtn.ZIndex = 201
+CancelBtn.Parent = WarningFrame
+Instance.new("UICorner", CancelBtn).CornerRadius = UDim.new(0, 6)
+
+local CurrentWarningCallback = nil
+
+ConfirmBtn.MouseButton1Click:Connect(function()
+    WarningFrame.Visible = false
+    if CurrentWarningCallback then CurrentWarningCallback(true) end
+end)
+
+CancelBtn.MouseButton1Click:Connect(function()
+    WarningFrame.Visible = false
+    if CurrentWarningCallback then CurrentWarningCallback(false) end
+end)
+
+local function TriggerWarning(callback)
+    WarnTitle.Text = T("Warn_Title")
+    WarnText.Text = T("Warn_Text")
+    ConfirmBtn.Text = T("Btn_Confirm")
+    CancelBtn.Text = T("Btn_Cancel")
+    CurrentWarningCallback = callback
+    WarningFrame.Visible = true
+end
+
+-- // Intro Animation Setup //
+local IntroFrame = Instance.new("Frame")
+IntroFrame.Size = UDim2.new(1, 0, 1, 0)
+IntroFrame.BackgroundTransparency = 1
+IntroFrame.ZIndex = 100
+IntroFrame.Parent = ScreenGui
+
+local IntroLogo = Instance.new("ImageLabel")
+IntroLogo.Size = UDim2.new(0, 0, 0, 0)
+IntroLogo.Position = UDim2.new(0.5, 0, 0.5, 0)
+IntroLogo.AnchorPoint = Vector2.new(0.5, 0.5)
+IntroLogo.BackgroundTransparency = 1
+IntroLogo.ZIndex = 101
+IntroLogo.Parent = IntroFrame
+
+-- Handle Logo Downloading
+task.spawn(function()
+    local LogoUrl = "https://i.postimg.cc/qMsS452M/Chat-GPT-Image-7-fevr-2026-g-05-02-51.png"
+    local FileName = "KuzqLogo_v1.png"
+    
+    if writefile and getcustomasset then
+        pcall(function()
+            if not isfile(FileName) then
+                local Content = game:HttpGet(LogoUrl)
+                writefile(FileName, Content)
+            end
+            IntroLogo.Image = getcustomasset(FileName)
+        end)
+    else
+        local FallbackLabel = Instance.new("TextLabel")
+        FallbackLabel.Text = "Kuzq"
+        FallbackLabel.Size = UDim2.new(1, 0, 1, 0)
+        FallbackLabel.BackgroundTransparency = 1
+        FallbackLabel.TextColor3 = Color3.fromRGB(170, 85, 255)
+        FallbackLabel.Font = Enum.Font.GothamBlack
+        FallbackLabel.TextSize = 60
+        FallbackLabel.Parent = IntroFrame
+        IntroLogo:Destroy()
+    end
+end)
+
+-- // Main UI //
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 500, 0, 550)
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -275)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Visible = false
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Text = T("Title")
+TitleLabel.Size = UDim2.new(1, -40, 1, 0)
+TitleLabel.Position = UDim2.new(0, 12, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.TextColor3 = Color3.fromRGB(170, 85, 255)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 18
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+-- Cleanup Function
+local function CleanUp()
+    ScriptRunning = false
+    ScreenGui:Destroy()
+    
+    Lighting.Brightness = 1
+    Lighting.ClockTime = 12
+    Lighting.GlobalShadows = true
+    
+    if LocalPlayer.Character then
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then 
+                v.CanCollide = true; v.Transparency = 0; v.CanTouch = true 
+                if v.Name == "HumanoidRootPart" or v.Name == "Head" then v.Size = Vector3.new(2,1,1) end -- Reset roughly
+            end
+        end
+        local Hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if Hum then 
+            Hum.PlatformStand = false 
+            Hum.HipHeight = 0
+            Hum.CameraOffset = Vector3.new(0,0,0)
+        end
+    end
+end
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 40, 0, 40)
+CloseButton.Position = UDim2.new(1, -40, 0, 0)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 20
+CloseButton.Parent = TitleBar
+CloseButton.MouseButton1Click:Connect(CleanUp)
+
+-- Toggle Button
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Name = "ToggleKuzq"
+ToggleBtn.Size = UDim2.new(0, 40, 0, 40)
+ToggleBtn.Position = UDim2.new(0, 10, 0.5, -20)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+ToggleBtn.Text = "K"
+ToggleBtn.TextColor3 = Color3.fromRGB(170, 85, 255)
+ToggleBtn.Font = Enum.Font.GothamBlack
+ToggleBtn.TextSize = 24
+ToggleBtn.Parent = ScreenGui
+ToggleBtn.Visible = false
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 8)
+ToggleCorner.Parent = ToggleBtn
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Scroll Container
+local Container = Instance.new("ScrollingFrame")
+Container.Size = UDim2.new(1, -20, 1, -50)
+Container.Position = UDim2.new(0, 10, 0, 45)
+Container.BackgroundTransparency = 1
+Container.ScrollBarThickness = 4
+Container.ScrollBarImageColor3 = Color3.fromRGB(170, 85, 255)
+Container.Parent = MainFrame
+Container.CanvasSize = UDim2.new(0, 0, 0, 1400)
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = Container
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 6)
+
+-- // UI Storage for Updates //
+local UI_Elements = {}
+
+-- // UI Builder Functions //
+local function CreateToggle(key, configTable, configKey, callback, isBeta)
+    local ToggleFrame = Instance.new("Frame")
+    ToggleFrame.Size = UDim2.new(1, -10, 0, 32)
+    ToggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    ToggleFrame.Parent = Container
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = ToggleFrame
+    
+    local Label = Instance.new("TextLabel")
+    Label.Text = T(key)
+    Label.Size = UDim2.new(0.7, 0, 1, 0)
+    Label.Position = UDim2.new(0, 10, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.TextColor3 = isBeta and Color3.fromRGB(255, 150, 50) or Color3.fromRGB(220, 220, 220)
+    Label.Font = Enum.Font.GothamSemibold
+    Label.TextSize = 13
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = ToggleFrame
+    
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0, 24, 0, 24)
+    Button.Position = UDim2.new(1, -34, 0.5, -12)
+    Button.BackgroundColor3 = configTable[configKey] and Color3.fromRGB(170, 85, 255) or Color3.fromRGB(60, 60, 60)
+    Button.Text = ""
+    Button.Parent = ToggleFrame
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = Button
+    
+    Button.MouseButton1Click:Connect(function()
+        local function ToggleIt()
+            configTable[configKey] = not configTable[configKey]
+            Button.BackgroundColor3 = configTable[configKey] and Color3.fromRGB(170, 85, 255) or Color3.fromRGB(60, 60, 60)
+            if callback then callback(configTable[configKey]) end
+        end
+
+        if isBeta and not configTable[configKey] then
+            TriggerWarning(function(confirmed)
+                if confirmed then ToggleIt() end
+            end)
+        else
+            ToggleIt()
+        end
+    end)
+
+    table.insert(UI_Elements, {Type = "Label", Obj = Label, Key = key})
+end
+
+local function CreateButton(key, callback)
+    local BtnFrame = Instance.new("Frame")
+    BtnFrame.Size = UDim2.new(1, -10, 0, 32)
+    BtnFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    BtnFrame.Parent = Container
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = BtnFrame
+
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(1, 0, 1, 0)
+    Button.BackgroundTransparency = 1
+    Button.Text = T(key)
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.Font = Enum.Font.GothamBold
+    Button.TextSize = 13
+    Button.Parent = BtnFrame
+    
+    Button.MouseButton1Click:Connect(callback)
+    table.insert(UI_Elements, {Type = "Button", Obj = Button, Key = key})
+end
+
+local function CreateSection(key)
+    local Label = Instance.new("TextLabel")
+    Label.Text = T(key)
+    Label.Size = UDim2.new(1, 0, 0, 25)
+    Label.BackgroundTransparency = 1
+    Label.TextColor3 = Color3.fromRGB(100, 100, 100)
+    Label.Font = Enum.Font.GothamBlack
+    Label.TextSize = 14
+    Label.Parent = Container
+    table.insert(UI_Elements, {Type = "Label", Obj = Label, Key = key})
+end
+
+local function UpdateLanguage()
+    TitleLabel.Text = T("Title")
+    WarnTitle.Text = T("Warn_Title")
+    WarnText.Text = T("Warn_Text")
+    ConfirmBtn.Text = T("Btn_Confirm")
+    CancelBtn.Text = T("Btn_Cancel")
+    for _, item in pairs(UI_Elements) do
+        if item.Type == "Label" or item.Type == "Button" then
+            item.Obj.Text = T(item.Key)
+        end
+    end
+end
+
+-- // Build Menu //
+CreateButton("LangSwitch", function()
+    CurrentLanguage = (CurrentLanguage == "EN") and "RU" or "EN"
+    UpdateLanguage()
+end)
+
+CreateSection("Sec_Combat")
+CreateToggle("Aimbot", Config.Combat, "Enabled")
+CreateToggle("RageBot", Config.Combat, "RageMode")
+CreateToggle("AutoShoot", Config.Combat, "AutoShoot")
+CreateToggle("SilentAim", Config.Combat, "SilentAim")
+CreateToggle("HitboxExpander", Config.Combat, "HitboxExpanded")
+CreateToggle("NoRecoil", Config.Combat, "NoRecoil")
+CreateToggle("WallCheck", Config.Combat, "WallCheck")
+CreateToggle("TeamCheck", Config.Combat, "TeamCheck")
+
+CreateSection("Sec_Visuals")
+CreateToggle("ESP", Config.Visuals, "Enabled")
+CreateToggle("Boxes", Config.Visuals, "Boxes")
+CreateToggle("Tracers", Config.Visuals, "Tracers")
+CreateToggle("Names", Config.Visuals, "Names")
+CreateToggle("Chams", Config.Visuals, "Chams")
+CreateToggle("Crosshair", Config.Visuals, "Crosshair")
+CreateToggle("FOV", Config.Combat, "ShowFOV")
+
+CreateSection("Sec_Movement")
+CreateToggle("Speed", Config.Movement, "SpeedEnabled")
+CreateToggle("Fly", Config.Movement, "FlyEnabled")
+CreateToggle("Noclip", Config.Movement, "Noclip")
+CreateToggle("InfJump", Config.Movement, "InfJump")
+CreateToggle("BunnyHop", Config.Movement, "BunnyHop")
+CreateToggle("SpinBot", Config.Movement, "SpinBot")
+
+CreateSection("Sec_Misc")
+CreateToggle("InvisVisual", Config.Misc, "InvisVisual", function(val)
+    if not ScriptRunning then return end
+    if LocalPlayer.Character then
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") or v:IsA("Decal") then
+                v.Transparency = val and 1 or 0
+            end
+        end
+    end
+end)
+CreateToggle("InvisUnder", Config.Misc, "InvisUnder")
+CreateToggle("FullBright", Config.Misc, "FullBright", function(val)
+    if not ScriptRunning then return end
+    Lighting.Brightness = val and 2 or 1
+    Lighting.ClockTime = val and 14 or 12
+    Lighting.GlobalShadows = not val
+end)
+CreateToggle("BlastProt", Config.Misc, "BlastProtection")
+CreateButton("ServerHop", function()
+    local x = {}
+    for _, v in ipairs(HttpService:JSONDecode(game:HttpGetAsync("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data) do
+        if type(v) == "table" and v.maxPlayers > v.playing and v.id ~= game.JobId then
+            x[#x + 1] = v.id
+        end
+    end
+    if #x > 0 then
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, x[math.random(1, #x)], LocalPlayer)
+    end
+end)
+CreateButton("Rejoin", function()
+    TeleportService:Teleport(game.PlaceId, LocalPlayer)
+end)
+
+CreateSection("Sec_Beta")
+CreateToggle("TinyChar", Config.Beta, "TinyChar", nil, true)
+CreateToggle("GodHitbox", Config.Beta, "GodHitbox", nil, true)
+
+-- // Drawing API //
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1.5
+FOVCircle.NumSides = 60
+FOVCircle.Radius = Config.Combat.FOV
+FOVCircle.Filled = false
+FOVCircle.Color = Color3.fromRGB(170, 85, 255)
+FOVCircle.Transparency = 1
+
+local CrosshairX = Drawing.new("Line")
+local CrosshairY = Drawing.new("Line")
+CrosshairX.Thickness = 1.5; CrosshairY.Thickness = 1.5
+CrosshairX.Color = Color3.new(1,1,1); CrosshairY.Color = Color3.new(1,1,1)
+
+local ESP_Storage = {}
+local Chams_Storage = {}
+local LastShootTime = 0
+
+-- // Logic Functions //
+
+local function IsAlive(player)
+    return player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
+end
+
+local function IsEnemy(player)
+    if not Config.Combat.TeamCheck then return true end
+    if player.Team == nil then return true end
+    return player.Team ~= LocalPlayer.Team
+end
+
+local function GetBestTarget()
+    local BestTarget = nil
+    local BestScore = math.huge
+    local MousePos = Vector2.new(Mouse.X, Mouse.Y)
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsAlive(player) and IsEnemy(player) then
+            local Char = player.Character
+            local TargetPart = Char:FindFirstChild("Head") or Char:FindFirstChild("HumanoidRootPart")
+            
+            if TargetPart then
+                local Dist = (LocalPlayer.Character.HumanoidRootPart.Position - TargetPart.Position).Magnitude
+                
+                if Config.Combat.RageMode then
+                    if Dist < BestScore then
+                        if Config.Combat.WallCheck then
+                            local Params = RaycastParams.new()
+                            Params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+                            local RayHit = Workspace:Raycast(Camera.CFrame.Position, (TargetPart.Position - Camera.CFrame.Position).Unit * Dist, Params)
+                            if not RayHit or RayHit.Instance:IsDescendantOf(Char) then
+                                BestScore = Dist
+                                BestTarget = TargetPart
+                            end
+                        else
+                            BestScore = Dist
+                            BestTarget = TargetPart
+                        end
+                    end
+                else
+                    local ScreenPos, OnScreen = Camera:WorldToViewportPoint(TargetPart.Position)
+                    if OnScreen then
+                        local MouseDist = (MousePos - Vector2.new(ScreenPos.X, ScreenPos.Y)).Magnitude
+                        if MouseDist < Config.Combat.FOV and MouseDist < BestScore then
+                            local IsVisible = true
+                            if Config.Combat.WallCheck then
+                                local Params = RaycastParams.new()
+                                Params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+                                local RayHit = Workspace:Raycast(Camera.CFrame.Position, (TargetPart.Position - Camera.CFrame.Position).Unit * Dist, Params)
+                                if RayHit and not RayHit.Instance:IsDescendantOf(Char) then
+                                    IsVisible = false
+                                end
+                            end
+
+                            if IsVisible then
+                                BestScore = MouseDist
+                                BestTarget = TargetPart
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return BestTarget
+end
+
+-- // ESP Logic //
+local function CreateESP(player)
+    if ESP_Storage[player] then return end
+    local Drawings = {
+        Box = Drawing.new("Square"),
+        Tracer = Drawing.new("Line"),
+        Text = Drawing.new("Text")
+    }
+    Drawings.Box.Thickness = 1.5; Drawings.Box.Filled = false
+    Drawings.Tracer.Thickness = 1
+    Drawings.Text.Size = 14; Drawings.Text.Center = true; Drawings.Text.Outline = true
+    ESP_Storage[player] = Drawings
+end
+
+local function RemoveESP(player)
+    if ESP_Storage[player] then
+        pcall(function()
+            ESP_Storage[player].Box:Remove()
+            ESP_Storage[player].Tracer:Remove()
+            ESP_Storage[player].Text:Remove()
+        end)
+        ESP_Storage[player] = nil
+    end
+    if Chams_Storage[player] then
+        Chams_Storage[player]:Destroy()
+        Chams_Storage[player] = nil
+    end
+end
+
+local function UpdateVisuals()
+    if not ScriptRunning then
+        for _, storage in pairs(ESP_Storage) do
+            storage.Box.Visible = false; storage.Tracer.Visible = false; storage.Text.Visible = false
+        end
+        CrosshairX.Visible = false; CrosshairY.Visible = false
+        FOVCircle.Visible = false
+        return
+    end
+
+    -- Crosshair
+    if Config.Visuals.Crosshair then
+        CrosshairX.Visible = true; CrosshairY.Visible = true
+        CrosshairX.From = Vector2.new(Mouse.X - 6, Mouse.Y); CrosshairX.To = Vector2.new(Mouse.X + 6, Mouse.Y)
+        CrosshairY.From = Vector2.new(Mouse.X, Mouse.Y - 6); CrosshairY.To = Vector2.new(Mouse.X, Mouse.Y + 6)
+    else
+        CrosshairX.Visible = false; CrosshairY.Visible = false
+    end
+
+    if not Config.Visuals.Enabled then
+        for _, storage in pairs(ESP_Storage) do
+            storage.Box.Visible = false; storage.Tracer.Visible = false; storage.Text.Visible = false
+        end
+        return
+    end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        -- STRICT CHECK: Do not draw on LocalPlayer
+        if player ~= LocalPlayer and player.UserId ~= LocalPlayer.UserId then
+            if IsAlive(player) and (not Config.Combat.TeamCheck or IsEnemy(player)) then
+                if not ESP_Storage[player] then CreateESP(player) end
+                
+                -- Chams Logic
+                if Config.Visuals.Chams then
+                    if not Chams_Storage[player] then
+                        local highlight = Instance.new("Highlight")
+                        highlight.Name = "KuzqChams"
+                        highlight.FillColor = Config.Visuals.EnemyColor
+                        highlight.OutlineColor = Color3.new(1,1,1)
+                        highlight.FillTransparency = 0.5
+                        highlight.OutlineTransparency = 0
+                        highlight.Parent = player.Character
+                        Chams_Storage[player] = highlight
+                    end
+                else
+                    if Chams_Storage[player] then Chams_Storage[player]:Destroy(); Chams_Storage[player] = nil end
+                end
+
+                local Drawings = ESP_Storage[player]
+                local Char = player.Character
+                local HRP = Char:FindFirstChild("HumanoidRootPart")
+                
+                if HRP then
+                    local Vector, OnScreen = Camera:WorldToViewportPoint(HRP.Position)
+                    
+                    if OnScreen then
+                        local Dist = (Camera.CFrame.Position - HRP.Position).Magnitude
+                        local Color = IsEnemy(player) and Config.Visuals.EnemyColor or Config.Visuals.TeamMateColor
+                        local Size = (Camera.ViewportSize.Y / Dist) * 2.5
+                        local W, H = Size * 0.7, Size
+                        
+                        -- Box
+                        if Config.Visuals.Boxes then
+                            Drawings.Box.Visible = true
+                            Drawings.Box.Size = Vector2.new(W, H)
+                            Drawings.Box.Position = Vector2.new(Vector.X - W/2, Vector.Y - H/2)
+                            Drawings.Box.Color = Color
+                        else Drawings.Box.Visible = false end
+                        
+                        -- Tracer
+                        if Config.Visuals.Tracers then
+                            Drawings.Tracer.Visible = true
+                            Drawings.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                            Drawings.Tracer.To = Vector2.new(Vector.X, Vector.Y + H/2)
+                            Drawings.Tracer.Color = Color
+                        else Drawings.Tracer.Visible = false end
+                        
+                        -- Name/Health
+                        if Config.Visuals.Names then
+                            Drawings.Text.Visible = true
+                            Drawings.Text.Position = Vector2.new(Vector.X, Vector.Y - H/2 - 15)
+                            local hp = Char.Humanoid.Health
+                            Drawings.Text.Text = string.format("%s\n[%d HP]", player.Name, math.floor(hp))
+                            Drawings.Text.Color = Color
+                        else Drawings.Text.Visible = false end
+                    else
+                        Drawings.Box.Visible = false; Drawings.Tracer.Visible = false; Drawings.Text.Visible = false
+                    end
+                end
+            else
+                if ESP_Storage[player] then
+                    ESP_Storage[player].Box.Visible = false; ESP_Storage[player].Tracer.Visible = false; ESP_Storage[player].Text.Visible = false
+                end
+                if Chams_Storage[player] then Chams_Storage[player]:Destroy(); Chams_Storage[player] = nil end
+            end
+        else
+            RemoveESP(player)
+        end
+    end
+end
+
+-- // Movement & Misc Loops //
+local FlyBodyVelocity = nil
+
+RunService.RenderStepped:Connect(function()
+    if not ScriptRunning then
+        if FlyBodyVelocity then FlyBodyVelocity:Destroy(); FlyBodyVelocity = nil end
+        return 
+    end
+
+    -- FOV Update
+    FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
+    FOVCircle.Radius = Config.Combat.FOV
+    FOVCircle.Visible = (Config.Combat.Enabled and Config.Combat.ShowFOV and not Config.Combat.RageMode)
+
+    UpdateVisuals()
+
+    if not LocalPlayer.Character then return end
+    local HRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local Hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+    if not HRP or not Hum then return end
+
+    -- Aimbot
+    if Config.Combat.Enabled then
+        local IsAiming = UserInputService:IsMouseButtonPressed(Config.Combat.AimKey)
+        local TargetPart = GetBestTarget()
+
+        if TargetPart then
+            -- Auto Shoot
+            if Config.Combat.AutoShoot then
+                local currentTime = tick()
+                if currentTime - LastShootTime > 0.05 then
+                    LastShootTime = currentTime
+                    task.spawn(function()
+                        if mouse1click then mouse1click() 
+                        elseif VirtualUser then
+                            VirtualUser:Button1Down(Vector2.new(0,0), Camera.CFrame)
+                            VirtualUser:Button1Up(Vector2.new(0,0), Camera.CFrame)
+                        end
+                    end)
+                end
+            end
+
+            -- Aim Lock
+            if IsAiming or Config.Combat.RageMode then
+                if Config.Combat.RageMode then
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, TargetPart.Position)
+                else
+                    local CurrentCF = Camera.CFrame
+                    local GoalCF = CFrame.new(CurrentCF.Position, TargetPart.Position)
+                    Camera.CFrame = CurrentCF:Lerp(GoalCF, Config.Combat.Smoothing)
+                end
+            end
+        end
+    end
+
+    -- Movement: Speed
+    if Config.Movement.SpeedEnabled then
+        if Hum.MoveDirection.Magnitude > 0 then
+            HRP.CFrame = HRP.CFrame + (Hum.MoveDirection * Config.Movement.SpeedVal)
+        end
+    end
+
+    -- Movement: Fly
+    if Config.Movement.FlyEnabled then
+        if not FlyBodyVelocity then
+            FlyBodyVelocity = Instance.new("BodyVelocity")
+            FlyBodyVelocity.MaxForce = Vector3.new(100000, 100000, 100000)
+            FlyBodyVelocity.Parent = HRP
+        end
+        FlyBodyVelocity.Velocity = Vector3.new(0,0,0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then FlyBodyVelocity.Velocity = Camera.CFrame.LookVector * Config.Movement.FlySpeed end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then FlyBodyVelocity.Velocity = -Camera.CFrame.LookVector * Config.Movement.FlySpeed end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then FlyBodyVelocity.Velocity = Vector3.new(0, 50, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then FlyBodyVelocity.Velocity = Vector3.new(0, -50, 0) end
+    else
+        if FlyBodyVelocity then FlyBodyVelocity:Destroy(); FlyBodyVelocity = nil end
+    end
+
+    -- Movement: SpinBot
+    if Config.Movement.SpinBot then
+        HRP.CFrame = HRP.CFrame * CFrame.Angles(0, math.rad(20), 0)
+    end
+
+    -- Movement: BunnyHop
+    if Config.Movement.BunnyHop and Hum.FloorMaterial ~= Enum.Material.Air then
+        Hum:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+
+    -- Misc: Invis Under
+    if Config.Misc.InvisUnder then
+        local oldCF = HRP.CFrame
+        HRP.CFrame = CFrame.new(oldCF.X, oldCF.Y - 15, oldCF.Z)
+    end
+
+    -- BETA: Tiny Character (Small Hitbox)
+    if Config.Beta.TinyChar then
+        Hum.HipHeight = -1.2 -- Adjust so you don't sink too much or float
+        Hum.CameraOffset = Vector3.new(0, 1, 0) -- Keep camera up
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.Size = Vector3.new(0.1, 0.1, 0.1)
+                v.CanCollide = false
+                v.Massless = true
+            end
+        end
+    end
+
+    -- BETA: God Hitbox (No Hitbox)
+    if Config.Beta.GodHitbox then
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanTouch = false
+                pcall(function() v.CanQuery = false end)
+            end
+        end
+    end
+end)
+
+-- // Physics Loops (Noclip) //
+RunService.Stepped:Connect(function()
+    if not ScriptRunning then return end
+    if Config.Movement.Noclip and LocalPlayer.Character then
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") and v.CanCollide then
+                v.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- // Hitbox Expander Loop //
+task.spawn(function()
+    while task.wait(1) do
+        if not ScriptRunning then break end
+        if Config.Combat.HitboxExpanded then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and IsEnemy(p) and IsAlive(p) then
+                    local Head = p.Character:FindFirstChild("Head")
+                    if Head then
+                        Head.Size = Vector3.new(Config.Combat.HitboxSize, Config.Combat.HitboxSize, Config.Combat.HitboxSize)
+                        Head.Transparency = 0.5
+                        Head.CanCollide = false
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- // Blast Protection //
+Workspace.DescendantAdded:Connect(function(descendant)
+    if not ScriptRunning then return end
+    if Config.Misc.BlastProtection then
+        task.wait()
+        local name = descendant.Name:lower()
+        if name:find("grenade") or name:find("rocket") or name:find("molotov") or name:find("fire") then
+            if not descendant:IsDescendantOf(LocalPlayer.Character) then
+                pcall(function() descendant:Destroy() end)
+            end
+        end
+    end
+end)
+
+-- // Inf Jump //
+UserInputService.JumpRequest:Connect(function()
+    if not ScriptRunning then return end
+    if Config.Movement.InfJump and LocalPlayer.Character then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+-- // Cleanup //
+Players.PlayerRemoving:Connect(RemoveESP)
+ScreenGui.DescendantRemoving:Connect(function(descendant)
+    if descendant == MainFrame then
+        ScriptRunning = false
+        FOVCircle:Remove()
+        CrosshairX:Remove(); CrosshairY:Remove()
+        for _, p in pairs(Players:GetPlayers()) do RemoveESP(p) end
+    end
+end)
+
+-- // Execute Intro //
+task.spawn(function()
+    task.wait(0.5)
+    
+    if IntroLogo then
+        local tweenInfo = TweenInfo.new(1.0, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        local tweenSize = TweenService:Create(IntroLogo, tweenInfo, {Size = UDim2.new(0, 300, 0, 300)})
+        tweenSize:Play()
+        tweenSize.Completed:Wait()
+    end
+    
+    task.wait(1.5)
+    
+    local tweenInfo2 = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    if IntroLogo then
+        local tweenFade = TweenService:Create(IntroLogo, tweenInfo2, {ImageTransparency = 1})
+        tweenFade:Play()
+    end
+    local tweenFrame = TweenService:Create(IntroFrame, tweenInfo2, {BackgroundTransparency = 1})
+    
+    tweenFrame:Play()
+    tweenFrame.Completed:Wait()
+    
+    IntroFrame:Destroy()
+    MainFrame.Visible = true
+    ToggleBtn.Visible = true
+end)

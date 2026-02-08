@@ -1,0 +1,850 @@
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local Window = WindUI:CreateWindow({
+    Title = "",
+    Icon = "", -- lucide icon
+    Author = "",
+    Folder = "XXMZBREAKIN2",
+    
+    -- ↓ This all is Optional. You can remove it.
+    Size = UDim2.fromOffset(580, 460),
+    MinSize = Vector2.new(560, 350),
+    MaxSize = Vector2.new(850, 560),
+    Transparent = true,
+    Theme = "Dark",
+    Resizable = true,
+    SideBarWidth = 200,
+    BackgroundImageTransparency = 0.42,
+    HideSearchBar = true,
+    ScrollBarEnabled = false,
+    
+    -- ↓ Optional. You can remove it.
+    --[[ You can set 'rbxassetid://' or video to Background.
+        'rbxassetid://':
+            Background = "rbxassetid://", -- rbxassetid
+        Video:
+            Background = "video:YOUR-RAW-LINK-TO-VIDEO.webm", -- video 
+    --]]
+    
+    -- ↓ Optional. You can remove it.
+    User = {
+        Enabled = true,
+        Anonymous = true,
+        Callback = function()
+            print("clicked")
+        end,
+    },
+
+local Tab2 = Window:Tab({
+    Title = "Player modify",
+    Icon = "user", -- optional
+    Locked = false,
+})
+
+local ReceiveArmorButton = Tab2:Button({
+    Title = "Ativar armadura",
+    Desc = "Spawna Armor2",
+    Locked = false,
+    Callback = function()
+        local args = {
+            3,
+            "Armor2",
+            "Armor",
+            "1x4x4x4x43",
+            [6] = 1
+        }
+        game:GetService("ReplicatedStorage").Events.Vending:FireServer(unpack(args))
+        print("Armor recebida!")
+    end
+})
+
+-- Variável para armazenar o item selecionado
+local selectedItem = nil
+
+-- Botão Level 5 Strength
+local StrengthButton = Tab2:Button({
+    Title = "Level 5 Strength",
+    Desc = "Aumenta Strength 5 vezes",
+    Locked = false,
+    Callback = function()
+        for i = 1, 5 do
+            local args = {
+                "Strength"
+            }
+            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RainbowWhatStat"):FireServer(unpack(args))
+            wait(0.1) -- Pequeno delay entre execuções
+        end
+    end
+})
+
+-- Botão Level 5 Speed
+local SpeedButton = Tab2:Button({
+    Title = "Level 5 Speed",
+    Desc = "Aumenta Speed 5 vezes",
+    Locked = false,
+    Callback = function()
+        for i = 1, 5 do
+            local args = {
+                "Speed"
+            }
+            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RainbowWhatStat"):FireServer(unpack(args))
+            wait(0.1) -- Pequeno delay entre execuções
+        end
+    end
+})
+
+-- Botão Anão
+Tab2:Button({
+    Title = "Anão",
+    Desc = "Deixa o jogador pequeno (Delete Energy primeiro!)",
+    Locked = false,
+    Callback = function()
+        game:GetService("ReplicatedStorage").Events.MakePancake:FireServer()
+        print("Modo Anão ativado!")
+    end
+})
+
+local Tab3 = Window:Tab({
+    Title = "Item Giver",
+    Icon = "package", -- optional
+    Locked = false,
+})
+
+-- Variável para armazenar o item selecionado e modo
+local selectedItem = "GoldenApple"
+local selectedWeapon = "Bat"
+local itemMode = "Vending" -- Modo padrão
+
+-- Dropdown de Modo
+local ModeDropdown = Tab3:Dropdown({
+    Title = "Modo de Item",
+    Values = { "Vending", "Tool" },
+    Multi = false,
+    AllowNone = false,
+    Callback = function(option)
+        itemMode = option
+        print("Modo selecionado: " .. itemMode)
+    end
+})
+
+-- Dropdown Item Giver
+local ItemDropdown = Tab3:Dropdown({
+    Title = "Item Giver",
+    Values = { "GoldenApple", "RainbowPizza", "Pizza", "Cookie", "BloxyCola", "Drink", "GoldenPizza", "Chips", "Apple", "RainbowPizzaBox", "Battery", "Louise", "DetectiveKey", "Book", "Phone", "GoldKey", "MedKit" },
+    Multi = false,
+    AllowNone = false,
+    Callback = function(option)
+        selectedItem = option
+        print("Item selecionado: " .. selectedItem)
+    end
+})
+
+-- Botão Receber Item
+local ReceiveButton = Tab3:Button({
+    Title = "Receber Item",
+    Desc = "Spawna o item selecionado",
+    Locked = false,
+    Callback = function()
+        if itemMode == "Vending" then
+            local args = {
+                3,
+                selectedItem,
+                "Food",
+                game.Players.LocalPlayer.Name,
+                [6] = 2
+            }
+            game:GetService("ReplicatedStorage").Events.Vending:FireServer(unpack(args))
+        else -- Tool mode
+            game:GetService("ReplicatedStorage").Events.GiveTool:FireServer(selectedItem)
+        end
+        print("Item recebido: " .. selectedItem .. " (Modo: " .. itemMode .. ")")
+    end
+})
+
+local ReceiveArmorButton = Tab3:Button({
+    Title = "Get Expired Bloxy Cola",
+    Desc = "Spawna o item",
+    Locked = false,
+    Callback = function()
+        local args = {
+    	3,
+    	"ExpiredBloxyCola",
+    	"Drinks",
+    	"1x4x4x4x43",
+    	[6] = 9
+    }
+    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Vending"):FireServer(unpack(args))
+
+    end
+})
+
+local WeaponDropdown = Tab3:Dropdown({
+    Title = "Weapon",
+    Values = { "Bat", "Broom", "Crowbar", "Wrench", "Pitchfork", "Hammer", "LordSword" },
+    Multi = false,
+    AllowNone = false,
+    Callback = function(option)
+        selectedWeapon = option
+        print("Arma selecionada: " .. selectedWeapon)
+    end
+})
+
+-- Botão Receber Arma
+local ReceiveWeaponButton = Tab3:Button({
+    Title = "Receber Arma",
+    Desc = "Spawna a arma selecionada",
+    Locked = false,
+    Callback = function()
+        if itemMode == "Vending" then
+            local args = {
+                3,
+                selectedWeapon,
+                "Weapons",
+                "1x4x4x4x43",
+                [6] = 1
+            }
+            game:GetService("ReplicatedStorage").Events.Vending:FireServer(unpack(args))
+        else -- Tool mode
+            game:GetService("ReplicatedStorage").Events.GiveTool:FireServer(selectedWeapon)
+        end
+        print("Arma recebida: " .. selectedWeapon .. " (Modo: " .. itemMode .. ")")
+    end
+})
+
+local Tab4 = Window:Tab({
+    Title = "Combat",
+    Icon = "sword", -- optional
+    Locked = false,
+})
+
+-- Toggle Kill Aura
+local killAuraActive = false
+local killAuraConnection = nil
+
+local KillAuraToggle = Tab4:Toggle({
+    Title = "Kill Aura",
+    Desc = "Bate em todos os BadGuys",
+    Locked = false,
+    Callback = function(state)
+        killAuraActive = state
+        
+        if killAuraActive then
+            killAuraConnection = game:GetService("RunService").Heartbeat:Connect(function()
+                if killAuraActive then
+                    local folders = { "BadGuys", "BadGuysBoss", "BadGuysFront" }
+                    for _, folderName in pairs(folders) do
+                        local folder = workspace:FindFirstChild(folderName)
+                        if folder then
+                            for _, badGuy in pairs(folder:GetChildren()) do
+                                local args = {
+                                    badGuy,
+                                    32.4,
+                                    4
+                                }
+                                game:GetService("ReplicatedStorage").Events.HitBadguy:FireServer(unpack(args))
+                            end
+                        end
+                    end
+                    
+                    local badGuyBrute = workspace:FindFirstChild("BadGuyBrute")
+                    if badGuyBrute then
+                        local args = {
+                            badGuyBrute,
+                            64.8,
+                            4
+                        }
+                        game:GetService("ReplicatedStorage").Events.HitBadguy:FireServer(unpack(args))
+                    end
+                    if pizzaBoss then
+                        local badGuyPizza = pizzaBoss:FindFirstChild("BadGuyPizza")
+                        if badGuyPizza then
+                            local args = {
+                                badGuyPizza,
+                                32.4,
+                                4
+                            }
+                            game:GetService("ReplicatedStorage").Events.HitBadguy:FireServer(unpack(args))
+                        end
+                    end
+                end
+            end)
+        else
+            if killAuraConnection then
+                killAuraConnection:Disconnect()
+                killAuraConnection = nil
+            end
+        end
+    end
+})
+
+local Tab5 = Window:Tab({
+    Title = "Delete FE",
+    Icon = "skull", -- optional
+    Locked = false,
+})
+
+-- Função Delete correta (Server-Side)
+local function Delete(Instance)
+    pcall(function()
+        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("OnDoorHit"):FireServer(Instance)
+    end)
+end
+
+-- Delete Custom
+Tab5:Input({
+    Title = "Delete Custom",
+    Placeholder = "Cole o path do DEX aqui",
+    Callback = function(value)
+        pcall(function()
+            -- Substitui 'workspace' por 'game:GetService("Workspace")'
+            local fixedValue = string.gsub(value, "^workspace", 'game:GetService("Workspace")')
+            local obj = loadstring("return " .. fixedValue)()
+            if obj then
+                Delete(obj)
+                print("Deletado com sucesso!")
+            else
+                print("Erro: objeto não encontrado")
+            end
+        end)
+    end
+})
+
+-- Delete The Game
+Tab5:Button({
+    Title = "Delete The Game",
+    Desc = "Deleta o jogo inteiro",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Workspace"):GetChildren()) do
+            Delete(v)
+        end
+    end
+})
+
+-- Delete The House
+Tab5:Button({
+    Title = "Delete The House",
+    Desc = "Deleta a casa",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Workspace").TheHouse:GetChildren()) do
+            if v.Name ~= "FloorLayer" then
+                Delete(v)
+            end
+        end
+    end
+})
+
+-- Kick Player
+Tab5:Input({
+    Title = "Kick Player",
+    Placeholder = "PlayerName",
+    Callback = function(value)
+        pcall(function()
+            Delete(game:GetService("Players")[value])
+        end)
+        print("Kicked: " .. value)
+    end
+})
+
+-- Kick Others
+Tab5:Button({
+    Title = "Kick Others",
+    Desc = "Kicka todos menos você",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            if v.Name ~= tostring(game:GetService("Players").LocalPlayer.Name) then
+                pcall(function()
+                    Delete(game:GetService("Players"):FindFirstChild(tostring(v.Name)))
+                end)
+            end
+        end
+        print("Kicked others!")
+    end
+})
+
+-- Kick All
+Tab5:Button({
+    Title = "Kick All",
+    Desc = "Kicka todos (incluindo você)",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            pcall(function()
+                Delete(game:GetService("Players"):FindFirstChild(tostring(v.Name)))
+            end)
+        end
+        print("Kicked everyone!")
+    end
+})
+
+-- Delete Player's Backpack
+Tab5:Input({
+    Title = "Delete Player's Backpack",
+    Placeholder = "PlayerName",
+    Callback = function(value)
+        pcall(function()
+            Delete(game:GetService("Players")[value].Backpack)
+        end)
+        print("Backpack deletado: " .. value)
+    end
+})
+
+-- Delete Others Backpack
+Tab5:Button({
+    Title = "Delete Others Backpack",
+    Desc = "Deleta backpack dos outros",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            if v.Name ~= tostring(game:GetService("Players").LocalPlayer.Name) then
+                pcall(function()
+                    Delete(game:GetService("Players"):FindFirstChild(tostring(v.Name)).Backpack)
+                end)
+            end
+        end
+        print("Backpacks deletados!")
+    end
+})
+
+-- Delete All Backpacks
+Tab5:Button({
+    Title = "Delete All Backpacks",
+    Desc = "Deleta backpack de todos",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            pcall(function()
+                Delete(game:GetService("Players"):FindFirstChild(tostring(v.Name)).Backpack)
+            end)
+        end
+        print("Todos backpacks deletados!")
+    end
+})
+
+-- Delete Everyone's Clothes
+Tab5:Button({
+    Title = "Delete Everyone's Clothes",
+    Desc = "Deleta roupa de todo mundo 😂",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            pcall(function()
+                local char = game:GetService("Workspace"):FindFirstChild(tostring(v.Name))
+                if char then
+                    -- Deleta Shirt
+                    local shirt = char:FindFirstChildOfClass("Shirt")
+                    if shirt then
+                        Delete(shirt)
+                    end
+                    -- Deleta Pants
+                    local pants = char:FindFirstChildOfClass("Pants")
+                    if pants then
+                        Delete(pants)
+                    end
+                    -- Deleta ShirtGraphic (camiseta)
+                    local shirtGraphic = char:FindFirstChildOfClass("ShirtGraphic")
+                    if shirtGraphic then
+                        Delete(shirtGraphic)
+                    end
+                end
+            end)
+        end
+        print("Roupas deletadas! kkkk")
+    end
+})
+
+-- Delete Everyone's Accessories
+Tab5:Button({
+    Title = "Delete Everyone's Accessories",
+    Desc = "Remove todos acessórios 😂",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            pcall(function()
+                local char = game:GetService("Workspace"):FindFirstChild(tostring(v.Name))
+                if char then
+                    for _, accessory in pairs(char:GetChildren()) do
+                        if accessory:IsA("Accessory") then
+                            Delete(accessory)
+                        end
+                    end
+                end
+            end)
+        end
+        print("Acessórios deletados! kkk")
+    end
+})
+
+-- Delete Player's Humanoid
+local DeleteHumanoidInput = Tab5:Input({
+    Title = "Delete Player's Humanoid",
+    Placeholder = "PlayerName",
+    Callback = function(value)
+        Delete(game:GetService("Workspace")[value])
+    end
+})
+
+-- Delete Other's Humanoid
+Tab5:Button({
+    Title = "Delete Other's Humanoid",
+    Desc = "Deleta humanoid dos outros",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            if v.Name ~= tostring(game:GetService("Players").LocalPlayer.Name) then
+                Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name), true))
+            end
+        end
+    end
+})
+
+-- Delete Everyone's Humanoid
+Tab5:Button({
+    Title = "Delete Everyone's Humanoid",
+    Desc = "Deleta humanoid de todos",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name), true))
+        end
+    end
+})
+
+-- Delete Player's Limbs
+local DeleteLimbsInput = Tab5:Input({
+    Title = "Delete Player's Limbs",
+    Placeholder = "PlayerName",
+    Callback = function(value)
+        local limbs = {"LeftHand", "LeftFoot", "LeftLowerArm", "LeftLowerLeg", "LeftUpperArm", "LeftUpperLeg", "RightFoot", "RightHand", "RightLowerArm", "RightLowerLeg", "RightUpperArm", "RightUpperLeg"}
+        pcall(function()
+            for _, limb in pairs(limbs) do
+                Delete(game:GetService("Workspace"):FindFirstChild(tostring(value))[limb])
+            end
+        end)
+    end
+})
+
+-- Delete Other's Limbs
+Tab5:Button({
+    Title = "Delete Other's Limbs",
+    Desc = "Deleta membros dos outros",
+    Locked = false,
+    Callback = function()
+        local limbs = {"LeftHand", "LeftFoot", "LeftLowerArm", "LeftLowerLeg", "LeftUpperArm", "LeftUpperLeg", "RightFoot", "RightHand", "RightLowerArm", "RightLowerLeg", "RightUpperArm", "RightUpperLeg"}
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            if v.Name ~= tostring(game:GetService("Players").LocalPlayer.Name) then
+                pcall(function()
+                    for _, limb in pairs(limbs) do
+                        Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name))[limb])
+                    end
+                end)
+            end
+        end
+    end
+})
+
+-- Delete Everyone's Limbs
+Tab5:Button({
+    Title = "Delete Everyone's Limbs",
+    Desc = "Deleta membros de todos",
+    Locked = false,
+    Callback = function()
+        local limbs = {"LeftHand", "LeftFoot", "LeftLowerArm", "LeftLowerLeg", "LeftUpperArm", "LeftUpperLeg", "RightFoot", "RightHand", "RightLowerArm", "RightLowerLeg", "RightUpperArm", "RightUpperLeg"}
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            pcall(function()
+                for _, limb in pairs(limbs) do
+                    Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name))[limb])
+                end
+            end)
+        end
+    end
+})
+
+-- Freeze Player
+local FreezeInput = Tab5:Input({
+    Title = "Freeze Player",
+    Placeholder = "PlayerName",
+    Callback = function(value)
+        pcall(function()
+            Delete(game:GetService("Workspace"):FindFirstChild(tostring(value)).LowerTorso)
+        end)
+    end
+})
+
+-- Freeze Other's Characters
+Tab5:Button({
+    Title = "Freeze Other's Characters",
+    Desc = "Congela personagens dos outros",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            if v.Name ~= tostring(game:GetService("Players").LocalPlayer.Name) then
+                pcall(function()
+                    Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name)).LowerTorso)
+                end)
+            end
+        end
+    end
+})
+
+-- Freeze Everyone's Characters
+Tab5:Button({
+    Title = "Freeze Everyone's Characters",
+    Desc = "Congela personagens de todos",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            pcall(function()
+                Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name)).LowerTorso)
+            end)
+        end
+    end
+})
+
+-- Kill Player
+local KillInput = Tab5:Input({
+    Title = "Kill Player",
+    Placeholder = "PlayerName",
+    Callback = function(value)
+        pcall(function()
+            Delete(game:GetService("Workspace"):FindFirstChild(tostring(value)).Head)
+            Delete(game:GetService("Workspace"):FindFirstChild(tostring(value)).UpperTorso)
+        end)
+    end
+})
+
+-- Kill Others
+Tab5:Button({
+    Title = "Kill Others",
+    Desc = "Mata os outros",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            if v.Name ~= tostring(game:GetService("Players").LocalPlayer.Name) then
+                pcall(function()
+                    Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name)).Head)
+                    Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name)).UpperTorso)
+                end)
+            end
+        end
+    end
+})
+
+-- Kill Everyone
+Tab5:Button({
+    Title = "Kill Everyone",
+    Desc = "Mata todos",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Players"):GetChildren()) do
+            pcall(function()
+                Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name)).Head)
+                Delete(game:GetService("Workspace"):FindFirstChild(tostring(v.Name)).UpperTorso)
+            end)
+        end
+    end
+})
+
+-- Delete Treadmills
+Tab5:Button({
+    Title = "Delete Treadmills",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace").Tredmills)
+    end
+})
+
+-- Delete Benches
+Tab5:Button({
+    Title = "Delete Benches",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace").BenchPresses)
+    end
+})
+
+-- Delete TV
+Tab5:Button({
+    Title = "Delete TV",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace").TheHouse.Projector)
+    end
+})
+
+-- Delete Vending Machines
+Tab5:Button({
+    Title = "Delete Vending Machines",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace").VendingMachines)
+    end
+})
+
+-- Delete Boss Room
+Tab5:Button({
+    Title = "Delete Boss Room",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace").Final.BossRoom)
+    end
+})
+
+-- Delete Bad Guys (workspace.BadGuys)
+Tab5:Button({
+    Title = "Delete Bad Guys",
+    Desc = "Deleta workspace.BadGuys",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace").BadGuys)
+        print("BadGuys deletado!")
+    end
+})
+
+-- Delete Bad Guys (Todos)
+Tab5:Button({
+    Title = "Delete All Bad Guys",
+    Desc = "Deleta todos os inimigos individuais",
+    Locked = false,
+    Callback = function()
+        for i, v in pairs(game:GetService("Workspace").BadGuys:GetChildren()) do
+            Delete(v)
+        end
+        for i, v in pairs(game:GetService("Workspace").BadGuysBoss:GetChildren()) do
+            Delete(v)
+        end
+        for i, v in pairs(game:GetService("Workspace").BadGuysFront:GetChildren()) do
+            Delete(v)
+        end
+    end
+})
+
+-- Delete Pizza Miniboss
+Tab5:Button({
+    Title = "Delete Pizza Miniboss",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace"):FindFirstChild("BadGuyPizza", true))
+    end
+})
+
+-- Delete Brute
+Tab5:Button({
+    Title = "Delete Brute",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace").BadGuyBrute)
+    end
+})
+
+-- Delete Scary Mary
+Tab5:Button({
+    Title = "Delete Scary Mary",
+    Locked = false,
+    Callback = function()
+        if game:GetService("Workspace"):FindFirstChild("Villainess") then
+            Delete(game:GetService("Workspace").Villainess)
+        end
+    end
+})
+
+-- Delete Scary Larry
+Tab5:Button({
+    Title = "Delete Scary Larry",
+    Locked = false,
+    Callback = function()
+        if game:GetService("Workspace"):FindFirstChild("BigBoss") then
+            Delete(game:GetService("Workspace").BigBoss)
+        end
+    end
+})
+
+-- Remove Wind For Everyone
+Tab5:Toggle({
+    Title = "Remove Wind For Everyone",
+    Locked = false,
+    Callback = function(state)
+        getgenv().NoWindSS = state
+        while getgenv().NoWindSS == true do
+            if game:GetService("Workspace"):FindFirstChild("WavePart") then
+                Delete(game:GetService("Workspace").WavePart)
+            end
+            task.wait(0.1)
+        end
+    end
+})
+
+-- Remove Ice For Everyone
+Tab5:Button({
+    Title = "Remove Ice For Everyone",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace").Terrain)
+    end
+})
+
+-- Remove Hailing For Everyone
+Tab5:Button({
+    Title = "Remove Hailing For Everyone",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("Workspace").Hails)
+    end
+})
+
+-- Remove Mud For Everyone
+Tab5:Button({
+    Title = "Remove Mud For Everyone",
+    Locked = false,
+    Callback = function()
+        pcall(function()
+            for i, v in pairs(game:GetService("Workspace").BogArea.Bog:GetDescendants()) do
+                if v.Name == "Mud" and v:IsA("Part") then
+                    Delete(v)
+                end
+            end
+        end)
+    end
+})
+
+-- CORREÇÃO: Anti IceClimb usando Delete FE
+Tab5:Button({
+    Title = "Anti IceClimb for everyone",
+    Desc = "Deleta o evento IceSlip (FE)",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("ReplicatedStorage").Events.IceSlip)
+    end
+})
+
+-- CORREÇÃO: Semi Godmode usando Delete FE
+Tab5:Button({
+    Title = "Semi Godmode for everyone",
+    Desc = "Deleta o evento Energy (FE)",
+    Locked = false,
+    Callback = function()
+        Delete(game:GetService("ReplicatedStorage").Events.Energy)
+    end
+})
+
+local ConfigTab = Window:Tab({
+    Title = "Configurações",
+    Icon = "settings",
+    Locked = false,
+})
+
+local Keybind = ConfigTab:Keybind({
+    Title = "Keybind",
+    Desc = "Keybind para abrir/fechar a UI",
+    Value = "K",
+    Callback = function(v)
+        Window:SetToggleKey(Enum.KeyCode[v])
+        WindUI:Notify({
+            Title = "Keybind",
+            Content = "Keybind alterada para: " .. v,
+            Duration = 2,
+            Icon = "keyboard",
+        })
+    end
+})

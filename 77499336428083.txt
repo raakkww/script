@@ -1,0 +1,143 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AFKMenu"
+screenGui.Parent = playerGui
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 250, 0, 150)
+frame.Position = UDim2.new(0.5, -125, 0.5, -75)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "" -- Sadece başlık güncellendi
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = frame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 30)
+statusLabel.Position = UDim2.new(0, 10, 0, 50)
+statusLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+statusLabel.Text = "Status: CLOSE"
+statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.Parent = frame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusLabel
+
+local afkButton = Instance.new("TextButton")
+afkButton.Size = UDim2.new(1, -20, 0, 40)
+afkButton.Position = UDim2.new(0, 10, 0, 90)
+afkButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+afkButton.Text = "AFK FARM: OFF"
+afkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+afkButton.TextScaled = true
+afkButton.Font = Enum.Font.GothamBold
+afkButton.Parent = frame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 6)
+buttonCorner.Parent = afkButton
+
+local afkEnabled = false
+local farmConnection = nil
+local targetPos = Vector3.new(9201.10, -16.51 + 5, -59.23)
+
+local function toggleAFK()
+    afkEnabled = not afkEnabled
+    
+    if afkEnabled then
+        statusLabel.Text = "Status: ON"
+        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        afkButton.Text = "AFK FARM: ON"
+        afkButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        
+        local character = player.Character or player.CharacterAdded:Wait()
+        local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+        humanoidRootPart.CFrame = CFrame.new(targetPos)
+        
+        farmConnection = RunService.Heartbeat:Connect(function()
+            if character and character.Parent and humanoidRootPart and humanoidRootPart.Parent then
+                local offset = Vector3.new(0, math.sin(tick() * 5) * 0.5, 0)
+                humanoidRootPart.CFrame = CFrame.new(targetPos + offset)
+            else
+                if farmConnection then farmConnection:Disconnect() end
+            end
+        end)
+    else
+        statusLabel.Text = "Status: CLOSE"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+        afkButton.Text = "AFK FARM: OFF"
+        afkButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        
+        if farmConnection then
+            farmConnection:Disconnect()
+            farmConnection = nil
+        end
+    end
+end
+
+afkButton.MouseButton1Click:Connect(toggleAFK)
+
+-- // SÜRÜKLENEBİLİR YAPMA (DRAGGING SYSTEM)
+local dragging, dragInput, dragStart, startPos
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        local delta = dragInput.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- // INSERT KEY TOGGLE
+local guiVisible = true
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Insert then
+        guiVisible = not guiVisible
+        frame.Visible = guiVisible
+    end
+end)

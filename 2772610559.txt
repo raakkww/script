@@ -1,0 +1,60 @@
+local RS = game:GetService("ReplicatedStorage")
+local Larry = RS:WaitForChild("Modules"):WaitForChild("Larry")
+
+
+local Equipment = workspace:WaitForChild("Equipment")
+local Buildings = workspace:WaitForChild("Buildings")
+
+
+local WithdrawPlanks = Larry:WaitForChild("EVTSawmill.WithdrawPlanks")
+
+
+local Flatbed = Equipment:WaitForChild("M2Flatbed")
+
+
+local AutoCarry = false
+
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoCarryGui"
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 90, 0, 40)
+ToggleButton.Position = UDim2.new(0.5, -45, 0.85, 0)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(40,40,40) -- gelap elegan
+ToggleButton.TextColor3 = Color3.fromRGB(255,255,255) -- teks putih
+ToggleButton.Text = "Carry: OFF" -- mulai OFF
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.TextSize = 16
+ToggleButton.Active = true
+ToggleButton.Draggable = true
+ToggleButton.Parent = ScreenGui
+
+
+ToggleButton.MouseButton1Click:Connect(function()
+    AutoCarry = not AutoCarry
+    if AutoCarry then
+        ToggleButton.Text = "Carry: ON"
+    else
+        ToggleButton.Text = "Carry: OFF"
+    end
+end)
+
+
+task.spawn(function()
+    while true do
+        if AutoCarry then
+            for _, sawmill in pairs(Buildings:GetChildren()) do
+                if sawmill.Name == "Sawmill" then
+                    WithdrawPlanks:FireServer(Flatbed, sawmill)
+                    task.wait(1)
+                end
+            end
+            task.wait(1)
+        else
+            task.wait(0.5)
+        end
+    end
+end)

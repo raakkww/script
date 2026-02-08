@@ -1,0 +1,483 @@
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Auto Scam",
+    LoadingTitle = "Auto Scam",
+    LoadingSubtitle = "",
+    ConfigurationSaving = {Enabled = false},
+    Discord = {Enabled = false},
+    KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Main", 4483362458)
+
+local player = game.Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local Board = Instance.new("ObjectValue")
+Board.Name = "Board"
+
+local YourSide = Instance.new("ObjectValue", Board)
+YourSide.Name = "YourSide"
+
+local TheirSide = Instance.new("ObjectValue", Board)
+TheirSide.Name = "TheirSide"
+
+local onV = Instance.new("BoolValue")
+onV.Name = "onV"
+
+local theyV = Instance.new("BoolValue")
+theyV.Name = "theyV"
+
+local enV = false
+local tradeCheckerEnabled = false
+local isExpanded = false
+
+local TradeCheckerGUI = Instance.new("ScreenGui")
+TradeCheckerGUI.Name = "TradeCheckerGUI"
+TradeCheckerGUI.Parent = player.PlayerGui
+TradeCheckerGUI.ResetOnSpawn = false
+
+local MinimizedFrame = Instance.new("Frame")
+MinimizedFrame.Size = UDim2.new(0, 200, 0, 50)
+MinimizedFrame.Position = UDim2.new(0, 10, 0, 10)
+MinimizedFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MinimizedFrame.BackgroundTransparency = 0.3
+MinimizedFrame.BorderSizePixel = 0
+MinimizedFrame.Active = true
+MinimizedFrame.Selectable = true
+MinimizedFrame.Visible = true
+MinimizedFrame.Parent = TradeCheckerGUI
+
+local MiniUICorner = Instance.new("UICorner")
+MiniUICorner.CornerRadius = UDim.new(0, 8)
+MiniUICorner.Parent = MinimizedFrame
+
+local MiniUIStroke = Instance.new("UIStroke")
+MiniUIStroke.Thickness = 2
+MiniUIStroke.Color = Color3.fromRGB(100, 100, 100)
+MiniUIStroke.Parent = MinimizedFrame
+
+local MiniAvatar = Instance.new("ImageLabel")
+MiniAvatar.Size = UDim2.new(0, 40, 0, 40)
+MiniAvatar.Position = UDim2.new(0, 5, 0, 5)
+MiniAvatar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MiniAvatar.BorderSizePixel = 0
+MiniAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=0&w=150&h=150"
+MiniAvatar.Parent = MinimizedFrame
+
+local MiniAvatarCorner = Instance.new("UICorner")
+MiniAvatarCorner.CornerRadius = UDim.new(0, 8)
+MiniAvatarCorner.Parent = MiniAvatar
+
+local MiniPlayerName = Instance.new("TextLabel")
+MiniPlayerName.Size = UDim2.new(0, 140, 0, 40)
+MiniPlayerName.Position = UDim2.new(0, 50, 0, 5)
+MiniPlayerName.BackgroundTransparency = 1
+MiniPlayerName.TextColor3 = Color3.fromRGB(255, 255, 255)
+MiniPlayerName.Font = Enum.Font.SourceSansBold
+MiniPlayerName.TextSize = 16
+MiniPlayerName.Text = "No player"
+MiniPlayerName.TextXAlignment = Enum.TextXAlignment.Left
+MiniPlayerName.Parent = MinimizedFrame
+
+local ExpandButton = Instance.new("TextButton")
+ExpandButton.Size = UDim2.new(0, 30, 0, 15)
+ExpandButton.Position = UDim2.new(1, -35, 1, -20)
+ExpandButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+ExpandButton.BorderSizePixel = 0
+ExpandButton.Text = "â¼"
+ExpandButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExpandButton.Font = Enum.Font.SourceSansBold
+ExpandButton.TextSize = 14
+ExpandButton.Parent = MinimizedFrame
+
+local ExpandButtonCorner = Instance.new("UICorner")
+ExpandButtonCorner.CornerRadius = UDim.new(0, 4)
+ExpandButtonCorner.Parent = ExpandButton
+
+local ExpandedFrame = Instance.new("Frame")
+ExpandedFrame.Size = UDim2.new(0, 220, 0, 150)
+ExpandedFrame.Position = UDim2.new(0, 10, 0, 10)
+ExpandedFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ExpandedFrame.BackgroundTransparency = 0.3
+ExpandedFrame.BorderSizePixel = 0
+ExpandedFrame.Active = true
+ExpandedFrame.Selectable = true
+ExpandedFrame.Visible = false
+ExpandedFrame.Parent = TradeCheckerGUI
+
+local ExpandedUICorner = Instance.new("UICorner")
+ExpandedUICorner.CornerRadius = UDim.new(0, 8)
+ExpandedUICorner.Parent = ExpandedFrame
+
+local ExpandedUIStroke = Instance.new("UIStroke")
+ExpandedUIStroke.Thickness = 2
+ExpandedUIStroke.Color = Color3.fromRGB(100, 100, 100)
+ExpandedUIStroke.Parent = ExpandedFrame
+
+local ExpandedTitle = Instance.new("TextLabel")
+ExpandedTitle.Size = UDim2.new(1, 0, 0, 30)
+ExpandedTitle.Position = UDim2.new(0, 0, 0, 0)
+ExpandedTitle.BackgroundTransparency = 1
+ExpandedTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExpandedTitle.Font = Enum.Font.SourceSansBold
+ExpandedTitle.TextSize = 18
+ExpandedTitle.Text = "Trade Details"
+ExpandedTitle.TextXAlignment = Enum.TextXAlignment.Center
+ExpandedTitle.Parent = ExpandedFrame
+
+local ExpandedSeparator = Instance.new("Frame")
+ExpandedSeparator.Size = UDim2.new(1, -10, 0, 1)
+ExpandedSeparator.Position = UDim2.new(0, 5, 0, 30)
+ExpandedSeparator.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+ExpandedSeparator.BorderSizePixel = 0
+ExpandedSeparator.Parent = ExpandedFrame
+
+local ExpandedOnBoard = Instance.new("TextLabel")
+ExpandedOnBoard.Size = UDim2.new(1, -10, 0, 25)
+ExpandedOnBoard.Position = UDim2.new(0, 5, 0, 35)
+ExpandedOnBoard.BackgroundTransparency = 1
+ExpandedOnBoard.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExpandedOnBoard.Font = Enum.Font.SourceSans
+ExpandedOnBoard.TextSize = 16
+ExpandedOnBoard.Text = "On Board: OFF"
+ExpandedOnBoard.Parent = ExpandedFrame
+
+local ExpandedAccept = Instance.new("TextLabel")
+ExpandedAccept.Size = UDim2.new(1, -10, 0, 25)
+ExpandedAccept.Position = UDim2.new(0, 5, 0, 60)
+ExpandedAccept.BackgroundTransparency = 1
+ExpandedAccept.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExpandedAccept.Font = Enum.Font.SourceSans
+ExpandedAccept.TextSize = 16
+ExpandedAccept.Text = "Other Accept: OFF"
+ExpandedAccept.Parent = ExpandedFrame
+
+local ExpandedPlayerName = Instance.new("TextLabel")
+ExpandedPlayerName.Size = UDim2.new(1, -10, 0, 25)
+ExpandedPlayerName.Position = UDim2.new(0, 5, 0, 85)
+ExpandedPlayerName.BackgroundTransparency = 1
+ExpandedPlayerName.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExpandedPlayerName.Font = Enum.Font.SourceSans
+ExpandedPlayerName.TextSize = 16
+ExpandedPlayerName.Text = "Other Player: None"
+ExpandedPlayerName.Parent = ExpandedFrame
+
+local ExpandedAvatar = Instance.new("ImageLabel")
+ExpandedAvatar.Size = UDim2.new(0, 50, 0, 50)
+ExpandedAvatar.Position = UDim2.new(0, 160, 0, 90)
+ExpandedAvatar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ExpandedAvatar.BorderSizePixel = 0
+ExpandedAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=0&w=150&h=150"
+ExpandedAvatar.Parent = ExpandedFrame
+
+local ExpandedAvatarCorner = Instance.new("UICorner")
+ExpandedAvatarCorner.CornerRadius = UDim.new(0, 8)
+ExpandedAvatarCorner.Parent = ExpandedAvatar
+
+local CollapseButton = Instance.new("TextButton")
+CollapseButton.Size = UDim2.new(0, 30, 0, 15)
+CollapseButton.Position = UDim2.new(1, -35, 1, -20)
+CollapseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+CollapseButton.BorderSizePixel = 0
+CollapseButton.Text = "â²"
+CollapseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CollapseButton.Font = Enum.Font.SourceSansBold
+CollapseButton.TextSize = 14
+CollapseButton.Parent = ExpandedFrame
+
+local CollapseButtonCorner = Instance.new("UICorner")
+CollapseButtonCorner.CornerRadius = UDim.new(0, 4)
+CollapseButtonCorner.Parent = CollapseButton
+
+local function makeDraggable(frame)
+    local dragging = false
+    local dragStartPos
+    local frameStartPos
+    
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStartPos = input.Position
+            frameStartPos = frame.Position
+            
+            frame.BackgroundTransparency = 0.2
+        end
+    end)
+    
+    frame.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStartPos
+            
+            local newX = frameStartPos.X.Offset + delta.X
+            local newY = frameStartPos.Y.Offset + delta.Y
+            
+            local screenSize = workspace.CurrentCamera.ViewportSize
+            local frameSize = frame.AbsoluteSize
+            
+            newX = math.clamp(newX, 0, screenSize.X - frameSize.X)
+            newY = math.clamp(newY, 0, screenSize.Y - frameSize.Y)
+            
+            frame.Position = UDim2.new(0, newX, 0, newY)
+        end
+    end)
+    
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+            frame.BackgroundTransparency = 0.3
+        end
+    end)
+end
+
+makeDraggable(MinimizedFrame)
+makeDraggable(ExpandedFrame)
+
+local function toggleView()
+    isExpanded = not isExpanded
+    
+    if isExpanded then
+        MinimizedFrame.Visible = false
+        ExpandedFrame.Visible = true
+        ExpandedFrame.Position = MinimizedFrame.Position
+    else
+        ExpandedFrame.Visible = false
+        MinimizedFrame.Visible = true
+        MinimizedFrame.Position = ExpandedFrame.Position
+    end
+end
+
+ExpandButton.MouseButton1Click:Connect(toggleView)
+CollapseButton.MouseButton1Click:Connect(toggleView)
+
+TradeCheckerGUI.Enabled = false
+
+local function updateGUI()
+    if not tradeCheckerEnabled then return end
+    
+    if Board.Value and Board.Value:FindFirstChild("Player1") and Board.Value:FindFirstChild("Player2") then
+        local otherPlayer
+        if Board.Value.Player1.Value == player then
+            otherPlayer = Board.Value.Player2.Value
+        else
+            otherPlayer = Board.Value.Player1.Value
+        end
+        
+        if otherPlayer then
+            MiniPlayerName.Text = otherPlayer.Name
+            ExpandedPlayerName.Text = "Other: " .. otherPlayer.Name
+            
+            pcall(function()
+                local userId = otherPlayer.UserId
+                local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=150&height=150&format=png"
+                MiniAvatar.Image = avatarUrl
+                ExpandedAvatar.Image = avatarUrl
+            end)
+            
+            if onV.Value then
+                ExpandedOnBoard.Text = "On Board: ON"
+                ExpandedOnBoard.TextColor3 = Color3.fromRGB(0, 255, 0)
+            else
+                ExpandedOnBoard.Text = "On Board: OFF"
+                ExpandedOnBoard.TextColor3 = Color3.fromRGB(255, 255, 255)
+            end
+            
+            if theyV.Value then
+                ExpandedAccept.Text = "Other Accept: ON"
+                ExpandedAccept.TextColor3 = Color3.fromRGB(0, 255, 0)
+            else
+                ExpandedAccept.Text = "Other Accept: OFF"
+                ExpandedAccept.TextColor3 = Color3.fromRGB(255, 255, 255)
+            end
+            
+            return
+        end
+    end
+    
+    MiniPlayerName.Text = "No player"
+    ExpandedPlayerName.Text = "Other Player: None"
+    MiniAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=0&w=150&h=150"
+    ExpandedAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=0&w=150&h=150"
+    ExpandedOnBoard.Text = "On Board: OFF"
+    ExpandedOnBoard.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ExpandedAccept.Text = "Other Accept: OFF"
+    ExpandedAccept.TextColor3 = Color3.fromRGB(255, 255, 255)
+end
+
+MainTab:CreateToggle({
+    Name = "Enable Auto Scam",
+    CurrentValue = false,
+    Flag = "AutoScam",
+    Callback = function(v)
+        enV = v
+        if v then
+            Rayfield:Notify({
+                Title = "Auto Scam",
+                Content = "Auto Scam enabled. Make sure Trade Checker is on.",
+                Duration = 3
+            })
+        else
+            Rayfield:Notify({
+                Title = "Auto Scam",
+                Content = "Auto Scam disabled.",
+                Duration = 3
+            })
+        end
+    end
+})
+
+MainTab:CreateLabel("How to use: stand on the board and wait player jump on the accept")
+MainTab:CreateLabel("â ï¸ work only under 150ms ping")
+
+MainTab:CreateToggle({
+    Name = "Trade Checker Display",
+    CurrentValue = false,
+    Flag = "TradeChecker",
+    Callback = function(v)
+        tradeCheckerEnabled = v
+        TradeCheckerGUI.Enabled = v
+        if v then
+            updateGUI()
+            Rayfield:Notify({
+                Title = "Trade Checker",
+                Content = "Trade Checker enabled. Drag to move, click arrow to expand/collapse.",
+                Duration = 3
+            })
+        end
+    end
+})
+
+task.spawn(function()
+    while task.wait(0.5) do
+        local found = false
+
+        pcall(function()
+            for _, v in pairs(workspace.Boards:GetChildren()) do
+                if v:FindFirstChild("Player1") then
+                    if v.Player1.Value == player or v.Player2.Value == player then
+                        Board.Value = v
+
+                        if v.Player1.Value == player then
+                            YourSide.Value = v.Player1Action
+                            TheirSide.Value = v.Player2Action
+                        else
+                            YourSide.Value = v.Player2Action
+                            TheirSide.Value = v.Player1Action
+                        end
+
+                        onV.Value = true
+                        found = true
+                        updateGUI()
+                        break
+                    end
+                end
+            end
+
+            if not found then
+                Board.Value = nil
+                YourSide.Value = nil
+                TheirSide.Value = nil
+                onV.Value = false
+                updateGUI()
+            end
+        end)
+    end
+end)
+
+local currentConn
+
+local function updateThey()
+    if TheirSide.Value and TheirSide.Value.Value == "Done" then
+        theyV.Value = true
+    else
+        theyV.Value = false
+    end
+    updateGUI()
+end
+
+TheirSide.Changed:Connect(function(newSide)
+    if currentConn then
+        currentConn:Disconnect()
+        currentConn = nil
+    end
+    if newSide then
+        currentConn = newSide.Changed:Connect(updateThey)
+    end
+    updateThey()
+end)
+
+task.spawn(function()
+    while task.wait(0.2) do
+        if not (enV and onV.Value and theyV.Value and Board.Value and YourSide.Value) then
+            continue
+        end
+
+        pcall(function()
+            local targetPad
+            local shortestMag = math.huge
+            for _, v in pairs(Board.Value:GetChildren()) do
+                if v.Name == "Controls" and v:FindFirstChild("Done") and v.Done:FindFirstChild("Pad") then
+                    local mag = (v.Done.Pad.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                    if mag < shortestMag then
+                        shortestMag = mag
+                        targetPad = v
+                    end
+                end
+            end
+
+            if not targetPad then return end
+
+            local char = player.Character or player.CharacterAdded:Wait()
+            char.HumanoidRootPart.CFrame = targetPad.Done.Pad.CFrame + Vector3.new(0,4,0)
+
+            while true do
+                local picked = false
+                for _, drop in pairs(workspace.Dropped:GetChildren()) do
+                    if drop:FindFirstChild("Owner") and (drop.Owner.Value == player or drop.Owner.Value == char) then
+                        for _, part in pairs(char:GetChildren()) do
+                            if part:IsA("BasePart") or part:IsA("MeshPart") then
+                                firetouchinterest(part, drop.Handle, 1)
+                                firetouchinterest(part, drop.Handle, 0)
+                                picked = true
+                                break
+                            end
+                        end
+                    end
+                end
+                if not picked then break end
+                task.wait(0.1)
+            end
+
+            local stopJump = false
+            task.spawn(function()
+                repeat
+                    game.ReplicatedStorage.RemoteEvents.Jumped:FireServer()
+                    task.wait(0.05)
+                until stopJump
+            end)
+
+            task.wait(3)
+            stopJump = true
+
+            if Board.Value:FindFirstChild("MAIN") then
+                char.HumanoidRootPart.CFrame = Board.Value.MAIN.CFrame + Vector3.new(0,4,0)
+            end
+
+            task.wait(1)
+        end)
+    end
+end)
+
+local CreditsTab = Window:CreateTab("Credits", 4483362458)
+
+CreditsTab:CreateParagraph({
+    Title = "Auto Scam",
+    Content = "by arteembro8 (Roblox)"
+})
+
+CreditsTab:CreateParagraph({
+    Title = "Note",
+    Content = " ÑÐµÐºÑÐµÐ²ÐµÐ½, ÐÐ¾ÐºÐ¾Ð¹Ð¾  ÑÑÐµÐ½Ð´Ð¾Ð² 2 ÑÐ¸ÑÐ¸ ÑÐ¾Ð¿."
+})

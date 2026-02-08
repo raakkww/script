@@ -1,0 +1,275 @@
+-- =================== SERVICES ===================
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- =================== HUB ===================
+local function createHub()
+    local hubGui = Instance.new("ScreenGui")
+    hubGui.Name = "XonoHub"
+    hubGui.ResetOnSpawn = false
+    hubGui.IgnoreGuiInset = true
+    hubGui.DisplayOrder = 998
+    hubGui.Parent = playerGui
+
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.fromOffset(150,50)
+    toggleBtn.Position = UDim2.fromScale(0.01,0.02)
+    toggleBtn.Text = ""
+    toggleBtn.TextSize = 18
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(30,30,50)
+    toggleBtn.TextColor3 = Color3.fromRGB(200,200,255)
+    toggleBtn.Draggable = true
+    toggleBtn.Parent = hubGui
+
+    local tbCorner = Instance.new("UICorner")
+    tbCorner.CornerRadius = UDim.new(0,10)
+    tbCorner.Parent = toggleBtn
+
+    local main = Instance.new("Frame")
+    main.Size = UDim2.fromScale(0.48,0.62)
+    main.Position = UDim2.fromScale(0.26,0.19)
+    main.BackgroundColor3 = Color3.fromRGB(18,18,24)
+    main.Active = true
+    main.Draggable = true
+    main.Visible = false
+    main.BackgroundTransparency = 1 -- Start transparent
+    main.Parent = hubGui
+
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0,12)
+    mainCorner.Parent = main
+
+    local mainStroke = Instance.new("UIStroke")
+    mainStroke.Color = Color3.fromRGB(60,60,90)
+    mainStroke.Thickness = 1.5
+    mainStroke.Transparency = 0.5
+    mainStroke.Parent = main
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        main.Visible = not main.Visible
+        if main.Visible then
+            TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+        else
+            TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
+        end
+    end)
+
+    -- Tabs
+    local tabs = Instance.new("Frame", main)
+    tabs.Size = UDim2.fromScale(1,0.12)
+    tabs.BackgroundTransparency = 1
+
+    local pages = Instance.new("Frame", main)
+    pages.Position = UDim2.fromScale(0,0.12)
+    pages.Size = UDim2.fromScale(1,0.88)
+    pages.BackgroundTransparency = 1
+
+    local list = Instance.new("UIListLayout", tabs)
+    list.FillDirection = Enum.FillDirection.Horizontal
+    list.Padding = UDim.new(0,6)
+
+    local function newTab(name)
+        local b = Instance.new("TextButton", tabs)
+        b.Size = UDim2.fromScale(0.32,1)
+        b.Text = name
+        b.TextColor3 = Color3.new(1,1,1)
+        b.BackgroundColor3 = Color3.fromRGB(40,40,55)
+        b.Font = Enum.Font.GothamSemibold
+        b.TextSize = 16
+        local c = Instance.new("UICorner", b)
+        c.CornerRadius = UDim.new(0,8)
+        return b
+    end
+
+    local function newPage()
+        local p = Instance.new("Frame", pages)
+        p.Size = UDim2.fromScale(1,1)
+        p.Visible = false
+        p.BackgroundTransparency = 1
+        return p
+    end
+
+    local herbsTab = newTab("Herbs")
+    local miningTab = newTab("Mining")
+    local herbsPage = newPage()
+    local miningPage = newPage()
+    herbsPage.Visible = true
+
+    local function switch(page)
+        for _,v in pages:GetChildren() do
+            if v:IsA("Frame") then v.Visible = false end
+        end
+        page.Visible = true
+    end
+
+    herbsTab.MouseButton1Click:Connect(function() switch(herbsPage) end)
+    miningTab.MouseButton1Click:Connect(function() switch(miningPage) end)
+
+    -- =================== HERBS ===================
+    local Plants = workspace:WaitForChild("Plants")
+    local herbEnabled = false
+    local selectedHerbs = {}
+
+    local herbNames = {"Death Flower","Spirit Rose","Ginseng","Qi Berries","Moon Flower","Qi Flower"}
+
+    local herbScroll = Instance.new("ScrollingFrame", herbsPage)
+    herbScroll.Size = UDim2.fromScale(1,1)
+    herbScroll.CanvasSize = UDim2.new(0,0,0,#herbNames*45)
+    herbScroll.ScrollBarThickness = 5
+    herbScroll.BackgroundTransparency = 1
+
+    local layout = Instance.new("UIListLayout", herbScroll)
+    layout.Padding = UDim.new(0,6)
+
+    for _,name in herbNames do
+        local b = Instance.new("TextButton", herbScroll)
+        b.Text = "[ ] "..name
+        b.Size = UDim2.new(0.9,0,0,35)
+        b.TextColor3 = Color3.new(1,1,1)
+        b.BackgroundColor3 = Color3.fromRGB(45,45,55)
+        local c = Instance.new("UICorner", b)
+        c.CornerRadius = UDim.new(0,8)
+        b.MouseButton1Click:Connect(function()
+            selectedHerbs[name] = not selectedHerbs[name]
+            b.Text = selectedHerbs[name] and "[✓] "..name or "[ ] "..name
+        end)
+    end
+
+    local toggleHerb = Instance.new("TextButton", herbsPage)
+    toggleHerb.Text = "Herb Farm OFF"
+    toggleHerb.Size = UDim2.fromScale(0.4,0.08)
+    toggleHerb.Position = UDim2.fromScale(0.55,0.05)
+    toggleHerb.BackgroundColor3 = Color3.fromRGB(70,70,90)
+    toggleHerb.TextColor3 = Color3.new(1,1,1)
+    local thc = Instance.new("UICorner", toggleHerb)
+    thc.CornerRadius = UDim.new(0,8)
+    toggleHerb.MouseButton1Click:Connect(function()
+        herbEnabled = not herbEnabled
+        toggleHerb.Text = herbEnabled and "Herb Farm ON" or "Herb Farm OFF"
+    end)
+
+    -- =================== MINING ===================
+    local miningEnabled = false
+    local selectedOres = {}
+    local pickaxes = {"StarterPickaxe","InkStoneBreaker","RoosterIronResonance","HeavenlyWhiteSnowIron"}
+    local ores = {"DarkInkstoneOre","RedsnakeIronOre","RoosterIronOre","HeavenMetalOre","HeavenlyWhiteSnowIronOre"}
+
+    local oreScroll = Instance.new("ScrollingFrame", miningPage)
+    oreScroll.Size = UDim2.fromScale(1,1)
+    oreScroll.CanvasSize = UDim2.new(0,0,0,#ores*45)
+    oreScroll.ScrollBarThickness = 5
+    oreScroll.BackgroundTransparency = 1
+
+    local oreLayout = Instance.new("UIListLayout", oreScroll)
+    oreLayout.Padding = UDim.new(0,6)
+
+    for _,name in ores do
+        local b = Instance.new("TextButton", oreScroll)
+        b.Text = "[ ] "..name
+        b.Size = UDim2.new(0.9,0,0,35)
+        b.TextColor3 = Color3.new(1,1,1)
+        b.BackgroundColor3 = Color3.fromRGB(45,45,55)
+        local c = Instance.new("UICorner", b)
+        c.CornerRadius = UDim.new(0,8)
+        b.MouseButton1Click:Connect(function()
+            selectedOres[name] = not selectedOres[name]
+            b.Text = selectedOres[name] and "[✓] "..name or "[ ] "..name
+        end)
+    end
+
+    local toggleMine = Instance.new("TextButton", miningPage)
+    toggleMine.Text = "Mining OFF"
+    toggleMine.Size = UDim2.fromScale(0.4,0.08)
+    toggleMine.Position = UDim2.fromScale(0.55,0.05)
+    toggleMine.BackgroundColor3 = Color3.fromRGB(70,70,90)
+    toggleMine.TextColor3 = Color3.new(1,1,1)
+    local tmc = Instance.new("UICorner", toggleMine)
+    tmc.CornerRadius = UDim.new(0,8)
+    toggleMine.MouseButton1Click:Connect(function()
+        miningEnabled = not miningEnabled
+        toggleMine.Text = miningEnabled and "Mining ON" or "Mining OFF"
+    end)
+
+    -- =================== FARM LOOP ===================
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    player.CharacterAdded:Connect(function(char)
+        root = char:WaitForChild("HumanoidRootPart")
+    end)
+
+    task.spawn(function()
+        while true do
+            task.wait(0.4)
+
+            if herbEnabled and root then
+                for _,h in Plants:GetChildren() do
+                    if not herbEnabled then break end
+                    if selectedHerbs[h.Name] then
+                        local part = h.PrimaryPart or h:FindFirstChildWhichIsA("BasePart")
+                        if part then
+                            local dist = (root.Position - part.Position).Magnitude
+                            TweenService:Create(root, TweenInfo.new(dist/120, Enum.EasingStyle.Linear), {CFrame = CFrame.new(part.Position)}):Play()
+                            task.wait(dist/120 + 0.3)
+                            if not herbEnabled then break end
+                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                            task.wait(0.1)
+                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                            task.wait(4)
+                        end
+                    end
+                end
+            end
+
+            if miningEnabled and root then
+                local tool
+                for _,name in pickaxes do
+                    local t = player.Backpack:FindFirstChild(name) or (player.Character and player.Character:FindFirstChild(name))
+                    if t then
+                        tool = t
+                        player.Character.Humanoid:EquipTool(t)
+                        break
+                    end
+                end
+
+                if tool then
+                    local nearest, minDist
+                    for oreName in pairs(selectedOres) do
+                        if not miningEnabled then break end
+                        local folder = workspace.Rocks:FindFirstChild(oreName)
+                        if folder then
+                            for _,rock in folder:GetChildren() do
+                                local part = rock.PrimaryPart or rock:FindFirstChildWhichIsA("BasePart")
+                                if part then
+                                    local d = (root.Position - part.Position).Magnitude
+                                    if not minDist or d < minDist then
+                                        nearest = rock
+                                        minDist = d
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    if nearest and miningEnabled then
+                        local part = nearest.PrimaryPart or nearest:FindFirstChildWhichIsA("BasePart")
+                        local dist = (root.Position - part.Position).Magnitude
+                        TweenService:Create(root, TweenInfo.new(dist/50, Enum.EasingStyle.Linear), {CFrame = CFrame.new(part.Position + Vector3.new(0,3,0))}):Play()
+                        task.wait(dist/50 + 0.5)
+
+                        local start = tick()
+                        while nearest.Parent and tick() - start < 25 and miningEnabled do
+                            tool:Activate()
+                            task.wait(0.35)
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Immediately create the hub — no key check
+createHub()

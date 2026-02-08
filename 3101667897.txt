@@ -1,0 +1,36 @@
+local rs = game:GetService("ReplicatedStorage")
+local players = game:GetService("Players")
+local plr = players.LocalPlayer
+local orbEvent = rs.rEvents.orbEvent
+local rebirthEvent = rs.rEvents.rebirthEvent
+
+local orbs = {
+    "Orange Orb",
+    "Blue Orb",
+    "Red Orb",
+    "Yellow Orb",
+    "Ethereal Orb",
+    "Gem"
+}
+for _, orb in ipairs(orbs) do
+    coroutine.wrap(function()
+        while true do
+            for i = 1, 100 do
+                orbEvent:FireServer("collectOrb", orb, "City")
+            end
+            rebirthEvent:FireServer("rebirthRequest")
+            task.wait(0.1)
+        end
+    end)()
+end
+coroutine.wrap(function()
+    while true do
+        if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local root = plr.Character.HumanoidRootPart
+            for _, hoop in pairs(workspace.Hoops:GetChildren()) do
+                hoop.CFrame = root.CFrame
+            end
+        end
+        task.wait(0.1)
+    end
+end)()

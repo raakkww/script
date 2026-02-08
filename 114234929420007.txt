@@ -1,0 +1,1355 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- Settings
+_G.AimbotEnabled = false
+_G.AimbotFOV = 150
+_G.AimbotSmoothing = 0.15
+_G.ShowFOV = true
+_G.FOVColor = Color3.fromRGB(255, 255, 255)
+_G.FOVThickness = 2
+_G.FOVTransparency = 1
+_G.FOVFilled = false
+
+_G.BoxESP = false
+_G.SkeletonESP = false
+_G.ChamsEnabled = false
+_G.NameESP = false
+_G.DistanceESP = false
+_G.HealthESP = false
+_G.TracerESP = false
+_G.TeamCheck = true
+
+_G.WallHack = false
+_G.NoRecoil = false
+_G.NoSpread = false
+_G.InfiniteAmmo = false
+_G.RapidFire = false
+_G.TriggerBot = false
+_G.TriggerDelay = 0.1
+
+_G.CameraFOV = 70
+_G.FOVChangerEnabled = false
+_G.Crosshair = false
+_G.CrosshairSize = 10
+_G.CrosshairColor = Color3.fromRGB(0, 255, 0)
+
+-- Variables
+local FOVCircle = nil
+local ESPObjects = {}
+local ChamObjects = {}
+local CrosshairLines = {}
+local HttpService = game:GetService("HttpService")
+local UpdateCounter = 0
+
+-- Create Window
+local Window = Fluent:CreateWindow({
+    Title = "",
+    SubTitle = "O",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(560, 420),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightControl
+})
+
+-- Tabs
+local Tabs = {
+    Rage = Window:AddTab({ Title = "Rage", Icon = "crosshair" }),
+    Visuals = Window:AddTab({ Title = "Visuals", Icon = "eye" }),
+    Misc = Window:AddTab({ Title = "Misc", Icon = "zap" }),
+    Config = Window:AddTab({ Title = "Config", Icon = "save" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+---------------------------------------------------------------------
+-- CONFIG SYSTEM
+---------------------------------------------------------------------
+local function SaveConfig(name)
+    local config = {
+        AimbotEnabled = _G.AimbotEnabled,
+        AimbotFOV = _G.AimbotFOV,
+        AimbotSmoothing = _G.AimbotSmoothing,
+        ShowFOV = _G.ShowFOV,
+        FOVColor = {_G.FOVColor.R, _G.FOVColor.G, _G.FOVColor.B},
+        FOVThickness = _G.FOVThickness,
+        FOVTransparency = _G.FOVTransparency,
+        FOVFilled = _G.FOVFilled,
+        BoxESP = _G.BoxESP,
+        SkeletonESP = _G.SkeletonESP,
+        ChamsEnabled = _G.ChamsEnabled,
+        NameESP = _G.NameESP,
+        DistanceESP = _G.DistanceESP,
+        HealthESP = _G.HealthESP,
+        TracerESP = _G.TracerESP,
+        TeamCheck = _G.TeamCheck,
+        WallHack = _G.WallHack,
+        NoRecoil = _G.NoRecoil,
+        NoSpread = _G.NoSpread,
+        InfiniteAmmo = _G.InfiniteAmmo,
+        RapidFire = _G.RapidFire,
+        CameraFOV = _G.CameraFOV,
+        FOVChangerEnabled = _G.FOVChangerEnabled,
+        Crosshair = _G.Crosshair,
+        CrosshairSize = _G.CrosshairSize,
+        CrosshairColor = {_G.CrosshairColor.R, _G.CrosshairColor.G, _G.CrosshairColor.B}
+    }
+    
+    local success = pcall(function()
+        writefile("BloXtrike_" .. name .. ".json", HttpService:JSONEncode(config))
+    end)
+    
+    if success then
+        Fluent:Notify({
+            Title = "Config Saved",
+            Content = "Saved as: " .. name,
+            Duration = 3
+        })
+    else
+        Fluent:Notify({
+            Title = "Save Failed",
+            Content = "Could not save config",
+            Duration = 3
+        })
+    end
+end
+
+local function LoadConfig(name)
+    local success, result = pcall(function()
+        return readfile("BloXtrike_" .. name .. ".json")
+    end)
+    
+    if success then
+        local config = HttpService:JSONDecode(result)
+        
+        _G.AimbotEnabled = config.AimbotEnabled or false
+        _G.AimbotFOV = config.AimbotFOV or 150
+        _G.AimbotSmoothing = config.AimbotSmoothing or 0.15
+        _G.ShowFOV = config.ShowFOV or true
+        _G.FOVColor = config.FOVColor and Color3.new(config.FOVColor[1], config.FOVColor[2], config.FOVColor[3]) or Color3.fromRGB(255, 255, 255)
+        _G.FOVThickness = config.FOVThickness or 2
+        _G.FOVTransparency = config.FOVTransparency or 1
+        _G.FOVFilled = config.FOVFilled or false
+        _G.BoxESP = config.BoxESP or false
+        _G.SkeletonESP = config.SkeletonESP or false
+        _G.ChamsEnabled = config.ChamsEnabled or false
+        _G.NameESP = config.NameESP or false
+        _G.DistanceESP = config.DistanceESP or false
+        _G.HealthESP = config.HealthESP or false
+        _G.TracerESP = config.TracerESP or false
+        _G.TeamCheck = config.TeamCheck or true
+        _G.WallHack = config.WallHack or false
+        _G.NoRecoil = config.NoRecoil or false
+        _G.NoSpread = config.NoSpread or false
+        _G.InfiniteAmmo = config.InfiniteAmmo or false
+        _G.RapidFire = config.RapidFire or false
+        _G.CameraFOV = config.CameraFOV or 70
+        _G.FOVChangerEnabled = config.FOVChangerEnabled or false
+        _G.Crosshair = config.Crosshair or false
+        _G.CrosshairSize = config.CrosshairSize or 10
+        _G.CrosshairColor = config.CrosshairColor and Color3.new(config.CrosshairColor[1], config.CrosshairColor[2], config.CrosshairColor[3]) or Color3.fromRGB(0, 255, 0)
+        
+        Fluent:Notify({
+            Title = "Config Loaded",
+            Content = "Loaded: " .. name,
+            Duration = 3
+        })
+    else
+        Fluent:Notify({
+            Title = "Load Failed",
+            Content = "Config not found",
+            Duration = 3
+        })
+    end
+end
+
+local function GetConfigList()
+    local configs = {}
+    local success, files = pcall(function()
+        return listfiles()
+    end)
+    
+    if success then
+        for _, file in pairs(files) do
+            if file:match("BloXtrike_(.+)%.json") then
+                local name = file:match("BloXtrike_(.+)%.json")
+                table.insert(configs, name)
+            end
+        end
+    end
+    
+    return configs
+end
+
+---------------------------------------------------------------------
+-- CAMERA FOV CHANGER
+---------------------------------------------------------------------
+task.spawn(function()
+    RunService.RenderStepped:Connect(function()
+        if _G.FOVChangerEnabled then
+            Camera.FieldOfView = _G.CameraFOV
+        end
+    end)
+end)
+
+---------------------------------------------------------------------
+-- CUSTOM CROSSHAIR
+---------------------------------------------------------------------
+local function CreateCrosshair()
+    local lines = {}
+    
+    for i = 1, 4 do
+        local line = Drawing.new("Line")
+        line.Thickness = 2
+        line.Color = _G.CrosshairColor
+        line.Transparency = 1
+        line.Visible = _G.Crosshair
+        table.insert(lines, line)
+    end
+    
+    return lines
+end
+
+CrosshairLines = CreateCrosshair()
+
+task.spawn(function()
+    RunService.RenderStepped:Connect(function()
+        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        local size = _G.CrosshairSize
+        
+        for i, line in ipairs(CrosshairLines) do
+            line.Visible = _G.Crosshair
+            line.Color = _G.CrosshairColor
+            
+            if i == 1 then -- Top
+                line.From = Vector2.new(center.X, center.Y - size)
+                line.To = Vector2.new(center.X, center.Y - size - 10)
+            elseif i == 2 then -- Bottom
+                line.From = Vector2.new(center.X, center.Y + size)
+                line.To = Vector2.new(center.X, center.Y + size + 10)
+            elseif i == 3 then -- Left
+                line.From = Vector2.new(center.X - size, center.Y)
+                line.To = Vector2.new(center.X - size - 10, center.Y)
+            elseif i == 4 then -- Right
+                line.From = Vector2.new(center.X + size, center.Y)
+                line.To = Vector2.new(center.X + size + 10, center.Y)
+            end
+        end
+    end)
+end)
+
+---------------------------------------------------------------------
+-- GET BLOXSTRIKE PLAYERS
+---------------------------------------------------------------------
+local function GetBloXtrikePlayers()
+    local players = {}
+    
+    -- BloXtrike stores players in workspace differently
+    local playersFolder = Workspace:FindFirstChild("Players") or Workspace:FindFirstChild("Characters")
+    
+    if playersFolder then
+        for _, playerModel in pairs(playersFolder:GetChildren()) do
+            if playerModel:IsA("Model") and playerModel ~= LocalPlayer.Character then
+                local head = playerModel:FindFirstChild("Head")
+                local humanoid = playerModel:FindFirstChildOfClass("Humanoid")
+                
+                if head and humanoid and humanoid.Health > 0 then
+                    -- Get actual player object
+                    local playerName = playerModel.Name
+                    local player = Players:FindFirstChild(playerName)
+                    
+                    if player then
+                        table.insert(players, {
+                            Player = player,
+                            Character = playerModel,
+                            Head = head,
+                            Humanoid = humanoid
+                        })
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Also check standard player characters
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local char = player.Character
+            local head = char:FindFirstChild("Head")
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            
+            if head and humanoid and humanoid.Health > 0 then
+                local alreadyAdded = false
+                for _, p in pairs(players) do
+                    if p.Player == player then
+                        alreadyAdded = true
+                        break
+                    end
+                end
+                
+                if not alreadyAdded then
+                    table.insert(players, {
+                        Player = player,
+                        Character = char,
+                        Head = head,
+                        Humanoid = humanoid
+                    })
+                end
+            end
+        end
+    end
+    
+    return players
+end
+
+---------------------------------------------------------------------
+-- FOV CIRCLE
+---------------------------------------------------------------------
+local function CreateFOVCircle()
+    local circle = Drawing.new("Circle")
+    circle.Thickness = _G.FOVThickness
+    circle.NumSides = 64
+    circle.Radius = _G.AimbotFOV
+    circle.Filled = _G.FOVFilled
+    circle.Color = _G.FOVColor
+    circle.Transparency = _G.FOVTransparency
+    circle.Visible = _G.ShowFOV
+    circle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    return circle
+end
+
+FOVCircle = CreateFOVCircle()
+
+task.spawn(function()
+    RunService.RenderStepped:Connect(function()
+        if FOVCircle then
+            FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            FOVCircle.Radius = _G.AimbotFOV
+            FOVCircle.Visible = _G.ShowFOV
+            FOVCircle.Thickness = _G.FOVThickness
+            FOVCircle.Transparency = _G.FOVTransparency
+            FOVCircle.Color = _G.FOVColor
+            FOVCircle.Filled = _G.FOVFilled
+        end
+    end)
+end)
+
+---------------------------------------------------------------------
+-- AIMBOT (OPTIMIZED FOR BLOXSTRIKE)
+---------------------------------------------------------------------
+local function IsOnSameTeam(targetModel)
+    if not _G.TeamCheck then return false end
+    
+    -- Try to find player by model name
+    local targetPlayer = Players:FindFirstChild(targetModel.Name)
+    if targetPlayer and targetPlayer.Team and LocalPlayer.Team then
+        return targetPlayer.Team == LocalPlayer.Team
+    end
+    
+    -- Fallback: check team color on character (BloXtrike method)
+    local targetTeamColor = targetModel:FindFirstChild("TeamColor")
+    local myChar = LocalPlayer.Character
+    local myTeamColor = myChar and myChar:FindFirstChild("TeamColor")
+    
+    if targetTeamColor and myTeamColor then
+        return targetTeamColor.Value == myTeamColor.Value
+    end
+    
+    return false
+end
+
+local function GetClosestPlayerInFOV()
+    local closestPlayer = nil
+    local shortestDistance = _G.AimbotFOV
+    
+    -- Try BloXtrike's camera children method (most common)
+    for _, model in pairs(Camera:GetChildren()) do
+        if model:IsA("Model") and model.Name ~= LocalPlayer.Name then
+            -- Skip teammates
+            if IsOnSameTeam(model) then
+                continue
+            end
+            
+            local head = model:FindFirstChild("Head") or model:FindFirstChild("HeadHB")
+            if head and head:IsA("BasePart") then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestPlayer = head
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Fallback: check workspace players
+    if not closestPlayer then
+        local players = GetBloXtrikePlayers()
+        for _, playerData in pairs(players) do
+            local player = playerData.Player
+            local head = playerData.Head
+            
+            if head then
+                if _G.TeamCheck and player.Team == LocalPlayer.Team then
+                    continue
+                end
+                
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestPlayer = head
+                    end
+                end
+            end
+        end
+    end
+    
+    return closestPlayer
+end
+
+task.spawn(function()
+    RunService.RenderStepped:Connect(function()
+        if _G.AimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+            local target = GetClosestPlayerInFOV()
+            
+            if target then
+                local targetPos = Camera:WorldToViewportPoint(target.Position)
+                local mousePos = UserInputService:GetMouseLocation()
+                
+                local deltaX = (targetPos.X - mousePos.X) * _G.AimbotSmoothing
+                local deltaY = (targetPos.Y - mousePos.Y) * _G.AimbotSmoothing
+                
+                if mousemoverel then
+                    mousemoverel(deltaX, deltaY)
+                end
+            end
+        end
+    end)
+end)
+
+---------------------------------------------------------------------
+-- CHAMS
+---------------------------------------------------------------------
+local function ApplyChams(character)
+    if ChamObjects[character] then return end
+    
+    -- Check if teammate
+    if _G.TeamCheck then
+        local player = Players:GetPlayerFromCharacter(character)
+        if player and player.Team == LocalPlayer.Team then
+            return -- Don't apply chams to teammates
+        end
+        
+        -- Also check via model name
+        local targetPlayer = Players:FindFirstChild(character.Name)
+        if targetPlayer and targetPlayer.Team and LocalPlayer.Team then
+            if targetPlayer.Team == LocalPlayer.Team then
+                return
+            end
+        end
+    end
+    
+    ChamObjects[character] = {}
+    
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            local highlight = Instance.new("Highlight")
+            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Parent = part
+            
+            table.insert(ChamObjects[character], highlight)
+        end
+    end
+end
+
+local function RemoveChams(character)
+    if ChamObjects[character] then
+        for _, highlight in pairs(ChamObjects[character]) do
+            highlight:Destroy()
+        end
+        ChamObjects[character] = nil
+    end
+end
+
+task.spawn(function()
+    RunService.RenderStepped:Connect(function()
+        if _G.ChamsEnabled then
+            local players = GetBloXtrikePlayers()
+            for _, playerData in pairs(players) do
+                local player = playerData.Player
+                local character = playerData.Character
+                
+                -- Skip teammates if team check enabled
+                if _G.TeamCheck and player.Team == LocalPlayer.Team then
+                    RemoveChams(character)
+                else
+                    ApplyChams(character)
+                end
+            end
+        else
+            for character, _ in pairs(ChamObjects) do
+                RemoveChams(character)
+            end
+        end
+    end)
+end)
+
+---------------------------------------------------------------------
+-- ESP
+---------------------------------------------------------------------
+local function CreateESP(playerData)
+    local character = playerData.Character
+    if ESPObjects[character] then return end
+    
+    local esp = {
+        Box = Drawing.new("Square"),
+        BoxOutline = Drawing.new("Square"),
+        Name = Drawing.new("Text"),
+        Distance = Drawing.new("Text"),
+        Health = Drawing.new("Text"),
+        Tracer = Drawing.new("Line"),
+        SkeletonLines = {}
+    }
+    
+    -- Box
+    esp.Box.Thickness = 1
+    esp.Box.Filled = false
+    esp.Box.Color = Color3.fromRGB(255, 255, 255)
+    esp.Box.Transparency = 1
+    esp.Box.Visible = false
+    
+    esp.BoxOutline.Thickness = 3
+    esp.BoxOutline.Filled = false
+    esp.BoxOutline.Color = Color3.fromRGB(0, 0, 0)
+    esp.BoxOutline.Transparency = 1
+    esp.BoxOutline.Visible = false
+    
+    -- Text
+    esp.Name.Center = true
+    esp.Name.Outline = true
+    esp.Name.Color = Color3.fromRGB(255, 255, 255)
+    esp.Name.Size = 13
+    esp.Name.Visible = false
+    
+    esp.Distance.Center = true
+    esp.Distance.Outline = true
+    esp.Distance.Color = Color3.fromRGB(255, 255, 255)
+    esp.Distance.Size = 13
+    esp.Distance.Visible = false
+    
+    esp.Health.Center = false
+    esp.Health.Outline = true
+    esp.Health.Color = Color3.fromRGB(0, 255, 0)
+    esp.Health.Size = 13
+    esp.Health.Visible = false
+    
+    -- Tracer
+    esp.Tracer.Thickness = 1
+    esp.Tracer.Color = Color3.fromRGB(255, 255, 255)
+    esp.Tracer.Transparency = 1
+    esp.Tracer.Visible = false
+    
+    -- Skeleton lines
+    local skeletonPairs = {
+        {"Head", "UpperTorso"},
+        {"UpperTorso", "LowerTorso"},
+        {"UpperTorso", "LeftUpperArm"},
+        {"LeftUpperArm", "LeftLowerArm"},
+        {"LeftLowerArm", "LeftHand"},
+        {"UpperTorso", "RightUpperArm"},
+        {"RightUpperArm", "RightLowerArm"},
+        {"RightLowerArm", "RightHand"},
+        {"LowerTorso", "LeftUpperLeg"},
+        {"LeftUpperLeg", "LeftLowerLeg"},
+        {"LeftLowerLeg", "LeftFoot"},
+        {"LowerTorso", "RightUpperLeg"},
+        {"RightUpperLeg", "RightLowerLeg"},
+        {"RightLowerLeg", "RightFoot"}
+    }
+    
+    for i, pair in ipairs(skeletonPairs) do
+        local line = Drawing.new("Line")
+        line.Thickness = 1
+        line.Color = Color3.fromRGB(255, 255, 255)
+        line.Transparency = 1
+        line.Visible = false
+        esp.SkeletonLines[i] = {line = line, from = pair[1], to = pair[2]}
+    end
+    
+    ESPObjects[character] = esp
+end
+
+local function RemoveESP(character)
+    if ESPObjects[character] then
+        ESPObjects[character].Box:Remove()
+        ESPObjects[character].BoxOutline:Remove()
+        ESPObjects[character].Name:Remove()
+        ESPObjects[character].Distance:Remove()
+        ESPObjects[character].Health:Remove()
+        ESPObjects[character].Tracer:Remove()
+        
+        for _, skelData in pairs(ESPObjects[character].SkeletonLines) do
+            skelData.line:Remove()
+        end
+        
+        ESPObjects[character] = nil
+    end
+end
+
+local function UpdateESP()
+    local players = GetBloXtrikePlayers()
+    local activeCharacters = {}
+    
+    for _, playerData in pairs(players) do
+        local character = playerData.Character
+        local player = playerData.Player
+        local humanoid = playerData.Humanoid
+        
+        activeCharacters[character] = true
+        
+        if not ESPObjects[character] then
+            CreateESP(playerData)
+        end
+        
+        local esp = ESPObjects[character]
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        local head = character:FindFirstChild("Head")
+        
+        if hrp and head then
+            local rootPos = hrp.Position
+            local vector, onScreen = Camera:WorldToViewportPoint(rootPos)
+            
+            if onScreen then
+                -- Simplified box calculation for performance
+                local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local footPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                
+                local height = math.abs(headPos.Y - footPos.Y)
+                local width = height / 2
+                
+                local minX = vector.X - width / 2
+                local minY = headPos.Y
+                local maxX = vector.X + width / 2
+                local maxY = footPos.Y
+                
+                local boxWidth = maxX - minX
+                local boxHeight = maxY - minY
+                
+                -- Team color
+                local color = Color3.fromRGB(255, 255, 255)
+                if player.Team then
+                    color = player.Team.TeamColor.Color
+                end
+                
+                -- Skip rendering if teammate and team check enabled
+                local isTeammate = _G.TeamCheck and player.Team == LocalPlayer.Team
+                
+                if isTeammate then
+                    -- Hide all ESP for teammates
+                    esp.Box.Visible = false
+                    esp.BoxOutline.Visible = false
+                    esp.Name.Visible = false
+                    esp.Distance.Visible = false
+                    esp.Health.Visible = false
+                    esp.Tracer.Visible = false
+                    for _, skelData in pairs(esp.SkeletonLines) do
+                        skelData.line.Visible = false
+                    end
+                else
+                    -- Show ESP for enemies
+                    -- Box ESP
+                    if _G.BoxESP then
+                    esp.Box.Size = Vector2.new(boxWidth, boxHeight)
+                    esp.Box.Position = Vector2.new(minX, minY)
+                    esp.Box.Color = color
+                    esp.Box.Visible = true
+                    
+                    esp.BoxOutline.Size = Vector2.new(boxWidth, boxHeight)
+                    esp.BoxOutline.Position = Vector2.new(minX, minY)
+                    esp.BoxOutline.Visible = true
+                else
+                    esp.Box.Visible = false
+                    esp.BoxOutline.Visible = false
+                end
+                
+                -- Name ESP
+                if _G.NameESP then
+                    esp.Name.Text = player.Name
+                    esp.Name.Position = Vector2.new(minX + boxWidth / 2, minY - 16)
+                    esp.Name.Color = color
+                    esp.Name.Visible = true
+                else
+                    esp.Name.Visible = false
+                end
+                
+                -- Distance ESP
+                if _G.DistanceESP and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local distance = (LocalPlayer.Character.HumanoidRootPart.Position - rootPos).Magnitude
+                    esp.Distance.Text = math.floor(distance) .. "m"
+                    esp.Distance.Position = Vector2.new(minX + boxWidth / 2, maxY + 2)
+                    esp.Distance.Visible = true
+                else
+                    esp.Distance.Visible = false
+                end
+                
+                -- Health ESP
+                if _G.HealthESP and humanoid then
+                    local health = math.floor(humanoid.Health)
+                    esp.Health.Text = tostring(health) .. " HP"
+                    esp.Health.Position = Vector2.new(minX - 40, minY)
+                    
+                    local healthPercent = health / humanoid.MaxHealth
+                    if healthPercent > 0.75 then
+                        esp.Health.Color = Color3.fromRGB(0, 255, 0)
+                    elseif healthPercent > 0.5 then
+                        esp.Health.Color = Color3.fromRGB(255, 255, 0)
+                    elseif healthPercent > 0.25 then
+                        esp.Health.Color = Color3.fromRGB(255, 165, 0)
+                    else
+                        esp.Health.Color = Color3.fromRGB(255, 0, 0)
+                    end
+                    esp.Health.Visible = true
+                else
+                    esp.Health.Visible = false
+                end
+                
+                -- Tracer ESP
+                if _G.TracerESP then
+                    esp.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    esp.Tracer.To = Vector2.new(minX + boxWidth / 2, maxY)
+                    esp.Tracer.Color = color
+                    esp.Tracer.Visible = true
+                else
+                    esp.Tracer.Visible = false
+                end
+                
+                -- Skeleton ESP
+                if _G.SkeletonESP then
+                    for _, skelData in pairs(esp.SkeletonLines) do
+                        local fromPart = character:FindFirstChild(skelData.from)
+                        local toPart = character:FindFirstChild(skelData.to)
+                        
+                        if fromPart and toPart then
+                            local fromPos, fromOnScreen = Camera:WorldToViewportPoint(fromPart.Position)
+                            local toPos, toOnScreen = Camera:WorldToViewportPoint(toPart.Position)
+                            
+                            if fromOnScreen and toOnScreen then
+                                skelData.line.From = Vector2.new(fromPos.X, fromPos.Y)
+                                skelData.line.To = Vector2.new(toPos.X, toPos.Y)
+                                skelData.line.Color = color
+                                skelData.line.Visible = true
+                            else
+                                skelData.line.Visible = false
+                            end
+                        else
+                            skelData.line.Visible = false
+                        end
+                    end
+                else
+                    for _, skelData in pairs(esp.SkeletonLines) do
+                        skelData.line.Visible = false
+                    end
+                end
+                end
+            else
+                -- Off screen
+                esp.Box.Visible = false
+                esp.BoxOutline.Visible = false
+                esp.Name.Visible = false
+                esp.Distance.Visible = false
+                esp.Health.Visible = false
+                esp.Tracer.Visible = false
+                for _, skelData in pairs(esp.SkeletonLines) do
+                    skelData.line.Visible = false
+                end
+            end
+        end
+    end
+    
+    -- Clean up old ESP
+    for character, _ in pairs(ESPObjects) do
+        if not activeCharacters[character] then
+            RemoveESP(character)
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(UpdateESP)
+
+---------------------------------------------------------------------
+-- NO RECOIL / NO SPREAD / WEAPON MODS
+---------------------------------------------------------------------
+task.spawn(function()
+    while task.wait(0.5) do
+        if _G.NoRecoil or _G.NoSpread or _G.InfiniteAmmo then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    for _, tool in pairs(char:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            if _G.NoRecoil then
+                                local recoil = tool:FindFirstChild("Recoil") or tool:FindFirstChild("RecoilControl")
+                                if recoil and recoil:IsA("NumberValue") then
+                                    recoil.Value = 0
+                                end
+                            end
+                            
+                            if _G.NoSpread then
+                                local spread = tool:FindFirstChild("Spread") or tool:FindFirstChild("Accuracy")
+                                if spread and spread:IsA("NumberValue") then
+                                    spread.Value = 0
+                                end
+                            end
+                            
+                            if _G.InfiniteAmmo then
+                                local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("CurrentAmmo")
+                                if ammo and ammo:IsA("NumberValue") then
+                                    ammo.Value = 999
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+---------------------------------------------------------------------
+-- TRIGGERBOT
+---------------------------------------------------------------------
+local TriggerCooldown = false
+
+task.spawn(function()
+    RunService.RenderStepped:Connect(function()
+        if _G.TriggerBot and not TriggerCooldown then
+            -- Check what's under crosshair
+            local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            local ray = Camera:ViewportPointToRay(screenCenter.X, screenCenter.Y)
+            
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+            raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+            
+            local result = workspace:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
+            
+            if result and result.Instance then
+                local hitPart = result.Instance
+                local hitModel = hitPart.Parent
+                
+                if hitModel and hitModel:IsA("Model") then
+                    -- Check if it's an enemy player
+                    local isEnemy = false
+                    
+                    -- Check via Players service
+                    local targetPlayer = Players:GetPlayerFromCharacter(hitModel)
+                    if not targetPlayer then
+                        targetPlayer = Players:FindFirstChild(hitModel.Name)
+                    end
+                    
+                    if targetPlayer and targetPlayer ~= LocalPlayer then
+                        if _G.TeamCheck then
+                            if targetPlayer.Team ~= LocalPlayer.Team then
+                                isEnemy = true
+                            end
+                        else
+                            isEnemy = true
+                        end
+                    else
+                        -- Check if it's a camera child (BloXtrike method)
+                        for _, model in pairs(Camera:GetChildren()) do
+                            if model == hitModel and model.Name ~= LocalPlayer.Name then
+                                if not IsOnSameTeam(model) then
+                                    isEnemy = true
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- Auto shoot if enemy detected
+                    if isEnemy then
+                        TriggerCooldown = true
+                        if mouse1click then
+                            mouse1click()
+                        end
+                        task.wait(_G.TriggerDelay)
+                        TriggerCooldown = false
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+---------------------------------------------------------------------
+-- RAPID FIRE
+---------------------------------------------------------------------
+task.spawn(function()
+    while task.wait(0.05) do
+        if _G.RapidFire and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            if mouse1click then
+                mouse1click()
+            end
+        end
+    end
+end)
+
+---------------------------------------------------------------------
+-- WALLHACK
+---------------------------------------------------------------------
+task.spawn(function()
+    RunService.RenderStepped:Connect(function()
+        if _G.WallHack then
+            pcall(function()
+                for _, obj in pairs(Workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") and obj.Name == "Wall" or obj.Name:lower():find("wall") then
+                        obj.Transparency = 0.8
+                    end
+                end
+            end)
+        end
+    end)
+end)
+
+---------------------------------------------------------------------
+-- UI SETUP
+---------------------------------------------------------------------
+
+-- Rage Tab
+Tabs.Rage:AddParagraph({
+    Title = "BloXtrike Aimbot",
+    Content = "Custom aimbot for BloXtrike's unique player system"
+})
+
+Tabs.Rage:AddToggle("AimbotToggle", {
+    Title = "Aimbot",
+    Description = "Hold RMB to lock on",
+    Default = false,
+    Callback = function(Value)
+        _G.AimbotEnabled = Value
+    end
+})
+
+Tabs.Rage:AddSlider("FOVSlider", {
+    Title = "FOV Size",
+    Default = 150,
+    Min = 50,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(Value)
+        _G.AimbotFOV = Value
+    end
+})
+
+Tabs.Rage:AddSlider("SmoothSlider", {
+    Title = "Smoothing",
+    Default = 0.15,
+    Min = 0.01,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        _G.AimbotSmoothing = Value
+    end
+})
+
+Tabs.Rage:AddToggle("TeamCheckToggle", {
+    Title = "Team Check",
+    Default = true,
+    Callback = function(Value)
+        _G.TeamCheck = Value
+    end
+})
+
+Tabs.Rage:AddToggle("ShowFOVToggle", {
+    Title = "Show FOV Circle",
+    Default = true,
+    Callback = function(Value)
+        _G.ShowFOV = Value
+    end
+})
+
+Tabs.Rage:AddToggle("NoRecoilToggle", {
+    Title = "No Recoil",
+    Default = false,
+    Callback = function(Value)
+        _G.NoRecoil = Value
+    end
+})
+
+Tabs.Rage:AddToggle("NoSpreadToggle", {
+    Title = "No Spread",
+    Default = false,
+    Callback = function(Value)
+        _G.NoSpread = Value
+    end
+})
+
+Tabs.Rage:AddToggle("InfiniteAmmoToggle", {
+    Title = "Infinite Ammo",
+    Default = false,
+    Callback = function(Value)
+        _G.InfiniteAmmo = Value
+    end
+})
+
+Tabs.Rage:AddToggle("RapidFireToggle", {
+    Title = "Rapid Fire",
+    Default = false,
+    Callback = function(Value)
+        _G.RapidFire = Value
+    end
+})
+
+Tabs.Rage:AddSlider("FOVThicknessSlider", {
+    Title = "FOV Thickness",
+    Default = 2,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Callback = function(Value)
+        _G.FOVThickness = Value
+    end
+})
+
+Tabs.Rage:AddSlider("FOVTransparencySlider", {
+    Title = "FOV Transparency",
+    Default = 1,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        _G.FOVTransparency = Value
+    end
+})
+
+Tabs.Rage:AddToggle("FOVFilledToggle", {
+    Title = "Fill FOV Circle",
+    Default = false,
+    Callback = function(Value)
+        _G.FOVFilled = Value
+    end
+})
+
+Tabs.Rage:AddColorpicker("FOVColorPicker", {
+    Title = "FOV Color",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(Value)
+        _G.FOVColor = Value
+    end
+})
+
+Tabs.Rage:AddToggle("TriggerBotToggle", {
+    Title = "Trigger Bot",
+    Description = "Auto shoot when crosshair on enemy",
+    Default = false,
+    Callback = function(Value)
+        _G.TriggerBot = Value
+    end
+})
+
+Tabs.Rage:AddSlider("TriggerDelaySlider", {
+    Title = "Trigger Delay",
+    Description = "Delay between shots (seconds)",
+    Default = 0.1,
+    Min = 0.05,
+    Max = 0.5,
+    Rounding = 2,
+    Callback = function(Value)
+        _G.TriggerDelay = Value
+    end
+})
+
+-- Visuals Tab
+Tabs.Visuals:AddParagraph({
+    Title = "ESP Options",
+    Content = "Custom ESP for BloXtrike"
+})
+
+Tabs.Visuals:AddToggle("BoxESPToggle", {
+    Title = "Box ESP",
+    Default = false,
+    Callback = function(Value)
+        _G.BoxESP = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("SkeletonESPToggle", {
+    Title = "Skeleton ESP",
+    Default = false,
+    Callback = function(Value)
+        _G.SkeletonESP = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("ChamsToggle", {
+    Title = "Chams",
+    Description = "See players through walls",
+    Default = false,
+    Callback = function(Value)
+        _G.ChamsEnabled = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("NameESPToggle", {
+    Title = "Name ESP",
+    Default = false,
+    Callback = function(Value)
+        _G.NameESP = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("DistanceESPToggle", {
+    Title = "Distance ESP",
+    Default = false,
+    Callback = function(Value)
+        _G.DistanceESP = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("HealthESPToggle", {
+    Title = "Health ESP",
+    Default = false,
+    Callback = function(Value)
+        _G.HealthESP = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("TracerESPToggle", {
+    Title = "Tracer ESP",
+    Default = false,
+    Callback = function(Value)
+        _G.TracerESP = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("WallHackToggle", {
+    Title = "Wallhack",
+    Description = "Make walls transparent",
+    Default = false,
+    Callback = function(Value)
+        _G.WallHack = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("FOVChangerToggle", {
+    Title = "FOV Changer",
+    Description = "Change camera FOV",
+    Default = false,
+    Callback = function(Value)
+        _G.FOVChangerEnabled = Value
+        if not Value then
+            Camera.FieldOfView = 70
+        end
+    end
+})
+
+Tabs.Visuals:AddSlider("CameraFOVSlider", {
+    Title = "Camera FOV",
+    Default = 70,
+    Min = 70,
+    Max = 120,
+    Rounding = 0,
+    Callback = function(Value)
+        _G.CameraFOV = Value
+    end
+})
+
+Tabs.Visuals:AddToggle("CrosshairToggle", {
+    Title = "Custom Crosshair",
+    Default = false,
+    Callback = function(Value)
+        _G.Crosshair = Value
+    end
+})
+
+Tabs.Visuals:AddSlider("CrosshairSizeSlider", {
+    Title = "Crosshair Gap",
+    Default = 10,
+    Min = 5,
+    Max = 30,
+    Rounding = 0,
+    Callback = function(Value)
+        _G.CrosshairSize = Value
+    end
+})
+
+Tabs.Visuals:AddColorpicker("CrosshairColorPicker", {
+    Title = "Crosshair Color",
+    Default = Color3.fromRGB(0, 255, 0),
+    Callback = function(Value)
+        _G.CrosshairColor = Value
+    end
+})
+
+-- Misc Tab
+Tabs.Misc:AddParagraph({
+    Title = "Info",
+    Content = "BloXtrike custom cheat\nMade for BloXtrike's unique system\n\nPress Right Ctrl to toggle UI"
+})
+
+Tabs.Misc:AddButton({
+    Title = "Destroy All ESP",
+    Callback = function()
+        for character, _ in pairs(ESPObjects) do
+            RemoveESP(character)
+        end
+        Fluent:Notify({Title = "ESP Cleared", Content = "All ESP removed", Duration = 2})
+    end
+})
+
+Tabs.Misc:AddButton({
+    Title = "Remove All Chams",
+    Callback = function()
+        for character, _ in pairs(ChamObjects) do
+            RemoveChams(character)
+        end
+        Fluent:Notify({Title = "Chams Cleared", Content = "All chams removed", Duration = 2})
+    end
+})
+
+-- Config Tab
+local ConfigNameInput = Tabs.Config:AddInput("ConfigName", {
+    Title = "Config Name",
+    Default = "default",
+    Placeholder = "Enter config name"
+})
+
+Tabs.Config:AddButton({
+    Title = "Save Config",
+    Description = "Save current settings",
+    Callback = function()
+        local name = ConfigNameInput.Value
+        if name and name ~= "" then
+            SaveConfig(name)
+        else
+            Fluent:Notify({Title = "Error", Content = "Enter a config name", Duration = 3})
+        end
+    end
+})
+
+Tabs.Config:AddButton({
+    Title = "Load Config",
+    Description = "Load saved settings",
+    Callback = function()
+        local name = ConfigNameInput.Value
+        if name and name ~= "" then
+            LoadConfig(name)
+        else
+            Fluent:Notify({Title = "Error", Content = "Enter a config name", Duration = 3})
+        end
+    end
+})
+
+Tabs.Config:AddButton({
+    Title = "List Configs",
+    Description = "Show all saved configs",
+    Callback = function()
+        local configs = GetConfigList()
+        if #configs > 0 then
+            Fluent:Notify({
+                Title = "Saved Configs",
+                Content = table.concat(configs, ", "),
+                Duration = 5
+            })
+        else
+            Fluent:Notify({
+                Title = "No Configs",
+                Content = "No saved configs found",
+                Duration = 3
+            })
+        end
+    end
+})
+
+Tabs.Config:AddButton({
+    Title = "Reset to Default",
+    Description = "Reset all settings",
+    Callback = function()
+        _G.AimbotEnabled = false
+        _G.AimbotFOV = 150
+        _G.AimbotSmoothing = 0.15
+        _G.BoxESP = false
+        _G.SkeletonESP = false
+        _G.ChamsEnabled = false
+        _G.NameESP = false
+        _G.DistanceESP = false
+        _G.HealthESP = false
+        _G.TracerESP = false
+        _G.NoRecoil = false
+        _G.NoSpread = false
+        _G.InfiniteAmmo = false
+        _G.RapidFire = false
+        _G.FOVChangerEnabled = false
+        _G.Crosshair = false
+        Fluent:Notify({Title = "Reset", Content = "Settings reset to default", Duration = 3})
+    end
+})
+
+-- Settings Tab
+Tabs.Settings:AddParagraph({
+    Title = "Keybinds",
+    Content = "Right Ctrl - Toggle UI\nRight Mouse - Aimbot\nLeft Mouse - Shoot/RapidFire"
+})
+
+Tabs.Settings:AddParagraph({
+    Title = "Performance Tips",
+    Content = "If lagging:\n- Disable Skeleton ESP\n- Disable Chams\n- Only use Box/Name ESP"
+})
+
+Tabs.Settings:AddButton({
+    Title = "Unload Script",
+    Callback = function()
+        _G.AimbotEnabled = false
+        _G.BoxESP = false
+        _G.SkeletonESP = false
+        _G.ChamsEnabled = false
+        
+        if FOVCircle then
+            FOVCircle:Remove()
+        end
+        
+        for character, _ in pairs(ESPObjects) do
+            RemoveESP(character)
+        end
+        
+        for character, _ in pairs(ChamObjects) do
+            RemoveChams(character)
+        end
+        
+        Window:Destroy()
+        
+        Fluent:Notify({
+            Title = "Unloaded",
+            Content = "Script has been unloaded",
+            Duration = 3
+        })
+    end
+})
+
+-- Startup
+Fluent:Notify({
+    Title = "BloXtrike Loaded",
+    Content = "Custom aimbot & ESP ready!",
+    Duration = 5
+})

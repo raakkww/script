@@ -1,0 +1,278 @@
+-- [[ STARGLITCH HUB - RAYFIELD BRUTO EDITION ]] --
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local TweenService = game:GetService("TweenService")
+
+-- [[ EXTERNAL LOADSTRING ]] --
+task.spawn(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://pastefy.app/KMjSUcaG/raw"))()
+    end)
+end)
+
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   LoadingTitle = "",
+   LoadingSubtitle = "",
+   ConfigurationSaving = {
+      Enabled = false
+   },
+   KeySystem = false, 
+   KeySettings = {
+      Title = "StarGlitch System",
+      Subtitle = "Enter Key",
+      Note = "Key is: Cheese",
+      FileName = "SGKey", 
+      SaveKey = true, 
+      GrabKeyFromSite = false, 
+      Key = {"Cheese"} 
+   }
+})
+
+-- [[ GLOBAL VARIABLES ]] --
+local lp = game.Players.LocalPlayer
+local Lighting = game:GetService("Lighting")
+_G.EspS, _G.EspB, _G.EspN, _G.EspD = false, false, false, false
+_G.EspAllObj = false
+_G.EspCheeseItem = false
+_G.Fullbright = false
+_G.Spd, _G.TPKill, _G.Farm = false, false, false
+_G.AutoPickCheese = false
+
+local origAmbient = Lighting.Ambient
+local origOutdoorAmbient = Lighting.OutdoorAmbient
+local origBrightness = Lighting.Brightness
+
+-- [[ HELPER FUNCTIONS ]] --
+local function getObject(name, parentName)
+    for _, v in pairs(workspace:GetDescendants()) do
+        if parentName then
+            if v.Name == name and v.Parent and v.Parent.Name == parentName then
+                return v
+            end
+        else
+            if v.Name == name then
+                return v
+            end
+        end
+    end
+    return nil
+end
+
+local function bypassTween(targetCFrame)
+    if not lp.Character or not lp.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = lp.Character.HumanoidRootPart
+    local distance = (hrp.Position - targetCFrame.Position).Magnitude
+    local speed = 130 
+    local info = TweenInfo.new(distance / speed, Enum.EasingStyle.Linear)
+    
+    local tween = TweenService:Create(hrp, info, {CFrame = targetCFrame})
+    tween:Play()
+    return tween
+end
+
+-- [[ ESP SYSTEM ]] --
+local function updateTags(player, hrp, color)
+    local tag = hrp:FindFirstChild("SG_Tags")
+    if not tag then
+        tag = Instance.new("BillboardGui", hrp)
+        tag.Name = "SG_Tags"
+        tag.Size = UDim2.new(0, 200, 0, 50)
+        tag.AlwaysOnTop = true
+        tag.StudsOffset = Vector3.new(0, 4, 0)
+        local l = Instance.new("TextLabel", tag)
+        l.Size = UDim2.new(1, 0, 1, 0)
+        l.BackgroundTransparency = 1
+        l.TextSize = 14
+        l.Font = Enum.Font.SourceSansBold
+        l.TextStrokeTransparency = 0
+    end
+    local label = tag.TextLabel
+    label.TextColor3 = color
+    local text = ""
+    if _G.EspN then text = player.Name end
+    if _G.EspD and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        local d = math.floor((lp.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
+        text = text .. (text ~= "" and " | " or "") .. d .. "m"
+    end
+    label.Text = text
+    label.Visible = (_G.EspN or _G.EspD)
+end
+
+task.spawn(function()
+    while task.wait(0.5) do
+        for _, p in pairs(game.Players:GetPlayers()) do
+            if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = p.Character.HumanoidRootPart
+                local isBear = p.Team and (string.find(p.Team.Name, "Bear") or string.find(p.Team.Name, "Urso"))
+                
+                if _G.EspB and isBear then
+                    if not hrp:FindFirstChild("RayBox") then
+                        local b = Instance.new("BoxHandleAdornment", hrp)
+                        b.Name = "RayBox"; b.Size = Vector3.new(4.5, 6.5, 4.5)
+                        b.AlwaysOnTop = true; b.ZIndex = 10; b.Color3 = Color3.new(1,0,0)
+                        b.Transparency = 0.6; b.Adornee = hrp
+                    end
+                    updateTags(p, hrp, Color3.new(1,0,0))
+                elseif hrp:FindFirstChild("RayBox") then hrp.RayBox:Destroy() end
+
+                if _G.EspS and not isBear then
+                    if not p.Character:FindFirstChild("SHL") then
+                        local h = Instance.new("Highlight", p.Character)
+                        h.Name = "SHL"; h.FillColor = Color3.fromRGB(0, 160, 255)
+                        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    end
+                    updateTags(p, hrp, Color3.fromRGB(0, 160, 255))
+                elseif p.Character:FindFirstChild("SHL") then p.Character.SHL:Destroy() end
+            end
+        end
+
+        for _, o in pairs(workspace:GetDescendants()) do
+            if _G.EspAllObj then
+                if o.Name == "Wire" and not o:FindFirstChild("ObjHL") then
+                    local h = Instance.new("Highlight", o); h.Name = "ObjHL"; h.FillColor = Color3.fromRGB(255, 120, 0); h.DepthMode = "AlwaysOnTop"
+                elseif o.Name == "Base" and o.Parent and o.Parent.Name == "CheeseAltar" and not o:FindFirstChild("ObjHL") then
+                    local h = Instance.new("Highlight", o); h.Name = "ObjHL"; h.FillColor = Color3.fromRGB(255, 255, 0); h.DepthMode = "AlwaysOnTop"
+                end
+            elseif not _G.EspAllObj and o:FindFirstChild("ObjHL") then o.ObjHL:Destroy() end
+
+            if _G.EspCheeseItem then
+                if (o.Name == "Cheese" or o.Name == "cheese") and (o.Parent.Name == "Items" or o.Parent.Name == "Item") then
+                    if not o:FindFirstChild("CheeseHL") then
+                        local h = Instance.new("Highlight", o); h.Name = "CheeseHL"; h.FillColor = Color3.fromRGB(0, 0, 0); h.DepthMode = "AlwaysOnTop"
+                    end
+                end
+            elseif not _G.EspCheeseItem and o:FindFirstChild("CheeseHL") then o.CheeseHL:Destroy() end
+        end
+    end
+end)
+
+-- [[ TABS WITH ICONS ]] --
+local TabMain = Window:CreateTab("Main", 4370345144) -- Home Icon
+local TabPlayer = Window:CreateTab("Player", 4335482575) -- User Icon
+local TabESP = Window:CreateTab("ESP", 4370315910) -- Eye Icon
+local TabTasks = Window:CreateTab("Tp Task", 4384403532) -- Map Icon
+local TabBear = Window:CreateTab("Bear Only!!", 10126421528) -- Bear/Skull Icon
+local TabFarm = Window:CreateTab("Farm", 4384400782) -- Coin Icon
+local TabCredits = Window:CreateTab("Credits", 4384402633) -- Info Icon
+
+-- MAIN
+TabMain:CreateToggle({
+   Name = "Fullbright",
+   CurrentValue = false,
+   Callback = function(v)
+      _G.Fullbright = v
+      if v then 
+          Lighting.Ambient = Color3.new(1, 1, 1); Lighting.OutdoorAmbient = Color3.new(1, 1, 1); Lighting.Brightness = 2
+      else 
+          Lighting.Ambient = origAmbient; Lighting.OutdoorAmbient = origOutdoorAmbient; Lighting.Brightness = origBrightness 
+      end
+   end,
+})
+
+-- PLAYER
+TabPlayer:CreateToggle({
+   Name = "Infinite Stamina (Speed 24)",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.Spd = Value
+      task.spawn(function() while _G.Spd do if lp.Character and lp.Character:FindFirstChild("Humanoid") then lp.Character.Humanoid.WalkSpeed = 24 end task.wait(0.1) end end)
+   end,
+})
+
+TabPlayer:CreateToggle({
+    Name = "Auto pick-up Cheese",
+    CurrentValue = false,
+    Callback = function(v)
+        _G.AutoPickCheese = v
+        task.spawn(function()
+            while _G.AutoPickCheese do
+                local cheeseItem = getObject("Cheese") or getObject("cheese")
+
+                if cheeseItem and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+                    local originalPos = lp.Character.HumanoidRootPart.CFrame
+                    local toCheese = bypassTween(cheeseItem.CFrame)
+                    if toCheese then toCheese.Completed:Wait() end
+                    task.wait(0.5) 
+                    local toOriginal = bypassTween(originalPos)
+                    if toOriginal then toOriginal.Completed:Wait() end
+                end
+                task.wait(2.5)
+            end
+        end)
+    end
+})
+
+-- ESP
+TabESP:CreateToggle({Name = "Survivors (Highlight)", CurrentValue = false, Callback = function(v) _G.EspS = v end})
+TabESP:CreateToggle({Name = "Bear (Rayfield Box)", CurrentValue = false, Callback = function(v) _G.EspB = v end})
+TabESP:CreateToggle({Name = "Show Names", CurrentValue = false, Callback = function(v) _G.EspN = v end})
+TabESP:CreateToggle({Name = "Show Distance", CurrentValue = false, Callback = function(v) _G.EspD = v end})
+TabESP:CreateToggle({Name = "Esp All Objective", CurrentValue = false, Callback = function(v) _G.EspAllObj = v end})
+TabESP:CreateToggle({Name = "Esp Cheese", CurrentValue = false, Callback = function(v) _G.EspCheeseItem = v end})
+
+-- TP TASK
+TabTasks:CreateButton({
+    Name = "Tp To Random normal Puzzle",
+    Callback = function()
+        local wires = {}
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v.Name == "Wire" and v.Parent and v.Parent.Name == "PuzzleBin" then
+                table.insert(wires, v)
+            end
+        end
+        if #wires > 0 and lp.Character then
+            local randomWire = wires[math.random(1, #wires)]
+            lp.Character.HumanoidRootPart.CFrame = randomWire.CFrame * CFrame.new(0, 0, 3)
+        end
+    end,
+})
+
+-- BEAR ONLY
+TabBear:CreateToggle({
+   Name = "TP Kill Survivors",
+   CurrentValue = false,
+   Callback = function(v)
+      _G.TPKill = v
+      task.spawn(function()
+          while _G.TPKill do
+              for _, p in pairs(game.Players:GetPlayers()) do
+                  if p ~= lp and p.Team and string.find(p.Team.Name, "Survivor") then
+                      if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                          lp.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,2)
+                          task.wait(0.3)
+                      end
+                  end
+              end
+              task.wait(0.1)
+          end
+      end)
+   end,
+})
+
+-- FARM
+TabFarm:CreateToggle({
+   Name = "Auto Farm (TP 5s)",
+   CurrentValue = false,
+   Callback = function(v)
+      _G.Farm = v
+      task.spawn(function()
+          while _G.Farm do
+              if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+                  lp.Character.HumanoidRootPart.CFrame = CFrame.new(407.50, 30.00, -27.50)
+              end
+              task.wait(5)
+          end
+      end)
+   end,
+})
+
+-- CREDITS
+TabCredits:CreateLabel("Owner/Developer: 0deioegirls")
+TabCredits:CreateLabel("Technical Support: Gemini")
+TabCredits:CreateButton({
+   Name = "Copy Discord Link",
+   Callback = function()
+      setclipboard("discord.gg/starglitch")
+      Rayfield:Notify({Title = "Credits", Content = "Discord link copied!", Duration = 3})
+   end,
+})

@@ -1,0 +1,17 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local SkinsFolder = ReplicatedStorage:WaitForChild("Skins"):WaitForChild("SkinValues")
+local ImmunitiesFolder = ReplicatedStorage:WaitForChild("Immunities"):WaitForChild("ImmunitiesValues")
+local PurchaseItem = ReplicatedStorage:WaitForChild("PurchaseItem")
+
+-- Purchase all skins
+for _, skin in ipairs(SkinsFolder:GetChildren()) do
+    PurchaseItem:FireServer(skin.Name, "Skins", true)
+end
+
+-- Purchase all immunities
+for _, immunity in ipairs(ImmunitiesFolder:GetChildren()) do
+    PurchaseItem:FireServer(immunity.Name, "Immunities", true)
+end
+
+print("FIRED")
