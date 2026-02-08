@@ -1,0 +1,1908 @@
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ContentProvider = game:GetService("ContentProvider")
+local TextService = game:GetService("TextService")
+
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+
+-- Удаляем старую GUI если есть
+if CoreGui:FindFirstChild("UltraCheatMenuV45") then
+    CoreGui:FindFirstChild("UltraCheatMenuV45"):Destroy()
+end
+
+-- Цвета (премиум темная тема)
+local Colors = {
+    Background = Color3.fromRGB(8, 8, 8),
+    Window = Color3.fromRGB(15, 15, 15),
+    Element = Color3.fromRGB(25, 25, 25),
+    ElementHover = Color3.fromRGB(32, 32, 32),
+    Text = Color3.fromRGB(245, 245, 245),
+    TextSecondary = Color3.fromRGB(180, 180, 180),
+    Border = Color3.fromRGB(45, 45, 45),
+    Accent = Color3.fromRGB(0, 132, 255),
+    AccentHover = Color3.fromRGB(0, 152, 255),
+    Success = Color3.fromRGB(0, 200, 83),
+    Error = Color3.fromRGB(255, 61, 61),
+    Warning = Color3.fromRGB(255, 193, 7),
+    Purple = Color3.fromRGB(156, 39, 176),
+    Cyan = Color3.fromRGB(0, 188, 212),
+    DarkAccent = Color3.fromRGB(0, 100, 180),
+    MiniButton = Color3.fromRGB(20, 20, 20)
+}
+
+-- Создание GUI объектов
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "UltraCheatMenuV45"
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
+ScreenGui.Parent = CoreGui
+
+-- Функция закругленных углов
+local function createRoundedCorners(parent, cornerRadius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, cornerRadius)
+    corner.Parent = parent
+    return corner
+end
+
+-- Функция создания градиента
+local function createGradient(parent, color1, color2, rotation)
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, color1),
+        ColorSequenceKeypoint.new(1, color2)
+    })
+    gradient.Rotation = rotation or 90
+    gradient.Parent = parent
+    return gradient
+end
+
+-- Функция для создания текста с тенью
+local function createTextWithShadow(parent, properties)
+    local textLabel = Instance.new("TextLabel")
+    for prop, value in pairs(properties) do
+        textLabel[prop] = value
+    end
+    
+    local shadow = Instance.new("TextLabel")
+    shadow.Name = "Shadow"
+    shadow.Size = textLabel.Size
+    shadow.Position = textLabel.Position + UDim2.new(0, 1, 0, 1)
+    shadow.BackgroundTransparency = 1
+    shadow.Text = textLabel.Text
+    shadow.TextColor3 = Color3.new(0, 0, 0)
+    shadow.TextSize = textLabel.TextSize
+    shadow.Font = textLabel.Font
+    shadow.TextXAlignment = textLabel.TextXAlignment
+    shadow.TextYAlignment = textLabel.TextYAlignment
+    shadow.TextTransparency = 0.5
+    shadow.ZIndex = textLabel.ZIndex - 1
+    shadow.Parent = parent
+    
+    textLabel.Parent = parent
+    return textLabel
+end
+
+-- ==================== АНИМАЦИЯ ПРИ ЗАПУСКЕ ====================
+
+-- Создаем экран заставки
+local StartupScreen = Instance.new("Frame")
+StartupScreen.Name = "StartupScreen"
+StartupScreen.Size = UDim2.new(1, 0, 1, 0)
+StartupScreen.BackgroundColor3 = Colors.Background
+StartupScreen.BackgroundTransparency = 1
+StartupScreen.ZIndex = 1000
+StartupScreen.Parent = ScreenGui
+
+local BackgroundGradient = Instance.new("Frame")
+BackgroundGradient.Size = UDim2.new(1, 0, 1, 0)
+BackgroundGradient.BackgroundColor3 = Colors.Background
+BackgroundGradient.Parent = StartupScreen
+createGradient(BackgroundGradient, Colors.Background, Color3.fromRGB(20, 20, 20))
+
+-- Центральный круг для анимации
+local CenterCircle = Instance.new("Frame")
+CenterCircle.Name = "CenterCircle"
+CenterCircle.Size = UDim2.new(0, 0, 0, 0)
+CenterCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+CenterCircle.BackgroundColor3 = Colors.Accent
+CenterCircle.BorderSizePixel = 0
+CenterCircle.Parent = StartupScreen
+createRoundedCorners(CenterCircle, 100)
+
+-- Текст названия
+local TitleText = createTextWithShadow(StartupScreen, {
+    Size = UDim2.new(0, 0, 0, 0),
+    Position = UDim2.new(0.5, 0, 0.3, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+    TextColor3 = Colors.Text,
+    TextSize = 36,
+    Font = Enum.Font.GothamBold,
+    TextTransparency = 1
+})
+
+-- Текст версии
+local VersionText = createTextWithShadow(StartupScreen, {
+    Size = UDim2.new(0, 0, 0, 0),
+    Position = UDim2.new(0.5, 0, 0.4, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+    TextColor3 = Colors.Accent,
+    TextSize = 20,
+    Font = Enum.Font.Gotham,
+    TextTransparency = 1
+})
+
+-- Текст автора
+local AuthorText = createTextWithShadow(StartupScreen, {
+    Size = UDim2.new(0, 0, 0, 0),
+    Position = UDim2.new(0.5, 0, 0.7, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+    TextColor3 = Colors.TextSecondary,
+    TextSize = 16,
+    Font = Enum.Font.Gotham,
+    TextTransparency = 1
+})
+
+-- Индикатор загрузки
+local LoaderContainer = Instance.new("Frame")
+LoaderContainer.Name = "LoaderContainer"
+LoaderContainer.Size = UDim2.new(0, 200, 0, 4)
+LoaderContainer.Position = UDim2.new(0.5, -100, 0.6, 0)
+LoaderContainer.BackgroundColor3 = Colors.Element
+LoaderContainer.BackgroundTransparency = 1
+LoaderContainer.BorderSizePixel = 0
+LoaderContainer.Parent = StartupScreen
+createRoundedCorners(LoaderContainer, 2)
+
+local LoaderBar = Instance.new("Frame")
+LoaderBar.Name = "LoaderBar"
+LoaderBar.Size = UDim2.new(0, 0, 1, 0)
+LoaderBar.BackgroundColor3 = Colors.Accent
+LoaderBar.BorderSizePixel = 0
+LoaderBar.Parent = LoaderContainer
+createRoundedCorners(LoaderBar, 2)
+
+-- Функция показа анимации запуска
+local function showStartupAnimation()
+    StartupScreen.Visible = true
+    BackgroundGradient.BackgroundTransparency = 1
+    
+    -- Появление фона
+    TweenService:Create(BackgroundGradient, TweenInfo.new(0.5), {
+        BackgroundTransparency = 0
+    }):Play()
+    
+    task.wait(0.3)
+    
+    -- Анимация круга
+    TweenService:Create(CenterCircle, TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 300, 0, 300),
+        Position = UDim2.new(0.5, -150, 0.5, -150),
+        BackgroundTransparency = 0.7
+    }):Play()
+    
+    task.wait(0.4)
+    
+    -- Появление текста названия
+    TweenService:Create(TitleText, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 400, 0, 40),
+        Position = UDim2.new(0.5, -200, 0.3, -20),
+        TextTransparency = 0
+    }):Play()
+    
+    task.wait(0.2)
+    
+    -- Появление текста версии
+    TweenService:Create(VersionText, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 300, 0, 25),
+        Position = UDim2.new(0.5, -150, 0.4, -12.5),
+        TextTransparency = 0
+    }):Play()
+    
+    task.wait(0.2)
+    
+    -- Появление индикатора загрузки
+    TweenService:Create(LoaderContainer, TweenInfo.new(0.3), {
+        BackgroundTransparency = 0
+    }):Play()
+    
+    -- Анимация заполнения индикатора
+    TweenService:Create(LoaderBar, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+        Size = UDim2.new(1, 0, 1, 0)
+    }):Play()
+    
+    task.wait(0.8)
+    
+    -- Появление текста автора
+    TweenService:Create(AuthorText, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 200, 0, 20),
+        Position = UDim2.new(0.5, -100, 0.7, -10),
+        TextTransparency = 0
+    }):Play()
+    
+    task.wait(0.7)
+    
+    -- Исчезновение анимации
+    TweenService:Create(CenterCircle, TweenInfo.new(0.5), {
+        BackgroundTransparency = 1,
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    }):Play()
+    
+    TweenService:Create(TitleText, TweenInfo.new(0.4), {
+        TextTransparency = 1
+    }):Play()
+    
+    TweenService:Create(VersionText, TweenInfo.new(0.4), {
+        TextTransparency = 1
+    }):Play()
+    
+    TweenService:Create(AuthorText, TweenInfo.new(0.4), {
+        TextTransparency = 1
+    }):Play()
+    
+    TweenService:Create(LoaderContainer, TweenInfo.new(0.4), {
+        BackgroundTransparency = 1
+    }):Play()
+    
+    TweenService:Create(LoaderBar, TweenInfo.new(0.4), {
+        BackgroundTransparency = 1
+    }):Play()
+    
+    TweenService:Create(BackgroundGradient, TweenInfo.new(0.5), {
+        BackgroundTransparency = 1
+    }):Play()
+    
+    task.wait(0.5)
+    StartupScreen:Destroy()
+end
+
+-- ==================== МИНИ-КНОПКА ====================
+
+local MiniButton = Instance.new("TextButton")
+MiniButton.Name = "MiniMenuButton"
+MiniButton.Size = UDim2.new(0, 50, 0, 50)
+MiniButton.Position = UDim2.new(1, -70, 1, -70)
+MiniButton.BackgroundColor3 = Colors.MiniButton
+MiniButton.Text = ""
+MiniButton.AutoButtonColor = false
+MiniButton.Visible = false
+MiniButton.ZIndex = 900
+MiniButton.Draggable = true -- ПРОСТОЕ ПЕРЕТАСКИВАНИЕ
+MiniButton.Parent = ScreenGui
+createRoundedCorners(MiniButton, 25)
+
+-- Неоновая рамка для мини-кнопки
+local MiniButtonBorder = Instance.new("Frame")
+MiniButtonBorder.Name = "Border"
+MiniButtonBorder.Size = UDim2.new(1, 4, 1, 4)
+MiniButtonBorder.Position = UDim2.new(0, -2, 0, -2)
+MiniButtonBorder.BackgroundColor3 = Colors.Accent
+MiniButtonBorder.BorderSizePixel = 0
+MiniButtonBorder.ZIndex = 899
+MiniButtonBorder.Parent = MiniButton
+createRoundedCorners(MiniButtonBorder, 27)
+
+local MiniButtonInner = Instance.new("Frame")
+MiniButtonInner.Name = "Inner"
+MiniButtonInner.Size = UDim2.new(1, -2, 1, -2)
+MiniButtonInner.Position = UDim2.new(0, 1, 0, 1)
+MiniButtonInner.BackgroundColor3 = Colors.MiniButton
+MiniButtonInner.BorderSizePixel = 0
+MiniButtonInner.Parent = MiniButtonBorder
+createRoundedCorners(MiniButtonInner, 25)
+
+local MiniIcon = Instance.new("ImageLabel")
+MiniIcon.Name = "Icon"
+MiniIcon.Size = UDim2.new(0, 24, 0, 24)
+MiniIcon.Position = UDim2.new(0.5, -12, 0.5, -12)
+MiniIcon.BackgroundTransparency = 1
+MiniIcon.Image = "rbxassetid://3926307971"
+MiniIcon.ImageColor3 = Colors.Accent
+MiniIcon.ImageRectOffset = Vector2.new(644, 204)
+MiniIcon.ImageRectSize = Vector2.new(36, 36)
+MiniIcon.Parent = MiniButtonInner
+
+-- Анимация пульсации мини-кнопки
+spawn(function()
+    while MiniButton and MiniButton.Parent do
+        TweenService:Create(MiniButtonBorder, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            BackgroundColor3 = Colors.Purple
+        }):Play()
+        task.wait(1.2)
+        TweenService:Create(MiniButtonBorder, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            BackgroundColor3 = Colors.Accent
+        }):Play()
+        task.wait(1.2)
+    end
+end)
+
+-- ==================== СОЗДАНИЕ ОКНА ====================
+
+local function createWindow(title)
+    local window = {}
+    local mainWindowVisible = false
+    local mainWindowCreated = false
+    
+    -- Основное окно с неоновой рамкой
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainWindow"
+    MainFrame.Size = UDim2.new(0, 440, 0, 520)
+    MainFrame.Position = UDim2.new(0.5, -220, 0.5, -260)
+    MainFrame.BackgroundColor3 = Colors.Window
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+    MainFrame.Visible = false
+    MainFrame.ZIndex = 800
+    MainFrame.Draggable = true -- ПРОСТОЕ ПЕРЕТАСКИВАНИЕ
+    MainFrame.Active = true
+    MainFrame.Selectable = true
+    MainFrame.Parent = ScreenGui
+    createRoundedCorners(MainFrame, 14)
+    
+    -- Неоновая рамка
+    local NeonBorder = Instance.new("Frame")
+    NeonBorder.Name = "NeonBorder"
+    NeonBorder.Size = UDim2.new(1, 4, 1, 4)
+    NeonBorder.Position = UDim2.new(0, -2, 0, -2)
+    NeonBorder.BackgroundColor3 = Colors.Accent
+    NeonBorder.BorderSizePixel = 0
+    NeonBorder.ZIndex = 799
+    NeonBorder.BackgroundTransparency = 1
+    NeonBorder.Parent = MainFrame
+    createRoundedCorners(NeonBorder, 16)
+    
+    local InnerFrame = Instance.new("Frame")
+    InnerFrame.Name = "InnerFrame"
+    InnerFrame.Size = UDim2.new(1, -4, 1, -4)
+    InnerFrame.Position = UDim2.new(0, 2, 0, 2)
+    InnerFrame.BackgroundColor3 = Colors.Window
+    InnerFrame.BorderSizePixel = 0
+    InnerFrame.Parent = NeonBorder
+    createRoundedCorners(InnerFrame, 14)
+    
+    -- Функция показа меню с анимацией
+    function window:Show()
+        if mainWindowCreated and not mainWindowVisible then
+            local centerX = MiniButton.AbsolutePosition.X + MiniButton.AbsoluteSize.X / 2
+            local centerY = MiniButton.AbsolutePosition.Y + MiniButton.AbsoluteSize.Y / 2
+            
+            MainFrame.Size = UDim2.new(0, 0, 0, 0)
+            MainFrame.Position = UDim2.new(0, centerX, 0, centerY)
+            MainFrame.BackgroundTransparency = 1
+            MainFrame.Visible = true
+            
+            -- Скрываем мини-кнопку
+            TweenService:Create(MiniButton, TweenInfo.new(0.2), {
+                Size = UDim2.new(0, 0, 0, 0),
+                BackgroundTransparency = 1
+            }):Play()
+            
+            TweenService:Create(MiniButtonBorder, TweenInfo.new(0.2), {
+                BackgroundTransparency = 1
+            }):Play()
+            
+            TweenService:Create(MiniIcon, TweenInfo.new(0.2), {
+                ImageTransparency = 1
+            }):Play()
+            
+            -- Показываем меню
+            task.wait(0.1)
+            TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 440, 0, 520),
+                Position = UDim2.new(0.5, -220, 0.5, -260),
+                BackgroundTransparency = 0
+            }):Play()
+            
+            TweenService:Create(NeonBorder, TweenInfo.new(0.3), {
+                BackgroundTransparency = 0
+            }):Play()
+            
+            task.wait(0.3)
+            MiniButton.Visible = false
+            mainWindowVisible = true
+        end
+    end
+    
+    -- Функция скрытия меню с анимацией
+    function window:Hide()
+        if mainWindowCreated and mainWindowVisible then
+            local centerX = MainFrame.AbsolutePosition.X + MainFrame.AbsoluteSize.X / 2
+            local centerY = MainFrame.AbsolutePosition.Y + MainFrame.AbsoluteSize.Y / 2
+            
+            -- Позиционируем мини-кнопку в центре меню
+            MiniButton.Size = UDim2.new(0, 0, 0, 0)
+            MiniButton.Position = UDim2.new(0, centerX, 0, centerY)
+            MiniButton.BackgroundTransparency = 1
+            MiniButtonBorder.BackgroundTransparency = 1
+            MiniIcon.ImageTransparency = 1
+            MiniButton.Visible = true
+            
+            -- Анимация сворачивания меню
+            TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 0, 0, 0),
+                Position = UDim2.new(0, centerX, 0, centerY),
+                BackgroundTransparency = 1
+            }):Play()
+            
+            TweenService:Create(NeonBorder, TweenInfo.new(0.3), {
+                BackgroundTransparency = 1
+            }):Play()
+            
+            -- Анимация появления мини-кнопки
+            task.wait(0.2)
+            TweenService:Create(MiniButton, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 50, 0, 50),
+                Position = UDim2.new(0, centerX - 25, 0, centerY - 25),
+                BackgroundTransparency = 0
+            }):Play()
+            
+            TweenService:Create(MiniButtonBorder, TweenInfo.new(0.4), {
+                BackgroundTransparency = 0
+            }):Play()
+            
+            TweenService:Create(MiniIcon, TweenInfo.new(0.4), {
+                ImageTransparency = 0
+            }):Play()
+            
+            task.wait(0.4)
+            MainFrame.Visible = false
+            mainWindowVisible = false
+        end
+    end
+    
+    -- Заголовок с градиентом и иконкой
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Name = "TitleBar"
+    TitleBar.Size = UDim2.new(1, 0, 0, 42)
+    TitleBar.BackgroundColor3 = Colors.Element
+    TitleBar.BorderSizePixel = 0
+    TitleBar.Parent = InnerFrame
+    createRoundedCorners(TitleBar, 12)
+    createGradient(TitleBar, Color3.fromRGB(30, 30, 30), Color3.fromRGB(20, 20, 20))
+    
+    -- Иконка в заголовке
+    local Icon = Instance.new("ImageLabel")
+    Icon.Name = "Icon"
+    Icon.Size = UDim2.new(0, 24, 0, 24)
+    Icon.Position = UDim2.new(0, 12, 0.5, -12)
+    Icon.BackgroundTransparency = 1
+    Icon.Image = "rbxassetid://3926305904"
+    Icon.ImageColor3 = Colors.Accent
+    Icon.ImageRectOffset = Vector2.new(964, 324)
+    Icon.ImageRectSize = Vector2.new(36, 36)
+    Icon.Parent = TitleBar
+    
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Name = "Title"
+    TitleLabel.Size = UDim2.new(1, -100, 1, 0)
+    TitleLabel.Position = UDim2.new(0, 45, 0, 0)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = title or "ULTRA CHEAT MENU v4.5"
+    TitleLabel.TextColor3 = Colors.Text
+    TitleLabel.TextSize = 16
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.TextTransparency = 0
+    TitleLabel.Parent = TitleBar
+    
+    -- Кнопка закрытия
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Name = "Close"
+    CloseButton.Size = UDim2.new(0, 32, 0, 32)
+    CloseButton.Position = UDim2.new(1, -38, 0.5, -16)
+    CloseButton.BackgroundColor3 = Colors.Error
+    CloseButton.Text = "×"
+    CloseButton.TextColor3 = Colors.Text
+    CloseButton.TextSize = 24
+    CloseButton.Font = Enum.Font.GothamBold
+    CloseButton.AutoButtonColor = false
+    CloseButton.Parent = TitleBar
+    createRoundedCorners(CloseButton, 8)
+    
+    -- Анимация кнопки закрытия
+    CloseButton.MouseEnter:Connect(function()
+        TweenService:Create(CloseButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(255, 80, 80),
+            Rotation = 90,
+            Size = UDim2.new(0, 34, 0, 34),
+            Position = UDim2.new(1, -39, 0.5, -17)
+        }):Play()
+    end)
+    
+    CloseButton.MouseLeave:Connect(function()
+        TweenService:Create(CloseButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Colors.Error,
+            Rotation = 0,
+            Size = UDim2.new(0, 32, 0, 32),
+            Position = UDim2.new(1, -38, 0.5, -16)
+        }):Play()
+    end)
+    
+    CloseButton.MouseButton1Click:Connect(function()
+        window:Hide()
+    end)
+    
+    -- Разделительная линия под заголовком
+    local DividerLine = Instance.new("Frame")
+    DividerLine.Name = "DividerLine"
+    DividerLine.Size = UDim2.new(1, -20, 0, 1)
+    DividerLine.Position = UDim2.new(0, 10, 0, 52)
+    DividerLine.BackgroundColor3 = Colors.Border
+    DividerLine.BackgroundTransparency = 0.7
+    DividerLine.BorderSizePixel = 0
+    DividerLine.Parent = InnerFrame
+    
+    -- Контейнер для вкладок
+    local TabContainer = Instance.new("Frame")
+    TabContainer.Name = "TabContainer"
+    TabContainer.Size = UDim2.new(1, -20, 0, 36)
+    TabContainer.Position = UDim2.new(0, 10, 0, 60)
+    TabContainer.BackgroundTransparency = 1
+    TabContainer.Parent = InnerFrame
+    
+    local TabList = Instance.new("UIListLayout")
+    TabList.FillDirection = Enum.FillDirection.Horizontal
+    TabList.Padding = UDim.new(0, 6)
+    TabList.Parent = TabContainer
+    
+    -- Контейнер для контента вкладок
+    local ContentFrame = Instance.new("ScrollingFrame")
+    ContentFrame.Name = "Content"
+    ContentFrame.Size = UDim2.new(1, -20, 1, -120)
+    ContentFrame.Position = UDim2.new(0, 10, 0, 105)
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.BorderSizePixel = 0
+    ContentFrame.ScrollBarThickness = 3
+    ContentFrame.ScrollBarImageColor3 = Colors.Border
+    ContentFrame.ScrollBarImageTransparency = 0.5
+    ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ContentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    ContentFrame.Parent = InnerFrame
+    
+    -- Разделительная линия над контентом
+    local ContentDivider = Instance.new("Frame")
+    ContentDivider.Name = "ContentDivider"
+    ContentDivider.Size = UDim2.new(1, 0, 0, 1)
+    ContentDivider.Position = UDim2.new(0, 0, 0, -5)
+    ContentDivider.BackgroundColor3 = Colors.Border
+    ContentDivider.BackgroundTransparency = 0.7
+    ContentDivider.BorderSizePixel = 0
+    ContentDivider.Parent = ContentFrame
+    
+    -- Список элементов
+    local UIListLayout = Instance.new("UIListLayout")
+    UIListLayout.Padding = UDim.new(0, 15)
+    UIListLayout.Parent = ContentFrame
+    
+    local tabs = {}
+    local currentTab = nil
+    
+    -- Клик по мини-кнопке
+    MiniButton.MouseButton1Click:Connect(function()
+        window:Show()
+    end)
+    
+    -- Анимация при наведении на мини-кнопку
+    MiniButton.MouseEnter:Connect(function()
+        TweenService:Create(MiniButton, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 55, 0, 55)
+        }):Play()
+        
+        TweenService:Create(MiniIcon, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 28, 0, 28),
+            Position = UDim2.new(0.5, -14, 0.5, -14),
+            Rotation = 15
+        }):Play()
+    end)
+    
+    MiniButton.MouseLeave:Connect(function()
+        TweenService:Create(MiniButton, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 50, 0, 50)
+        }):Play()
+        
+        TweenService:Create(MiniIcon, TweenInfo.new(0.2), {
+            Size = UDim2.new(0, 24, 0, 24),
+            Position = UDim2.new(0.5, -12, 0.5, -12),
+            Rotation = 0
+        }):Play()
+    end)
+    
+    -- Функция создания вкладки
+    function window:CreateTab(name)
+        local tab = {}
+        
+        -- Кнопка вкладки
+        local tabButton = Instance.new("TextButton")
+        tabButton.Name = "Tab_" .. name
+        tabButton.Size = UDim2.new(0, 85, 1, 0)
+        tabButton.BackgroundColor3 = Colors.Element
+        tabButton.BorderSizePixel = 0
+        tabButton.Text = ""
+        tabButton.AutoButtonColor = false
+        tabButton.Parent = TabContainer
+        createRoundedCorners(tabButton, 8)
+        createGradient(tabButton, Colors.Element, Color3.fromRGB(28, 28, 28))
+        
+        -- Иконка для вкладки
+        local tabIcon = Instance.new("ImageLabel")
+        tabIcon.Name = "Icon"
+        tabIcon.Size = UDim2.new(0, 18, 0, 18)
+        tabIcon.Position = UDim2.new(0, 10, 0.5, -9)
+        tabIcon.BackgroundTransparency = 1
+        tabIcon.Image = "rbxassetid://3926305904"
+        tabIcon.ImageColor3 = Colors.Accent
+        tabIcon.ImageRectOffset = Vector2.new(964, 324)
+        tabIcon.ImageRectSize = Vector2.new(36, 36)
+        tabIcon.ImageTransparency = 0.3
+        tabIcon.Parent = tabButton
+        
+        local tabText = Instance.new("TextLabel")
+        tabText.Name = "Text"
+        tabText.Size = UDim2.new(1, -35, 1, 0)
+        tabText.Position = UDim2.new(0, 35, 0, 0)
+        tabText.BackgroundTransparency = 1
+        tabText.Text = name
+        tabText.TextColor3 = Colors.Text
+        tabText.TextSize = 13
+        tabText.Font = Enum.Font.Gotham
+        tabText.TextXAlignment = Enum.TextXAlignment.Left
+        tabText.TextTransparency = 0.3
+        tabText.Parent = tabButton
+        
+        -- Контент вкладки
+        local tabContent = Instance.new("Frame")
+        tabContent.Name = "TabContent_" .. name
+        tabContent.Size = UDim2.new(1, 0, 1, 0)
+        tabContent.BackgroundTransparency = 1
+        tabContent.Visible = false
+        tabContent.Parent = ContentFrame
+        
+        local contentList = Instance.new("UIListLayout")
+        contentList.Padding = UDim.new(0, 16)
+        contentList.Parent = tabContent
+        
+        -- Активация первой вкладки
+        if #tabs == 0 then
+            currentTab = name
+            tabButton.BackgroundColor3 = Colors.Accent
+            createGradient(tabButton, Colors.Accent, Colors.DarkAccent)
+            tabIcon.ImageTransparency = 0
+            tabText.TextTransparency = 0
+            tabContent.Visible = true
+            
+            TweenService:Create(tabIcon, TweenInfo.new(0.3), {
+                ImageColor3 = Colors.Text
+            }):Play()
+            
+            TweenService:Create(tabText, TweenInfo.new(0.3), {
+                TextColor3 = Colors.Text
+            }):Play()
+        end
+        
+        -- Обработчик клика по вкладке
+        tabButton.MouseButton1Click:Connect(function()
+            for _, t in pairs(tabs) do
+                t.button.BackgroundColor3 = Colors.Element
+                createGradient(t.button, Colors.Element, Color3.fromRGB(28, 28, 28))
+                
+                TweenService:Create(t.icon, TweenInfo.new(0.3), {
+                    ImageColor3 = Colors.Accent,
+                    ImageTransparency = 0.3
+                }):Play()
+                
+                TweenService:Create(t.text, TweenInfo.new(0.3), {
+                    TextColor3 = Colors.Text,
+                    TextTransparency = 0.3
+                }):Play()
+                
+                t.content.Visible = false
+            end
+            
+            tabButton.BackgroundColor3 = Colors.Accent
+            createGradient(tabButton, Colors.Accent, Colors.DarkAccent)
+            
+            TweenService:Create(tabIcon, TweenInfo.new(0.3), {
+                ImageColor3 = Colors.Text,
+                ImageTransparency = 0
+            }):Play()
+            
+            TweenService:Create(tabText, TweenInfo.new(0.3), {
+                TextColor3 = Colors.Text,
+                TextTransparency = 0
+            }):Play()
+            
+            -- Анимация переключения вкладок
+            TweenService:Create(tabIcon, TweenInfo.new(0.1), {
+                Rotation = 360
+            }):Play()
+            
+            task.wait(0.1)
+            tabContent.Visible = true
+            currentTab = name
+            
+            TweenService:Create(tabIcon, TweenInfo.new(0.2), {
+                Rotation = 0
+            }):Play()
+        end)
+        
+        -- Анимация при наведении
+        tabButton.MouseEnter:Connect(function()
+            if currentTab ~= name then
+                TweenService:Create(tabButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Colors.ElementHover,
+                    Size = UDim2.new(0, 88, 1, 0)
+                }):Play()
+                
+                createGradient(tabButton, Colors.ElementHover, Color3.fromRGB(35, 35, 35))
+                
+                TweenService:Create(tabIcon, TweenInfo.new(0.2), {
+                    ImageTransparency = 0,
+                    Rotation = 15
+                }):Play()
+                
+                TweenService:Create(tabText, TweenInfo.new(0.2), {
+                    TextTransparency = 0
+                }):Play()
+            end
+        end)
+        
+        tabButton.MouseLeave:Connect(function()
+            if currentTab ~= name then
+                TweenService:Create(tabButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Colors.Element,
+                    Size = UDim2.new(0, 85, 1, 0)
+                }):Play()
+                
+                createGradient(tabButton, Colors.Element, Color3.fromRGB(28, 28, 28))
+                
+                TweenService:Create(tabIcon, TweenInfo.new(0.2), {
+                    ImageTransparency = 0.3,
+                    Rotation = 0
+                }):Play()
+                
+                TweenService:Create(tabText, TweenInfo.new(0.2), {
+                    TextTransparency = 0.3
+                }):Play()
+            end
+        end)
+        
+        -- Сохраняем вкладку
+        tabs[name] = {
+            button = tabButton,
+            content = tabContent,
+            icon = tabIcon,
+            text = tabText,
+            name = name
+        }
+        
+        -- Функция создания кнопки
+        function tab:CreateButton(name, callback)
+            local button = Instance.new("TextButton")
+            button.Name = "Btn_" .. name
+            button.Size = UDim2.new(1, 0, 0, 40)
+            button.BackgroundColor3 = Colors.Element
+            button.BorderSizePixel = 0
+            button.Text = ""
+            button.AutoButtonColor = false
+            button.Parent = tabContent
+            createRoundedCorners(button, 8)
+            
+            local buttonGradient = createGradient(button, Colors.Element, Color3.fromRGB(30, 30, 30))
+            
+            local buttonText = Instance.new("TextLabel")
+            buttonText.Name = "Text"
+            buttonText.Size = UDim2.new(1, -50, 1, 0)
+            buttonText.Position = UDim2.new(0, 15, 0, 0)
+            buttonText.BackgroundTransparency = 1
+            buttonText.Text = name
+            buttonText.TextColor3 = Colors.Text
+            buttonText.TextSize = 14
+            buttonText.Font = Enum.Font.Gotham
+            buttonText.TextXAlignment = Enum.TextXAlignment.Left
+            buttonText.Parent = button
+            
+            local buttonIcon = Instance.new("ImageLabel")
+            buttonIcon.Name = "Icon"
+            buttonIcon.Size = UDim2.new(0, 20, 0, 20)
+            buttonIcon.Position = UDim2.new(1, -30, 0.5, -10)
+            buttonIcon.BackgroundTransparency = 1
+            buttonIcon.Image = "rbxassetid://3926305904"
+            buttonIcon.ImageColor3 = Colors.TextSecondary
+            buttonIcon.ImageRectOffset = Vector2.new(4, 964)
+            buttonIcon.ImageRectSize = Vector2.new(36, 36)
+            buttonIcon.Parent = button
+            
+            -- Эффекты при наведении
+            button.MouseEnter:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Colors.ElementHover,
+                    Size = UDim2.new(1, 2, 0, 42)
+                }):Play()
+                
+                createGradient(button, Colors.ElementHover, Color3.fromRGB(35, 35, 35))
+                
+                TweenService:Create(buttonIcon, TweenInfo.new(0.2), {
+                    ImageColor3 = Colors.Accent,
+                    Rotation = 15
+                }):Play()
+                
+                TweenService:Create(buttonText, TweenInfo.new(0.2), {
+                    TextColor3 = Colors.Accent
+                }):Play()
+            end)
+            
+            button.MouseLeave:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Colors.Element,
+                    Size = UDim2.new(1, 0, 0, 40)
+                }):Play()
+                
+                createGradient(button, Colors.Element, Color3.fromRGB(30, 30, 30))
+                
+                TweenService:Create(buttonIcon, TweenInfo.new(0.2), {
+                    ImageColor3 = Colors.TextSecondary,
+                    Rotation = 0
+                }):Play()
+                
+                TweenService:Create(buttonText, TweenInfo.new(0.2), {
+                    TextColor3 = Colors.Text
+                }):Play()
+            end)
+            
+            button.MouseButton1Click:Connect(function()
+                if callback then
+                    -- Анимация нажатия
+                    TweenService:Create(button, TweenInfo.new(0.1), {
+                        BackgroundColor3 = Colors.Success,
+                        Size = UDim2.new(1, -2, 0, 38),
+                        Position = UDim2.new(0, 1, 0, 1)
+                    }):Play()
+                    
+                    TweenService:Create(buttonIcon, TweenInfo.new(0.1), {
+                        ImageColor3 = Colors.Text,
+                        Rotation = 360,
+                        Size = UDim2.new(0, 22, 0, 22)
+                    }):Play()
+                    
+                    -- Эффект волны
+                    local wave = Instance.new("Frame")
+                    wave.Size = UDim2.new(0, 0, 0, 0)
+                    wave.Position = UDim2.new(0.5, 0, 0.5, 0)
+                    wave.BackgroundColor3 = Colors.Success
+                    wave.BackgroundTransparency = 0.7
+                    wave.BorderSizePixel = 0
+                    wave.Parent = button
+                    createRoundedCorners(wave, 100)
+                    
+                    TweenService:Create(wave, TweenInfo.new(0.4), {
+                        Size = UDim2.new(1, 20, 1, 20),
+                        Position = UDim2.new(0, -10, 0, -10),
+                        BackgroundTransparency = 1
+                    }):Play()
+                    
+                    game:GetService("Debris"):AddItem(wave, 0.5)
+                    
+                    -- Выполняем callback
+                    local success, errorMsg = pcall(callback)
+                    
+                    -- Возвращаем к исходному состоянию
+                    task.wait(0.1)
+                    TweenService:Create(button, TweenInfo.new(0.3), {
+                        BackgroundColor3 = Colors.Element,
+                        Size = UDim2.new(1, 0, 0, 40),
+                        Position = UDim2.new(0, 0, 0, 0)
+                    }):Play()
+                    
+                    TweenService:Create(buttonIcon, TweenInfo.new(0.3), {
+                        ImageColor3 = Colors.TextSecondary,
+                        Rotation = 0,
+                        Size = UDim2.new(0, 20, 0, 20)
+                    }):Play()
+                    
+                    if not success then
+                        self:Notify("Ошибка: " .. errorMsg)
+                    end
+                end
+            end)
+            
+            return button
+        end
+        -- Добавляем после функций CreateToggle, CreateButton и CreateSlider в секции создания вкладки:
+
+-- Функция создания выпадающего списка
+		function tab:CreateDropdown(name, options, callback)
+			local dropdown = Instance.new("Frame")
+			dropdown.Name = "Dropdown_" .. name
+			dropdown.Size = UDim2.new(1, 0, 0, 40)
+			dropdown.BackgroundTransparency = 1
+			dropdown.Parent = tabContent
+			
+			local dropdownBG = Instance.new("TextButton")
+			dropdownBG.Name = "Background"
+			dropdownBG.Size = UDim2.new(1, 0, 1, 0)
+			dropdownBG.BackgroundColor3 = Colors.Element
+			dropdownBG.BorderSizePixel = 0
+			dropdownBG.Text = ""
+			dropdownBG.AutoButtonColor = false
+			dropdownBG.ZIndex = 10
+			dropdownBG.Parent = dropdown
+			createRoundedCorners(dropdownBG, 8)
+			createGradient(dropdownBG, Colors.Element, Color3.fromRGB(30, 30, 30))
+			
+			local label = Instance.new("TextLabel")
+			label.Name = "Label"
+			label.Size = UDim2.new(0.7, -10, 1, 0)
+			label.Position = UDim2.new(0, 15, 0, 0)
+			label.BackgroundTransparency = 1
+			label.Text = name
+			label.TextColor3 = Colors.Text
+			label.TextSize = 14
+			label.Font = Enum.Font.Gotham
+			label.TextXAlignment = Enum.TextXAlignment.Left
+			label.ZIndex = 11
+			label.Parent = dropdown
+			
+			local selectedLabel = Instance.new("TextLabel")
+			selectedLabel.Name = "Selected"
+			selectedLabel.Size = UDim2.new(0.3, -30, 1, 0)
+			selectedLabel.Position = UDim2.new(0.7, 0, 0, 0)
+			selectedLabel.BackgroundTransparency = 1
+			selectedLabel.Text = options[1] or "Выберите..."
+			selectedLabel.TextColor3 = Colors.TextSecondary
+			selectedLabel.TextSize = 14
+			selectedLabel.Font = Enum.Font.Gotham
+			selectedLabel.TextXAlignment = Enum.TextXAlignment.Right
+			selectedLabel.ZIndex = 11
+			selectedLabel.Parent = dropdown
+			
+			local arrowIcon = Instance.new("ImageLabel")
+			arrowIcon.Name = "Arrow"
+			arrowIcon.Size = UDim2.new(0, 16, 0, 16)
+			arrowIcon.Position = UDim2.new(1, -25, 0.5, -8)
+			arrowIcon.BackgroundTransparency = 1
+			arrowIcon.Image = "rbxassetid://3926307971"
+			arrowIcon.ImageColor3 = Colors.TextSecondary
+			arrowIcon.ImageRectOffset = Vector2.new(324, 364)
+			arrowIcon.ImageRectSize = Vector2.new(36, 36)
+			arrowIcon.Rotation = 0
+			arrowIcon.ZIndex = 11
+			arrowIcon.Parent = dropdown
+			
+			-- Создаем отдельный контейнер для выпадающего списка на уровне ScreenGui
+			local dropdownContainer = Instance.new("Frame")
+			dropdownContainer.Name = "DropdownContainer_" .. name
+			dropdownContainer.Size = UDim2.new(1, 0, 0, 0)
+			dropdownContainer.BackgroundTransparency = 1
+			dropdownContainer.Visible = false
+			dropdownContainer.ZIndex = 900  -- Высокий ZIndex чтобы был поверх всего
+			dropdownContainer.Parent = ScreenGui
+			
+			local optionsContainer = Instance.new("Frame")
+			optionsContainer.Name = "OptionsContainer"
+			optionsContainer.Size = UDim2.new(0, 0, 0, 0)
+			optionsContainer.BackgroundColor3 = Colors.Element
+			optionsContainer.BorderSizePixel = 0
+			optionsContainer.Visible = false
+			optionsContainer.ZIndex = 901
+			optionsContainer.Parent = dropdownContainer
+			createRoundedCorners(optionsContainer, 8)
+			createGradient(optionsContainer, Colors.Element, Color3.fromRGB(28, 28, 28))
+			
+			local optionsList = Instance.new("UIListLayout")
+			optionsList.Padding = UDim.new(0, 2)
+			optionsList.Parent = optionsContainer
+			
+			local isOpen = false
+			local currentOption = options[1]
+			
+			-- Функция позиционирования контейнера опций
+			local function positionOptionsContainer()
+				local dropdownAbsPos = dropdown.AbsolutePosition
+				local dropdownAbsSize = dropdown.AbsoluteSize
+				
+				-- Позиционируем контейнер относительно dropdown
+				optionsContainer.Position = UDim2.new(
+					0, dropdownAbsPos.X,
+					0, dropdownAbsPos.Y + dropdownAbsSize.Y + 5
+				)
+				
+				-- Устанавливаем ширину равной ширине dropdown
+				optionsContainer.Size = UDim2.new(
+					0, dropdownAbsSize.X,
+					0, 0
+				)
+			end
+			
+			-- Обновляем позицию при изменении размера или позиции
+			local connection
+			connection = RunService.RenderStepped:Connect(function()
+				if isOpen and optionsContainer.Visible then
+					positionOptionsContainer()
+				end
+			end)
+			
+			-- Сохраняем соединение для очистки
+			dropdown.AncestryChanged:Connect(function()
+				if not dropdown:IsDescendantOf(game) then
+					connection:Disconnect()
+					dropdownContainer:Destroy()
+				end
+			end)
+			
+			-- Функция обновления выбранного значения
+			local function updateDropdown(value)
+				currentOption = value
+				selectedLabel.Text = value
+				
+				TweenService:Create(selectedLabel, TweenInfo.new(0.2), {
+					TextColor3 = Colors.Accent
+				}):Play()
+				
+				if callback then
+					local success, errorMsg = pcall(function()
+						callback(value)
+					end)
+					if not success then
+						self:Notify("Ошибка в dropdown: " .. errorMsg)
+					end
+				end
+				
+				-- Анимация выбранного значения
+				task.wait(0.2)
+				TweenService:Create(selectedLabel, TweenInfo.new(0.2), {
+					TextColor3 = Colors.Text
+				}):Play()
+			end
+			
+			-- Создание опций
+			for i, option in ipairs(options) do
+				local optionButton = Instance.new("TextButton")
+				optionButton.Name = "Option_" .. option
+				optionButton.Size = UDim2.new(1, -10, 0, 35)
+				optionButton.Position = UDim2.new(0, 5, 0, 5 + (i-1)*37)
+				optionButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+				optionButton.BorderSizePixel = 0
+				optionButton.Text = ""
+				optionButton.AutoButtonColor = false
+				optionButton.ZIndex = 902
+				optionButton.Parent = optionsContainer
+				createRoundedCorners(optionButton, 6)
+				
+				local optionLabel = Instance.new("TextLabel")
+				optionLabel.Name = "Label"
+				optionLabel.Size = UDim2.new(1, -10, 1, 0)
+				optionLabel.Position = UDim2.new(0, 10, 0, 0)
+				optionLabel.BackgroundTransparency = 1
+				optionLabel.Text = option
+				optionLabel.TextColor3 = Colors.Text
+				optionLabel.TextSize = 13
+				optionLabel.Font = Enum.Font.Gotham
+				optionLabel.TextXAlignment = Enum.TextXAlignment.Left
+				optionLabel.ZIndex = 903
+				optionLabel.Parent = optionButton
+				
+				local optionIcon = Instance.new("ImageLabel")
+				optionIcon.Name = "Icon"
+				optionIcon.Size = UDim2.new(0, 16, 0, 16)
+				optionIcon.Position = UDim2.new(1, -25, 0.5, -8)
+				optionIcon.BackgroundTransparency = 1
+				optionIcon.Image = "rbxassetid://3926307971"
+				optionIcon.ImageColor3 = Colors.TextSecondary
+				optionIcon.ImageRectOffset = Vector2.new(124, 204)
+				optionIcon.ImageRectSize = Vector2.new(36, 36)
+				optionIcon.Visible = (option == currentOption)
+				optionIcon.ZIndex = 903
+				optionIcon.Parent = optionButton
+				
+				-- Обработчик выбора опции
+				optionButton.MouseButton1Click:Connect(function()
+					updateDropdown(option)
+					dropdownBG.MouseButton1Click()
+					
+					-- Подсветка выбранной опции
+					for _, child in ipairs(optionsContainer:GetChildren()) do
+						if child:IsA("TextButton") then
+							local icon = child:FindFirstChild("Icon")
+							if icon then
+								icon.Visible = (child.Name == "Option_" .. option)
+								
+								-- Анимация галочки
+								if icon.Visible then
+									TweenService:Create(icon, TweenInfo.new(0.2), {
+										ImageColor3 = Colors.Success,
+										Size = UDim2.new(0, 18, 0, 18),
+										Position = UDim2.new(1, -26, 0.5, -9)
+									}):Play()
+								else
+									TweenService:Create(icon, TweenInfo.new(0.2), {
+										ImageColor3 = Colors.TextSecondary,
+										Size = UDim2.new(0, 16, 0, 16),
+										Position = UDim2.new(1, -25, 0.5, -8)
+									}):Play()
+								end
+							end
+						end
+					end
+				end)
+				
+				-- Анимация при наведении на опцию
+				optionButton.MouseEnter:Connect(function()
+					if option ~= currentOption then
+						TweenService:Create(optionButton, TweenInfo.new(0.2), {
+							BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+							Size = UDim2.new(1, -8, 0, 37)
+						}):Play()
+						
+						TweenService:Create(optionLabel, TweenInfo.new(0.2), {
+							TextColor3 = Colors.Accent
+						}):Play()
+					end
+				end)
+				
+				optionButton.MouseLeave:Connect(function()
+					if option ~= currentOption then
+						TweenService:Create(optionButton, TweenInfo.new(0.2), {
+							BackgroundColor3 = Color3.fromRGB(35, 35, 35),
+							Size = UDim2.new(1, -10, 0, 35)
+						}):Play()
+						
+						TweenService:Create(optionLabel, TweenInfo.new(0.2), {
+							TextColor3 = Colors.Text
+						}):Play()
+					end
+				end)
+			end
+			
+			-- Функция открытия/закрытия выпадающего списка
+			dropdownBG.MouseButton1Click:Connect(function()
+				isOpen = not isOpen
+				
+				if isOpen then
+					-- Позиционируем контейнер перед открытием
+					positionOptionsContainer()
+					
+					-- Открываем список
+					dropdownContainer.Visible = true
+					optionsContainer.Visible = true
+					local optionCount = #options
+					local containerHeight = math.min(optionCount * 37 + 10, 200) -- Максимальная высота 200
+					
+					TweenService:Create(optionsContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+						Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, containerHeight)
+					}):Play()
+					
+					TweenService:Create(arrowIcon, TweenInfo.new(0.3), {
+						Rotation = 180,
+						ImageColor3 = Colors.Accent
+					}):Play()
+					
+					TweenService:Create(dropdownBG, TweenInfo.new(0.3), {
+						BackgroundColor3 = Colors.ElementHover
+					}):Play()
+					
+					TweenService:Create(selectedLabel, TweenInfo.new(0.3), {
+						TextColor3 = Colors.Accent
+					}):Play()
+					
+					-- Закрываем другие выпадающие списки
+					for _, child in ipairs(ScreenGui:GetChildren()) do
+						if child.Name ~= dropdownContainer.Name and string.find(child.Name, "DropdownContainer_") then
+							local bg = child:FindFirstChild("OptionsContainer")
+							if bg and bg.Visible then
+								-- Находим соответствующий dropdown и закрываем его
+								local dropdownName = string.match(child.Name, "DropdownContainer_(.+)")
+								local dropdownElement = tabContent:FindFirstChild("Dropdown_" .. dropdownName)
+								if dropdownElement then
+									local dropdownBG = dropdownElement:FindFirstChild("Background")
+									if dropdownBG then
+										dropdownBG.MouseButton1Click()
+									end
+								end
+							end
+						end
+					end
+				else
+					-- Закрываем список
+					TweenService:Create(optionsContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+						Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0)
+					}):Play()
+					
+					TweenService:Create(arrowIcon, TweenInfo.new(0.3), {
+						Rotation = 0,
+						ImageColor3 = Colors.TextSecondary
+					}):Play()
+					
+					TweenService:Create(dropdownBG, TweenInfo.new(0.3), {
+						BackgroundColor3 = Colors.Element
+					}):Play()
+					
+					TweenService:Create(selectedLabel, TweenInfo.new(0.3), {
+						TextColor3 = Colors.Text
+					}):Play()
+					
+					task.wait(0.3)
+					optionsContainer.Visible = false
+					dropdownContainer.Visible = false
+				end
+			end)
+			
+			-- Анимация при наведении на основной элемент
+			dropdownBG.MouseEnter:Connect(function()
+				if not isOpen then
+					TweenService:Create(dropdownBG, TweenInfo.new(0.2), {
+						BackgroundColor3 = Colors.ElementHover,
+						Size = UDim2.new(1, 2, 1, 2)
+					}):Play()
+					
+					createGradient(dropdownBG, Colors.ElementHover, Color3.fromRGB(35, 35, 35))
+					
+					TweenService:Create(arrowIcon, TweenInfo.new(0.2), {
+						ImageColor3 = Colors.Accent,
+						Rotation = 90
+					}):Play()
+				end
+			end)
+			
+			dropdownBG.MouseLeave:Connect(function()
+				if not isOpen then
+					TweenService:Create(dropdownBG, TweenInfo.new(0.2), {
+						BackgroundColor3 = Colors.Element,
+						Size = UDim2.new(1, 0, 1, 0)
+					}):Play()
+					
+					createGradient(dropdownBG, Colors.Element, Color3.fromRGB(30, 30, 30))
+					
+					TweenService:Create(arrowIcon, TweenInfo.new(0.2), {
+						ImageColor3 = Colors.TextSecondary,
+						Rotation = 0
+					}):Play()
+				end
+			end)
+			
+			-- Закрытие выпадающего списка при клике вне его
+			local function closeIfClickedOutside(input)
+				if isOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
+					local mousePos = UserInputService:GetMouseLocation()
+					local dropdownAbsPos = dropdown.AbsolutePosition
+					local dropdownAbsSize = dropdown.AbsoluteSize
+					
+					-- Получаем позицию и размер контейнера опций
+					local optionsAbsPos = optionsContainer.AbsolutePosition
+					local optionsAbsSize = optionsContainer.AbsoluteSize
+					
+					-- Проверяем, был ли клик вне dropdown и опций
+					local clickedOnDropdown = mousePos.X >= dropdownAbsPos.X and 
+											mousePos.X <= dropdownAbsPos.X + dropdownAbsSize.X and
+											mousePos.Y >= dropdownAbsPos.Y and 
+											mousePos.Y <= dropdownAbsPos.Y + dropdownAbsSize.Y
+					
+					local clickedOnOptions = mousePos.X >= optionsAbsPos.X and 
+											mousePos.X <= optionsAbsPos.X + optionsAbsSize.X and
+											mousePos.Y >= optionsAbsPos.Y and 
+											mousePos.Y <= optionsAbsPos.Y + optionsAbsSize.Y
+					
+					if not clickedOnDropdown and not clickedOnOptions then
+						dropdownBG.MouseButton1Click()
+					end
+				end
+			end
+			
+			UserInputService.InputBegan:Connect(closeIfClickedOutside)
+			
+			-- Инициализируем первую опцию
+			updateDropdown(options[1])
+			
+			return dropdown
+		end
+        -- Функция создания переключателя
+        function tab:CreateToggle(name, callback)
+            local toggle = Instance.new("Frame")
+            toggle.Name = "Toggle_" .. name
+            toggle.Size = UDim2.new(1, 0, 0, 40)
+            toggle.BackgroundTransparency = 1
+            toggle.Parent = tabContent
+            
+            local toggleBG = Instance.new("TextButton") -- ИСПРАВЛЕНИЕ: TextButton вместо Frame
+            toggleBG.Name = "Background"
+            toggleBG.Size = UDim2.new(1, 0, 1, 0)
+            toggleBG.BackgroundColor3 = Colors.Element
+            toggleBG.BorderSizePixel = 0
+            toggleBG.Text = ""
+            toggleBG.AutoButtonColor = false
+            toggleBG.Parent = toggle
+            createRoundedCorners(toggleBG, 8)
+            createGradient(toggleBG, Colors.Element, Color3.fromRGB(30, 30, 30))
+            
+            local label = Instance.new("TextLabel")
+            label.Name = "Label"
+            label.Size = UDim2.new(0.7, -10, 1, 0)
+            label.Position = UDim2.new(0, 15, 0, 0)
+            label.BackgroundTransparency = 1
+            label.Text = name
+            label.TextColor3 = Colors.Text
+            label.TextSize = 14
+            label.Font = Enum.Font.Gotham
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Parent = toggle
+            
+            local toggleContainer = Instance.new("TextButton")
+            toggleContainer.Name = "ToggleContainer"
+            toggleContainer.Size = UDim2.new(0, 60, 0, 30)
+            toggleContainer.Position = UDim2.new(1, -70, 0.5, -15)
+            toggleContainer.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            toggleContainer.BorderSizePixel = 0
+            toggleContainer.Text = ""
+            toggleContainer.AutoButtonColor = false
+            toggleContainer.Parent = toggle
+            createRoundedCorners(toggleContainer, 15)
+            
+            local toggleButton = Instance.new("Frame")
+            toggleButton.Name = "Switch"
+            toggleButton.Size = UDim2.new(0, 26, 0, 26)
+            toggleButton.Position = UDim2.new(0, 2, 0.5, -13)
+            toggleButton.BackgroundColor3 = Colors.Text
+            toggleButton.BorderSizePixel = 0
+            toggleButton.Parent = toggleContainer
+            createRoundedCorners(toggleButton, 13)
+            
+            local isEnabled = false
+            
+            local function updateToggle()
+                if isEnabled then
+                    TweenService:Create(toggleButton, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                        Position = UDim2.new(1, -28, 0.5, -13),
+                        BackgroundColor3 = Colors.Success,
+                        Size = UDim2.new(0, 28, 0, 28)
+                    }):Play()
+                    
+                    TweenService:Create(toggleContainer, TweenInfo.new(0.3), {
+                        BackgroundColor3 = Color3.fromRGB(0, 70, 0)
+                    }):Play()
+                    
+                    TweenService:Create(toggleBG, TweenInfo.new(0.3), {
+                        BackgroundColor3 = Color3.fromRGB(30, 40, 30)
+                    }):Play()
+                else
+                    TweenService:Create(toggleButton, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                        Position = UDim2.new(0, 2, 0.5, -13),
+                        BackgroundColor3 = Colors.Text,
+                        Size = UDim2.new(0, 26, 0, 26)
+                    }):Play()
+                    
+                    TweenService:Create(toggleContainer, TweenInfo.new(0.3), {
+                        BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                    }):Play()
+                    
+                    TweenService:Create(toggleBG, TweenInfo.new(0.3), {
+                        BackgroundColor3 = Colors.Element
+                    }):Play()
+                end
+                
+                if callback then
+                    local success, errorMsg = pcall(function()
+                        callback(isEnabled)
+                    end)
+                    if not success then
+                        self:Notify("Ошибка в toggle: " .. errorMsg)
+                    end
+                end
+            end
+            
+            -- ИСПРАВЛЕНИЕ: Теперь все элементы - TextButton с MouseButton1Click
+            toggleContainer.MouseButton1Click:Connect(function()
+                isEnabled = not isEnabled
+                updateToggle()
+            end)
+            
+            toggleBG.MouseButton1Click:Connect(function()
+                isEnabled = not isEnabled
+                updateToggle()
+            end)
+            
+            -- Анимация при наведении
+            toggleContainer.MouseEnter:Connect(function()
+                if not isEnabled then
+                    TweenService:Create(toggleContainer, TweenInfo.new(0.2), {
+                        BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                    }):Play()
+                end
+            end)
+            
+            toggleContainer.MouseLeave:Connect(function()
+                if not isEnabled then
+                    TweenService:Create(toggleContainer, TweenInfo.new(0.2), {
+                        BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                    }):Play()
+                end
+            end)
+            
+            updateToggle()
+            
+            return toggle
+        end
+        
+        -- Функция создания слайдера
+        function tab:CreateSlider(name, min, max, callback)
+            local slider = Instance.new("Frame")
+            slider.Name = "Slider_" .. name
+            slider.Size = UDim2.new(1, 0, 0, 60)
+            slider.BackgroundTransparency = 1
+            slider.Parent = tabContent
+            
+            local sliderBG = Instance.new("Frame")
+            sliderBG.Name = "Background"
+            sliderBG.Size = UDim2.new(1, 0, 1, 0)
+            sliderBG.BackgroundColor3 = Colors.Element
+            sliderBG.BorderSizePixel = 0
+            sliderBG.Parent = slider
+            createRoundedCorners(sliderBG, 8)
+            createGradient(sliderBG, Colors.Element, Color3.fromRGB(30, 30, 30))
+            
+            local label = Instance.new("TextLabel")
+            label.Name = "Label"
+            label.Size = UDim2.new(1, -20, 0, 20)
+            label.Position = UDim2.new(0, 15, 0, 5)
+            label.BackgroundTransparency = 1
+            label.Text = name .. ": " .. tostring(min)
+            label.TextColor3 = Colors.Text
+            label.TextSize = 14
+            label.Font = Enum.Font.Gotham
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Parent = slider
+            
+            local sliderContainer = Instance.new("TextButton") -- ИСПРАВЛЕНИЕ: TextButton для клика
+            sliderContainer.Name = "Container"
+            sliderContainer.Size = UDim2.new(1, -20, 0, 6)
+            sliderContainer.Position = UDim2.new(0, 10, 1, -25)
+            sliderContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            sliderContainer.BorderSizePixel = 0
+            sliderContainer.Text = ""
+            sliderContainer.AutoButtonColor = false
+            sliderContainer.Parent = slider
+            createRoundedCorners(sliderContainer, 3)
+            
+            local sliderFill = Instance.new("Frame")
+            sliderFill.Name = "Fill"
+            sliderFill.Size = UDim2.new(0, 0, 1, 0)
+            sliderFill.BackgroundColor3 = Colors.Accent
+            sliderFill.BorderSizePixel = 0
+            sliderFill.Parent = sliderContainer
+            createRoundedCorners(sliderFill, 3)
+            
+            local sliderButton = Instance.new("TextButton")
+            sliderButton.Name = "Handle"
+            sliderButton.Size = UDim2.new(0, 22, 0, 22)
+            sliderButton.Position = UDim2.new(0, -11, 0.5, -11)
+            sliderButton.BackgroundColor3 = Colors.Text
+            sliderButton.BorderSizePixel = 0
+            sliderButton.Text = ""
+            sliderButton.AutoButtonColor = false
+            sliderButton.ZIndex = 2
+            sliderButton.Parent = sliderContainer
+            createRoundedCorners(sliderButton, 11)
+            
+            local valueDisplay = Instance.new("TextLabel")
+            valueDisplay.Name = "Value"
+            valueDisplay.Size = UDim2.new(0, 40, 0, 20)
+            valueDisplay.Position = UDim2.new(1, -50, 0, 5)
+            valueDisplay.BackgroundColor3 = Colors.Accent
+            valueDisplay.BorderSizePixel = 0
+            valueDisplay.Text = tostring(min)
+            valueDisplay.TextColor3 = Colors.Text
+            valueDisplay.TextSize = 13
+            valueDisplay.Font = Enum.Font.GothamBold
+            valueDisplay.Parent = slider
+            createRoundedCorners(valueDisplay, 4)
+            
+            local dragging = false
+            local currentValue = min
+            
+            local function updateSlider(value)
+                currentValue = math.clamp(math.floor(value), min, max)
+                local percent = (currentValue - min) / (max - min)
+                
+                sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+                sliderButton.Position = UDim2.new(percent, -11, 0.5, -11)
+                label.Text = name .. ": " .. tostring(currentValue)
+                valueDisplay.Text = tostring(currentValue)
+                
+                -- Анимация при изменении значения
+                TweenService:Create(valueDisplay, TweenInfo.new(0.1), {
+                    Size = UDim2.new(0, 42, 0, 22),
+                    BackgroundColor3 = Colors.AccentHover
+                }):Play()
+                
+                task.wait(0.1)
+                
+                TweenService:Create(valueDisplay, TweenInfo.new(0.1), {
+                    Size = UDim2.new(0, 40, 0, 20),
+                    BackgroundColor3 = Colors.Accent
+                }):Play()
+                
+                if callback then
+                    local success, errorMsg = pcall(function()
+                        callback(currentValue)
+                    end)
+                    if not success then
+                        self:Notify("Ошибка в слайдере: " .. errorMsg)
+                    end
+                end
+            end
+            
+            sliderButton.MouseButton1Down:Connect(function()
+                dragging = true
+                TweenService:Create(sliderButton, TweenInfo.new(0.2), {
+                    Size = UDim2.new(0, 26, 0, 26),
+                    BackgroundColor3 = Colors.Accent
+                }):Play()
+            end)
+            
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    dragging = false
+                    TweenService:Create(sliderButton, TweenInfo.new(0.2), {
+                        Size = UDim2.new(0, 22, 0, 22),
+                        BackgroundColor3 = Colors.Text
+                    }):Play()
+                end
+            end)
+            
+            sliderContainer.MouseButton1Click:Connect(function(x, y)
+                local percent = math.clamp(
+                    (x - sliderContainer.AbsolutePosition.X) / sliderContainer.AbsoluteSize.X,
+                    0, 1
+                )
+                updateSlider(min + (max - min) * percent)
+            end)
+            
+            local connection
+            connection = RunService.Heartbeat:Connect(function()
+                if dragging then
+                    local percent = math.clamp(
+                        (Mouse.X - sliderContainer.AbsolutePosition.X) / sliderContainer.AbsoluteSize.X,
+                        0, 1
+                    )
+                    updateSlider(min + (max - min) * percent)
+                end
+            end)
+            
+            -- Сохраняем соединение для очистки
+            slider.AncestryChanged:Connect(function()
+                if not slider:IsDescendantOf(game) then
+                    connection:Disconnect()
+                end
+            end)
+            
+            updateSlider(min)
+            
+            return slider
+        end
+        
+        -- Функция уведомления
+        function tab:Notify(text)
+            local notifyContainer = ScreenGui:FindFirstChild("NotifyContainer")
+            if not notifyContainer then
+                notifyContainer = Instance.new("Frame")
+                notifyContainer.Name = "NotifyContainer"
+                notifyContainer.Size = UDim2.new(0, 320, 0, 0)
+                notifyContainer.Position = UDim2.new(1, -340, 0, 20)
+                notifyContainer.BackgroundTransparency = 1
+                notifyContainer.Parent = ScreenGui
+                
+                local list = Instance.new("UIListLayout")
+                list.Padding = UDim.new(0, 12)
+                list.SortOrder = Enum.SortOrder.LayoutOrder
+                list.Parent = notifyContainer
+            end
+            
+            local notify = Instance.new("Frame")
+            notify.Name = "Notification"
+            notify.Size = UDim2.new(1, 0, 0, 55)
+            notify.BackgroundColor3 = Colors.Element
+            notify.BorderSizePixel = 0
+            notify.LayoutOrder = -999999
+            notify.Parent = notifyContainer
+            createRoundedCorners(notify, 10)
+            
+            -- Неоновая полоска слева
+            local neonStrip = Instance.new("Frame")
+            neonStrip.Name = "NeonStrip"
+            neonStrip.Size = UDim2.new(0, 4, 1, -10)
+            neonStrip.Position = UDim2.new(0, 5, 0, 5)
+            neonStrip.BackgroundColor3 = Colors.Accent
+            neonStrip.BorderSizePixel = 0
+            neonStrip.Parent = notify
+            createRoundedCorners(neonStrip, 2)
+            
+            createGradient(notify, Color3.fromRGB(30, 30, 30), Colors.Element)
+            
+            local icon = Instance.new("ImageLabel")
+            icon.Size = UDim2.new(0, 24, 0, 24)
+            icon.Position = UDim2.new(0, 15, 0.5, -12)
+            icon.BackgroundTransparency = 1
+            icon.Image = "rbxassetid://3926305904"
+            icon.ImageColor3 = Colors.Accent
+            icon.ImageRectOffset = Vector2.new(964, 324)
+            icon.ImageRectSize = Vector2.new(36, 36)
+            icon.Parent = notify
+            
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(1, -55, 1, -10)
+            label.Position = UDim2.new(0, 50, 0, 5)
+            label.BackgroundTransparency = 1
+            label.Text = text
+            label.TextColor3 = Colors.Text
+            label.TextSize = 14
+            label.Font = Enum.Font.Gotham
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.TextYAlignment = Enum.TextYAlignment.Top
+            label.TextWrapped = true
+            label.Parent = notify
+            
+            -- Анимация появления
+            notify.Position = UDim2.new(0, 0, 0, -70)
+            notify.BackgroundTransparency = 1
+            label.TextTransparency = 1
+            icon.ImageTransparency = 1
+            neonStrip.BackgroundTransparency = 1
+            
+            TweenService:Create(notify, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Position = UDim2.new(0, 0, 0, 0),
+                BackgroundTransparency = 0
+            }):Play()
+            
+            TweenService:Create(label, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                TextTransparency = 0
+            }):Play()
+            
+            TweenService:Create(icon, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                ImageTransparency = 0
+            }):Play()
+            
+            TweenService:Create(neonStrip, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 0
+            }):Play()
+            
+            -- Анимация пульсации неоновой полоски
+            spawn(function()
+                while notify and notify.Parent do
+                    TweenService:Create(neonStrip, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                        BackgroundColor3 = Colors.Purple
+                    }):Play()
+                    task.wait(0.8)
+                    TweenService:Create(neonStrip, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                        BackgroundColor3 = Colors.Accent
+                    }):Play()
+                    task.wait(0.8)
+                end
+            end)
+            
+            -- Автоматическое удаление через 5 секунд
+            task.delay(5, function()
+                if notify and notify.Parent then
+                    TweenService:Create(notify, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+                        Position = UDim2.new(0, 0, 0, -70),
+                        BackgroundTransparency = 1
+                    }):Play()
+                    
+                    TweenService:Create(label, TweenInfo.new(0.3), {
+                        TextTransparency = 1
+                    }):Play()
+                    
+                    TweenService:Create(icon, TweenInfo.new(0.3), {
+                        ImageTransparency = 1
+                    }):Play()
+                    
+                    TweenService:Create(neonStrip, TweenInfo.new(0.3), {
+                        BackgroundTransparency = 1
+                    }):Play()
+                    
+                    task.wait(0.5)
+                    if notify and notify.Parent then
+                        notify:Destroy()
+                    end
+                end
+            end)
+        end
+        
+        return tab
+    end
+    
+    -- Помечаем окно как созданное
+    mainWindowCreated = true
+    
+    return window
+end
+
+-- ==================== ЗАПУСК СКРИПТА ====================
+
+-- Показываем анимацию запуска
+showStartupAnimation()
+
+-- Ждем окончания анимации
+task.wait(2)
+
+-- Создаем окно
+local window = createWindow("ULTRA CHEAT SUITE v4.5")
+
+-- Показываем мини-кнопку после анимации
+MiniButton.Size = UDim2.new(0, 0, 0, 0)
+MiniButton.Position = UDim2.new(0.5, 0, 0.5, 0)
+MiniButton.BackgroundTransparency = 1
+MiniButtonBorder.BackgroundTransparency = 1
+MiniIcon.ImageTransparency = 1
+MiniButton.Visible = true
+
+TweenService:Create(MiniButton, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0, 50, 0, 50),
+    Position = UDim2.new(1, -70, 1, -70),
+    BackgroundTransparency = 0
+}):Play()
+
+TweenService:Create(MiniButtonBorder, TweenInfo.new(0.5), {
+    BackgroundTransparency = 0
+}):Play()
+
+TweenService:Create(MiniIcon, TweenInfo.new(0.5), {
+    ImageTransparency = 0
+}):Play()
+
+-- ==================== СОЗДАНИЕ ВКЛАДОК ====================
+
+-- Вкладка 1: Движение
+local main = window:CreateTab("Main")
+local autoe = false
+local auto = main:CreateToggle("Auto eat (you need to be dur and to be in first face)",function(a)autoe = a;main:Notify("Enabled")end)
+local ts = 25
+main:Notify("FOR AUTOEAT YOU SHOULD BE AT FIRST FACE")
+local function tw(a,b)
+    local s = (a.Position - b).Magnitude / ts
+    game:GetService("TweenService"):Create(a,TweenInfo.new(s,Enum.EasingStyle.Linear),{CFrame = CFrame.new(b.X,b.Y,b.Z)}):Play()
+    return s
+end
+task.spawn(function()
+    while task.wait(1) do
+        if autoe == true then
+            local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
+            for i,p in game.Players:GetPlayers() do
+                if (p.Character.HumanoidRootPart.Position - hrp.Position).Magnitude <= 500 then
+                    for i = 1,5 do
+                        local rp = p.Character.HumanoidRootPart
+                        local ar = tw(hrp,rp.Position + rp.CFrame.LookVector * 5)
+                        task.wait(ar)
+                        local virtualUser = game:GetService("VirtualUser")
+                        virtualUser:CaptureController()
+                        virtualUser:ClickButton1(Vector2.new(0,0))
+                        task.wait(.5)              
+                    end
+                end
+            end
+        end
+    end
+end)
+local cord = "135, 86.9998169, -67"
+local set = window:CreateTab("Settings")
+set:CreateSlider("Set tween speed",25,100,function(a)ts = a;end)
+local farm = window:CreateTab("Farm")
+local of = false
+local obby = farm:CreateToggle("Farm Monky (Obby method)",function(a)of = a;end)
+task.spawn(function()
+    while task.wait(1) do
+        if of == true then
+            local hrp = game.Players.LocalPlayer.Character.HumanoidRootPart
+            if (hrp.Position - Vector3.new(135, 86.9998169, -67)).Magnitude <= 200 then
+                local a = tw(hrp,Vector3.new(135, 86.9998169, -67))
+                task.wait(a)
+            end
+        end
+    end
+end)
+
+local movementTab = window:CreateTab("Movement")
+
+-- Слайдер для скорости
+local walkSpeedValue = 16
+movementTab:CreateSlider("Speed", 16, 200, function(value)
+    walkSpeedValue = value
+end)
+
+-- Кнопка применения скорости
+movementTab:CreateButton("apply speed", function()
+    local character = Player.Character
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid.WalkSpeed = walkSpeedValue
+        movementTab:Notify("✅ speed: " .. walkSpeedValue .. " studs/s")
+    else
+        movementTab:Notify("❌ Персонаж не найден")
+    end
+end)
+
+-- Вкладка 2: Визуал
+local visualTab = window:CreateTab("Visual")
+
+-- ESP игроков
+local espEnabled = false
+local espHighlights = {}
+
+visualTab:CreateToggle("ESP", function(enabled)
+    espEnabled = enabled
+    
+    if enabled then
+        visualTab:Notify("👁️ ESP")
+        
+        local function createESP(player)
+            if player == Player then return end
+            if espHighlights[player] then return end
+            
+            local highlight = Instance.new("Highlight")
+            highlight.Name = player.Name .. "_ESP"
+            highlight.Adornee = nil
+            highlight.OutlineColor = Color3.fromRGB(255, 50, 50)
+            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.FillTransparency = 0.85
+            highlight.OutlineTransparency = 0
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Parent = game:GetService("CoreGui")
+            
+            espHighlights[player] = highlight
+            
+            local connection
+            connection = RunService.Heartbeat:Connect(function()
+                if not espEnabled or not player.Character then
+                    if highlight then highlight:Destroy() end
+                    if connection then connection:Disconnect() end
+                    espHighlights[player] = nil
+                    return
+                end
+                highlight.Adornee = player.Character
+            end)
+        end
+        
+        -- ESP для всех игроков
+        for _, player in ipairs(Players:GetPlayers()) do
+            task.spawn(createESP, player)
+        end
+    else
+        visualTab:Notify("👁️ ESP")
+        -- Удаляем все ESP
+        for player, highlight in pairs(espHighlights) do
+            if highlight then 
+                highlight:Destroy()
+            end
+        end
+        espHighlights = {}
+    end
+end)
+
+-- Вкладка 3: Игрок
+
+-- ==================== УПРАВЛЕНИЕ ====================
+
+-- Переключение GUI по клавише
+local guiToggleKey = Enum.KeyCode.RightControl
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == guiToggleKey then
+        -- Находим MainWindow
+        local mainWindow = ScreenGui:FindFirstChild("MainWindow")
+        if mainWindow then
+            if mainWindow.Visible then
+                window:Hide()
+            else
+                window:Show()
+            end
+        else
+            -- Если меню еще не создано, показываем мини-кнопку
+            MiniButton.Visible = not MiniButton.Visible
+        end
+    end
+end)
