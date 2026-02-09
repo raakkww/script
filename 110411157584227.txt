@@ -1,0 +1,392 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+--[[ 
+    Bounce Highest UI
+    Features: Cash/Ticket Mods, Daily, Tramp Unlocker
+    Credits: Made By @SilentExecute
+]]
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+--// REMOTES SETUP //--
+-- Kita siapkan path remote agar script lebih rapi
+local RS_Events = ReplicatedStorage:WaitForChild("RemoteEvents")
+local ServerScript = RS_Events:WaitForChild("ServerScript")
+local RewardStat = ServerScript:WaitForChild("RewardStat")
+local RewardRecieveStat = ServerScript:WaitForChild("RewardRecieveStat")
+local ClaimDaily = ReplicatedStorage:WaitForChild("DailyEvents"):WaitForChild("ClaimDaily")
+
+--// DATA TRAMPS (Dari Screenshot) //--
+local TrampList = {
+    "Acid Tramp", "Advanced Tramp", "Aurora", "Azurefire Tramp", 
+    "Celestial Tramp", "Chained Tramp", "Cog Tramp", "Corrupted Tramp",
+    "Crystal Tramp", "Disk Tramp", "Double Tramp", "Forbidden Tramp",
+    "Frosted Tramp", "Mirrored Desolation", "Molten Tramp", "Portal Tramp",
+    "Prism Tramp", "Sandy Tramp", "Solar Tramp", "Starter Tramp",
+    "Tramp of Lumens", "Trampion", "Underworld Tramp", "Voidbound Tramp",
+    "Webbed Tramp", "Whirlwind Tramp", "Wooden Tramp"
+}
+table.sort(TrampList) -- Biar urut abjad
+
+--// UI SETUP //--
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
+local TitleBar = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+local ButtonContainer = Instance.new("Frame") 
+local CloseButton = Instance.new("TextButton")
+local MinMaxButton = Instance.new("TextButton")
+local ContentFrame = Instance.new("ScrollingFrame") -- Pakai Scroll biar muat banyak
+local FooterText = Instance.new("TextLabel")
+local UIListLayout = Instance.new("UIListLayout")
+local UIPadding = Instance.new("UIPadding")
+
+-- Setup Parent
+ScreenGui.Name = "SilentExecuteUI_Bounce"
+if game.CoreGui:FindFirstChild("SilentExecuteUI_Bounce") then
+    game.CoreGui.SilentExecuteUI_Bounce:Destroy()
+end
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ResetOnSpawn = false
+
+--// MAIN FRAME STYLING //--
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Position = UDim2.new(0.5, -140, 0.5, -150)
+MainFrame.Size = UDim2.new(0, 280, 0, 320) -- Size disesuaikan
+MainFrame.ClipsDescendants = true
+
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+--// RGB BORDER ANIMATION //--
+UIStroke.Parent = MainFrame
+UIStroke.Thickness = 2
+UIStroke.Transparency = 0
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+task.spawn(function()
+	local t = 0
+	while true do
+		t = t + 0.005
+		local color = Color3.fromHSV(t % 1, 0.8, 1)
+		UIStroke.Color = color
+		TitleLabel.TextColor3 = color
+		RunService.Heartbeat:Wait()
+	end
+end)
+
+--// DRAG SCRIPT //--
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+	local delta = input.Position - dragStart
+	MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+TitleBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = MainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+TitleBar.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		update(input)
+	end
+end)
+
+--// TITLE BAR //--
+TitleBar.Name = "TitleBar"
+TitleBar.Parent = MainFrame
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.BackgroundTransparency = 1
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+
+TitleLabel.Name = "Title"
+TitleLabel.Parent = TitleBar
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.Size = UDim2.new(0.7, 0, 1, 0)
+TitleLabel.Font = Enum.Font.Code
+TitleLabel.Text = "Bounce Highest"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 16
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+--// CONTROL BUTTONS //--
+ButtonContainer.Parent = TitleBar
+ButtonContainer.Position = UDim2.new(1, -60, 0, 0)
+ButtonContainer.Size = UDim2.new(0, 60, 1, 0)
+ButtonContainer.BackgroundTransparency = 1
+
+CloseButton.Parent = ButtonContainer
+CloseButton.BackgroundTransparency = 1
+CloseButton.Position = UDim2.new(0.5, 0, 0, 0)
+CloseButton.Size = UDim2.new(0.5, 0, 1, 0)
+CloseButton.Font = Enum.Font.Code
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseButton.TextSize = 16
+CloseButton.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+MinMaxButton.Parent = ButtonContainer
+MinMaxButton.BackgroundTransparency = 1
+MinMaxButton.Size = UDim2.new(0.5, 0, 1, 0)
+MinMaxButton.Font = Enum.Font.Code
+MinMaxButton.Text = "-"
+MinMaxButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinMaxButton.TextSize = 18
+
+local isMinimized = false
+MinMaxButton.MouseButton1Click:Connect(function()
+	if isMinimized then
+		TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 280, 0, 320)}):Play()
+		MinMaxButton.Text = "-"
+		ContentFrame.Visible = true
+		FooterText.Visible = true
+	else
+		TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 280, 0, 35)}):Play()
+		MinMaxButton.Text = "+"
+		ContentFrame.Visible = false
+		FooterText.Visible = false
+	end
+	isMinimized = not isMinimized
+end)
+
+--// CONTENT AREA //--
+ContentFrame.Name = "Content"
+ContentFrame.Parent = MainFrame
+ContentFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Position = UDim2.new(0, 0, 0, 40)
+ContentFrame.Size = UDim2.new(1, 0, 1, -60)
+ContentFrame.ScrollBarThickness = 4
+ContentFrame.CanvasSize = UDim2.new(0, 0, 1.5, 0) -- Bisa scroll
+
+UIListLayout.Parent = ContentFrame
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+UIPadding.Parent = ContentFrame
+UIPadding.PaddingTop = UDim.new(0, 5)
+
+--// HELPER: CREATE INPUT BOX //--
+local function CreateInputMod(name, placeholder, callback)
+	local Frame = Instance.new("Frame")
+	local Label = Instance.new("TextLabel")
+	local Input = Instance.new("TextBox")
+	local Button = Instance.new("TextButton")
+	local UIC = Instance.new("UICorner")
+	
+	Frame.Name = name
+	Frame.Parent = ContentFrame
+	Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	Frame.Size = UDim2.new(0, 260, 0, 50)
+	
+	local FC = Instance.new("UICorner"); FC.CornerRadius = UDim.new(0, 6); FC.Parent = Frame
+	
+	Label.Parent = Frame
+	Label.BackgroundTransparency = 1
+	Label.Position = UDim2.new(0, 10, 0, 0)
+	Label.Size = UDim2.new(1, -10, 0, 20)
+	Label.Font = Enum.Font.Code
+	Label.Text = name
+	Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+	Label.TextSize = 12
+	Label.TextXAlignment = Enum.TextXAlignment.Left
+	
+	Input.Parent = Frame
+	Input.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	Input.Position = UDim2.new(0, 10, 0, 22)
+	Input.Size = UDim2.new(0, 160, 0, 22)
+	Input.Font = Enum.Font.Code
+	Input.PlaceholderText = placeholder
+	Input.Text = ""
+	Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Input.TextSize = 12
+	
+	local IC = Instance.new("UICorner"); IC.CornerRadius = UDim.new(0, 4); IC.Parent = Input
+	
+	Button.Parent = Frame
+	Button.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+	Button.Position = UDim2.new(1, -80, 0, 22)
+	Button.Size = UDim2.new(0, 70, 0, 22)
+	Button.Font = Enum.Font.Code
+	Button.Text = "GET"
+	Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Button.TextSize = 12
+	
+	local BC = Instance.new("UICorner"); BC.CornerRadius = UDim.new(0, 4); BC.Parent = Button
+	
+	Button.MouseButton1Click:Connect(function()
+		local amt = tonumber(Input.Text)
+		if amt then
+			callback(amt)
+			Button.Text = "Success!"
+			wait(1)
+			Button.Text = "GET"
+		else
+			Button.Text = "NaN"
+			wait(1)
+			Button.Text = "GET"
+		end
+	end)
+end
+
+--// HELPER: CREATE SIMPLE BUTTON //--
+local function CreateButton(text, callback)
+	local Button = Instance.new("TextButton")
+	local UIC = Instance.new("UICorner")
+	
+	Button.Name = text
+	Button.Parent = ContentFrame
+	Button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	Button.Size = UDim2.new(0, 260, 0, 35)
+	Button.Font = Enum.Font.Code
+	Button.Text = text
+	Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	Button.TextSize = 14
+	
+	UIC.CornerRadius = UDim.new(0, 6)
+	UIC.Parent = Button
+	
+	Button.MouseButton1Click:Connect(function()
+		TweenService:Create(Button, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(80, 80, 80)}):Play()
+		callback()
+		wait(0.1)
+		TweenService:Create(Button, TweenInfo.new(0.5), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+	end)
+end
+
+--// HELPER: CREATE DROPDOWN (TRAMP HACK) //--
+local function CreateDropdown(title, items)
+	local Frame = Instance.new("Frame")
+	local DropButton = Instance.new("TextButton")
+	local DropList = Instance.new("ScrollingFrame")
+	local UIC = Instance.new("UICorner")
+	local Layout = Instance.new("UIListLayout")
+	
+	Frame.Name = "Dropdown"
+	Frame.Parent = ContentFrame
+	Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	Frame.Size = UDim2.new(0, 260, 0, 35) -- Tinggi awal (tutup)
+	Frame.ClipsDescendants = true
+	
+	local FC = Instance.new("UICorner"); FC.CornerRadius = UDim.new(0, 6); FC.Parent = Frame
+	
+	DropButton.Parent = Frame
+	DropButton.BackgroundTransparency = 1
+	DropButton.Size = UDim2.new(1, 0, 0, 35)
+	DropButton.Font = Enum.Font.Code
+	DropButton.Text = title .. " (V)"
+	DropButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	DropButton.TextSize = 14
+	
+	DropList.Parent = Frame
+	DropList.Active = true
+	DropList.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	DropList.BorderSizePixel = 0
+	DropList.Position = UDim2.new(0, 5, 0, 35)
+	DropList.Size = UDim2.new(1, -10, 0, 150)
+	DropList.ScrollBarThickness = 4
+	DropList.Visible = false
+	
+	Layout.Parent = DropList
+	Layout.SortOrder = Enum.SortOrder.LayoutOrder
+	
+	-- Isi Dropdown
+	for _, trampName in ipairs(items) do
+		local ItemBtn = Instance.new("TextButton")
+		ItemBtn.Parent = DropList
+		ItemBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+		ItemBtn.Size = UDim2.new(1, 0, 0, 25)
+		ItemBtn.Font = Enum.Font.Code
+		ItemBtn.Text = trampName
+		ItemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+		ItemBtn.TextSize = 12
+		
+		ItemBtn.MouseButton1Click:Connect(function()
+			-- Logic Get Tramp
+			local args = { trampName, "Trampoline" }
+			RewardRecieveStat:InvokeServer(unpack(args))
+			
+			-- Feedback Visual
+			DropButton.Text = "Got: " .. trampName
+			ItemBtn.TextColor3 = Color3.fromRGB(0, 255, 100)
+			wait(1)
+			DropButton.Text = title .. " (V)"
+			ItemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+		end)
+	end
+	
+	DropList.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y)
+	
+	local open = false
+	DropButton.MouseButton1Click:Connect(function()
+		open = not open
+		if open then
+			DropList.Visible = true
+			TweenService:Create(Frame, TweenInfo.new(0.3), {Size = UDim2.new(0, 260, 0, 190)}):Play()
+			DropButton.Text = title .. " (^)"
+		else
+			TweenService:Create(Frame, TweenInfo.new(0.3), {Size = UDim2.new(0, 260, 0, 35)}):Play()
+			wait(0.3)
+			DropList.Visible = false
+			DropButton.Text = title .. " (V)"
+		end
+	end)
+end
+
+--// IMPLEMENTASI FITUR //--
+
+-- 1. Cash Mods
+CreateInputMod("Cash Mods", "Input Amount...", function(amount)
+	local args = { amount, "Cash" }
+	RewardStat:FireServer(unpack(args))
+end)
+
+-- 2. Ticket Mods
+CreateInputMod("Tickets Mods", "Input Amount...", function(amount)
+	local args = { amount, "Tickets" }
+	RewardStat:FireServer(unpack(args))
+end)
+
+-- 3. Claim Daily
+CreateButton("Claim Daily Reward", function()
+	ClaimDaily:FireServer()
+end)
+
+-- 4. Tramp Hack (Dropdown)
+CreateDropdown("Tramp Hack (Select)", TrampList)
+
+--// FOOTER //--
+FooterText.Name = "Footer"
+FooterText.Parent = MainFrame
+FooterText.BackgroundTransparency = 1
+FooterText.Position = UDim2.new(0, 0, 1, -20)
+FooterText.Size = UDim2.new(1, 0, 0, 15)
+FooterText.Font = Enum.Font.Code
+FooterText.Text = "Made By @SilentExecute"
+FooterText.TextColor3 = Color3.fromRGB(150, 150, 150)
+FooterText.TextSize = 10
+
+--// NOTIFIKASI //--
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "Bounce Highest Loaded";
+	Text = "Enjoy the cheats! @SilentExecute";
+	Duration = 5;
+})
