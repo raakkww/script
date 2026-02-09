@@ -1,0 +1,878 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local localPlayer = Players.LocalPlayer
+
+-- Configuración de Tema Premium
+local THEME = {
+    Background = Color3.fromRGB(10, 10, 10),
+    Darker = Color3.fromRGB(5, 5, 5),
+    Accent = Color3.fromRGB(0, 255, 127), -- Verde Neón
+    AccentGlow = Color3.fromRGB(0, 150, 75),
+    Text = Color3.fromRGB(255, 255, 255),
+    SecondaryText = Color3.fromRGB(200, 200, 200),
+    Danger = Color3.fromRGB(255, 60, 60)
+}
+
+-- Utilidades de Animación
+local function Tween(obj, info, goal)
+    local t = TweenService:Create(obj, TweenInfo.new(unpack(info)), goal)
+    t:Play()
+    return t
+end
+
+-- Crear GUI Principal
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AnimeStealSuite"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = CoreGui
+
+-- Notificaciones (Toast System)
+local notifyContainer = Instance.new("Frame")
+notifyContainer.Name = "Notifications"
+notifyContainer.Size = UDim2.new(0, 250, 1, 0)
+notifyContainer.Position = UDim2.new(1, -260, 0, 10)
+notifyContainer.BackgroundTransparency = 1
+notifyContainer.Parent = screenGui
+
+local notifyLayout = Instance.new("UIListLayout")
+notifyLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+notifyLayout.Padding = UDim.new(0, 10)
+notifyLayout.Parent = notifyContainer
+
+local function Notify(text, duration)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = THEME.Background
+    frame.BackgroundTransparency = 0.1
+    frame.Position = UDim2.new(1, 10, 0, 0)
+    
+    local corner = Instance.new("UICorner", frame)
+    corner.CornerRadius = UDim.new(0, 6)
+    
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = THEME.Accent
+    stroke.Thickness = 1
+    
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(1, -10, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = THEME.Text
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    frame.Parent = notifyContainer
+    Tween(frame, {0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out}, {Position = UDim2.new(0, 0, 0, 0)})
+    
+    task.delay(duration or 3, function()
+        if frame and frame.Parent then
+            Tween(frame, {0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In}, {Position = UDim2.new(1, 10, 0, 0)})
+            task.wait(0.5)
+            frame:Destroy()
+        end
+    end)
+end
+
+-- Frame Principal con Brillo
+local mainShadow = Instance.new("Frame")
+mainShadow.Size = UDim2.new(0, 320, 0, 420) -- Un poco más alto para el logo grande
+mainShadow.Position = UDim2.new(0.5, -160, 0.5, -210)
+mainShadow.BackgroundColor3 = THEME.Accent
+mainShadow.BackgroundTransparency = 0.9
+mainShadow.Parent = screenGui
+
+local shadowCorner = Instance.new("UICorner", mainShadow)
+shadowCorner.CornerRadius = UDim.new(0, 12)
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(1, -4, 1, -4)
+mainFrame.Position = UDim2.new(0, 2, 0, 2)
+mainFrame.BackgroundColor3 = THEME.Background
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = mainShadow
+
+local mainCorner = Instance.new("UICorner", mainFrame)
+mainCorner.CornerRadius = UDim.new(0, 10)
+
+local mainStroke = Instance.new("UIStroke", mainFrame)
+mainStroke.Color = THEME.Accent
+mainStroke.Thickness = 2
+mainStroke.Transparency = 0.5
+
+-- Barra de Título con Logo GRANDE
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 70) -- Barra más alta para el logo
+titleBar.BackgroundColor3 = THEME.Darker
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner", titleBar)
+titleCorner.CornerRadius = UDim.new(0, 10)
+
+local logo = Instance.new("ImageLabel")
+logo.Size = UDim2.new(0, 55, 0, 55) -- Logo mucho más grande
+logo.Position = UDim2.new(0, 10, 0, 7)
+logo.BackgroundTransparency = 1
+logo.Image = "rbxassetid://126140066167935"
+logo.ScaleType = Enum.ScaleType.Fit -- Asegura nitidez
+logo.Parent = titleBar
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -120, 1, 0)
+titleLabel.Position = UDim2.new(0, 75, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = ""
+titleLabel.RichText = true
+titleLabel.TextColor3 = THEME.Text
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 20 -- Título más grande
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -40, 0, 20)
+closeButton.BackgroundColor3 = THEME.Darker
+closeButton.Text = "×"
+closeButton.TextColor3 = THEME.Danger
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 20
+closeButton.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner", closeButton)
+closeCorner.CornerRadius = UDim.new(0, 8)
+
+-- Contenedor de Contenido
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -30, 1, -90)
+content.Position = UDim2.new(0, 15, 0, 80)
+content.BackgroundTransparency = 1
+content.Parent = mainFrame
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 15)
+layout.Parent = content
+
+-- Dropdowns Estilizados
+local function createDropdown(placeholder)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 40)
+    container.BackgroundColor3 = THEME.Darker
+    container.Parent = content
+    
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 8)
+    local stroke = Instance.new("UIStroke", container)
+    stroke.Color = THEME.Accent
+    stroke.Transparency = 0.7
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = placeholder
+    btn.TextColor3 = THEME.SecondaryText
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 14
+    btn.Parent = container
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, 0, 0, 150)
+    scroll.Position = UDim2.new(0, 0, 1, 5)
+    scroll.BackgroundColor3 = THEME.Darker
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 2
+    scroll.ScrollBarImageColor3 = THEME.Accent
+    scroll.Visible = false
+    scroll.ZIndex = 10
+    scroll.Parent = container
+    
+    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", scroll).Color = THEME.Accent
+
+    Instance.new("UIListLayout", scroll).Padding = UDim.new(0, 2)
+
+    return container, btn, scroll
+end
+
+local baseCont, baseBtn, baseScroll = createDropdown("Seleccionar Base")
+local charCont, charBtn, charScroll = createDropdown("Seleccionar Personaje")
+
+-- Botón de Robo Ultra Pro
+local stealBtn = Instance.new("TextButton")
+stealBtn.Size = UDim2.new(1, 0, 0, 50)
+stealBtn.BackgroundColor3 = THEME.Accent
+stealBtn.Text = "⚡ START THEFT ⚡"
+stealBtn.TextColor3 = THEME.Background
+stealBtn.Font = Enum.Font.GothamBold
+stealBtn.TextSize = 16
+stealBtn.Parent = content
+
+Instance.new("UICorner", stealBtn).CornerRadius = UDim.new(0, 8)
+
+-- Efecto de Parpadeo Neón
+task.spawn(function()
+    while true do
+        if stealBtn and stealBtn.Parent then
+            Tween(stealBtn, {1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut}, {BackgroundColor3 = THEME.AccentGlow})
+            task.wait(1)
+            Tween(stealBtn, {1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut}, {BackgroundColor3 = THEME.Accent})
+            task.wait(1)
+        else break end
+    end
+end)
+
+-- Barra de Progreso
+local progressBg = Instance.new("Frame")
+progressBg.Size = UDim2.new(1, 0, 0, 6)
+progressBg.BackgroundColor3 = THEME.Darker
+progressBg.Visible = false
+progressBg.Parent = content
+Instance.new("UICorner", progressBg)
+
+local progressBar = Instance.new("Frame")
+progressBar.Size = UDim2.new(0, 0, 1, 0)
+progressBar.BackgroundColor3 = THEME.Accent
+progressBar.Parent = progressBg
+Instance.new("UICorner", progressBar)
+
+-- Lógica Funcional
+local selectedBase, selectedChar = nil, nil
+
+local function getBases()
+    local b = {}
+    if workspace:FindFirstChild("Bases") then
+        for _, base in pairs(workspace.Bases:GetChildren()) do
+            local s = base:FindFirstChild("Sign")
+            if s and s:FindFirstChild("SignPart") and s.SignPart:FindFirstChild("SurfaceGui") then
+                local t = s.SignPart.SurfaceGui:FindFirstChild("TextLabel")
+                if t and t.Text then
+                    local name = string.match(t.Text, "(.+)'s Base")
+                    if name then table.insert(b, {Obj = base, Name = name}) end
+                end
+            end
+        end
+    end
+    return b
+end
+
+local function getChars(base)
+    local c = {}
+    local folders = {"Characters", "RainbowCharacters", "CosmicCharacters"}
+    for _, fName in ipairs(folders) do
+        local f = base:FindFirstChild(fName)
+        if f then
+            for _, char in pairs(f:GetChildren()) do
+                if char:IsA("Model") then table.insert(c, {Obj = char, Name = char.Name, Folder = fName}) end
+            end
+        end
+    end
+    return c
+end
+
+local function updateBases()
+    for _, v in pairs(baseScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    for _, data in ipairs(getBases()) do
+        local b = Instance.new("TextButton", baseScroll)
+        b.Size = UDim2.new(1, 0, 0, 30)
+        b.BackgroundTransparency = 1
+        b.Text = "  " .. data.Name
+        b.TextColor3 = THEME.Text
+        b.TextXAlignment = Enum.TextXAlignment.Left
+        b.Font = Enum.Font.Gotham
+        b.TextSize = 12
+        b.ZIndex = 11
+        
+        b.MouseEnter:Connect(function() b.BackgroundTransparency = 0.8; b.BackgroundColor3 = THEME.Accent end)
+        b.MouseLeave:Connect(function() b.BackgroundTransparency = 1 end)
+        
+        b.MouseButton1Click:Connect(function()
+            selectedBase = data.Obj
+            baseBtn.Text = data.Name
+            baseBtn.TextColor3 = THEME.Accent
+            baseScroll.Visible = false
+            Notify("Base de " .. data.Name .. " seleccionada")
+            updateChars()
+        end)
+    end
+    baseScroll.CanvasSize = UDim2.new(0, 0, 0, #baseScroll:GetChildren() * 32)
+end
+
+function updateChars()
+    for _, v in pairs(charScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    if not selectedBase then return end
+    for _, data in ipairs(getChars(selectedBase)) do
+        local b = Instance.new("TextButton", charScroll)
+        b.Size = UDim2.new(1, 0, 0, 30)
+        b.BackgroundTransparency = 1
+        b.Text = "  " .. data.Name .. " [" .. data.Folder .. "]"
+        b.TextColor3 = THEME.Text
+        b.TextXAlignment = Enum.TextXAlignment.Left
+        b.Font = Enum.Font.Gotham
+        b.TextSize = 12
+        b.ZIndex = 11
+        
+        b.MouseEnter:Connect(function() b.BackgroundTransparency = 0.8; b.BackgroundColor3 = THEME.Accent end)
+        b.MouseLeave:Connect(function() b.BackgroundTransparency = 1 end)
+        
+        b.MouseButton1Click:Connect(function()
+            selectedChar = data.Obj
+            charBtn.Text = data.Name
+            charBtn.TextColor3 = THEME.Accent
+            charScroll.Visible = false
+            Notify("Personaje " .. data.Name .. " listo")
+        end)
+    end
+    charScroll.CanvasSize = UDim2.new(0, 0, 0, #charScroll:GetChildren() * 32)
+end
+
+baseBtn.MouseButton1Click:Connect(function() baseScroll.Visible = not baseScroll.Visible; charScroll.Visible = false; updateBases() end)
+charBtn.MouseButton1Click:Connect(function() if selectedBase then charScroll.Visible = not charScroll.Visible; baseScroll.Visible = false; updateChars() else Notify("¡Selecciona una base primero!", 2) end end)
+
+-- Arrastrar
+local dragging, dragStart, startPos
+titleBar.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; dragStart = i.Position; startPos = mainShadow.Position end end)
+UserInputService.InputChanged:Connect(function(i) if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+    local delta = i.Position - dragStart
+    mainShadow.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+
+-- Ejecución de Robo
+stealBtn.MouseButton1Click:Connect(function()
+    if not selectedBase or not selectedChar then return Notify("Faltan datos de selección", 2) end
+    
+    local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local hum = char:WaitForChild("Humanoid")
+    local targetHrp = selectedChar:FindFirstChild("HumanoidRootPart")
+    
+    if not targetHrp then return Notify("Error: RootPart no encontrado") end
+    
+    Notify("Iniciando secuencia de robo...")
+    progressBg.Visible = true
+    progressBar.Size = UDim2.new(0, 0, 1, 0)
+    
+    -- Noclip & Fly
+    local noclip = RunService.Stepped:Connect(function()
+        if char then
+            for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+        end
+    end)
+    hum.PlatformStand = true
+    
+    hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 3, 6)
+    
+    local bg = Instance.new("BodyGyro", hrp)
+    bg.MaxTorque = Vector3.new(4e5, 4e5, 4e5)
+    local bv = Instance.new("BodyVelocity", hrp)
+    bv.MaxForce = Vector3.new(4e5, 4e5, 4e5)
+    bv.Velocity = Vector3.zero
+
+    local fly = RunService.Heartbeat:Connect(function()
+        if hrp and targetHrp then
+            bg.CFrame = CFrame.lookAt(hrp.Position, targetHrp.Position) * CFrame.Angles(math.rad(-90), 0, 0)
+        end
+    end)
+
+    -- Animación de barra
+    Tween(progressBar, {6, Enum.EasingStyle.Linear}, {Size = UDim2.new(1, 0, 1, 0)})
+    task.wait(6)
+
+    -- Retorno
+    local function getMyBase()
+        for _, b in pairs(workspace.Bases:GetChildren()) do
+            local s = b:FindFirstChild("Sign")
+            if s and s:FindFirstChild("SignPart") then
+                local t = s.SignPart.SurfaceGui.TextLabel
+                if string.find(t.Text, localPlayer.Name) then return b end
+            end
+        end
+    end
+
+    local myBase = getMyBase()
+    if myBase and myBase:FindFirstChild("StealCollect2") then
+        hrp.CFrame = myBase.StealCollect2.CFrame + Vector3.new(0, 3, 0)
+    end
+
+    -- Limpieza
+    if bg then bg:Destroy() end
+    if bv then bv:Destroy() end
+    if fly then fly:Disconnect() end
+    if noclip then noclip:Disconnect() end
+    
+    if hum then hum.PlatformStand = false end
+    if char then
+        for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = true end end
+    end
+    
+    progressBg.Visible = false
+    Notify("¡Robo completado con éxito! ✅")
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+    Tween(mainShadow, {0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In}, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1})
+    task.wait(0.5)
+    screenGui:Destroy()
+end)
+
+-- Intro Animation
+mainShadow.Size = UDim2.new(0, 0, 0, 0)
+Tween(mainShadow, {0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out}, {Size = UDim2.new(0, 320, 0, 420)})
+
+-- Bypass AC
+local function bypass()
+    local ps = localPlayer:WaitForChild("PlayerScripts")
+    for _, n in pairs({"Testing1", "Testing2"}) do
+        local s = ps:FindFirstChild(n)
+        if s then s.Disabled = true end
+    end
+end
+
+bypass()
+Notify("Anime Steal 0.1 Cargado", 4)
+--[[
+    ANIME STEAL v0.1:
+    Original by: PalaceScriptz ©
+    Enhanced by: spikEZZ
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local localPlayer = Players.LocalPlayer
+
+-- Configuración de Tema Premium
+local THEME = {
+    Background = Color3.fromRGB(10, 10, 10),
+    Darker = Color3.fromRGB(5, 5, 5),
+    Accent = Color3.fromRGB(0, 255, 127), -- Verde Neón
+    AccentGlow = Color3.fromRGB(0, 150, 75),
+    Text = Color3.fromRGB(255, 255, 255),
+    SecondaryText = Color3.fromRGB(200, 200, 200),
+    Danger = Color3.fromRGB(255, 60, 60)
+}
+
+-- Utilidades de Animación
+local function Tween(obj, info, goal)
+    local t = TweenService:Create(obj, TweenInfo.new(unpack(info)), goal)
+    t:Play()
+    return t
+end
+
+-- Crear GUI Principal
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AnimeStealSuite"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = CoreGui
+
+-- Notificaciones (Toast System)
+local notifyContainer = Instance.new("Frame")
+notifyContainer.Name = "Notifications"
+notifyContainer.Size = UDim2.new(0, 250, 1, 0)
+notifyContainer.Position = UDim2.new(1, -260, 0, 10)
+notifyContainer.BackgroundTransparency = 1
+notifyContainer.Parent = screenGui
+
+local notifyLayout = Instance.new("UIListLayout")
+notifyLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+notifyLayout.Padding = UDim.new(0, 10)
+notifyLayout.Parent = notifyContainer
+
+local function Notify(text, duration)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = THEME.Background
+    frame.BackgroundTransparency = 0.1
+    frame.Position = UDim2.new(1, 10, 0, 0)
+    
+    local corner = Instance.new("UICorner", frame)
+    corner.CornerRadius = UDim.new(0, 6)
+    
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = THEME.Accent
+    stroke.Thickness = 1
+    
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(1, -10, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = THEME.Text
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    frame.Parent = notifyContainer
+    Tween(frame, {0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out}, {Position = UDim2.new(0, 0, 0, 0)})
+    
+    task.delay(duration or 3, function()
+        if frame and frame.Parent then
+            Tween(frame, {0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In}, {Position = UDim2.new(1, 10, 0, 0)})
+            task.wait(0.5)
+            frame:Destroy()
+        end
+    end)
+end
+
+-- Frame Principal con Brillo
+local mainShadow = Instance.new("Frame")
+mainShadow.Size = UDim2.new(0, 320, 0, 420) -- Un poco más alto para el logo grande
+mainShadow.Position = UDim2.new(0.5, -160, 0.5, -210)
+mainShadow.BackgroundColor3 = THEME.Accent
+mainShadow.BackgroundTransparency = 0.9
+mainShadow.Parent = screenGui
+
+local shadowCorner = Instance.new("UICorner", mainShadow)
+shadowCorner.CornerRadius = UDim.new(0, 12)
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(1, -4, 1, -4)
+mainFrame.Position = UDim2.new(0, 2, 0, 2)
+mainFrame.BackgroundColor3 = THEME.Background
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = mainShadow
+
+local mainCorner = Instance.new("UICorner", mainFrame)
+mainCorner.CornerRadius = UDim.new(0, 10)
+
+local mainStroke = Instance.new("UIStroke", mainFrame)
+mainStroke.Color = THEME.Accent
+mainStroke.Thickness = 2
+mainStroke.Transparency = 0.5
+
+-- Barra de Título con Logo GRANDE
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 70) -- Barra más alta para el logo
+titleBar.BackgroundColor3 = THEME.Darker
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner", titleBar)
+titleCorner.CornerRadius = UDim.new(0, 10)
+
+local logo = Instance.new("ImageLabel")
+logo.Size = UDim2.new(0, 55, 0, 55) -- Logo mucho más grande
+logo.Position = UDim2.new(0, 10, 0, 7)
+logo.BackgroundTransparency = 1
+logo.Image = "rbxassetid://126140066167935"
+logo.ScaleType = Enum.ScaleType.Fit -- Asegura nitidez
+logo.Parent = titleBar
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -120, 1, 0)
+titleLabel.Position = UDim2.new(0, 75, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = ""
+titleLabel.RichText = true
+titleLabel.TextColor3 = THEME.Text
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 20 -- Título más grande
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -40, 0, 20)
+closeButton.BackgroundColor3 = THEME.Darker
+closeButton.Text = "×"
+closeButton.TextColor3 = THEME.Danger
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 20
+closeButton.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner", closeButton)
+closeCorner.CornerRadius = UDim.new(0, 8)
+
+-- Contenedor de Contenido
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -30, 1, -90)
+content.Position = UDim2.new(0, 15, 0, 80)
+content.BackgroundTransparency = 1
+content.Parent = mainFrame
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 15)
+layout.Parent = content
+
+-- Dropdowns Estilizados
+local function createDropdown(placeholder)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 40)
+    container.BackgroundColor3 = THEME.Darker
+    container.Parent = content
+    
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 8)
+    local stroke = Instance.new("UIStroke", container)
+    stroke.Color = THEME.Accent
+    stroke.Transparency = 0.7
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = placeholder
+    btn.TextColor3 = THEME.SecondaryText
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 14
+    btn.Parent = container
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, 0, 0, 150)
+    scroll.Position = UDim2.new(0, 0, 1, 5)
+    scroll.BackgroundColor3 = THEME.Darker
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 2
+    scroll.ScrollBarImageColor3 = THEME.Accent
+    scroll.Visible = false
+    scroll.ZIndex = 10
+    scroll.Parent = container
+    
+    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", scroll).Color = THEME.Accent
+
+    Instance.new("UIListLayout", scroll).Padding = UDim.new(0, 2)
+
+    return container, btn, scroll
+end
+
+local baseCont, baseBtn, baseScroll = createDropdown("Seleccionar Base")
+local charCont, charBtn, charScroll = createDropdown("Seleccionar Personaje")
+
+-- Botón de Robo Ultra Pro
+local stealBtn = Instance.new("TextButton")
+stealBtn.Size = UDim2.new(1, 0, 0, 50)
+stealBtn.BackgroundColor3 = THEME.Accent
+stealBtn.Text = "⚡ START THEFT ⚡"
+stealBtn.TextColor3 = THEME.Background
+stealBtn.Font = Enum.Font.GothamBold
+stealBtn.TextSize = 16
+stealBtn.Parent = content
+
+Instance.new("UICorner", stealBtn).CornerRadius = UDim.new(0, 8)
+
+-- Efecto de Parpadeo Neón
+task.spawn(function()
+    while true do
+        if stealBtn and stealBtn.Parent then
+            Tween(stealBtn, {1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut}, {BackgroundColor3 = THEME.AccentGlow})
+            task.wait(1)
+            Tween(stealBtn, {1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut}, {BackgroundColor3 = THEME.Accent})
+            task.wait(1)
+        else break end
+    end
+end)
+
+-- Barra de Progreso
+local progressBg = Instance.new("Frame")
+progressBg.Size = UDim2.new(1, 0, 0, 6)
+progressBg.BackgroundColor3 = THEME.Darker
+progressBg.Visible = false
+progressBg.Parent = content
+Instance.new("UICorner", progressBg)
+
+local progressBar = Instance.new("Frame")
+progressBar.Size = UDim2.new(0, 0, 1, 0)
+progressBar.BackgroundColor3 = THEME.Accent
+progressBar.Parent = progressBg
+Instance.new("UICorner", progressBar)
+
+-- Lógica Funcional
+local selectedBase, selectedChar = nil, nil
+
+local function getBases()
+    local b = {}
+    if workspace:FindFirstChild("Bases") then
+        for _, base in pairs(workspace.Bases:GetChildren()) do
+            local s = base:FindFirstChild("Sign")
+            if s and s:FindFirstChild("SignPart") and s.SignPart:FindFirstChild("SurfaceGui") then
+                local t = s.SignPart.SurfaceGui:FindFirstChild("TextLabel")
+                if t and t.Text then
+                    local name = string.match(t.Text, "(.+)'s Base")
+                    if name then table.insert(b, {Obj = base, Name = name}) end
+                end
+            end
+        end
+    end
+    return b
+end
+
+local function getChars(base)
+    local c = {}
+    local folders = {"Characters", "RainbowCharacters", "CosmicCharacters"}
+    for _, fName in ipairs(folders) do
+        local f = base:FindFirstChild(fName)
+        if f then
+            for _, char in pairs(f:GetChildren()) do
+                if char:IsA("Model") then table.insert(c, {Obj = char, Name = char.Name, Folder = fName}) end
+            end
+        end
+    end
+    return c
+end
+
+local function updateBases()
+    for _, v in pairs(baseScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    for _, data in ipairs(getBases()) do
+        local b = Instance.new("TextButton", baseScroll)
+        b.Size = UDim2.new(1, 0, 0, 30)
+        b.BackgroundTransparency = 1
+        b.Text = "  " .. data.Name
+        b.TextColor3 = THEME.Text
+        b.TextXAlignment = Enum.TextXAlignment.Left
+        b.Font = Enum.Font.Gotham
+        b.TextSize = 12
+        b.ZIndex = 11
+        
+        b.MouseEnter:Connect(function() b.BackgroundTransparency = 0.8; b.BackgroundColor3 = THEME.Accent end)
+        b.MouseLeave:Connect(function() b.BackgroundTransparency = 1 end)
+        
+        b.MouseButton1Click:Connect(function()
+            selectedBase = data.Obj
+            baseBtn.Text = data.Name
+            baseBtn.TextColor3 = THEME.Accent
+            baseScroll.Visible = false
+            Notify("Base de " .. data.Name .. " seleccionada")
+            updateChars()
+        end)
+    end
+    baseScroll.CanvasSize = UDim2.new(0, 0, 0, #baseScroll:GetChildren() * 32)
+end
+
+function updateChars()
+    for _, v in pairs(charScroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    if not selectedBase then return end
+    for _, data in ipairs(getChars(selectedBase)) do
+        local b = Instance.new("TextButton", charScroll)
+        b.Size = UDim2.new(1, 0, 0, 30)
+        b.BackgroundTransparency = 1
+        b.Text = "  " .. data.Name .. " [" .. data.Folder .. "]"
+        b.TextColor3 = THEME.Text
+        b.TextXAlignment = Enum.TextXAlignment.Left
+        b.Font = Enum.Font.Gotham
+        b.TextSize = 12
+        b.ZIndex = 11
+        
+        b.MouseEnter:Connect(function() b.BackgroundTransparency = 0.8; b.BackgroundColor3 = THEME.Accent end)
+        b.MouseLeave:Connect(function() b.BackgroundTransparency = 1 end)
+        
+        b.MouseButton1Click:Connect(function()
+            selectedChar = data.Obj
+            charBtn.Text = data.Name
+            charBtn.TextColor3 = THEME.Accent
+            charScroll.Visible = false
+            Notify("Personaje " .. data.Name .. " listo")
+        end)
+    end
+    charScroll.CanvasSize = UDim2.new(0, 0, 0, #charScroll:GetChildren() * 32)
+end
+
+baseBtn.MouseButton1Click:Connect(function() baseScroll.Visible = not baseScroll.Visible; charScroll.Visible = false; updateBases() end)
+charBtn.MouseButton1Click:Connect(function() if selectedBase then charScroll.Visible = not charScroll.Visible; baseScroll.Visible = false; updateChars() else Notify("¡Selecciona una base primero!", 2) end end)
+
+-- Arrastrar
+local dragging, dragStart, startPos
+titleBar.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; dragStart = i.Position; startPos = mainShadow.Position end end)
+UserInputService.InputChanged:Connect(function(i) if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+    local delta = i.Position - dragStart
+    mainShadow.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+
+-- Ejecución de Robo
+stealBtn.MouseButton1Click:Connect(function()
+    if not selectedBase or not selectedChar then return Notify("Faltan datos de selección", 2) end
+    
+    local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local hum = char:WaitForChild("Humanoid")
+    local targetHrp = selectedChar:FindFirstChild("HumanoidRootPart")
+    
+    if not targetHrp then return Notify("Error: RootPart no encontrado") end
+    
+    Notify("Iniciando secuencia de robo...")
+    progressBg.Visible = true
+    progressBar.Size = UDim2.new(0, 0, 1, 0)
+    
+    -- Noclip & Fly
+    local noclip = RunService.Stepped:Connect(function()
+        if char then
+            for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+        end
+    end)
+    hum.PlatformStand = true
+    
+    hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 3, 6)
+    
+    local bg = Instance.new("BodyGyro", hrp)
+    bg.MaxTorque = Vector3.new(4e5, 4e5, 4e5)
+    local bv = Instance.new("BodyVelocity", hrp)
+    bv.MaxForce = Vector3.new(4e5, 4e5, 4e5)
+    bv.Velocity = Vector3.zero
+
+    local fly = RunService.Heartbeat:Connect(function()
+        if hrp and targetHrp then
+            bg.CFrame = CFrame.lookAt(hrp.Position, targetHrp.Position) * CFrame.Angles(math.rad(-90), 0, 0)
+        end
+    end)
+
+    -- Animación de barra
+    Tween(progressBar, {6, Enum.EasingStyle.Linear}, {Size = UDim2.new(1, 0, 1, 0)})
+    task.wait(6)
+
+    -- Retorno
+    local function getMyBase()
+        for _, b in pairs(workspace.Bases:GetChildren()) do
+            local s = b:FindFirstChild("Sign")
+            if s and s:FindFirstChild("SignPart") then
+                local t = s.SignPart.SurfaceGui.TextLabel
+                if string.find(t.Text, localPlayer.Name) then return b end
+            end
+        end
+    end
+
+    local myBase = getMyBase()
+    if myBase and myBase:FindFirstChild("StealCollect2") then
+        hrp.CFrame = myBase.StealCollect2.CFrame + Vector3.new(0, 3, 0)
+    end
+
+    -- Limpieza
+    if bg then bg:Destroy() end
+    if bv then bv:Destroy() end
+    if fly then fly:Disconnect() end
+    if noclip then noclip:Disconnect() end
+    
+    if hum then hum.PlatformStand = false end
+    if char then
+        for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = true end end
+    end
+    
+    progressBg.Visible = false
+    Notify("Robbery successfully completed! ✅")
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+    Tween(mainShadow, {0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In}, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1})
+    task.wait(0.5)
+    screenGui:Destroy()
+end)
+
+-- Intro Animation
+mainShadow.Size = UDim2.new(0, 0, 0, 0)
+Tween(mainShadow, {0.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out}, {Size = UDim2.new(0, 320, 0, 420)})
+
+-- Bypass AC
+local function bypass()
+    local ps = localPlayer:WaitForChild("PlayerScripts")
+    for _, n in pairs({"Testing1", "Testing2"}) do
+        local s = ps:FindFirstChild(n)
+        if s then s.Disabled = true end
+    end
+end
+
+bypass()
+Notify("", 4)
