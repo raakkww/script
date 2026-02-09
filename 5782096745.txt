@@ -1,0 +1,102 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local teleporting = false
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0,300,0,170)
+frame.Position = UDim2.new(0.5,-150,0.5,-85)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+Instance.new("UICorner", frame)
+
+local startBtn = Instance.new("TextButton")
+startBtn.Size = UDim2.new(0.8,0,0,40)
+startBtn.Position = UDim2.new(0.1,0,0.25,0)
+startBtn.Text = "START"
+startBtn.BackgroundColor3 = Color3.fromRGB(0,120,255)
+startBtn.TextColor3 = Color3.new(1,1,1)
+startBtn.Parent = frame
+Instance.new("UICorner", startBtn)
+
+local stopBtn = Instance.new("TextButton")
+stopBtn.Size = UDim2.new(0.8,0,0,40)
+stopBtn.Position = UDim2.new(0.1,0,0.6,0)
+stopBtn.Text = "STOP"
+stopBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
+stopBtn.TextColor3 = Color3.new(1,1,1)
+stopBtn.Parent = frame
+Instance.new("UICorner", stopBtn)
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0,30,0,30)
+close.Position = UDim2.new(1,-35,0,5)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(255,60,60)
+close.Parent = frame
+Instance.new("UICorner", close)
+
+close.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
+
+-- TELEPORT FUNCTION
+local function startTeleport()
+	teleporting = true
+	
+	local character = player.Character or player.CharacterAdded:Wait()
+	local root = character:WaitForChild("HumanoidRootPart")
+
+	local obbies = workspace:FindFirstChild("Obbies")
+	if not obbies then
+		warn("No Obbies folder found!")
+		return
+	end
+
+	local extreme = obbies:FindFirstChild("Extreme")
+	if not extreme then
+		warn("No Extreme folder found!")
+		return
+	end
+
+	print("Extreme found:", extreme.Name)
+
+	for _, wallHop in ipairs(extreme:GetChildren()) do
+		if not teleporting then break end
+
+		print("Checking:", wallHop.Name)
+
+		local finishFolder = wallHop:FindFirstChild("FinishParts")
+
+		if finishFolder then
+			local part = finishFolder:FindFirstChildWhichIsA("BasePart", true)
+			if part then
+				print("Teleporting to:", part:GetFullName())
+				root.CFrame = part.CFrame + Vector3.new(0,3,0)
+				task.wait(0.5)
+			else
+				warn("No BasePart inside FinishParts of", wallHop.Name)
+			end
+		else
+			warn("No FinishParts in", wallHop.Name)
+		end
+	end
+	
+	teleporting = false
+end
+
+startBtn.MouseButton1Click:Connect(function()
+	if not teleporting then
+		startTeleport()
+	end
+end)
+
+stopBtn.MouseButton1Click:Connect(function()
+	teleporting = false
+end)
