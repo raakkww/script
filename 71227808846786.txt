@@ -1,0 +1,84 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+local function forceNoSit()
+    local character = player.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root then return end
+    
+    if humanoid.Sit then
+        humanoid.Sit = false
+    end
+    
+    for _, seat in pairs(character:GetDescendants()) do
+        if seat:IsA("Seat") or seat:IsA("VehicleSeat") then
+            if seat.Occupant == humanoid then
+                seat:Sit(nil)
+            end
+        end
+    end
+    
+    for _, obj in pairs(root:GetChildren()) do
+        if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyForce") 
+           or obj:IsA("BodyPosition") or obj:IsA("BodyThrust") or obj:IsA("VectorForce")
+           or obj:IsA("LinearVelocity") or obj:IsA("AngularVelocity") then
+            obj:Destroy()
+        end
+    end
+    
+    for _, obj in pairs(character:GetDescendants()) do
+        if obj:IsA("AlignPosition") or obj:IsA("AlignOrientation") then
+            obj.Enabled = false
+            obj:Destroy()
+        end
+    end
+    
+    if root.Velocity.Magnitude > 35 or root.AssemblyLinearVelocity.Magnitude > 35 then
+        root.Velocity = Vector3.new(0, math.max(root.Velocity.Y, 16), 0)
+        root.AssemblyLinearVelocity = Vector3.new(0, math.max(root.AssemblyLinearVelocity.Y, 16), 0)
+        root.AssemblyAngularVelocity = Vector3.new(0, root.AssemblyAngularVelocity.Y, 0)
+    end
+end
+
+player.CharacterAdded:Connect(function(character)
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    local root = character:WaitForChild("HumanoidRootPart", 5)
+    if not humanoid or not root then return end
+    
+    humanoid:GetPropertyChangedSignal("Sit"):Connect(function()
+        if humanoid.Sit then
+            humanoid.Sit = false
+        end
+    end)
+    
+    character.DescendantAdded:Connect(function(desc)
+        if desc:IsA("Seat") or desc:IsA("VehicleSeat") then
+            task.delay(0.1, function()
+                if desc and desc.Parent and desc.Occupant == humanoid then
+                    desc:Sit(nil)
+                end
+            end)
+        elseif desc:IsA("BodyVelocity") or desc:IsA("BodyAngularVelocity") or desc:IsA("BodyForce") 
+               or desc:IsA("BodyPosition") or desc:IsA("BodyThrust") or desc:IsA("VectorForce")
+               or desc:IsA("LinearVelocity") or desc:IsA("AngularVelocity")
+               or desc:IsA("AlignPosition") or desc:IsA("AlignOrientation") then
+            task.delay(0.05, function()
+                if desc and desc.Parent then
+                    desc:Destroy()
+                end
+            end)
+        end
+    end)
+end)
+
+RunService.Heartbeat:Connect(forceNoSit)
+RunService.Stepped:Connect(forceNoSit)
+
+if player.Character then
+    forceNoSit()
+end
