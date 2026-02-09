@@ -1,0 +1,10 @@
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local LocalPlayer = Players.LocalPlayer
+local product = 2697281347
+function StartProduct()
+    MarketplaceService:SignalPromptProductPurchaseFinished(LocalPlayer.UserId, product, true)
+end
+
+StartProduct()
