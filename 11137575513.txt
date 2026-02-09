@@ -1,0 +1,209 @@
+---------------------------------------------------
+-- TOXICIFYHUB (LOW-END / XENO SAFE)
+---------------------------------------------------
+
+-- SAFETY RELOAD
+if _G.ToxicifyHubRunning then return end
+_G.ToxicifyHubRunning = true
+
+---------------------------------------------------
+-- SERVICES
+---------------------------------------------------
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
+
+local player = Players.LocalPlayer
+
+---------------------------------------------------
+-- SETTINGS
+---------------------------------------------------
+local Settings = {
+    SnakeOn = false,
+    TrackBricks = false,
+    DeleteOn = false,
+    ToxicifyOn = false,
+    Radius = 35
+}
+
+---------------------------------------------------
+-- TRACKED BRICKS (PLAYER ONLY)
+---------------------------------------------------
+local TrackedBricks = {}
+local MAX_BRICKS = 60
+
+local function IsValidBrick(part)
+    return part:IsA("BasePart")
+        and not part.Anchored
+        and part.Size.Magnitude < 50
+        and not part.Parent:FindFirstChildOfClass("Humanoid")
+end
+
+workspace.DescendantAdded:Connect(function(obj)
+    if not Settings.TrackBricks or not Settings.SnakeOn then return end
+    if not IsValidBrick(obj) then return end
+
+    task.delay(0.05, function()
+        if obj and obj.Parent and IsValidBrick(obj) then
+            if not TrackedBricks[obj] and table.getn(TrackedBricks) < MAX_BRICKS then
+                TrackedBricks[obj] = true
+            end
+        end
+    end)
+end)
+
+workspace.DescendantRemoving:Connect(function(obj)
+    TrackedBricks[obj] = nil
+end)
+
+---------------------------------------------------
+-- DELETE AURA
+---------------------------------------------------
+local function GetDeleteRemote()
+    local tool = player.Backpack:FindFirstChild("Delete")
+        or (player.Character and player.Character:FindFirstChild("Delete"))
+    if not tool then return end
+
+    local scr = tool:FindFirstChildWhichIsA("Script") or tool:FindFirstChildWhichIsA("LocalScript")
+    return scr and scr:FindFirstChild("Event")
+end
+
+task.spawn(function()
+    while task.wait(0.25) do
+        if not Settings.DeleteOn then continue end
+        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+
+        local remote = GetDeleteRemote()
+        if not remote then continue end
+
+        for _, v in ipairs(workspace:GetChildren()) do
+            if v:IsA("BasePart") and not v.Anchored then
+                if (v.Position - hrp.Position).Magnitude <= Settings.Radius then
+                    pcall(function()
+                        remote:FireServer(v, v.Position)
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+---------------------------------------------------
+-- TOXICIFY AURA
+---------------------------------------------------
+local function GetTool(name)
+    return player.Backpack:FindFirstChild(name)
+        or (player.Character and player.Character:FindFirstChild(name))
+end
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if not Settings.ToxicifyOn then continue end
+
+        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+
+        local paint = GetTool("Paint")
+        if not paint or not paint:FindFirstChild("Script") then continue end
+
+        pcall(function()
+            paint.Radius.Value = 35
+        end)
+
+        for _, v in ipairs(workspace:GetChildren()) do
+            if v:IsA("BasePart") and (v.Position - hrp.Position).Magnitude <= 35 then
+                pcall(function()
+                    paint.Script.Event:FireServer(v)
+                end)
+            end
+        end
+    end
+end)
+
+---------------------------------------------------
+-- UI (MINECRAFT STYLE RED)
+---------------------------------------------------
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.DisplayOrder = 100
+
+-- INTRO TEXT
+local intro = Instance.new("TextLabel", gui)
+intro.Size = UDim2.fromScale(1,1)
+intro.BackgroundTransparency = 1
+intro.Text = ""
+intro.Font = Enum.Font.Arcade
+intro.TextSize = 60
+intro.TextColor3 = Color3.new(1,0,0)
+
+-- TNT SOUND
+local boom = Instance.new("Sound", SoundService)
+boom.SoundId = "rbxassetid://13114759" -- TNT-style boom
+boom.Volume = 2
+boom:Play()
+
+TweenService:Create(intro, TweenInfo.new(2), {TextTransparency = 1}):Play()
+task.wait(2)
+
+intro:Destroy()
+
+-- MAIN FRAME
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromOffset(360,420)
+frame.Position = UDim2.fromScale(0.05,0.25)
+frame.BackgroundColor3 = Color3.fromRGB(120,0,0)
+frame.BackgroundTransparency = 0.15
+frame.Active = true
+frame.Draggable = true
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,14)
+
+local layout = Instance.new("UIListLayout", frame)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.Padding = UDim.new(0,8)
+
+local function MakeButton(text)
+    local b = Instance.new("TextButton", frame)
+    b.Size = UDim2.new(0.9,0,0,45)
+    b.BackgroundColor3 = Color3.fromRGB(70,0,0)
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.Arcade
+    b.TextSize = 18
+    b.Text = text
+    Instance.new("UICorner", b)
+    return b
+end
+
+local snakeBtn = MakeButton("SNAKE: OFF")
+local trackBtn = MakeButton("TRACK BRICKS: OFF")
+local delBtn   = MakeButton("DELETE AURA: OFF")
+local toxBtn   = MakeButton("TOXICIFY: OFF")
+
+snakeBtn.MouseButton1Click:Connect(function()
+    Settings.SnakeOn = not Settings.SnakeOn
+    snakeBtn.Text = "SNAKE: " .. (Settings.SnakeOn and "ON" or "OFF")
+end)
+
+trackBtn.MouseButton1Click:Connect(function()
+    Settings.TrackBricks = not Settings.TrackBricks
+    trackBtn.Text = "TRACK BRICKS: " .. (Settings.TrackBricks and "ON" or "OFF")
+end)
+
+delBtn.MouseButton1Click:Connect(function()
+    Settings.DeleteOn = not Settings.DeleteOn
+    delBtn.Text = "DELETE AURA: " .. (Settings.DeleteOn and "ON" or "OFF")
+end)
+
+toxBtn.MouseButton1Click:Connect(function()
+    Settings.ToxicifyOn = not Settings.ToxicifyOn
+    toxBtn.Text = "TOXICIFY: " .. (Settings.ToxicifyOn and "ON" or "OFF")
+end)
+
+---------------------------------------------------
+-- END (SNAKE ENGINE PLUGS IN HERE)
+---------------------------------------------------
+-- Your existing snake script should read:
+-- Settings.SnakeOn
+-- TrackedBricks
+-- SnakeData
