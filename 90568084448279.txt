@@ -1,0 +1,323 @@
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+Library.ForceCheckbox = false
+Library.ShowToggleFrameInKeybinds = true
+
+local Window = Library:CreateWindow({
+    Title = "",
+    Footer = "version: example",
+    Icon = 95816097006870,
+    NotifySide = "Right",
+    ShowCustomCursor = true,
+})
+
+-- Tabs
+local Tabs = {
+    Info = Window:AddTab("Info", "alert"),
+    Main = Window:AddTab("Main", "user"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+getgenv().Toggles = Library.Toggles
+getgenv().Options = Library.Options
+
+-- Info tab groupbox
+local InfoGroup = Tabs.Info:AddLeftGroupbox("About")
+InfoGroup:AddLabel("Credits to Lazarus")
+InfoGroup:AddLabel("Made by Lazarus")
+
+-- Theme & Save config
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+ThemeManager:SetFolder("LinoriaThemes")
+SaveManager:SetFolder("LinoriaSaves")
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyTheme("Default")
+
+-- Silent Aim Settings
+local SilentAimSettings = {
+    Enabled = true,
+    FOV = 150,
+    TargetPart = "Head",
+    ShowFOV = true,
+    HitChance = 100,
+}
+
+-- Silent Aim UI
+local AimGroup = Tabs.Main:AddLeftGroupbox("Silent Aim")
+
+AimGroup:AddToggle("SilentAimToggle", {
+    Text = "Silent Aim",
+    Default = SilentAimSettings.Enabled,
+    Callback = function(val) SilentAimSettings.Enabled = val end
+})
+
+AimGroup:AddSlider("SilentAimFOV", {
+    Text = "FOV Radius",
+    Default = SilentAimSettings.FOV,
+    Min = 10,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(val) SilentAimSettings.FOV = val end
+})
+
+AimGroup:AddSlider("SilentAimHitChance", {
+    Text = "Hit Chance %",
+    Default = SilentAimSettings.HitChance,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(val) SilentAimSettings.HitChance = val end
+})
+
+AimGroup:AddInput("SilentAimTargetPart", {
+    Text = "Target Part",
+    Default = SilentAimSettings.TargetPart,
+    Placeholder = "e.g. Head",
+    Callback = function(val) SilentAimSettings.TargetPart = val end
+})
+
+AimGroup:AddToggle("SilentAimShowFOV", {
+    Text = "Show FOV Circle",
+    Default = SilentAimSettings.ShowFOV,
+    Callback = function(val) SilentAimSettings.ShowFOV = val end
+})
+
+-- ESP UI
+local ESPGroup = Tabs.Main:AddRightGroupbox("Player ESP")
+
+ESPGroup:AddToggle("ESPEnabled", {
+    Text = "Enable Player ESP",
+    Default = true,
+})
+
+-- Gun Tracker UI
+local GunGroup = Tabs.Main:AddRightGroupbox("Gun Tracker")
+
+GunGroup:AddToggle("GunTrackerEnabled", {
+    Text = "Enable Tracker Line",
+    Default = false,
+})
+
+-- Discord Invite Button
+local MiscGroup = Tabs.Main:AddLeftGroupbox("Miscellaneous")
+
+MiscGroup:AddButton("Copy Discord Invite", function()
+    setclipboard("https://discord.gg/dJJ3psbAxw")
+end)
+
+-- Game Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local WeaponPackets = require(ReplicatedStorage.Common.Packets.WeaponPackets)
+
+local Settings = SilentAimSettings
+
+-- FOV Circle
+local fovCircle = Drawing.new("Circle")
+fovCircle.Color = Color3.fromRGB(255, 255, 255)
+fovCircle.Thickness = 1
+fovCircle.Transparency = 0.7
+fovCircle.Filled = false
+
+RunService.RenderStepped:Connect(function()
+    fovCircle.Visible = Settings.Enabled and Settings.ShowFOV
+    fovCircle.Position = Camera.ViewportSize / 2
+    fovCircle.Radius = Settings.FOV
+end)
+
+-- Targeting
+local function getClosestTarget()
+    local screenCenter = Camera.ViewportSize / 2
+    local closestPlayer, closestPart
+    local closestDist = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local part = player.Character:FindFirstChild(Settings.TargetPart)
+                    or player.Character:FindFirstChild("Head")
+                    or player.Character:FindFirstChild("HumanoidRootPart")
+
+                if part then
+                    local screenPos = Camera:WorldToViewportPoint(part.Position)
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+
+                    if dist <= Settings.FOV and dist < closestDist then
+                        closestDist = dist
+                        closestPlayer = player
+                        closestPart = part
+                    end
+                end
+            end
+        end
+    end
+
+    return closestPlayer, closestPart
+end
+
+local function shouldHit()
+    return math.random(1, 100) <= Settings.HitChance
+end
+
+-- Packet Intercept
+local originalSend = WeaponPackets.useWeapon.send
+
+WeaponPackets.useWeapon.send = function(data)
+    if Settings.Enabled and shouldHit() then
+        local target, part = getClosestTarget()
+        if target and part then
+            local newData = {
+                hitResult = part.Parent,
+                hitPart = part,
+                position = part.Position,
+                scoped = data.scoped,
+                was360 = data.was360,
+                quickscope = data.quickscope,
+                weaponType = data.weaponType
+            }
+            return originalSend(newData)
+        end
+    end
+    return originalSend(data)
+end
+
+-- Gun Tracker
+local GunTracker = Drawing.new("Line")
+GunTracker.Thickness = 2
+GunTracker.Color = Color3.fromRGB(0, 255, 0)
+GunTracker.Visible = false
+
+RunService.RenderStepped:Connect(function()
+    if not Toggles.GunTrackerEnabled or not Toggles.GunTrackerEnabled.Value or not Settings.Enabled then
+        GunTracker.Visible = false
+        return
+    end
+
+    local target, part = getClosestTarget()
+    if not (target and part) then
+        GunTracker.Visible = false
+        return
+    end
+
+    local center = Camera.ViewportSize / 2
+    local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+
+    if onScreen then
+        GunTracker.From = center
+        GunTracker.To = Vector2.new(pos.X, pos.Y)
+        GunTracker.Visible = true
+    else
+        GunTracker.Visible = false
+    end
+end)
+
+-- Classic ESP (Fixed Dead Removal)
+local ESP = {}
+
+local function createESP(player)
+    if ESP[player] then return end
+
+    local box = Drawing.new("Square")
+    box.Thickness = 1
+    box.Filled = false
+    box.Color = Color3.fromRGB(255, 0, 0)
+    box.Visible = false
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Size = 14
+    nameTag.Center = true
+    nameTag.Outline = true
+    nameTag.Color = Color3.fromRGB(255, 255, 255)
+    nameTag.Visible = false
+
+    local distanceTag = Drawing.new("Text")
+    distanceTag.Size = 13
+    distanceTag.Center = true
+    distanceTag.Outline = true
+    distanceTag.Color = Color3.fromRGB(180, 180, 180)
+    distanceTag.Visible = false
+
+    ESP[player] = {
+        Box = box,
+        Name = nameTag,
+        Distance = distanceTag
+    }
+end
+
+Players.PlayerRemoving:Connect(function(player)
+    if ESP[player] then
+        for _, obj in pairs(ESP[player]) do
+            obj:Remove()
+        end
+        ESP[player] = nil
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not Toggles.ESPEnabled or not Toggles.ESPEnabled.Value then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local head = char and char:FindFirstChild("Head")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+            if not (char and hrp and head and hum) or hum.Health <= 0 then
+                if ESP[player] then
+                    ESP[player].Box.Visible = false
+                    ESP[player].Name.Visible = false
+                    ESP[player].Distance.Visible = false
+                end
+                continue
+            end
+
+            createESP(player)
+
+            local box = ESP[player].Box
+            local nameTag = ESP[player].Name
+            local distanceTag = ESP[player].Distance
+
+            local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+            local feetPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 2.5, 0))
+
+            if onScreen then
+                local boxHeight = math.abs(headPos.Y - feetPos.Y)
+                local boxWidth = boxHeight / 2
+
+                box.Size = Vector2.new(boxWidth, boxHeight)
+                box.Position = Vector2.new(hrpPos.X - boxWidth / 2, headPos.Y)
+                box.Visible = true
+
+                nameTag.Text = player.Name
+                nameTag.Position = Vector2.new(hrpPos.X, headPos.Y - 16)
+                nameTag.Visible = true
+
+                local distance = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
+                distanceTag.Text = tostring(distance) .. " studs"
+                distanceTag.Position = Vector2.new(hrpPos.X, headPos.Y + boxHeight + 2)
+                distanceTag.Visible = true
+            else
+                box.Visible = false
+                nameTag.Visible = false
+                distanceTag.Visible = false
+            end
+        end
+    end
+end)
+
+print("✅ Vodka Hub loaded | ESP now instantly hides on kill | Made by Lazarus")
