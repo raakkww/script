@@ -1,0 +1,40 @@
+local workspace = game:GetService("Workspace")
+local players = game:GetService("Players")
+local userService = game:GetService("UserService")
+
+local localPlayer = players.LocalPlayer
+local userInfo = userService:GetUserInfosByUserIdsAsync({localPlayer.UserId})
+local displayName = userInfo[1].DisplayName
+
+local boxDropoff = workspace.BoxDropoffs.Dropoff1
+local dropoffPart = boxDropoff.PayPart
+
+local tycoons = workspace.Tycoons
+local localTycoon = nil
+for _, i in pairs(tycoons:GetChildren()) do 
+    local owner = i.TycoonClaimer.ClaimTycoonPart.SurfaceGui.TextLabel.Text
+    if owner == displayName then
+        localTycoon = i
+        break
+    end
+end
+
+local boxes = localTycoon.Boxes.FullBoxes
+
+
+boxes.ChildAdded:Connect(function()
+    task.wait(2.5)
+    for _, i in pairs(boxes:GetChildren()) do
+        local boxModel = i.BoxModel
+        local ownershipPart = nil
+        for _, i in pairs(boxModel:GetChildren()) do
+            if not i:IsA("BasePart") then continue end
+            if isnetworkowner(i) then
+                ownershipPart = i
+                break
+            end
+        end
+
+        ownershipPart.CFrame = dropoffPart.CFrame
+    end
+end)
