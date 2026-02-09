@@ -1,0 +1,196 @@
+-- 1. FPS BOOSTER (ALWAYS ON)
+local function ApplyFPSBoost()
+    settings().Rendering.QualityLevel = 1
+    game:GetService("Lighting").GlobalShadows = false
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v.Enabled = false
+        end
+    end
+end
+ApplyFPSBoost()
+
+-- 2. FILE SYSTEM & CONFIG
+local HttpService = game:GetService("HttpService")
+local folder = "NexMacroData"
+local configFile = folder.."/config.json"
+if not isfolder(folder) then makefolder(folder) end
+
+local function SaveToFile(name, data)
+    local export = {}
+    for _, v in ipairs(data) do
+        table.insert(export, {P = {v.CFrame:GetComponents()}, I = v.GUID})
+    end
+    writefile(folder.."/"..name..".json", HttpService:JSONEncode(export))
+end
+
+-- 3. VARIABLES
+local RecordedUnits = {} 
+local IsPlaying = false
+local AutoReplay = true -- DEFAULTS TO ON
+local SpamSpeed = 1.5 
+local SelectedFile = "None"
+local SpeedRan = false
+
+-- 4. REMOTES
+local NetBase = game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+local PlaceRemote = NetBase:WaitForChild("RE/PlaceUnit")
+local VoteRemote = NetBase:WaitForChild("RE/VoteEvent")
+local SpeedRemote = NetBase:WaitForChild("RE/UpdateGameSpeed")
+
+-- 5. SNIFFER
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    if method == "FireServer" and self == PlaceRemote then
+        task.spawn(function()
+            local data = (type(args[1]) == "table" and args[1][1]) or args[1]
+            if data and data.PlaceCFrame and data.UnitGUID then
+                table.insert(RecordedUnits, {CFrame = data.PlaceCFrame, GUID = data.UnitGUID})
+            end
+        end)
+    end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+-- 6. STEADY LOOP
+task.spawn(function()
+    while true do
+        if IsPlaying and #RecordedUnits > 0 then
+            -- Auto-Start Game
+            VoteRemote:FireServer("StartGame")
+            
+            -- AUTO REPLAY (AGAIN) - Toggled On by default
+            if AutoReplay then
+                local againArgs = {"Again"}
+                VoteRemote:FireServer(unpack(againArgs))
+            end
+
+            -- Speed Up (Once per load)
+            if not SpeedRan then
+                SpeedRemote:FireServer()
+                SpeedRan = true
+            end
+
+            -- Placement Cycle
+            for _, unit in ipairs(RecordedUnits) do
+                if not IsPlaying then break end 
+                local packet = {{
+                    PlaceCFrame = unit.CFrame,
+                    UnitGUID = unit.GUID
+                }}
+                PlaceRemote:FireServer(unpack(packet))
+                task.wait(0.1) 
+            end
+            
+            -- 1.5s Delay to prevent lag
+            task.wait(SpamSpeed) 
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- 7. UI SETUP (RAYFIELD)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+   Name = "macro",
+   LoadingTitle = "Logic Ready...",
+   ConfigurationSaving = { Enabled = false }
+})
+
+local MainTab = Window:CreateTab("Macro Hub", 4483362458)
+local SaveTab = Window:CreateTab("Saves", 4483362458)
+
+local PlayToggle = MainTab:CreateToggle({
+   Name = "🟢 PLAY MACRO",
+   CurrentValue = false,
+   Callback = function(V) IsPlaying = V end,
+})
+
+MainTab:CreateToggle({
+    Name = "🔄 AUTO REPLAY (AGAIN)",
+    CurrentValue = true, 
+    Callback = function(V) AutoReplay = V end,
+})
+
+MainTab:CreateSlider({
+   Name = "Wait Between Loops",
+   Range = {0.1, 10},
+   Increment = 0.1,
+   CurrentValue = 1.5,
+   Callback = function(V) SpamSpeed = V end,
+})
+
+-- 8. SAVE/LOAD LOGIC
+local function GetFiles()
+    local t = {"None"}
+    for _, v in pairs(listfiles(folder)) do
+        if v:find(".json") and not v:find("config") then
+            t[#t + 1] = v:gsub(folder.."/", ""):gsub(".json", "")
+        end
+    end
+    return t
+end
+
+local function LoadLogic(name)
+    if not name or name == "None" then return end
+    local path = folder.."/"..name..".json"
+    if isfile(path) then
+        local data = HttpService:JSONDecode(readfile(path))
+        RecordedUnits = {}
+        for _, v in ipairs(data) do
+            table.insert(RecordedUnits, {CFrame = CFrame.new(unpack(v.P)), GUID = v.I})
+        end
+        IsPlaying = true
+        PlayToggle:Set(true)
+    end
+end
+
+local Dropdown = SaveTab:CreateDropdown({
+   Name = "Select Save",
+   Options = GetFiles(),
+   CurrentOption = "None",
+   Callback = function(Option) SelectedFile = type(Option) == "table" and Option[1] or tostring(Option) end,
+})
+
+SaveTab:CreateButton({Name = "📂 LOAD & PLAY", Callback = function() LoadLogic(SelectedFile) end})
+SaveTab:CreateButton({Name = "❌ DELETE FILE", Callback = function() if SelectedFile ~= "None" then delfile(folder.."/"..SelectedFile..".json") Dropdown:Refresh(GetFiles()) end end})
+
+SaveTab:CreateSection("Auto-Load Settings")
+
+SaveTab:CreateButton({
+    Name = "📌 SET AS AUTO-LOAD", 
+    Callback = function() 
+        if SelectedFile ~= "None" then 
+            writefile(configFile, HttpService:JSONEncode({AutoLoad = SelectedFile})) 
+        end 
+    end
+})
+
+SaveTab:CreateButton({
+    Name = "🚫 REMOVE AUTO-LOAD", 
+    Callback = function() 
+        writefile(configFile, HttpService:JSONEncode({AutoLoad = "None"})) 
+    end
+})
+
+SaveTab:CreateSection("New Save")
+
+local SaveIn = SaveTab:CreateInput({Name = "Save Name", PlaceholderText = "Map...", Callback = function() end})
+SaveTab:CreateButton({Name = "💾 SAVE CURRENT", Callback = function() if SaveIn.CurrentValue ~= "" and #RecordedUnits > 0 then SaveToFile(SaveIn.CurrentValue, RecordedUnits) Dropdown:Refresh(GetFiles()) end end})
+
+-- STARTUP
+if isfile(configFile) then
+    local conf = HttpService:JSONDecode(readfile(configFile))
+    if conf.AutoLoad and conf.AutoLoad ~= "None" then LoadLogic(conf.AutoLoad) end
+end
