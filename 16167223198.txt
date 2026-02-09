@@ -1,0 +1,69 @@
+local players = game:GetService("Players")
+local ws = game:GetService("Workspace")
+local uis = game:GetService("UserInputService")
+local player = players.LocalPlayer
+local camera = ws.CurrentCamera
+local target = nil
+local fov = 100
+
+local function isValidTarget(p)
+    if p == player then return false end
+    local char = p.Character
+    if not char then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    return hum and hum.Health > 0
+end
+
+local function wallcheck(part)
+    local char = player.Character
+    if not char then return false end
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {char}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local result = ws:Raycast(camera.CFrame.Position, part.Position - camera.CFrame.Position, params)
+    return result and result.Instance:IsDescendantOf(part.Parent) or true
+end
+
+local function getClosest()
+    local closest, shortestDist = nil, fov
+    local mousePos = uis:GetMouseLocation()
+    
+    for _, p in pairs(players:GetPlayers()) do
+        if not isValidTarget(p) then continue end
+        
+        local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+        
+        local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+        if not onScreen then continue end
+        
+        local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+        if distance >= shortestDist then continue end
+        if not wallcheck(hrp) then continue end
+        
+        shortestDist = distance
+        closest = hrp
+    end
+    
+    return closest
+end
+
+task.spawn(function()
+    while task.wait() do target = getClosest() end
+end)
+
+local mt = getrawmetatable(game)
+local original = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local args = {...}
+    if not checkcaller() and target and tostring(self) == "Workspace" and getnamecallmethod() == "Raycast" then
+        local origin = args[1]
+        local newDir = (target.Position - origin).Unit * 1000
+        return original(self, origin, newDir, args[3])
+    end
+    return original(self, ...)
+end)
+
+setreadonly(mt, true)
