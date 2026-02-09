@@ -1,0 +1,64 @@
+-- load my ui lib
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ReliefScript/Basic-Library/refs/heads/main/main.lua"))()
+
+-- services
+local function Service(Name)
+	local S = game:GetService(Name)
+	local F = cloneref or clonereference
+	return F and F(S) or S
+end
+
+local VirtualInputManager = Service("VirtualInputManager")
+local RunService = Service("RunService")
+local Workspace = Service("Workspace")
+local ReplicatedStorage = Service("ReplicatedStorage")
+local Players = Service("Players")
+
+-- setup & vars
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer.PlayerGui
+
+local Camera = Workspace.CurrentCamera
+local Button = Workspace.MoneyButton
+Button.Transparency = 1
+Button.Anchored = true
+Button.CanCollide = false
+
+local VP = Camera.ViewportSize
+local X, Y = VP.X / 2, VP.Y / 2
+
+-- main
+local Root = Library:Init("Mommy ASMR simulator")
+local Main = Root:Tab("Main")
+
+Main:Toggle("AutoClicker", function(T)
+	if T then
+		C = RunService.PreRender:Connect(function()
+			if #PlayerGui:GetGuiObjectsAtPosition(X, Y) > 0 then return end
+			Button.CFrame = Camera.CFrame * CFrame.new(0, 0, -5)
+			VirtualInputManager:SendMouseButtonEvent(X, Y, 0, true, game, 1)
+			VirtualInputManager:SendMouseButtonEvent(X, Y, 0, false, game, 1)
+		end)
+	else
+		C:Disconnect()
+	end
+end)
+
+local Rebirth = ReplicatedStorage.RebirthRequest
+Main:Toggle("AutoRebirth", function(T)
+	if T then
+		RunService.Heartbeat:Connect(function()
+			Rebirth:FireServer()
+		end)
+	else
+		C:Disconnect()
+	end
+end)
+
+Main:Button("GrabHiddens", function()
+	local Char = LocalPlayer.Character
+	for _ = 1, 10 do
+		local P = Workspace[`Hidden{_}`]
+		P.CFrame = Char:GetPivot()
+	end
+end)
