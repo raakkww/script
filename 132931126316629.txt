@@ -1,0 +1,4 @@
+local args = {
+	1000000 -- quantity change here
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("AddSpeed"):FireServer(unpack(args))
