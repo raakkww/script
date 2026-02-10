@@ -1,0 +1,105 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   LoadingTitle = "",
+   LoadingSubtitle = "",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "MeuHubConfig",
+      FileName = "Config"
+   }
+})
+
+local Tab = Window:CreateTab("Autofarm", 4483362458)
+
+local States = {
+    AutoClick = false,
+    AutoMoney = false,
+    AutoXP = false,
+    AutoCoins = false
+}
+
+--- 1. AUTO CLICKER
+Tab:CreateToggle({
+   Name = "Auto Clicker",
+   CurrentValue = false,
+   Callback = function(Value)
+      States.AutoClick = Value
+      task.spawn(function()
+         while States.AutoClick do
+            game:GetService("ReplicatedStorage").Remotes.DropperClick:FireServer()
+            task.wait(0.1)
+         end
+      end)
+   end,
+})
+
+--- 2. AUTO UPGRADE (MONEY)
+Tab:CreateToggle({
+   Name = "Auto Upgrade (Money)",
+   CurrentValue = false,
+   Callback = function(Value)
+      States.AutoMoney = Value
+      task.spawn(function()
+         while States.AutoMoney do
+            game:GetService("ReplicatedStorage").Remotes.Upgrade:FireServer("Cash", "CashMoreCash", true)
+            task.wait(0.5)
+         end
+      end)
+   end,
+})
+
+--- 3. AUTO UPGRADE (XP)
+Tab:CreateToggle({
+   Name = "Auto Upgrade (XP)",
+   CurrentValue = false,
+   Callback = function(Value)
+      States.AutoXP = Value
+      task.spawn(function()
+         while States.AutoXP do
+            game:GetService("ReplicatedStorage").Remotes.Upgrade:FireServer("Cash", "CashMoreXP", true)
+            task.wait(0.5)
+         end
+      end)
+   end,
+})
+
+--- 4. AUTO COINS (BUSCA AVANÃADA NO WORKSPACE)
+Tab:CreateToggle({
+   Name = "Auto Coins (Smart Scan)",
+   CurrentValue = false,
+   Callback = function(Value)
+      States.AutoCoins = Value
+      task.spawn(function()
+         local Remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CollectPart")
+         
+         while States.AutoCoins do
+            -- Varre o Workspace em busca de itens coletÃ¡veis
+            for _, obj in pairs(game.Workspace:GetDescendants()) do
+                -- Verifica se Ã© uma peÃ§a (Part) e se tem cara de moeda
+                if obj:IsA("BasePart") then
+                    -- Se o nome for um nÃºmero (como o ID que vocÃª mandou) ou tiver Coin/Money/Part
+                    if tonumber(obj.Name) or obj.Name:find("Coin") or obj.Name:find("Money") or obj.Name == "Part" then
+                        
+                        -- Tenta coletar usando o Nome (que parece ser o ID no seu jogo)
+                        Remote:FireServer(tostring(obj.Name))
+                        
+                        -- Caso o ID esteja em um atributo chamado "ID" ou "Value"
+                        if obj:GetAttribute("ID") then
+                            Remote:FireServer(tostring(obj:GetAttribute("ID")))
+                        end
+                    end
+                end
+            end
+            task.wait(0.3) -- Velocidade de busca
+         end
+      end)
+   end,
+})
+
+Rayfield:Notify({
+   Title = "Scan Ativado",
+   Content = "O script agora estÃ¡ buscando moedas por nome e ID no Workspace.",
+   Duration = 5,
+})
