@@ -1,0 +1,150 @@
+local Player = game:GetService("Players").LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local StarterGui = game:GetService("StarterGui")
+
+-- Icon for Notifications
+local NOTIF_ICON = ""
+
+-- Utility for finding the character safely
+local function getChar()
+    return Player.Character or Player.CharacterAdded:Wait()
+end
+
+-- Native Roblox Notification Function
+local function sendRobloxNotif(title, text)
+    StarterGui:SetCore("SendNotification", {
+        Title = title;
+        Text = text;
+        Icon = NOTIF_ICON;
+        Duration = 5;
+    })
+end
+
+-- ScreenGui Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EliteAutomator"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
+
+-- Main Window
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 260, 0, 220)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -110)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Parent = ScreenGui
+
+-- Visual Header
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 4)
+Header.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+Header.BorderSizePixel = 0
+Header.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = ""
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.BackgroundTransparency = 1
+Title.Parent = MainFrame
+
+-- Helper to create buttons
+local function createButton(text, pos, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 42)
+    btn.Position = pos
+    btn.Text = text
+    btn.BackgroundColor3 = color
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 13
+    btn.AutoButtonColor = true
+    btn.Parent = MainFrame
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+    
+    return btn
+end
+
+local InstantRageBtn = createButton("INSTANT RAGE (Z)", UDim2.new(0.05, 0, 0.25, 0), Color3.fromRGB(40, 40, 40))
+local InstantBloodBtn = createButton("INSTANT BLOODMOON (X)", UDim2.new(0.05, 0, 0.50, 0), Color3.fromRGB(40, 40, 40))
+local MaxOutBtn = createButton("FILL ALL GAUGE", UDim2.new(0.05, 0, 0.75, 0), Color3.fromRGB(100, 0, 0))
+
+-- LOGIC --
+
+-- 1. Instant Rage (Z)
+InstantRageBtn.MouseButton1Click:Connect(function()
+    local char = getChar()
+    local isRaged = char:GetAttribute("InRaged")
+    
+    if isRaged == true then
+        sendRobloxNotif("Rage Error", "Already in Raged state!")
+        return
+    end
+    
+    -- Auto fill
+    char:SetAttribute("rage", 100)
+    task.wait(0.1)
+    
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Z, false, game)
+    sendRobloxNotif("Rage System", "Rage Activated!")
+end)
+
+-- 2. Instant Bloodmoon (X)
+InstantBloodBtn.MouseButton1Click:Connect(function()
+    local char = getChar()
+    local isRaged = char:GetAttribute("InRaged")
+    local isBloodmoon = char:GetAttribute("BloodMoonChain") -- Example attribute for BM state
+    
+    -- Check if player is NOT in special forms
+    if isRaged == true or isBloodmoon == true then
+        sendRobloxNotif("Bloodmoon Error", "You must be a normal CHAIN to use this!")
+        return
+    end
+    
+    -- Auto fill requirements (Rage and RageUses)
+    char:SetAttribute("rage", 100)
+    char:SetAttribute("RageUses", 3)
+    
+    task.wait(0.2) -- Sync delay
+    
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.X, false, game)
+    sendRobloxNotif("Bloodmoon System", "Bloodmoon Activated!")
+end)
+
+-- 3. Max Stats Button
+MaxOutBtn.MouseButton1Click:Connect(function()
+    local char = getChar()
+    char:SetAttribute("rage", 100)
+    char:SetAttribute("RageUses", 3)
+    sendRobloxNotif("System", "All bars filled successfully!")
+end)
+
+-- DRAGGING LOGIC --
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
