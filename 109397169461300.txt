@@ -1,0 +1,74 @@
+local players = game:GetService("Players")
+local ws = game:GetService("Workspace")
+local uis = game:GetService("UserInputService")
+local player = players.LocalPlayer
+local camera = ws.CurrentCamera
+local target = nil
+local fov = 120
+
+local function isValidTarget(p)
+    if p == player then return false end
+    local char = p.Character
+    if not char then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    return hum and hum.Health > 0
+end
+
+local function wallcheck(part)
+    local char = player.Character
+    if not char then return false end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    local params = RaycastParams.new()
+
+    params.FilterDescendantsInstances = {char, camera}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.IgnoreWater = true
+    
+    local origin = camera.CFrame.Position
+    local direction = (part.Position - origin)
+    
+    local result = ws:Raycast(origin, direction, params)
+    if not result then return true end
+    return result.Instance:IsDescendantOf(part.Parent)
+end
+
+local function getClosest()
+    local closest, shortestDist = nil, math.huge
+    local mousePos = uis:GetMouseLocation()
+    local viewportSize = camera.ViewportSize
+    local fovRadius = math.min(viewportSize.X, viewportSize.Y) * (fov / 120)
+    for _, p in pairs(players:GetPlayers()) do
+        if not isValidTarget(p) then continue end
+        local head = p.Character:FindFirstChild("Head")
+        if not head then continue end
+
+        local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+        if not onScreen then continue end
+        local screenPosition = Vector2.new(screenPos.X, screenPos.Y)
+        local distance = (screenPosition - mousePos).Magnitude
+        
+        if distance > fovRadius then continue end
+        if distance >= shortestDist then continue end
+        if not wallcheck(head) then continue end
+        shortestDist = distance
+        closest = head
+    end
+
+    return closest
+end
+
+task.spawn(function()
+    while task.wait() do target = getClosest() end
+end)
+
+local original
+original = hookmetamethod(game, "__namecall", function(self, ...)
+    local args = {...}
+    if not checkcaller() and target and tostring(self) == "Workspace" and getnamecallmethod() == "Raycast" then
+        local origin = args[1]
+        local newDir = (target.Position - origin).Unit * 1000
+        return original(self, origin, newDir, args[3])
+    end
+    return original(self, ...)
+end)
