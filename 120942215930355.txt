@@ -1,0 +1,4 @@
+while true do
+task.wait()
+game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("GiveFlip"):FireServer()
+end
