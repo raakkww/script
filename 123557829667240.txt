@@ -1,0 +1,100 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Tree Hub | Chop your tree",
+   LoadingTitle = "Carregando Sistemas Finais...",
+   LoadingSubtitle = "by Gemini",
+   ConfigurationSaving = { Enabled = true, FolderName = "TreeHubConfig", FileName = "ChopTree" }
+})
+
+local MainTab = Window:CreateTab("Autofarm", 4483362458)
+local MiscTab = Window:CreateTab("Diversos", 4483362458)
+
+local AutoClickEnabled = false
+local AutoTreeEnabled = false
+local AutoLuckyEnabled = false
+local AutoPrestigeEnabled = false
+
+-- 1. AUTO TREE + MAGNET (Ajustado)
+MainTab:CreateToggle({
+   Name = "Auto Tree + Magnet",
+   CurrentValue = false,
+   Flag = "AutoTree",
+   Callback = function(Value)
+      AutoTreeEnabled = Value
+      task.spawn(function()
+         while AutoTreeEnabled do
+            pcall(function()
+                game:GetService("ReplicatedStorage").Remotes.AxeSwing:FireServer()
+                local char = game.Players.LocalPlayer.Character
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if obj.Name == "Coin" and obj:IsA("BasePart") then
+                        obj.CFrame = char.HumanoidRootPart.CFrame
+                    end
+                end
+            end)
+            task.wait(0.1)
+         end
+      end)
+   end,
+})
+
+-- 2. AUTO LUCKY BLOCK (Coleta tudo no mapa)
+MiscTab:CreateToggle({
+   Name = "Auto Lucky Block (Global)",
+   CurrentValue = false,
+   Flag = "AutoLucky",
+   Callback = function(Value)
+      AutoLuckyEnabled = Value
+      task.spawn(function()
+         while AutoLuckyEnabled do
+            pcall(function()
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("ProximityPrompt") and (v.Parent.Name:find("Lucky") or v.ObjectText:find("Lucky")) then
+                        -- Simula segurar o "E" instantaneamente
+                        fireproximityprompt(v)
+                    end
+                end
+            end)
+            task.wait(0.5)
+         end
+      end)
+   end,
+})
+
+-- 3. AUTO PRESTIGE (InvokeServer)
+MainTab:CreateToggle({
+   Name = "Auto Prestige",
+   CurrentValue = false,
+   Flag = "AutoPrestige",
+   Callback = function(Value)
+      AutoPrestigeEnabled = Value
+      task.spawn(function()
+         while AutoPrestigeEnabled do
+            pcall(function()
+                -- O InvokeServer tenta realizar o prestígio
+                game:GetService("ReplicatedStorage").Remotes.Prestige:InvokeServer()
+            end)
+            task.wait(2) -- Espera 2 segundos entre tentativas para evitar lag
+         end
+      end)
+   end,
+})
+
+-- Botão de Auto Click (Regador) mantido para completar o Hub
+MainTab:CreateToggle({
+   Name = "Auto Click (Regador)",
+   CurrentValue = false,
+   Flag = "AutoClick",
+   Callback = function(Value)
+      AutoClickEnabled = Value
+      task.spawn(function()
+         while AutoClickEnabled do
+            pcall(function()
+                game:GetService("ReplicatedStorage").Remotes.TapButtonClick:FireServer(workspace.Plots.Plot)
+            end)
+            task.wait(0.1)
+         end
+      end)
+   end,
+})
