@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Tree Hub | Chop your tree",
-   LoadingTitle = "Carregando Sistemas Finais...",
-   LoadingSubtitle = "by Gemini",
+   Name = "Chop your tree",
+   LoadingTitle = "",
+   LoadingSubtitle = "",
    ConfigurationSaving = { Enabled = true, FolderName = "TreeHubConfig", FileName = "ChopTree" }
 })
 
