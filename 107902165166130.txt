@@ -1,0 +1,85 @@
+local R = game:GetService("ReplicatedStorage").Remote
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TweenService")
+local toggles = {}
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "GF"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 160, 0, 0)
+frame.Position = UDim2.new(0, 15, 0.15, 0)
+frame.BackgroundColor3 = Color3.fromRGB(12, 10, 20)
+frame.BorderSizePixel = 0
+frame.AutomaticSize = Enum.AutomaticSize.Y
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(100, 40, 180)
+stroke.Thickness = 1.5
+
+local layout = Instance.new("UIListLayout", frame)
+layout.Padding = UDim.new(0, 4)
+local pad = Instance.new("UIPadding", frame)
+pad.PaddingTop = UDim.new(0, 6)
+pad.PaddingBottom = UDim.new(0, 6)
+pad.PaddingLeft = UDim.new(0, 8)
+pad.PaddingRight = UDim.new(0, 8)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 18)
+title.BackgroundTransparency = 1
+title.Text = "GAME FARM"
+title.TextColor3 = Color3.fromRGB(160, 120, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 11
+title.Parent = frame
+
+local dragging, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local d = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+local function makeToggle(name, cb)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, 0, 0, 30)
+    b.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    b.Text = name .. ": OFF"
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 12
+    b.AutoButtonColor = false
+    b.Parent = frame
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+    toggles[name] = false
+    b.MouseButton1Click:Connect(function()
+        toggles[name] = not toggles[name]
+        b.Text = name .. (toggles[name] and ": ON" or ": OFF")
+        TS:Create(b, TweenInfo.new(0.2), {BackgroundColor3 = toggles[name] and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(180, 40, 40)}):Play()
+        while toggles[name] do cb() task.wait() end
+    end)
+end
+
+makeToggle("Race $$$", function()
+    R.Race:FireServer("ToQuit", 9e308)
+end)
+
+makeToggle("Daily", function()
+    R.Daily:FireServer("TryClaim")
+end)
+
+if gethui then gui.Parent = gethui()
+elseif syn and syn.protect_gui then syn.protect_gui(gui); gui.Parent = game:GetService("CoreGui")
+else gui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui") end
