@@ -1,0 +1,609 @@
+--// Lost Currents ESP & Teleport System (Key System Removed)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+
+--// Переменные для управления ESP (по умолчанию ВЫКЛЮЧЕНО)
+local showGold = false
+local showShark = false
+
+-- Таблица для хранения ESP и BillboardGui
+getgenv()._LC_espElements = getgenv()._LC_espElements or {}
+local espElements = getgenv()._LC_espElements
+
+-- Максимальная дистанция рендера ESP
+local maxRenderDistance = 650
+
+-- Функция для получения размера модели
+local function getModelSize(model)
+    local parts = model:GetDescendants()
+    local min, max = Vector3.new(math.huge, math.huge, math.huge), Vector3.new(-math.huge, -math.huge, -math.huge)
+    
+    for _, part in pairs(parts) do
+        if part:IsA("BasePart") then
+            local size = part.Size
+            local cframe = part.CFrame
+            local corners = {
+                cframe * Vector3.new(-size.X/2, -size.Y/2, -size.Z/2),
+                cframe * Vector3.new(-size.X/2, -size.Y/2, size.Z/2),
+                cframe * Vector3.new(-size.X/2, size.Y/2, -size.Z/2),
+                cframe * Vector3.new(-size.X/2, size.Y/2, size.Z/2),
+                cframe * Vector3.new(size.X/2, -size.Y/2, -size.Z/2),
+                cframe * Vector3.new(size.X/2, -size.Y/2, size.Z/2),
+                cframe * Vector3.new(size.X/2, size.Y/2, -size.Z/2),
+                cframe * Vector3.new(size.X/2, size.Y/2, size.Z/2)
+            }
+            for _, corner in pairs(corners) do
+                min = Vector3.new(math.min(min.X, corner.X), math.min(min.Y, corner.Y), math.min(min.Z, corner.Z))
+                max = Vector3.new(math.max(max.X, corner.X), math.max(max.Y, corner.Y), math.max(max.Z, corner.Z))
+            end
+        end
+    end
+    
+    if min == Vector3.new(math.huge, math.huge, math.huge) then
+        return Vector3.new(2, 2, 2)
+    end
+    return max - min + Vector3.new(0.2, 0.2, 0.2)
+end
+
+-- Функция для получения позиции объекта
+local function getObjectPosition(obj)
+    if obj:IsA("BasePart") then
+        return obj.Position
+    elseif obj:IsA("Model") then
+        local cframe = obj:GetBoundingBox()
+        return cframe.Position
+    end
+    return Vector3.new(0, 0, 0)
+end
+
+-- Функция для создания ESP и надписи
+local function createESP(obj)
+    if not obj or espElements[obj] then return end
+
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    local playerPos = LocalPlayer.Character.HumanoidRootPart.Position
+    local objPos = getObjectPosition(obj)
+    local distance = (playerPos - objPos).Magnitude
+
+    if distance > maxRenderDistance then
+        return
+    end
+
+    local espSize
+    if obj:IsA("BasePart") then
+        espSize = obj.Size + Vector3.new(0.2, 0.2, 0.2)
+    elseif obj:IsA("Model") then
+        espSize = getModelSize(obj)
+    else
+        return
+    end
+
+    local isGold = obj.Name == "Gold"
+    local isShark = obj.Name == "Shark"
+
+    if (isGold and not showGold) or (isShark and not showShark) then
+        return
+    end
+
+    local defaultEspColor = isGold and Color3.new(1, 1, 0) or Color3.new(0, 0.5, 1)
+    local defaultLabelColor = defaultEspColor
+    local defaultLabelText = isGold and "Gold" or "🦈"
+    local defaultLabelSize = isGold and UDim2.new(0, 15, 0, 15) or UDim2.new(0, 12.5, 0, 12.5)
+
+    local esp = Instance.new("BoxHandleAdornment")
+    esp.Adornee = obj
+    esp.AlwaysOnTop = true
+    esp.ZIndex = 0
+    esp.Size = espSize
+    esp.Transparency = 0.5
+    esp.Color3 = defaultEspColor
+    esp.Parent = CoreGui
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = obj
+    billboard.Size = isGold and UDim2.new(0, 50, 0, 40) or defaultLabelSize
+    billboard.StudsOffset = Vector3.new(0, espSize.Y + 1, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Enabled = true
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = isGold and UDim2.new(1, 0, 0.5, 0) or UDim2.new(1, 0, 1, 0)
+    textLabel.Position = isGold and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 0, 0, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = defaultLabelText
+    textLabel.TextColor3 = defaultLabelColor
+    textLabel.TextScaled = true
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.Parent = billboard
+
+    local distanceLabel
+    if isGold then
+        distanceLabel = Instance.new("TextLabel")
+        distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
+        distanceLabel.BackgroundTransparency = 1
+        distanceLabel.Text = math.floor(distance) .. " studs"
+        distanceLabel.TextColor3 = defaultLabelColor
+        distanceLabel.TextScaled = true
+        distanceLabel.Font = Enum.Font.SourceSans
+        distanceLabel.Parent = billboard
+    end
+
+    billboard.Parent = CoreGui
+
+    espElements[obj] = {
+        esp = esp,
+        billboard = billboard,
+        textLabel = textLabel,
+        distanceLabel = distanceLabel,
+        defaultSize = espSize,
+        defaultLabelSize = defaultLabelSize,
+        defaultLabelText = defaultLabelText,
+        isGold = isGold,
+        defaultEspColor = defaultEspColor,
+        defaultLabelColor = defaultLabelColor
+    }
+end
+
+-- Функция для поиска всех объектов "Gold" и "Shark"
+local function findAndApplyESP()
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if (obj.Name == "Gold" or obj.Name == "Shark") and (obj:IsA("BasePart") or obj:IsA("Model")) then
+            createESP(obj)
+        end
+    end
+end
+
+--// GUI для управления ESP
+local controlGui = Instance.new("ScreenGui")
+controlGui.Parent = CoreGui
+controlGui.Name = "ControlGui"
+controlGui.ResetOnSpawn = false
+
+-- Кнопка Open
+local openButton = Instance.new("TextButton")
+openButton.Size = UDim2.new(0, 80, 0, 30)
+openButton.Position = UDim2.new(0.05, 0, 0.2, 0)
+openButton.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+openButton.Text = "Open ESP"
+openButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+openButton.Font = Enum.Font.GothamBold
+openButton.TextSize = 12
+openButton.TextScaled = false
+openButton.BorderSizePixel = 0
+openButton.Active = true
+openButton.Draggable = true
+openButton.Parent = controlGui
+
+local openButtonCorner = Instance.new("UICorner")
+openButtonCorner.CornerRadius = UDim.new(0, 6)
+openButtonCorner.Parent = openButton
+
+-- Панель
+local panel = Instance.new("Frame")
+panel.Size = UDim2.new(0, 200, 0, 180)
+panel.Position = UDim2.new(0.5, -100, 0.5, -90)
+panel.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+panel.BorderSizePixel = 0
+panel.Visible = false
+panel.Active = true
+panel.Draggable = true
+panel.Parent = controlGui
+
+local panelCorner = Instance.new("UICorner")
+panelCorner.CornerRadius = UDim.new(0, 8)
+panelCorner.Parent = panel
+
+-- Заголовок
+local title2 = Instance.new("TextLabel")
+title2.Size = UDim2.new(1, -26, 0, 28)
+title2.Position = UDim2.new(0, 0, 0, 0)
+title2.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+title2.Text = "ESP Control"
+title2.TextColor3 = Color3.fromRGB(200, 200, 200)
+title2.Font = Enum.Font.GothamBold
+title2.TextSize = 14
+title2.TextScaled = false
+title2.BorderSizePixel = 0
+title2.Parent = panel
+
+local title2Corner = Instance.new("UICorner")
+title2Corner.CornerRadius = UDim.new(0, 8)
+title2Corner.Parent = title2
+
+-- Кнопка закрыть
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 26, 0, 26)
+closeBtn.Position = UDim2.new(1, -26, 0, 1)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+closeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+closeBtn.TextScaled = false
+closeBtn.BorderSizePixel = 0
+closeBtn.Parent = panel
+
+local closeBtnCorner = Instance.new("UICorner")
+closeBtnCorner.CornerRadius = UDim.new(0, 6)
+closeBtnCorner.Parent = closeBtn
+
+-- Контейнер для кнопок
+local buttonContainer = Instance.new("Frame")
+buttonContainer.Size = UDim2.new(1, 0, 1, -28)
+buttonContainer.Position = UDim2.new(0, 0, 0, 28)
+buttonContainer.BackgroundTransparency = 1
+buttonContainer.Parent = panel
+
+-- UIListLayout для расстояния 3 пикселя
+local buttonLayout = Instance.new("UIListLayout")
+buttonLayout.FillDirection = Enum.FillDirection.Vertical
+buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+buttonLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+buttonLayout.Padding = UDim.new(0, 3)
+buttonLayout.Parent = buttonContainer
+
+-- Кнопка Gold ESP
+local goldBtn = Instance.new("TextButton")
+goldBtn.Size = UDim2.new(0.85, 0, 0, 32)
+goldBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+goldBtn.Text = "Gold ESP 🔴"
+goldBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+goldBtn.Font = Enum.Font.GothamBold
+goldBtn.TextSize = 12
+goldBtn.TextScaled = false
+goldBtn.BorderSizePixel = 0
+goldBtn.Parent = buttonContainer
+
+local goldBtnCorner = Instance.new("UICorner")
+goldBtnCorner.CornerRadius = UDim.new(0, 6)
+goldBtnCorner.Parent = goldBtn
+
+-- Кнопка Shark ESP
+local sharkBtn = Instance.new("TextButton")
+sharkBtn.Size = UDim2.new(0.85, 0, 0, 32)
+sharkBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+sharkBtn.Text = "Shark ESP 🔴"
+sharkBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+sharkBtn.Font = Enum.Font.GothamBold
+sharkBtn.TextSize = 12
+sharkBtn.TextScaled = false
+sharkBtn.BorderSizePixel = 0
+sharkBtn.Parent = buttonContainer
+
+local sharkBtnCorner = Instance.new("UICorner")
+sharkBtnCorner.CornerRadius = UDim.new(0, 6)
+sharkBtnCorner.Parent = sharkBtn
+
+-- Кнопка Teleport to Gold
+local teleportBtn = Instance.new("TextButton")
+teleportBtn.Size = UDim2.new(0.85, 0, 0, 32)
+teleportBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+teleportBtn.Text = "Teleport to Gold"
+teleportBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+teleportBtn.Font = Enum.Font.GothamBold
+teleportBtn.TextSize = 12
+teleportBtn.TextScaled = false
+teleportBtn.BorderSizePixel = 0
+teleportBtn.Parent = buttonContainer
+
+local teleportBtnCorner = Instance.new("UICorner")
+teleportBtnCorner.CornerRadius = UDim.new(0, 6)
+teleportBtnCorner.Parent = teleportBtn
+
+-- Кнопка Teleport to Boat
+local boatTeleportBtn = Instance.new("TextButton")
+boatTeleportBtn.Size = UDim2.new(0.85, 0, 0, 32)
+boatTeleportBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+boatTeleportBtn.Text = "Teleport to Boat"
+boatTeleportBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+boatTeleportBtn.Font = Enum.Font.GothamBold
+boatTeleportBtn.TextSize = 12
+boatTeleportBtn.TextScaled = false
+boatTeleportBtn.BorderSizePixel = 0
+boatTeleportBtn.Parent = buttonContainer
+
+local boatTeleportBtnCorner = Instance.new("UICorner")
+boatTeleportBtnCorner.CornerRadius = UDim.new(0, 6)
+boatTeleportBtnCorner.Parent = boatTeleportBtn
+
+-- Надпись by ExluZive
+local creditLabel2 = Instance.new("TextLabel")
+creditLabel2.Size = UDim2.new(1, 0, 0, 16)
+creditLabel2.Position = UDim2.new(0, 0, 1, -18)
+creditLabel2.BackgroundTransparency = 1
+creditLabel2.Text = ""
+creditLabel2.TextColor3 = Color3.fromRGB(150, 150, 150)
+creditLabel2.Font = Enum.Font.Gotham
+creditLabel2.TextSize = 10
+creditLabel2.TextScaled = false
+creditLabel2.TextXAlignment = Enum.TextXAlignment.Center
+creditLabel2.Parent = panel
+
+-- Hover effects for buttons
+local function addHoverEffect(button)
+    local originalColor = button.BackgroundColor3
+    button.MouseEnter:Connect(function()
+        button.BackgroundColor3 = Color3.fromRGB(
+            math.min(originalColor.R * 255 + 20, 255),
+            math.min(originalColor.G * 255 + 20, 255),
+            math.min(originalColor.B * 255 + 20, 255)
+        )
+    end)
+    button.MouseLeave:Connect(function()
+        button.BackgroundColor3 = originalColor
+    end)
+end
+
+addHoverEffect(openButton)
+addHoverEffect(closeBtn)
+addHoverEffect(goldBtn)
+addHoverEffect(sharkBtn)
+addHoverEffect(teleportBtn)
+addHoverEffect(boatTeleportBtn)
+
+-- Логика панели
+openButton.MouseButton1Click:Connect(function()
+    panel.Visible = not panel.Visible
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    panel.Visible = false
+end)
+
+-- Функция телепортации к ближайшему Gold
+local function teleportToNearestGold()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+
+    local playerPos = LocalPlayer.Character.HumanoidRootPart.Position
+    local nearestGold = nil
+    local minDistance = math.huge
+    local maxRenderDistance = 650
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj.Name == "Gold" and (obj:IsA("BasePart") or obj:IsA("Model")) then
+            local objPos
+            if obj:IsA("BasePart") then
+                objPos = obj.Position
+            elseif obj:IsA("Model") then
+                local cframe = obj:GetBoundingBox()
+                objPos = cframe.Position
+            end
+            local distance = (playerPos - objPos).Magnitude
+            if distance <= maxRenderDistance and distance < minDistance then
+                minDistance = distance
+                nearestGold = obj
+            end
+        end
+    end
+
+    if nearestGold then
+        local teleportPos
+        if nearestGold:IsA("BasePart") then
+            teleportPos = nearestGold.Position
+        elseif nearestGold:IsA("Model") then
+            local cframe = nearestGold:GetBoundingBox()
+            teleportPos = cframe.Position
+        end
+        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(teleportPos + Vector3.new(0, 5, 0))
+    end
+end
+
+-- Функция телепортации к BoatOrigin
+local function teleportToBoatOrigin()
+    local boatOrigin = game.Workspace:FindFirstChild("Boat") and game.Workspace.Boat:FindFirstChild("BoatOrigin")
+    if not boatOrigin then
+        warn("BoatOrigin не найден в Workspace.Boat!")
+        return
+    elseif not boatOrigin:IsA("Part") then
+        warn("BoatOrigin не является Part! Тип: " .. boatOrigin.ClassName)
+        return
+    end
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        warn("Не удалось телепортировать: персонаж недоступен")
+        return
+    end
+    local position = boatOrigin.Position
+    LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
+    print("Телепортирован к BoatOrigin (Путь: " .. boatOrigin:GetFullName() .. ")")
+end
+
+-- Логика кнопки Teleport to Gold (показывает плавающую кнопку)
+local floatingTPButton = nil
+teleportBtn.MouseButton1Click:Connect(function()
+    if floatingTPButton then
+        floatingTPButton:Destroy()
+        floatingTPButton = nil
+        return
+    end
+
+    floatingTPButton = Instance.new("TextButton")
+    floatingTPButton.Size = UDim2.new(0, 100, 0, 30)
+    floatingTPButton.Position = UDim2.new(0.5, -50, 0.9, -15)
+    floatingTPButton.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+    floatingTPButton.Text = "TP to Gold"
+    floatingTPButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    floatingTPButton.Font = Enum.Font.GothamBold
+    floatingTPButton.TextSize = 12
+    floatingTPButton.TextScaled = false
+    floatingTPButton.BorderSizePixel = 0
+    floatingTPButton.Active = true
+    floatingTPButton.Draggable = true
+    floatingTPButton.Parent = controlGui
+
+    local floatingCorner = Instance.new("UICorner")
+    floatingCorner.CornerRadius = UDim.new(0, 6)
+    floatingCorner.Parent = floatingTPButton
+
+    addHoverEffect(floatingTPButton)
+
+    floatingTPButton.MouseButton1Click:Connect(function()
+        pcall(teleportToNearestGold)
+    end)
+end)
+
+-- Логика кнопки Teleport to Boat (показывает плавающую кнопку)
+local floatingBoatTPButton = nil
+boatTeleportBtn.MouseButton1Click:Connect(function()
+    if floatingBoatTPButton then
+        floatingBoatTPButton:Destroy()
+        floatingBoatTPButton = nil
+        return
+    end
+
+    floatingBoatTPButton = Instance.new("TextButton")
+    floatingBoatTPButton.Size = UDim2.new(0, 100, 0, 30)
+    floatingBoatTPButton.Position = UDim2.new(0.5, -50, 0.85, -15)
+    floatingBoatTPButton.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+    floatingBoatTPButton.Text = "TP to Boat"
+    floatingBoatTPButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    floatingBoatTPButton.Font = Enum.Font.GothamBold
+    floatingBoatTPButton.TextSize = 12
+    floatingBoatTPButton.TextScaled = false
+    floatingBoatTPButton.BorderSizePixel = 0
+    floatingBoatTPButton.Active = true
+    floatingBoatTPButton.Draggable = true
+    floatingBoatTPButton.Parent = controlGui
+
+    local floatingBoatCorner = Instance.new("UICorner")
+    floatingBoatCorner.CornerRadius = UDim.new(0, 6)
+    floatingBoatCorner.Parent = floatingBoatTPButton
+
+    addHoverEffect(floatingBoatTPButton)
+
+    floatingBoatTPButton.MouseButton1Click:Connect(function()
+        pcall(teleportToBoatOrigin)
+    end)
+end)
+
+-- Удаление всех текущих ESP по типу
+local function removeESPByType(isGoldType)
+    for obj, elements in pairs(espElements) do
+        if elements.isGold == isGoldType then
+            if elements.esp then pcall(function() elements.esp:Destroy() end) end
+            if elements.billboard then pcall(function() elements.billboard:Destroy() end) end
+            if elements.distanceLabel then pcall(function() elements.distanceLabel:Destroy() end) end
+            if elements.textLabel then pcall(function() elements.textLabel:Destroy() end) end
+            espElements[obj] = nil
+        end
+    end
+end
+
+-- Переключатели
+goldBtn.MouseButton1Click:Connect(function()
+    showGold = not showGold
+    goldBtn.Text = "Gold ESP " .. (showGold and "🟢" or "🔴")
+    if not showGold then
+        removeESPByType(true)
+    else
+        findAndApplyESP()
+    end
+end)
+
+sharkBtn.MouseButton1Click:Connect(function()
+    showShark = not showShark
+    sharkBtn.Text = "Shark ESP " .. (showShark and "🟢" or "🔴")
+    if not showShark then
+        removeESPByType(false)
+    else
+        findAndApplyESP()
+    end
+end)
+
+-- Первоначальный поиск
+findAndApplyESP()
+
+-- Отслеживание новых объектов
+workspace.DescendantAdded:Connect(function(obj)
+    if (obj.Name == "Gold" or obj.Name == "Shark") and (obj:IsA("BasePart") or obj:IsA("Model")) then
+        createESP(obj)
+    end
+end)
+
+-- Глобальный Heartbeat для обновления всех ESP
+RunService.Heartbeat:Connect(function()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    local playerPos = LocalPlayer.Character.HumanoidRootPart.Position
+    
+    for obj, elements in pairs(espElements) do
+        if not obj or not obj:IsDescendantOf(workspace) then
+            if elements.esp then pcall(function() elements.esp:Destroy() end) end
+            if elements.billboard then pcall(function() elements.billboard:Destroy() end) end
+            if elements.distanceLabel then pcall(function() elements.distanceLabel:Destroy() end) end
+            if elements.textLabel then pcall(function() elements.textLabel:Destroy() end) end
+            espElements[obj] = nil
+            continue
+        end
+        
+        local objPos = getObjectPosition(obj)
+        local distance = (playerPos - objPos).Magnitude
+        
+        if elements.isGold and not showGold then
+            if elements.esp then pcall(function() elements.esp:Destroy() end) end
+            if elements.billboard then pcall(function() elements.billboard:Destroy() end) end
+            if elements.distanceLabel then pcall(function() elements.distanceLabel:Destroy() end) end
+            if elements.textLabel then pcall(function() elements.textLabel:Destroy() end) end
+            espElements[obj] = nil
+            continue
+        elseif not elements.isGold and not showShark then
+            if elements.esp then pcall(function() elements.esp:Destroy() end) end
+            if elements.billboard then pcall(function() elements.billboard:Destroy() end) end
+            if elements.distanceLabel then pcall(function() elements.distanceLabel:Destroy() end) end
+            if elements.textLabel then pcall(function() elements.textLabel:Destroy() end) end
+            espElements[obj] = nil
+            continue
+        end
+        
+        if distance > maxRenderDistance then
+            elements.esp.Transparency = 1
+            elements.billboard.Enabled = false
+            continue
+        else
+            elements.esp.Transparency = 0.5
+            elements.billboard.Enabled = true
+        end
+        
+        if elements.isGold then
+            if elements.distanceLabel then
+                elements.distanceLabel.Text = math.floor(distance) .. " studs"
+                if distance <= 150 then
+                    elements.esp.Color3 = Color3.new(1, 0, 0)
+                    elements.esp.Size = elements.defaultSize * 1.1
+                    elements.distanceLabel.TextColor3 = Color3.new(1, 0, 0)
+                    if elements.textLabel then elements.textLabel.TextColor3 = Color3.new(1, 0, 0) end
+                else
+                    elements.esp.Color3 = elements.defaultEspColor
+                    elements.esp.Size = elements.defaultSize
+                    elements.distanceLabel.TextColor3 = elements.defaultLabelColor
+                    if elements.textLabel then elements.textLabel.TextColor3 = elements.defaultLabelColor end
+                end
+            end
+        else
+            if distance <= 100 then
+                if elements.textLabel then
+                    elements.textLabel.Text = "♦️"
+                    elements.textLabel.TextColor3 = Color3.new(1, 0, 0)
+                end
+                elements.billboard.Size = UDim2.new(0, 41.67, 0, 41.67)
+                elements.esp.Size = elements.defaultSize * 1.1
+            else
+                if elements.textLabel then
+                    elements.textLabel.Text = elements.defaultLabelText
+                    elements.textLabel.TextColor3 = elements.defaultLabelColor
+                end
+                elements.billboard.Size = elements.defaultLabelSize
+                elements.esp.Size = elements.defaultSize
+            end
+            elements.esp.Color3 = elements.defaultEspColor
+        end
+    end
+end)
