@@ -1,0 +1,771 @@
+local player = game.Players.LocalPlayer
+local running = false
+local noclip = false
+local wins = 0
+local startTime = 0
+
+----------------------------------------------------------------
+-- ANTI-AFK
+----------------------------------------------------------------
+task.spawn(function()
+    local vu = game:GetService("VirtualUser")
+    player.Idled:Connect(function()
+        vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end)
+end)
+
+----------------------------------------------------------------
+-- MAIN UI CONTAINER
+----------------------------------------------------------------
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "ZombyScriptGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 260, 0, 260)
+frame.Position = UDim2.new(0.5, -130, 0.5, -130)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.Active = true
+frame.Draggable = true
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+
+local scaleObj = Instance.new("UIScale", frame)
+scaleObj.Scale = 1
+
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0, 12)
+
+----------------------------------------------------------------
+-- TAB BAR (SCROLLABLE)
+----------------------------------------------------------------
+local tabBar = Instance.new("ScrollingFrame", frame)
+tabBar.Size = UDim2.new(1, -20, 0, 30)
+tabBar.Position = UDim2.new(0, 10, 0, 5)
+tabBar.CanvasSize = UDim2.new(0, 300, 0, 0)
+tabBar.ScrollBarThickness = 4
+tabBar.BackgroundTransparency = 1
+tabBar.AutomaticCanvasSize = Enum.AutomaticSize.X
+tabBar.ScrollingDirection = Enum.ScrollingDirection.X
+
+local function createTabButton(name, xPos)
+    local btn = Instance.new("TextButton", tabBar)
+    btn.Size = UDim2.new(0, 60, 1, 0)
+    btn.Position = UDim2.new(0, xPos, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Text = name
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    local c = Instance.new("UICorner", btn)
+    c.CornerRadius = UDim.new(0, 8)
+    return btn
+end
+
+local mainTabBtn = createTabButton("Main", 0)
+local funTabBtn  = createTabButton("Fun", 65)
+local miscTabBtn = createTabButton("Misc", 130)
+local fpsTabBtn  = createTabButton("Fps", 195)
+
+----------------------------------------------------------------
+-- SCROLLABLE PAGE CREATOR
+----------------------------------------------------------------
+local function createPage()
+    local scroll = Instance.new("ScrollingFrame", frame)
+    scroll.Size = UDim2.new(1, -20, 1, -50)
+    scroll.Position = UDim2.new(0, 10, 0, 40)
+    scroll.BackgroundTransparency = 1
+    scroll.Visible = false
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 800) -- enough space for long content
+    scroll.ScrollBarThickness = 4
+    scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    return scroll
+end
+
+local mainPage = createPage()
+local funPage  = createPage()
+local miscPage = createPage()
+local fpsPage  = createPage()
+
+local pages = {
+    Main = mainPage,
+    Fun  = funPage,
+    Misc = miscPage,
+    Fps  = fpsPage
+}
+
+----------------------------------------------------------------
+-- TAB SWITCHING
+----------------------------------------------------------------
+local function setActiveTab(tabName)
+    for name, page in pairs(pages) do
+        page.Visible = (name == tabName)
+    end
+
+    local function style(btn, active)
+        if active then
+            btn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+    end
+
+    style(mainTabBtn, tabName == "Main")
+    style(funTabBtn,  tabName == "Fun")
+    style(miscTabBtn, tabName == "Misc")
+    style(fpsTabBtn,  tabName == "Fps")
+end
+
+setActiveTab("Main")
+
+mainTabBtn.MouseButton1Click:Connect(function() setActiveTab("Main") end)
+funTabBtn.MouseButton1Click:Connect(function() setActiveTab("Fun") end)
+miscTabBtn.MouseButton1Click:Connect(function() setActiveTab("Misc") end)
+fpsTabBtn.MouseButton1Click:Connect(function() setActiveTab("Fps") end)
+
+----------------------------------------------------------------
+-- NOTIFICATION + UI SHRINK/GROW (K)
+----------------------------------------------------------------
+local TweenService = game:GetService("TweenService")
+
+local function notify(text)
+    pcall(function()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Zomby Script";
+            Text = text;
+            Duration = 2;
+        })
+    end)
+end
+
+local function toggleUI()
+    if frame.Visible then
+        local shrink = TweenService:Create(scaleObj, TweenInfo.new(0.3), {Scale = 0.1})
+        shrink:Play()
+        shrink.Completed:Wait()
+        frame.Visible = false
+        scaleObj.Scale = 1
+        notify("UI Hidden")
+    else
+        scaleObj.Scale = 0.1
+        frame.Visible = true
+        local grow = TweenService:Create(scaleObj, TweenInfo.new(0.3), {Scale = 1})
+        grow:Play()
+        notify("UI Shown")
+    end
+end
+
+game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.K then
+        toggleUI()
+    end
+end)
+
+----------------------------------------------------------------
+-- POSITIONS FOR AUTOFARM
+----------------------------------------------------------------
+local endPos = Vector3.new(-120, 834, -1669)
+local forwardPos = Vector3.new(-119, 833, -1714)
+local resetHeight = 50
+
+----------------------------------------------------------------
+-- MAIN PAGE CONTENT
+----------------------------------------------------------------
+local title = Instance.new("TextLabel", mainPage)
+title.Size = UDim2.new(1, -20, 0, 25)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.fromRGB(0, 255, 0)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Text = ""
+
+local autoLabel = Instance.new("TextLabel", mainPage)
+autoLabel.Size = UDim2.new(1, -20, 0, 20)
+autoLabel.Position = UDim2.new(0, 10, 0, 25)
+autoLabel.BackgroundTransparency = 1
+autoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+autoLabel.TextScaled = true
+autoLabel.Font = Enum.Font.Gotham
+autoLabel.Text = "Autofarm:"
+
+local button = Instance.new("TextButton", mainPage)
+button.Size = UDim2.new(1, -20, 0, 35)
+button.Position = UDim2.new(0, 10, 0, 50)
+button.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Text = "OFF"
+button.Font = Enum.Font.GothamBold
+button.TextSize = 16
+local btnCorner = Instance.new("UICorner", button)
+btnCorner.CornerRadius = UDim.new(0, 8)
+
+local noclipBtn = Instance.new("TextButton", mainPage)
+noclipBtn.Size = UDim2.new(1, -20, 0, 30)
+noclipBtn.Position = UDim2.new(0, 10, 0, 90)
+noclipBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+noclipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+noclipBtn.Text = "Noclip: Off"
+noclipBtn.Font = Enum.Font.GothamBold
+noclipBtn.TextSize = 14
+local noclipCorner = Instance.new("UICorner", noclipBtn)
+noclipCorner.CornerRadius = UDim.new(0, 8)
+
+local winLabel = Instance.new("TextLabel", mainPage)
+winLabel.Size = UDim2.new(1, -20, 0, 20)
+winLabel.Position = UDim2.new(0, 10, 0, 125)
+winLabel.BackgroundTransparency = 1
+winLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+winLabel.Text = "Wins: 0"
+winLabel.Font = Enum.Font.Gotham
+winLabel.TextSize = 14
+
+local timeLabel = Instance.new("TextLabel", mainPage)
+timeLabel.Size = UDim2.new(1, -20, 0, 20)
+timeLabel.Position = UDim2.new(0, 10, 0, 145)
+timeLabel.BackgroundTransparency = 1
+timeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+timeLabel.Text = "Time: 0:00:00"
+timeLabel.Font = Enum.Font.Gotham
+timeLabel.TextSize = 14
+
+local closeLabel1 = Instance.new("TextLabel", mainPage)
+closeLabel1.Size = UDim2.new(1, -20, 0, 20)
+closeLabel1.Position = UDim2.new(0, 10, 0, 170)
+closeLabel1.BackgroundTransparency = 1
+closeLabel1.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeLabel1.Text = "-- Close UI: K"
+closeLabel1.Font = Enum.Font.Gotham
+closeLabel1.TextSize = 14
+
+local closeLabel2 = Instance.new("TextLabel", mainPage)
+closeLabel2.Size = UDim2.new(1, -20, 0, 20)
+closeLabel2.Position = UDim2.new(0, 10, 0, 190)
+closeLabel2.BackgroundTransparency = 1
+closeLabel2.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeLabel2.Text = ""
+closeLabel2.Font = Enum.Font.Gotham
+closeLabel2.TextSize = 14
+
+----------------------------------------------------------------
+-- TIMER
+----------------------------------------------------------------
+local function updateTimer()
+    while running do
+        local elapsed = math.floor(tick() - startTime)
+        local hours = math.floor(elapsed / 3600)
+        local minutes = math.floor((elapsed % 3600) / 60)
+        local seconds = elapsed % 60
+        timeLabel.Text = string.format("Time: %d:%02d:%02d", hours, minutes, seconds)
+        task.wait(1)
+    end
+end
+
+----------------------------------------------------------------
+-- NOCLIP
+----------------------------------------------------------------
+game:GetService("RunService").Stepped:Connect(function()
+    if noclip then
+        local char = player.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+----------------------------------------------------------------
+-- AUTOFARM
+----------------------------------------------------------------
+local function autoFarm()
+    startTime = tick()
+    task.spawn(updateTimer)
+
+    while running do
+        local char = player.Character or player.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+
+        hrp.CFrame = CFrame.new(endPos)
+        task.wait(1)
+
+        hrp.CFrame = CFrame.new(forwardPos)
+        task.wait(1)
+
+        repeat
+            task.wait(0.2)
+            char = player.Character
+            hrp = char and char:FindFirstChild("HumanoidRootPart")
+        until hrp and hrp.Position.Y < resetHeight
+
+        wins += 1
+        winLabel.Text = "Wins: " .. wins
+    end
+end
+
+button.MouseButton1Click:Connect(function()
+    running = not running
+
+    if running then
+        button.Text = "ON"
+        button.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        wins = 0
+        winLabel.Text = "Wins: 0"
+        notify("Autofarm Enabled")
+        task.spawn(autoFarm)
+    else
+        button.Text = "OFF"
+        button.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+        notify("Autofarm Disabled")
+    end
+end)
+
+noclipBtn.MouseButton1Click:Connect(function()
+    noclip = not noclip
+    noclipBtn.Text = noclip and "Noclip: On" or "Noclip: Off"
+    noclipBtn.BackgroundColor3 = noclip and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(170, 0, 0)
+    notify("Noclip " .. (noclip and "Enabled" or "Disabled"))
+end)
+
+----------------------------------------------------------------
+-- FUN PAGE
+----------------------------------------------------------------
+local funY = 0
+
+local function makeToggle(parent, text)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(1, -20, 0, 25)
+    btn.Position = UDim2.new(0, 10, 0, funY)
+    funY = funY + 30
+    btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = text .. ": OFF"
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    local c = Instance.new("UICorner", btn)
+    c.CornerRadius = UDim.new(0, 8)
+    return btn
+end
+
+-- 1) Rainbow UI
+local rainbowToggle = makeToggle(funPage, "Rainbow UI")
+local rainbowOn = false
+task.spawn(function()
+    while true do
+        if rainbowOn then
+            local t = tick() * 2
+            local r = (math.sin(t) + 1) / 2
+            local g = (math.sin(t + 2) + 1) / 2
+            local b = (math.sin(t + 4) + 1) / 2
+            frame.BackgroundColor3 = Color3.fromRGB(r * 255, g * 255, b * 255)
+        end
+        task.wait(0.05)
+    end
+end)
+
+rainbowToggle.MouseButton1Click:Connect(function()
+    rainbowOn = not rainbowOn
+    rainbowToggle.Text = "Rainbow UI: " .. (rainbowOn and "ON" or "OFF")
+    rainbowToggle.BackgroundColor3 = rainbowOn and Color3.fromRGB(0,170,0) or Color3.fromRGB(70,70,70)
+    if not rainbowOn then
+        frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    end
+end)
+
+-- 2) ESP (highlight + names)
+local espToggle = makeToggle(funPage, "ESP")
+local espOn = false
+local espFolder = Instance.new("Folder", gui)
+espFolder.Name = "ESP_Highlights"
+
+local nameFolder = Instance.new("Folder", gui)
+nameFolder.Name = "ESP_Names"
+
+local function updateESP()
+    for _, v in ipairs(espFolder:GetChildren()) do
+        v:Destroy()
+    end
+    if not espOn then return end
+
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local h = Instance.new("Highlight", espFolder)
+            h.Adornee = plr.Character
+            h.FillColor = Color3.fromRGB(0, 255, 0)
+            h.OutlineColor = Color3.fromRGB(255, 255, 255)
+            h.FillTransparency = 0.7
+        end
+    end
+end
+
+local function updateNameESP()
+    for _, v in ipairs(nameFolder:GetChildren()) do
+        v:Destroy()
+    end
+    if not espOn then return end
+
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("Head") then
+            local head = plr.Character:FindFirstChild("Head")
+            if head then
+                local billboard = Instance.new("BillboardGui", nameFolder)
+                billboard.Adornee = head
+                billboard.Size = UDim2.new(0, 100, 0, 20)
+                billboard.AlwaysOnTop = true
+
+                local label = Instance.new("TextLabel", billboard)
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.Text = plr.Name
+                label.TextColor3 = Color3.fromRGB(0, 255, 0)
+                label.TextStrokeTransparency = 0.5
+                label.Font = Enum.Font.GothamBold
+                label.TextScaled = true
+            end
+        end
+    end
+end
+
+espToggle.MouseButton1Click:Connect(function()
+    espOn = not espOn
+    espToggle.Text = "ESP: " .. (espOn and "ON" or "OFF")
+    espToggle.BackgroundColor3 = espOn and Color3.fromRGB(0,170,0) or Color3.fromRGB(70,70,70)
+    updateESP()
+    updateNameESP()
+end)
+
+game.Players.PlayerAdded:Connect(function()
+    task.wait(1)
+    updateESP()
+    updateNameESP()
+end)
+
+game.Players.PlayerRemoving:Connect(function()
+    task.wait(1)
+    updateESP()
+    updateNameESP()
+end)
+
+-- 3) Fly
+local flyToggle = makeToggle(funPage, "Fly")
+local flyOn = false
+local flySpeed = 2
+local UIS = game:GetService("UserInputService")
+
+local function getHRP()
+    local char = player.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+task.spawn(function()
+    while true do
+        if flyOn then
+            local hrp = getHRP()
+            if hrp then
+                local moveDir = Vector3.new()
+                local cam = workspace.CurrentCamera
+                if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0,1,0) end
+                if moveDir.Magnitude > 0 then
+                    hrp.Velocity = moveDir.Unit * 60 * flySpeed
+                else
+                    hrp.Velocity = Vector3.new(0,0,0)
+                end
+            end
+        end
+        task.wait()
+    end
+end)
+
+flyToggle.MouseButton1Click:Connect(function()
+    flyOn = not flyOn
+    flyToggle.Text = "Fly: " .. (flyOn and "ON" or "OFF")
+    flyToggle.BackgroundColor3 = flyOn and Color3.fromRGB(0,170,0) or Color3.fromRGB(70,70,70)
+    if not flyOn then
+        local hrp = getHRP()
+        if hrp then hrp.Velocity = Vector3.new(0,0,0) end
+    end
+end)
+
+-- 4) Speed Boost
+local speedToggle = makeToggle(funPage, "Speed Boost")
+local speedOn = false
+local normalWS = 16
+local boostWS = 40
+
+speedToggle.MouseButton1Click:Connect(function()
+    speedOn = not speedOn
+    speedToggle.Text = "Speed Boost: " .. (speedOn and "ON" or "OFF")
+    speedToggle.BackgroundColor3 = speedOn and Color3.fromRGB(0,170,0) or Color3.fromRGB(70,70,70)
+    local char = player.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        hum.WalkSpeed = speedOn and boostWS or normalWS
+    end
+end)
+
+-- 5) WalkSpeed label
+local wsLabel = Instance.new("TextLabel", funPage)
+wsLabel.Size = UDim2.new(1, -20, 0, 20)
+wsLabel.Position = UDim2.new(0, 10, 0, funY)
+wsLabel.BackgroundTransparency = 1
+wsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+wsLabel.Text = "WalkSpeed: 16"
+wsLabel.Font = Enum.Font.Gotham
+wsLabel.TextSize = 14
+funY = funY + 20
+
+-- 6) WalkSpeed +4
+local wsSlider = Instance.new("TextButton", funPage)
+wsSlider.Size = UDim2.new(1, -20, 0, 20)
+wsSlider.Position = UDim2.new(0, 10, 0, funY)
+wsSlider.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+wsSlider.Text = "Click to +4"
+wsSlider.TextColor3 = Color3.fromRGB(255, 255, 255)
+wsSlider.Font = Enum.Font.Gotham
+wsSlider.TextSize = 12
+local wsCorner = Instance.new("UICorner", wsSlider)
+wsCorner.CornerRadius = UDim.new(0, 8)
+funY = funY + 30
+
+wsSlider.MouseButton1Click:Connect(function()
+    local char = player.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        hum.WalkSpeed = hum.WalkSpeed + 4
+        wsLabel.Text = "WalkSpeed: " .. math.floor(hum.WalkSpeed)
+    end
+end)
+
+-- 7) WalkSpeed -4
+local wsMinus = Instance.new("TextButton", funPage)
+wsMinus.Size = UDim2.new(1, -20, 0, 20)
+wsMinus.Position = UDim2.new(0, 10, 0, funY)
+wsMinus.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+wsMinus.Text = "Click to -4"
+wsMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
+wsMinus.Font = Enum.Font.Gotham
+wsMinus.TextSize = 12
+local wsMinusCorner = Instance.new("UICorner", wsMinus)
+wsMinusCorner.CornerRadius = UDim.new(0, 8)
+funY = funY + 30
+
+wsMinus.MouseButton1Click:Connect(function()
+    local char = player.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        hum.WalkSpeed = math.max(0, hum.WalkSpeed - 4)
+        wsLabel.Text = "WalkSpeed: " .. math.floor(hum.WalkSpeed)
+    end
+end)
+
+-- 8) JumpPower label
+local jpLabel = Instance.new("TextLabel", funPage)
+jpLabel.Size = UDim2.new(1, -20, 0, 20)
+jpLabel.Position = UDim2.new(0, 10, 0, funY)
+jpLabel.BackgroundTransparency = 1
+jpLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+jpLabel.Text = "JumpPower: 50"
+jpLabel.Font = Enum.Font.Gotham
+jpLabel.TextSize = 14
+funY = funY + 20
+
+-- 9) JumpPower +10
+local jpSlider = Instance.new("TextButton", funPage)
+jpSlider.Size = UDim2.new(1, -20, 0, 20)
+jpSlider.Position = UDim2.new(0, 10, 0, funY)
+jpSlider.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+jpSlider.Text = "Click to +10"
+jpSlider.TextColor3 = Color3.fromRGB(255, 255, 255)
+jpSlider.Font = Enum.Font.Gotham
+jpSlider.TextSize = 12
+local jpCorner = Instance.new("UICorner", jpSlider)
+jpCorner.CornerRadius = UDim.new(0, 8)
+funY = funY + 30
+
+jpSlider.MouseButton1Click:Connect(function()
+    local char = player.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        hum.UseJumpPower = true
+        hum.JumpPower = hum.JumpPower + 10
+        jpLabel.Text = "JumpPower: " .. math.floor(hum.JumpPower)
+    end
+end)
+
+-- 10) JumpPower -10
+local jpMinus = Instance.new("TextButton", funPage)
+jpMinus.Size = UDim2.new(1, -20, 0, 20)
+jpMinus.Position = UDim2.new(0, 10, 0, funY)
+jpMinus.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+jpMinus.Text = "Click to -10"
+jpMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
+jpMinus.Font = Enum.Font.Gotham
+jpMinus.TextSize = 12
+local jpMinusCorner = Instance.new("UICorner", jpMinus)
+jpMinusCorner.CornerRadius = UDim.new(0, 8)
+funY = funY + 30
+
+jpMinus.MouseButton1Click:Connect(function()
+    local char = player.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        hum.UseJumpPower = true
+        hum.JumpPower = math.max(0, hum.JumpPower - 10)
+        jpLabel.Text = "JumpPower: " .. math.floor(hum.JumpPower)
+    end
+end)
+
+-- 11) JumpPower Toggle
+local jpToggle = Instance.new("TextButton", funPage)
+jpToggle.Size = UDim2.new(1, -20, 0, 25)
+jpToggle.Position = UDim2.new(0, 10, 0, funY)
+jpToggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+jpToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+jpToggle.Text = "JumpPower Toggle: OFF"
+jpToggle.Font = Enum.Font.GothamBold
+jpToggle.TextSize = 14
+local jpToggleCorner = Instance.new("UICorner", jpToggle)
+jpToggleCorner.CornerRadius = UDim.new(0, 8)
+funY = funY + 30
+
+local jpToggleOn = false
+local normalJP = 50
+local boostedJP = 120
+
+jpToggle.MouseButton1Click:Connect(function()
+    jpToggleOn = not jpToggleOn
+    jpToggle.Text = "JumpPower Toggle: " .. (jpToggleOn and "ON" or "OFF")
+    jpToggle.BackgroundColor3 = jpToggleOn and Color3.fromRGB(0,170,0) or Color3.fromRGB(70,70,70)
+
+    local char = player.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        hum.UseJumpPower = true
+        hum.JumpPower = jpToggleOn and boostedJP or normalJP
+        jpLabel.Text = "JumpPower: " .. math.floor(hum.JumpPower)
+    end
+end)
+
+----------------------------------------------------------------
+-- MISC PAGE: REJOIN, SERVER HOP
+----------------------------------------------------------------
+local rejoinBtn = Instance.new("TextButton", miscPage)
+rejoinBtn.Size = UDim2.new(1, -20, 0, 30)
+rejoinBtn.Position = UDim2.new(0, 10, 0, 10)
+rejoinBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+rejoinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+rejoinBtn.Text = "Rejoin"
+rejoinBtn.Font = Enum.Font.GothamBold
+rejoinBtn.TextSize = 14
+local rjc = Instance.new("UICorner", rejoinBtn)
+rjc.CornerRadius = UDim.new(0, 8)
+
+local hopBtn = Instance.new("TextButton", miscPage)
+hopBtn.Size = UDim2.new(1, -20, 0, 30)
+hopBtn.Position = UDim2.new(0, 10, 0, 45)
+hopBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+hopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+hopBtn.Text = "Server Hop"
+hopBtn.Font = Enum.Font.GothamBold
+hopBtn.TextSize = 14
+local hpc = Instance.new("UICorner", hopBtn)
+hpc.CornerRadius = UDim.new(0, 8)
+
+rejoinBtn.MouseButton1Click:Connect(function()
+    notify("Rejoining...")
+    local TeleportService = game:GetService("TeleportService")
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+end)
+
+hopBtn.MouseButton1Click:Connect(function()
+    notify("Server hopping...")
+    local TeleportService = game:GetService("TeleportService")
+    TeleportService:Teleport(game.PlaceId, player)
+end)
+
+----------------------------------------------------------------
+-- FPS PAGE: FPS BOOST + BLACK SCREEN
+----------------------------------------------------------------
+local fpsOn = false
+local fpsBtn = Instance.new("TextButton", fpsPage)
+fpsBtn.Size = UDim2.new(1, -20, 0, 30)
+fpsBtn.Position = UDim2.new(0, 10, 0, 10)
+fpsBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+fpsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+fpsBtn.Text = "FPS Boost: OFF"
+fpsBtn.Font = Enum.Font.GothamBold
+fpsBtn.TextSize = 14
+local fpsc = Instance.new("UICorner", fpsBtn)
+fpsc.CornerRadius = UDim.new(0, 8)
+
+local Lighting = game:GetService("Lighting")
+local oldSettings = {
+    GlobalShadows = Lighting.GlobalShadows,
+    FogEnd = Lighting.FogEnd,
+    Brightness = Lighting.Brightness
+}
+
+fpsBtn.MouseButton1Click:Connect(function()
+    fpsOn = not fpsOn
+    fpsBtn.Text = "FPS Boost: " .. (fpsOn and "ON" or "OFF")
+    fpsBtn.BackgroundColor3 = fpsOn and Color3.fromRGB(0,170,0) or Color3.fromRGB(70,70,70)
+
+    if fpsOn then
+        oldSettings.GlobalShadows = Lighting.GlobalShadows
+        oldSettings.FogEnd = Lighting.FogEnd
+        oldSettings.Brightness = Lighting.Brightness
+
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 1e5
+        Lighting.Brightness = 1
+    else
+        Lighting.GlobalShadows = oldSettings.GlobalShadows
+        Lighting.FogEnd = oldSettings.FogEnd
+        Lighting.Brightness = oldSettings.Brightness
+    end
+end)
+
+-- Black Screen toggle
+local blackOn = false
+
+local blackBtn = Instance.new("TextButton", fpsPage)
+blackBtn.Size = UDim2.new(1, -20, 0, 30)
+blackBtn.Position = UDim2.new(0, 10, 0, 50)
+blackBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+blackBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+blackBtn.Text = "Black Screen: OFF"
+blackBtn.Font = Enum.Font.GothamBold
+blackBtn.TextSize = 14
+local blackCorner = Instance.new("UICorner", blackBtn)
+blackCorner.CornerRadius = UDim.new(0, 8)
+
+local blackScreen = Instance.new("Frame", gui)
+blackScreen.Size = UDim2.new(1, 0, 1, 0)
+blackScreen.Position = UDim2.new(0, 0, 0, 0)
+blackScreen.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+blackScreen.Visible = false
+blackScreen.ZIndex = 0
+
+frame.ZIndex = 2
+for _, v in ipairs(frame:GetDescendants()) do
+    if v:IsA("GuiObject") then
+        v.ZIndex = 2
+    end
+end
+
+blackBtn.MouseButton1Click:Connect(function()
+    blackOn = not blackOn
+    blackScreen.Visible = blackOn
+    blackBtn.Text = "Black Screen: " .. (blackOn and "ON" or "OFF")
+    blackBtn.BackgroundColor3 = blackOn and Color3.fromRGB(0,170,0) or Color3.fromRGB(70,70,70)
+end)
