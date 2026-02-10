@@ -1,0 +1,559 @@
+-- Frisbee Monitor Script with Rayfield UI
+-- Features: Frisbee modifications, walkspeed, and jump power controls
+
+-- Load Rayfield UI Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Create Window
+local Window = Rayfield:CreateWindow({
+    Name = "",
+    LoadingTitle = "",
+    LoadingSubtitle = "",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "FrisbeeHelper"
+    },
+    Discord = {
+        Enabled = false,
+    },
+    KeySystem = false,
+})
+
+-- Get Services and Player
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Configuration Variables
+local CONFIG = {
+    HORIZONTAL_MULTIPLIER = 1.5,
+    VERTICAL_MULTIPLIER = 3,
+    TRANSPARENCY = 0.5,
+    WALKSPEED = 16,
+    JUMPPOWER = 50,
+    MAGNET_RANGE = 50,
+    DIVE_SPEED = 0.5, -- Duration in seconds (lower = faster)
+    
+    -- Toggle States
+    frisbeeModEnabled = false,
+    walkspeedEnabled = false,
+    jumppowerEnabled = false,
+    magnetEnabled = false,
+    noJumpCooldownEnabled = false,
+}
+
+-- Table to track processed Frisbees
+local processedFrisbees = {}
+local frisbeeConnections = {}
+
+-- Function to apply modifications to a Frisbee
+local function modifyFrisbee(frisbee)
+    if processedFrisbees[frisbee] then
+        return
+    end
+    
+    print("Found new Frisbee:", frisbee.Name)
+    
+    -- Store original properties
+    if not frisbee:GetAttribute("OriginalSize") then
+        frisbee:SetAttribute("OriginalSize", tostring(frisbee.Size))
+        frisbee:SetAttribute("OriginalTransparency", frisbee.Transparency)
+    end
+    
+    -- Increase size with more vertical height
+    local currentSize = frisbee.Size
+    frisbee.Size = Vector3.new(
+        currentSize.X * CONFIG.HORIZONTAL_MULTIPLIER,
+        currentSize.Y * CONFIG.VERTICAL_MULTIPLIER,
+        currentSize.Z * CONFIG.HORIZONTAL_MULTIPLIER
+    )
+    
+    -- Set transparency
+    frisbee.Transparency = CONFIG.TRANSPARENCY
+    
+    -- Mark as processed
+    processedFrisbees[frisbee] = true
+    
+    print("Modified Frisbee - New Size:", frisbee.Size, "Transparency:", frisbee.Transparency)
+end
+
+-- Function to restore Frisbee to original state
+local function restoreFrisbee(frisbee)
+    local originalSize = frisbee:GetAttribute("OriginalSize")
+    local originalTransparency = frisbee:GetAttribute("OriginalTransparency")
+    
+    if originalSize then
+        -- Parse the Vector3 string
+        local x, y, z = originalSize:match("([%d%.]+),%s*([%d%.]+),%s*([%d%.]+)")
+        if x and y and z then
+            frisbee.Size = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
+        end
+    end
+    
+    if originalTransparency then
+        frisbee.Transparency = originalTransparency
+    end
+    
+    frisbee.CanCollide = true
+end
+
+-- Function to check if Frisbee is under the player
+local function checkAndUpdateCollision(frisbee)
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    -- Check if Frisbee is below the player
+    local playerY = humanoidRootPart.Position.Y
+    local frisbeeY = frisbee.Position.Y
+    
+    if frisbeeY < playerY then
+        frisbee.CanCollide = false
+    else
+        frisbee.CanCollide = true
+    end
+end
+
+-- Function to check if Frisbee is owned by any player
+local function isFrisbeeOwnedByPlayer(frisbee)
+    -- Check if the Frisbee is a child of any player's character
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Character then
+            if frisbee:IsDescendantOf(player.Character) then
+                return true
+            end
+        end
+    end
+    
+    -- Check if the Frisbee has a BodyVelocity or is being held (common ownership indicators)
+    local bodyVelocity = frisbee:FindFirstChild("BodyVelocity")
+    local bodyPosition = frisbee:FindFirstChild("BodyPosition")
+    
+    -- If it has these and they're active, it might be owned
+    if bodyVelocity or bodyPosition then
+        -- Additional check: see if it's near any player's hand
+        for _, player in pairs(Players:GetPlayers()) do
+            if player.Character then
+                local rightHand = player.Character:FindFirstChild("RightHand") or player.Character:FindFirstChild("Right Arm")
+                local leftHand = player.Character:FindFirstChild("LeftHand") or player.Character:FindFirstChild("Left Arm")
+                
+                if rightHand and (frisbee.Position - rightHand.Position).Magnitude < 5 then
+                    return true
+                end
+                if leftHand and (frisbee.Position - leftHand.Position).Magnitude < 5 then
+                    return true
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+-- Active dives table to track ongoing dives
+local activeDives = {}
+
+-- Function to create a smooth dive to the Frisbee
+local function diveToFrisbee(humanoidRootPart, targetFrisbee)
+    -- Cancel any existing dive
+    if activeDives[humanoidRootPart] then
+        activeDives[humanoidRootPart].connection:Disconnect()
+        if activeDives[humanoidRootPart].bodyVelocity then
+            activeDives[humanoidRootPart].bodyVelocity:Destroy()
+        end
+    end
+    
+    local startTime = tick()
+    local trackingDuration = 2 -- Track for 2 seconds
+    
+    -- Create BodyVelocity for smooth movement
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Name = "DiveVelocity"
+    bodyVelocity.MaxForce = Vector3.new(100000, 100000, 100000)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = humanoidRootPart
+    
+    -- Create the diving motion
+    local diveConnection
+    diveConnection = RunService.Heartbeat:Connect(function()
+        local elapsed = tick() - startTime
+        
+        -- Stop tracking after 2 seconds
+        if elapsed >= trackingDuration then
+            if bodyVelocity and bodyVelocity.Parent then
+                bodyVelocity:Destroy()
+            end
+            diveConnection:Disconnect()
+            activeDives[humanoidRootPart] = nil
+            print("Dive ended - 2 seconds elapsed")
+            return
+        end
+        
+        -- Check if Frisbee still exists
+        if not targetFrisbee or not targetFrisbee.Parent then
+            if bodyVelocity and bodyVelocity.Parent then
+                bodyVelocity:Destroy()
+            end
+            diveConnection:Disconnect()
+            activeDives[humanoidRootPart] = nil
+            print("Dive ended - Frisbee disappeared")
+            return
+        end
+        
+        -- Check if Frisbee is now owned by a player (someone caught it)
+        if isFrisbeeOwnedByPlayer(targetFrisbee) then
+            if bodyVelocity and bodyVelocity.Parent then
+                bodyVelocity:Destroy()
+            end
+            diveConnection:Disconnect()
+            activeDives[humanoidRootPart] = nil
+            print("Dive ended - Frisbee was caught")
+            return
+        end
+        
+        -- Update target position to follow the Frisbee
+        local targetPosition = targetFrisbee.Position + Vector3.new(0, -1.5, 0)
+        local currentPosition = humanoidRootPart.Position
+        local distance = (targetPosition - currentPosition).Magnitude
+        
+        -- If we're very close, stop diving
+        if distance < 2 then
+            if bodyVelocity and bodyVelocity.Parent then
+                bodyVelocity.Velocity = targetFrisbee.AssemblyLinearVelocity
+            end
+            print("Dive ended - Reached Frisbee")
+            return
+        end
+        
+        -- Calculate direction
+        local direction = (targetPosition - currentPosition).Unit
+        
+        -- Much faster speed calculation
+        local baseSpeed = math.min(distance * 8, 200) -- Much faster multiplier and higher cap
+        local speedMultiplier = 1.5 + (elapsed / trackingDuration) * 1 -- Start faster and speed up more
+        local targetSpeed = baseSpeed * speedMultiplier
+        
+        -- Cap speed
+        targetSpeed = math.clamp(targetSpeed, 60, 250) -- Higher minimum and maximum speed
+        
+        -- Calculate target velocity
+        local targetVelocity = direction * targetSpeed
+        
+        -- Add slight upward component for diving arc (only at start)
+        local arcStrength = math.max(0, 1 - (elapsed / 0.3)) -- Shorter arc duration
+        targetVelocity = targetVelocity + Vector3.new(0, 15 * arcStrength, 0)
+        
+        -- Apply velocity directly (no lerp for more responsive movement)
+        bodyVelocity.Velocity = targetVelocity
+        
+        -- Rotate to face direction of movement
+        local lookDirection = targetVelocity.Unit
+        if lookDirection.Magnitude > 0 then
+            humanoidRootPart.CFrame = CFrame.new(currentPosition, currentPosition + lookDirection)
+        end
+    end)
+    
+    activeDives[humanoidRootPart] = {
+        connection = diveConnection,
+        bodyVelocity = bodyVelocity
+    }
+end
+
+-- Function to magnet Frisbee to player on click
+local function setupMagnetClick()
+    local UserInputService = game:GetService("UserInputService")
+    
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if not CONFIG.magnetEnabled then return end
+            
+            local character = LocalPlayer.Character
+            if not character then return end
+            
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if not humanoidRootPart then return end
+            
+            -- Find the closest Frisbee in range
+            local closestFrisbee = nil
+            local closestDistance = CONFIG.MAGNET_RANGE
+            
+            for _, object in pairs(workspace:GetDescendants()) do
+                if object:IsA("BasePart") and string.lower(object.Name):find("frisbee") then
+                    local distance = (object.Position - humanoidRootPart.Position).Magnitude
+                    
+                    if distance <= CONFIG.MAGNET_RANGE and distance < closestDistance and not isFrisbeeOwnedByPlayer(object) then
+                        closestFrisbee = object
+                        closestDistance = distance
+                    end
+                end
+            end
+            
+            if closestFrisbee then
+                -- Dive to the Frisbee with smooth animation and tracking
+                diveToFrisbee(humanoidRootPart, closestFrisbee)
+                
+                print("Diving to Frisbee! Distance: " .. math.floor(closestDistance) .. " studs - Tracking for 2 seconds!")
+            else
+                print("No Frisbee in range!")
+            end
+        end
+    end)
+end
+
+-- Function to find and modify all Frisbees
+local function findAndModifyFrisbees()
+    for _, object in pairs(workspace:GetDescendants()) do
+        if object:IsA("BasePart") and string.lower(object.Name):find("frisbee") then
+            if CONFIG.frisbeeModEnabled then
+                modifyFrisbee(object)
+                checkAndUpdateCollision(object)
+            end
+        end
+    end
+end
+
+-- Function to restore all Frisbees
+local function restoreAllFrisbees()
+    for frisbee, _ in pairs(processedFrisbees) do
+        if frisbee and frisbee.Parent then
+            restoreFrisbee(frisbee)
+        end
+    end
+    processedFrisbees = {}
+end
+
+-- Create Tabs
+local FrisbeeTab = Window:CreateTab("Frisbee", 4483362458)
+local PlayerTab = Window:CreateTab("Player", 4483362458)
+
+-- Frisbee Tab Controls
+local FrisbeeSection = FrisbeeTab:CreateSection("Frisbee Modifications")
+
+local FrisbeeToggle = FrisbeeTab:CreateToggle({
+    Name = "Enable Frisbee Modifications",
+    CurrentValue = false,
+    Flag = "FrisbeeToggle",
+    Callback = function(Value)
+        CONFIG.frisbeeModEnabled = Value
+        if Value then
+            print("Frisbee modifications enabled")
+            findAndModifyFrisbees()
+        else
+            print("Frisbee modifications disabled")
+            restoreAllFrisbees()
+        end
+    end,
+})
+
+FrisbeeTab:CreateSlider({
+    Name = "Horizontal Size Multiplier",
+    Range = {1, 5},
+    Increment = 0.1,
+    CurrentValue = 1.5,
+    Flag = "HorizontalMultiplier",
+    Callback = function(Value)
+        CONFIG.HORIZONTAL_MULTIPLIER = Value
+        if CONFIG.frisbeeModEnabled then
+            restoreAllFrisbees()
+            findAndModifyFrisbees()
+        end
+    end,
+})
+
+FrisbeeTab:CreateSlider({
+    Name = "Vertical Size Multiplier",
+    Range = {1, 10},
+    Increment = 0.5,
+    CurrentValue = 3,
+    Flag = "VerticalMultiplier",
+    Callback = function(Value)
+        CONFIG.VERTICAL_MULTIPLIER = Value
+        if CONFIG.frisbeeModEnabled then
+            restoreAllFrisbees()
+            findAndModifyFrisbees()
+        end
+    end,
+})
+
+FrisbeeTab:CreateSlider({
+    Name = "Transparency",
+    Range = {0, 1},
+    Increment = 0.1,
+    CurrentValue = 0.5,
+    Flag = "Transparency",
+    Callback = function(Value)
+        CONFIG.TRANSPARENCY = Value
+        if CONFIG.frisbeeModEnabled then
+            restoreAllFrisbees()
+            findAndModifyFrisbees()
+        end
+    end,
+})
+
+local MagnetSection = FrisbeeTab:CreateSection("Frisbee Magnet")
+
+local MagnetToggle = FrisbeeTab:CreateToggle({
+    Name = "Dive to Frisbee (Left Click)",
+    CurrentValue = false,
+    Flag = "MagnetToggle",
+    Callback = function(Value)
+        CONFIG.magnetEnabled = Value
+        if Value then
+            print("Frisbee dive enabled - Left click to dive to nearest Frisbee!")
+        else
+            print("Frisbee dive disabled")
+        end
+    end,
+})
+
+FrisbeeTab:CreateSlider({
+    Name = "Magnet Range",
+    Range = {10, 200},
+    Increment = 5,
+    CurrentValue = 50,
+    Flag = "MagnetRange",
+    Callback = function(Value)
+        CONFIG.MAGNET_RANGE = Value
+    end,
+})
+
+FrisbeeTab:CreateSlider({
+    Name = "Dive Speed (Lower = Faster)",
+    Range = {0.1, 2},
+    Increment = 0.1,
+    CurrentValue = 0.5,
+    Flag = "DiveSpeed",
+    Callback = function(Value)
+        CONFIG.DIVE_SPEED = Value
+    end,
+})
+
+-- Player Tab Controls
+local PlayerSection = PlayerTab:CreateSection("Player Modifications")
+
+local WalkspeedToggle = PlayerTab:CreateToggle({
+    Name = "Custom Walkspeed",
+    CurrentValue = false,
+    Flag = "WalkspeedToggle",
+    Callback = function(Value)
+        CONFIG.walkspeedEnabled = Value
+        if not Value then
+            local character = LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = 16 -- Default Roblox walkspeed
+                end
+            end
+        end
+    end,
+})
+
+PlayerTab:CreateSlider({
+    Name = "Walkspeed",
+    Range = {16, 200},
+    Increment = 1,
+    CurrentValue = 16,
+    Flag = "Walkspeed",
+    Callback = function(Value)
+        CONFIG.WALKSPEED = Value
+    end,
+})
+
+local JumppowerToggle = PlayerTab:CreateToggle({
+    Name = "Custom Jump Power",
+    CurrentValue = false,
+    Flag = "JumppowerToggle",
+    Callback = function(Value)
+        CONFIG.jumppowerEnabled = Value
+        if not Value then
+            local character = LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.JumpPower = 50 -- Default Roblox jump power
+                end
+            end
+        end
+    end,
+})
+
+PlayerTab:CreateSlider({
+    Name = "Jump Power",
+    Range = {50, 300},
+    Increment = 5,
+    CurrentValue = 50,
+    Flag = "Jumppower",
+    Callback = function(Value)
+        CONFIG.JUMPPOWER = Value
+    end,
+})
+
+local NoJumpCooldownToggle = PlayerTab:CreateToggle({
+    Name = "No Jump Cooldown",
+    CurrentValue = false,
+    Flag = "NoJumpCooldown",
+    Callback = function(Value)
+        CONFIG.noJumpCooldownEnabled = Value
+        if Value then
+            print("No jump cooldown enabled")
+        else
+            print("No jump cooldown disabled")
+        end
+    end,
+})
+
+-- Main Loop using RunService
+RunService.Heartbeat:Connect(function()
+    -- Update Frisbees
+    if CONFIG.frisbeeModEnabled then
+        findAndModifyFrisbees()
+    end
+    
+    -- Update Player Stats
+    local character = LocalPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            if CONFIG.walkspeedEnabled then
+                humanoid.WalkSpeed = CONFIG.WALKSPEED
+            end
+            if CONFIG.jumppowerEnabled then
+                humanoid.JumpPower = CONFIG.JUMPPOWER
+            end
+            if CONFIG.noJumpCooldownEnabled then
+                -- Remove jump cooldown by setting UseJumpPower to true
+                -- This allows instant jumping
+                if humanoid:GetState() == Enum.HumanoidStateType.Landed then
+                    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                end
+                -- Alternative method: Set JumpHeight or modify the StateChanged
+                pcall(function()
+                    humanoid.UseJumpPower = true
+                end)
+            end
+        end
+    end
+end)
+
+-- Wait for character to load before setting up magnet
+if LocalPlayer.Character then
+    setupMagnetClick()
+else
+    LocalPlayer.CharacterAdded:Wait()
+    setupMagnetClick()
+end
+
+-- Initial check
+print("Frisbee Helper UI Loaded!")
+Rayfield:Notify({
+    Title = "Frisbee Helper",
+    Content = "UI Loaded Successfully!",
+    Duration = 3,
+    Image = 4483362458,
+})
