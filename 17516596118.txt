@@ -1,0 +1,294 @@
+-- ================= SAFE LOAD =================
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game:GetService("Players").LocalPlayer
+repeat task.wait() until game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+
+-- ================= LIBRARY =================
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+
+-- ================= SETTINGS =================
+_G.Settings = {
+    Enabled = true,
+    Size = 10,
+    Transparency = 0.65,
+    PlayerColor = Color3.fromRGB(0,170,255),
+    MobColor = Color3.fromRGB(255,0,0),
+    UpdateRate = 0.15,
+    AutoRestore = true,
+    SpeedEnabled = false,
+    SpeedValue = 55,
+    RecoilEnabled = false,
+    NoCooldownEnabled = false,
+    TeamCheck = true
+}
+
+-- ================= SERVICES =================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local MobsFolder = workspace:FindFirstChild("Mobs")
+
+-- ================= CHARACTER HANDLER (RESPAWN SAFE) =================
+local Character, HRP, Humanoid
+
+local function applySpeed()
+    if not _G.Settings.SpeedEnabled or not HRP then return end
+    if not HRP:FindFirstChild("SpeedVelocity") then
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = "SpeedVelocity"
+        bv.MaxForce = Vector3.new(1, 0, 1) * 1e5
+        bv.Velocity = Vector3.zero
+        bv.P = 1250
+        bv.Parent = HRP
+    end
+end
+
+local function onCharacterAdded(char)
+    Character = char
+    HRP = char:WaitForChild("HumanoidRootPart")
+    Humanoid = char:WaitForChild("Humanoid")
+    task.wait(0.5)
+    applySpeed()
+end
+
+onCharacterAdded(LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait())
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+-- ================= GUI =================
+local Window = Library:CreateWindow({
+    Title = "",
+    Footer = "Mobile Safe",
+    Center = true,
+    AutoShow = true
+})
+
+local Tabs = {
+    Main = Window:AddTab("Main", "target"),
+    Visual = Window:AddTab("Visual", "eye")
+}
+
+-- ================= MAIN TAB =================
+local HitboxBox = Tabs.Main:AddLeftGroupbox("Hitbox Expander")
+
+HitboxBox:AddToggle("HitboxToggle", {
+    Text = "Enable Hitbox",
+    Default = true,
+    Callback = function(v)
+        _G.Settings.Enabled = v
+    end
+})
+
+HitboxBox:AddSlider("HitboxSize", {
+    Text = "Hitbox Size",
+    Min = 2,
+    Max = 30,
+    Default = 10,
+    Rounding = 1,
+    Callback = function(v)
+        _G.Settings.Size = v
+    end
+})
+
+HitboxBox:AddToggle("TeamCheckToggle", {
+    Text = "Team Check",
+    Default = true,
+    Callback = function(v)
+        _G.Settings.TeamCheck = v
+    end
+})
+
+-- ================= SPEED =================
+local SpeedBox = Tabs.Main:AddLeftGroupbox("Speed Hack")
+
+SpeedBox:AddToggle("SpeedToggle", {
+    Text = "Enable Speed",
+    Default = false,
+    Callback = function(v)
+        _G.Settings.SpeedEnabled = v
+        if not HRP then return end
+        if v then
+            applySpeed()
+        else
+            local existing = HRP:FindFirstChild("SpeedVelocity")
+            if existing then existing:Destroy() end
+        end
+    end
+})
+
+SpeedBox:AddSlider("SpeedAmount", {
+    Text = "Speed Value",
+    Min = 10,
+    Max = 150,
+    Default = 55,
+    Rounding = 0,
+    Callback = function(v)
+        _G.Settings.SpeedValue = v
+    end
+})
+
+-- ================= VISUALS =================
+local VisualBox = Tabs.Visual:AddLeftGroupbox("Weapon / Ability")
+
+VisualBox:AddToggle("NoRecoil", {
+    Text = "No Recoil",
+    Default = false,
+    Callback = function(v)
+        _G.Settings.RecoilEnabled = v
+        if v then
+            for _, t in next, getgc(true) do
+                if typeof(t) == "table" and rawget(t, "Spread") then
+                    rawset(t, "Spread", 0)
+                    rawset(t, "BaseSpread", 0)
+                    rawset(t, "MinCamRecoil", Vector3.new())
+                    rawset(t, "MaxCamRecoil", Vector3.new())
+                    rawset(t, "MinRotRecoil", Vector3.new())
+                    rawset(t, "MaxRotRecoil", Vector3.new())
+                    rawset(t, "MinTransRecoil", Vector3.new())
+                    rawset(t, "MaxTransRecoil", Vector3.new())
+                    rawset(t, "ScopeSpeed", 100)
+                end
+            end
+        end
+    end
+})
+
+VisualBox:AddToggle("NoCooldown", {
+    Text = "No Cooldown",
+    Default = false,
+    Callback = function(v)
+        _G.Settings.NoCooldownEnabled = v
+        if v then
+            for _, t in next, getgc(true) do
+                if typeof(t) == "table" and rawget(t, "CD") then
+                    rawset(t, "CD", 0)
+                end
+            end
+        end
+    end
+})
+
+-- ================= DISCORD + NOTE =================
+local CommunityBox = Tabs.Main:AddLeftGroupbox("Community")
+
+CommunityBox:AddButton("Copy Discord Invite", function()
+    if setclipboard then
+        setclipboard("https://discord.gg/dJJ3psbAxw")
+    end
+end)
+
+CommunityBox:AddLabel("If you want me to add more features, please join the Discord.", true)
+
+-- ================= SPEED LOOP =================
+RunService.RenderStepped:Connect(function()
+    if not _G.Settings.SpeedEnabled then return end
+    if not HRP or not Humanoid then return end
+
+    local bv = HRP:FindFirstChild("SpeedVelocity")
+    if not bv then return end
+
+    local moveDir = Humanoid.MoveDirection
+    if moveDir.Magnitude > 0 then
+        local flatDir = Vector3.new(moveDir.X, 0, moveDir.Z).Unit
+        bv.Velocity = flatDir * _G.Settings.SpeedValue
+    else
+        bv.Velocity = Vector3.zero
+    end
+end)
+
+-- ================= TEAM CHECK =================
+local function isEnemy(plr)
+    if not _G.Settings.TeamCheck then return true end
+    if not plr.Team or not LocalPlayer.Team then return true end
+    return plr.Team ~= LocalPlayer.Team
+end
+
+-- ================= ADVANCED HITBOX =================
+local Cache = {}
+local lastUpdate = 0
+
+local function backup(part)
+    if not Cache[part] then
+        Cache[part] = {
+            Size = part.Size,
+            Transparency = part.Transparency,
+            CanCollide = part.CanCollide,
+            Material = part.Material,
+            Color = part.Color,
+            Reflectance = part.Reflectance,
+            CastShadow = part.CastShadow,
+            Anchored = part.Anchored,
+            Name = part.Name
+        }
+    end
+end
+
+local function apply(part, color)
+    backup(part)
+    part.Size = Vector3.new(_G.Settings.Size, _G.Settings.Size, _G.Settings.Size)
+    part.Transparency = _G.Settings.Transparency
+    part.Material = Enum.Material.Neon
+    part.Color = color
+    part.Reflectance = 0.1
+    part.CastShadow = false
+    part.Anchored = false
+    part.CanCollide = false
+end
+
+local function restore(part)
+    local data = Cache[part]
+    if data then
+        for prop, val in pairs(data) do
+            pcall(function() part[prop] = val end)
+        end
+        Cache[part] = nil
+    end
+end
+
+local function highlight(model, color)
+    local h = model:FindFirstChild("HighlightESP")
+    if not h then
+        h = Instance.new("Highlight")
+        h.Name = "HighlightESP"
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        h.Parent = model
+        h.Adornee = model
+    end
+    h.FillColor = color
+    h.FillTransparency = 0.25
+    h.OutlineTransparency = 0
+end
+
+RunService.Heartbeat:Connect(function(dt)
+    lastUpdate += dt
+    if lastUpdate < _G.Settings.UpdateRate then return end
+    lastUpdate = 0
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and isEnemy(plr) then
+            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                if _G.Settings.Enabled then
+                    apply(hrp, _G.Settings.PlayerColor)
+                    highlight(plr.Character, _G.Settings.PlayerColor)
+                elseif _G.Settings.AutoRestore then
+                    restore(hrp)
+                end
+            end
+        end
+    end
+
+    if MobsFolder then
+        for _, mob in ipairs(MobsFolder:GetChildren()) do
+            local hrp = mob:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                if _G.Settings.Enabled then
+                    apply(hrp, _G.Settings.MobColor)
+                    highlight(mob, _G.Settings.MobColor)
+                elseif _G.Settings.AutoRestore then
+                    restore(hrp)
+                end
+            end
+        end
+    end
+end)
