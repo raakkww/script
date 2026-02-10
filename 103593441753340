@@ -1,0 +1,169 @@
+-- button esp for https://www.roblox.com/games/103593441753340/Find-The-Button
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- config
+local CONFIG = {
+    Enabled = true,
+    MaxDistance = 500, -- render distance, low = lower render distance high = higher render distance
+    TextSize = 14,
+    TextColor = Color3.fromRGB(255, 255, 255),
+    BoxColor = Color3.fromRGB(0, 255, 0),
+    BoxThickness = 2,
+    ShowDistance = true,
+}
+
+local btns = {
+    "button",
+    "btn",
+    "clickbutton",
+    "pressbutton",
+    "switch",
+    "lever",
+    "clickdetector",
+}
+
+local ESPObjects = {}
+
+local function isButtonName(name)
+    local lowerName = string.lower(name)
+    for _, pattern in ipairs(btns) do
+        if string.find(lowerName, pattern) then
+            return true
+        end
+    end
+    return false
+end
+
+local function createESP(object)
+    if ESPObjects[object] then return end
+    
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ButtonESP"
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.Adornee = object
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = CONFIG.TextColor
+    textLabel.TextSize = CONFIG.TextSize
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.TextStrokeTransparency = 0.5
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    textLabel.Text = object.Name
+    textLabel.Parent = billboard
+    
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "ButtonESPBox"
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Size = object.Size or Vector3.new(2, 2, 2)
+    box.Color3 = CONFIG.BoxColor
+    box.Transparency = 0.7
+    box.Adornee = object
+    
+    billboard.Parent = object
+    box.Parent = object
+    
+    ESPObjects[object] = {
+        Billboard = billboard,
+        Box = box,
+        TextLabel = textLabel,
+    }
+end
+
+local function removeESP(object)
+    if ESPObjects[object] then
+        ESPObjects[object].Billboard:Destroy()
+        ESPObjects[object].Box:Destroy()
+        ESPObjects[object] = nil
+    end
+end
+
+local function updateESP()
+    if not CONFIG.Enabled then return end
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    for object, espData in pairs(ESPObjects) do
+        if object and object.Parent then
+            local distance = (rootPart.Position - object.Position).Magnitude
+            
+            if distance > CONFIG.MaxDistance then
+                espData.Billboard.Enabled = false
+                espData.Box.Visible = false
+            else
+                espData.Billboard.Enabled = true
+                espData.Box.Visible = true
+                
+                if CONFIG.ShowDistance then
+                    espData.TextLabel.Text = string.format("%s\n[%.1fm]", object.Name, distance)
+                else
+                    espData.TextLabel.Text = object.Name
+                end
+            end
+        else
+            removeESP(object)
+        end
+    end
+end
+
+local function scanWorkspace(parent)
+    for _, child in ipairs(parent:GetDescendants()) do
+        if (child:IsA("BasePart") or child:IsA("Model") or child:IsA("ClickDetector")) and isButtonName(child.Name) then
+            if child:IsA("BasePart") then
+                createESP(child)
+            elseif child:IsA("ClickDetector") and child.Parent:IsA("BasePart") then
+                createESP(child.Parent)
+            end
+        end
+    end
+end
+
+scanWorkspace(Workspace)
+
+Workspace.DescendantAdded:Connect(function(descendant)
+    if CONFIG.Enabled and isButtonName(descendant.Name) then
+        if descendant:IsA("BasePart") then
+            createESP(descendant)
+        elseif descendant:IsA("ClickDetector") and descendant.Parent:IsA("BasePart") then
+            createESP(descendant.Parent)
+        end
+    end
+end)
+
+Workspace.DescendantRemoving:Connect(function(descendant)
+    if ESPObjects[descendant] then
+        removeESP(descendant)
+    end
+end)
+
+RunService.RenderStepped:Connect(updateESP)
+
+local function toggleESP()
+    CONFIG.Enabled = not CONFIG.Enabled
+    print("Button ESP:", CONFIG.Enabled and "Enabled" or "Disabled")
+    
+    if not CONFIG.Enabled then
+        for object, espData in pairs(ESPObjects) do
+            espData.Billboard.Enabled = false
+            espData.Box.Visible = false
+        end
+    end
+end
+
+_G.ToggleButtonESP = toggleESP
+
+print("open source - pt 1")
