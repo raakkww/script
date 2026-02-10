@@ -1,0 +1,276 @@
+-- ===== SERVIÇOS =====
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local VirtualInput = game:GetService("VirtualInputManager")
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- ===== CONFIG =====
+local UISTransparency = 0.9
+local FARMSAFE_POS = Vector3.new(169,14,129)
+local TP_GUN_POS = Vector3.new(163,34,134)
+local FARM_POS = Vector3.new(-78,64,40)
+local FarmSafeActive = false
+local XRAY_ENABLED = false
+
+-- ===== GUI =====
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.ResetOnSpawn = false
+
+-- Toggle flutuante UI
+local uiToggle = Instance.new("TextButton", gui)
+uiToggle.Size = UDim2.new(0,45,0,45)
+uiToggle.Position = UDim2.new(0,15,0,120)
+uiToggle.Text = "UI"
+uiToggle.Font = Enum.Font.GothamBold
+uiToggle.TextSize = 16
+uiToggle.BackgroundColor3 = Color3.fromRGB(60,60,60)
+Instance.new("UICorner", uiToggle).CornerRadius = UDim.new(1,0)
+
+-- ===== MAIN FRAME =====
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0,360,0,500)
+main.Position = UDim2.new(0.5,-180,0.5,-250)
+main.BackgroundColor3 = Color3.fromRGB(25,25,25)
+main.BackgroundTransparency = 1 - UISTransparency
+main.Active = true
+main.Draggable = true
+Instance.new("UICorner", main).CornerRadius = UDim.new(0,14)
+
+uiToggle.MouseButton1Click:Connect(function()
+	main.Visible = not main.Visible
+end)
+
+-- ===== BOTÃO FLUTUANTE TP =====
+local tpFloat = Instance.new("TextButton", gui)
+tpFloat.Size = UDim2.new(0,45,0,45)
+tpFloat.Position = UDim2.new(0,15,0,175)
+tpFloat.Text = "TP"
+tpFloat.Font = Enum.Font.GothamBold
+tpFloat.TextSize = 16
+tpFloat.BackgroundColor3 = Color3.fromRGB(70,130,255)
+Instance.new("UICorner", tpFloat).CornerRadius = UDim.new(1,0)
+
+tpFloat.MouseButton1Click:Connect(function()
+	local char = player.Character
+	if char and char:FindFirstChild("HumanoidRootPart") then
+		char.HumanoidRootPart.CFrame = CFrame.new(TP_GUN_POS)
+	end
+end)
+
+-- ===== TITULO =====
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1,0,0,40)
+title.Text = "Shoot or Die"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundColor3 = Color3.fromRGB(35,35,35)
+
+-- ===== ABAS =====
+local tabBar = Instance.new("Frame", main)
+tabBar.Position = UDim2.new(0,0,0,40)
+tabBar.Size = UDim2.new(1,0,0,40)
+tabBar.BackgroundTransparency = 1
+
+local pages = Instance.new("Folder", main)
+
+local function createTab(name,x)
+	local b = Instance.new("TextButton", tabBar)
+	b.Size = UDim2.new(0,115,1,0)
+	b.Position = UDim2.new(0,x,0,0)
+	b.Text = name
+	b.Font = Enum.Font.Gotham
+	b.TextSize = 14
+	b.TextColor3 = Color3.new(1,1,1)
+	b.BackgroundColor3 = Color3.fromRGB(55,55,55)
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+
+	local p = Instance.new("Frame", pages)
+	p.Position = UDim2.new(0,0,0,80)
+	p.Size = UDim2.new(1,0,1,-80)
+	p.Visible = false
+	p.BackgroundTransparency = 1
+
+	b.MouseButton1Click:Connect(function()
+		for _,v in pairs(pages:GetChildren()) do
+			v.Visible = false
+		end
+		p.Visible = true
+	end)
+
+	return p
+end
+
+local DiscordTab = createTab("Discord",0)
+local FarmTab = createTab("Farm",120)
+local ConfigTab = createTab("Config",240)
+DiscordTab.Visible = true
+
+-- ===== DISCORD ABA =====
+local dText = Instance.new("TextLabel", DiscordTab)
+dText.Size = UDim2.new(0.9,0,0,90)
+dText.Position = UDim2.new(0.05,0,0,20)
+dText.TextWrapped = true
+dText.Text = ""
+dText.Font = Enum.Font.GothamBold
+dText.TextSize = 16
+dText.TextColor3 = Color3.new(1,1,1)
+dText.BackgroundTransparency = 1
+
+local dBtn = Instance.new("TextButton", DiscordTab)
+dBtn.Size = UDim2.new(0.7,0,0,40)
+dBtn.Position = UDim2.new(0.15,0,0,120)
+dBtn.Text = ""
+dBtn.Font = Enum.Font.GothamBold
+dBtn.TextSize = 16
+dBtn.BackgroundColor3 = Color3.fromRGB(120,60,255)
+Instance.new("UICorner", dBtn).CornerRadius = UDim.new(0,10)
+
+dBtn.MouseButton1Click:Connect(function()
+	setclipboard("")
+end)
+
+-- ===== FARM TAB =====
+local function mkBtn(parent,text,y)
+	local b = Instance.new("TextButton", parent)
+	b.Size = UDim2.new(0.85,0,0,40)
+	b.Position = UDim2.new(0.075,0,0,y)
+	b.Text = text
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 16
+	b.TextColor3 = Color3.new(1,1,1)
+	b.BackgroundColor3 = Color3.fromRGB(255,200,60)
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0,12)
+	return b
+end
+
+-- FARM💰
+local farmBtn = mkBtn(FarmTab,"Farm💰",10)
+farmBtn.MouseButton1Click:Connect(function()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local hrp = char:WaitForChild("HumanoidRootPart")
+	hrp.CFrame = CFrame.new(FARM_POS)
+	task.wait(0.2)
+	local closestPrompt
+	local shortestDist = math.huge
+	for _,obj in pairs(workspace:GetDescendants()) do
+		if obj:IsA("ProximityPrompt") then
+			local dist = (obj.Parent.Position - hrp.Position).Magnitude
+			if dist < shortestDist then
+				shortestDist = dist
+				closestPrompt = obj
+			end
+		end
+	end
+	if closestPrompt then
+		closestPrompt.HoldDuration = 0
+		closestPrompt.RequiresLineOfSight = false
+		pcall(function()
+			fireproximityprompt(closestPrompt,0,false)
+		end)
+		VirtualInput:SendKeyEvent(true,Enum.KeyCode.E,false,game)
+		task.wait(0.05)
+		VirtualInput:SendKeyEvent(false,Enum.KeyCode.E,false,game)
+	end
+end)
+
+-- FARMSAFE(OP)
+local farmSafeBtn = mkBtn(FarmTab,"FarmSafe(OP): OFF",60)
+farmSafeBtn.BackgroundColor3 = Color3.fromRGB(50,200,120)
+farmSafeBtn.MouseButton1Click:Connect(function()
+	FarmSafeActive = not FarmSafeActive
+	XRAY_ENABLED = FarmSafeActive
+	farmSafeBtn.Text = FarmSafeActive and "FarmSafe(OP): ON" or "FarmSafe(OP): OFF"
+end)
+
+-- TP TO GUN
+local tpGunBtn = mkBtn(FarmTab,"TP TO GUN",110)
+tpGunBtn.BackgroundColor3 = Color3.fromRGB(70,130,255)
+tpGunBtn.MouseButton1Click:Connect(function()
+	local char = player.Character
+	if char and char:FindFirstChild("HumanoidRootPart") then
+		char.HumanoidRootPart.CFrame = CFrame.new(TP_GUN_POS)
+	end
+end)
+
+-- ===== CONFIG TAB =====
+local transLabel = Instance.new("TextLabel", ConfigTab)
+transLabel.Size = UDim2.new(0.8,0,0,30)
+transLabel.Position = UDim2.new(0.1,0,0,10)
+transLabel.Text = "Transparência UI (0-1)"
+transLabel.Font = Enum.Font.GothamBold
+transLabel.TextSize = 14
+transLabel.TextColor3 = Color3.new(1,1,1)
+transLabel.BackgroundTransparency = 1
+
+local transSlider = Instance.new("TextBox", ConfigTab)
+transSlider.Size = UDim2.new(0.7,0,0,30)
+transSlider.Position = UDim2.new(0.15,0,0,50)
+transSlider.Text = tostring(UISTransparency)
+transSlider.ClearTextOnFocus = false
+transSlider.Font = Enum.Font.Gotham
+transSlider.TextSize = 14
+transSlider.TextColor3 = Color3.new(1,1,1)
+transSlider.BackgroundColor3 = Color3.fromRGB(70,70,70)
+Instance.new("UICorner", transSlider).CornerRadius = UDim.new(0,6)
+
+transSlider.FocusLost:Connect(function()
+	local v = tonumber(transSlider.Text)
+	if v and v >= 0 and v <= 1 then
+		UISTransparency = v
+		main.BackgroundTransparency = 1 - UISTransparency
+	end
+end)
+
+local hopBtn = mkBtn(ConfigTab,"Hop",100)
+hopBtn.BackgroundColor3 = Color3.fromRGB(255,50,50)
+hopBtn.MouseButton1Click:Connect(function()
+	local placeId = game.PlaceId
+	local success, servers = pcall(function()
+		return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"))
+	end)
+	if success and servers and servers.data then
+		for _,server in pairs(servers.data) do
+			if server.playing < server.maxPlayers then
+				TeleportService:TeleportToPlaceInstance(placeId, server.id, player)
+				break
+			end
+		end
+	end
+end)
+
+-- ===== LOOP PRINCIPAL =====
+RunService.RenderStepped:Connect(function()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local hrp = char:WaitForChild("HumanoidRootPart")
+
+	-- FARMSAFE
+	if FarmSafeActive then
+		hrp.CFrame = CFrame.new(FARMSAFE_POS)
+
+		-- Cria plataforma
+		if not workspace:FindFirstChild("FarmSafePlatform") then
+			local plat = Instance.new("Part")
+			plat.Name = "FarmSafePlatform"
+			plat.Size = Vector3.new(10,1,10)
+			plat.Position = FARMSAFE_POS - Vector3.new(0,2,0)
+			plat.Anchored = true
+			plat.CanCollide = true
+			plat.Parent = workspace
+		end
+
+		-- Xray nos inimigos
+		for _,plr in pairs(Players:GetPlayers()) do
+			if plr ~= player and plr.Character then
+				for _,part in pairs(plr.Character:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.LocalTransparencyModifier = 0.6
+					end
+				end
+			end
+		end
+	end
+end)
