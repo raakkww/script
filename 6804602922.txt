@@ -1,0 +1,514 @@
+--// HUNTER â ALL IN ONE (FINAL BUILD)
+--// CLEAN â¢ STABLE â¢ BOXING BETA READY
+
+-----------------------------------------------------
+-- LOAD RAYFIELD
+-----------------------------------------------------
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "",
+    LoadingTitle = "",
+    LoadingSubtitle = "",
+    Theme = "Dark",
+})
+
+Rayfield:Notify({
+    Title = "",
+    Content = "",
+    Duration = 3
+})
+
+-----------------------------------------------------
+-- SERVICES
+-----------------------------------------------------
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+
+local player = Players.LocalPlayer
+local hum, root
+
+local function refreshChar()
+    local char = player.Character or player.CharacterAdded:Wait()
+    hum = char:WaitForChild("Humanoid")
+    root = char:WaitForChild("HumanoidRootPart")
+end
+
+refreshChar()
+player.CharacterAdded:Connect(refreshChar)
+
+-----------------------------------------------------
+-- MOVEMENT TAB
+-----------------------------------------------------
+local MovementTab = Window:CreateTab("Movement")
+
+local baseSpeed = 16
+
+MovementTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {0, 200},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(v)
+        baseSpeed = v
+        if hum then hum.WalkSpeed = v end
+    end,
+})
+
+MovementTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {0, 200},
+    Increment = 1,
+    CurrentValue = 50,
+    Callback = function(v)
+        if hum then hum.JumpPower = v end
+    end,
+})
+
+-- Sprint
+local sprinting = false
+local sprintSpeed = 40
+
+UIS.InputBegan:Connect(function(i,gp)
+    if gp then return end
+    if i.KeyCode == Enum.KeyCode.LeftShift then
+        sprinting = true
+        if hum then hum.WalkSpeed = sprintSpeed end
+    end
+end)
+
+UIS.InputEnded:Connect(function(i,gp)
+    if gp then return end
+    if i.KeyCode == Enum.KeyCode.LeftShift then
+        sprinting = false
+        if hum then hum.WalkSpeed = baseSpeed end
+    end
+end)
+
+-- Noclip
+local noclip = false
+MovementTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Callback = function(v)
+        noclip = v
+    end,
+})
+
+RunService.Stepped:Connect(function()
+    if noclip and player.Character then
+        for _, p in ipairs(player.Character:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+    end
+end)
+
+-----------------------------------------------------
+-- WORLD TAB
+-----------------------------------------------------
+local WorldTab = Window:CreateTab("World")
+
+WorldTab:CreateSlider({
+    Name = "Field Of View",
+    Range = {40, 120},
+    Increment = 1,
+    CurrentValue = 70,
+    Callback = function(v)
+        workspace.CurrentCamera.FieldOfView = v
+    end,
+})
+
+WorldTab:CreateSlider({
+    Name = "Gravity",
+    Range = {0, 400},
+    Increment = 5,
+    CurrentValue = workspace.Gravity,
+    Callback = function(v)
+        workspace.Gravity = v
+    end,
+})
+
+WorldTab:CreateSlider({
+    Name = "Time Of Day",
+    Range = {0, 24},
+    Increment = 0.1,
+    CurrentValue = Lighting.ClockTime,
+    Callback = function(v)
+        Lighting.ClockTime = v
+    end,
+})
+
+-----------------------------------------------------
+-- CHARACTER TAB
+-----------------------------------------------------
+local CharTab = Window:CreateTab("Character")
+
+local hipEnabled = false
+local hipValue = 1
+
+CharTab:CreateToggle({
+    Name = "Enable HipHeight",
+    CurrentValue = false,
+    Callback = function(v)
+        hipEnabled = v
+        if hum then
+            hum.HipHeight = v and hipValue or 0.1
+        end
+    end,
+})
+
+CharTab:CreateSlider({
+    Name = "HipHeight",
+    Range = {1, 200},
+    Increment = 1,
+    CurrentValue = 1,
+    Callback = function(v)
+        hipValue = v
+        if hipEnabled and hum then
+            hum.HipHeight = v
+        end
+    end,
+})
+
+CharTab:CreateButton({
+    Name = "Stylish Walkstyle",
+    Callback = function()
+        if not hum then return end
+        local desc = Players:GetHumanoidDescriptionFromUserId(player.UserId)
+        hum:ApplyDescription(desc)
+    end,
+})
+
+-----------------------------------------------------
+-- ESP TAB (GREEN HUNTER OUTLINE)
+-----------------------------------------------------
+local ESPTab = Window:CreateTab("ESP")
+
+local espEnabled = false
+local espFolder = Instance.new("Folder", workspace)
+espFolder.Name = "HUNTER_ESP"
+
+local function clearESP()
+    for _, v in ipairs(espFolder:GetChildren()) do v:Destroy() end
+end
+
+local function createESP(plr)
+    if not plr.Character then return end
+    local h = Instance.new("Highlight")
+    h.FillTransparency = 1
+    h.OutlineColor = Color3.fromRGB(0, 255, 0)
+    h.OutlineTransparency = 0
+    h.Adornee = plr.Character
+    h.Parent = espFolder
+end
+
+local function refreshESP()
+    clearESP()
+    if not espEnabled then return end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then createESP(plr) end
+    end
+end
+
+ESPTab:CreateToggle({
+    Name = "Player ESP (Hunter Green)",
+    CurrentValue = false,
+    Callback = function(v)
+        espEnabled = v
+        refreshESP()
+    end,
+})
+
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function()
+        if espEnabled then task.wait(1) refreshESP() end
+    end)
+end)
+
+-----------------------------------------------------
+-- TELEPORT TAB
+-----------------------------------------------------
+local TeleTab = Window:CreateTab("Teleports")
+
+local names = {}
+local selected = nil
+
+local function updateList()
+    table.clear(names)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then table.insert(names, plr.Name) end
+    end
+end
+
+updateList()
+
+local dropdown = TeleTab:CreateDropdown({
+    Name = "Select Player",
+    Options = names,
+    CurrentOption = names[1],
+    MultipleOptions = false,
+    Callback = function(opt)
+        selected = typeof(opt) == "table" and opt[1] or opt
+    end,
+})
+
+Players.PlayerAdded:Connect(function()
+    updateList()
+    dropdown:Set(names)
+end)
+
+Players.PlayerRemoving:Connect(function()
+    updateList()
+    dropdown:Set(names)
+end)
+
+TeleTab:CreateButton({
+    Name = "Teleport To Player",
+    Callback = function()
+        if not selected or not root then return end
+        local t = Players:FindFirstChild(selected)
+        if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
+            root.CFrame = t.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+        end
+    end,
+})
+
+TeleTab:CreateButton({
+    Name = "Rejoin",
+    Callback = function()
+        TeleportService:Teleport(game.PlaceId, player)
+    end,
+})
+
+TeleTab:CreateButton({
+    Name = "Server Hop",
+    Callback = function()
+        TeleportService:Teleport(game.PlaceId)
+    end,
+})
+
+-----------------------------------------------------
+-- BOXING BETA TAB (INF STAMINA + AUTO DODGE)
+-----------------------------------------------------
+local BoxingTab = Window:CreateTab("Boxing Beta")
+
+getgenv().BoxConfig = {
+    InfStamina = false,
+    StamThreshold = 77,
+    CombatSpeed = 28,
+    BlockSpeed = 14,
+    CombatMomentum = false,
+    AutoDodgePunches = false,
+    DodgeAura = false,
+}
+
+-----------------------------------------------------
+-- UI
+-----------------------------------------------------
+BoxingTab:CreateToggle({
+    Name = "Smart Stamina Floor (Inf Stamina)",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().BoxConfig.InfStamina = v
+    end,
+})
+
+BoxingTab:CreateSlider({
+    Name = "Minimum Stamina Floor",
+    Range = {1, 100},
+    Increment = 1,
+    CurrentValue = 77,
+    Callback = function(v)
+        getgenv().BoxConfig.StamThreshold = v
+    end,
+})
+
+BoxingTab:CreateToggle({
+    Name = "Combat Momentum (Safe)",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().BoxConfig.CombatMomentum = v
+    end,
+})
+
+BoxingTab:CreateToggle({
+    Name = "Auto Dodge Punches (Predictive)",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().BoxConfig.AutoDodgePunches = v
+    end,
+})
+
+BoxingTab:CreateToggle({
+    Name = "Dodge Aura",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().BoxConfig.DodgeAura = v
+    end,
+})
+
+-----------------------------------------------------
+-- INF STAMINA (SAFE)
+-----------------------------------------------------
+RunService.Stepped:Connect(function()
+    if not getgenv().BoxConfig.InfStamina then return end
+    if not player.Character then return end
+
+    local char = player.Character
+
+    local attr = char:GetAttribute("Stamina")
+    if typeof(attr) == "number" and attr < getgenv().BoxConfig.StamThreshold then
+        char:SetAttribute("Stamina", getgenv().BoxConfig.StamThreshold)
+    end
+
+    local s = char:FindFirstChild("Stamina")
+    if s and s:IsA("NumberValue") and s.Value < getgenv().BoxConfig.StamThreshold then
+        s.Value = getgenv().BoxConfig.StamThreshold
+    end
+end)
+
+-----------------------------------------------------
+-- ANTI-FATIGUE RESET (FIXES WEIRD MOVEMENT)
+-----------------------------------------------------
+RunService.Heartbeat:Connect(function()
+    if not getgenv().BoxConfig.InfStamina then return end
+    if not hum or not root then return end
+
+    local state = hum:GetState()
+
+    if state == Enum.HumanoidStateType.FallingDown
+    or state == Enum.HumanoidStateType.PlatformStanding
+    or state == Enum.HumanoidStateType.Physics
+    or state == Enum.HumanoidStateType.Ragdoll then
+        
+        hum:ChangeState(Enum.HumanoidStateType.Running)
+        hum.Sit = false
+        hum.PlatformStand = false
+
+        root.AssemblyLinearVelocity = Vector3.new(
+            root.AssemblyLinearVelocity.X,
+            0,
+            root.AssemblyLinearVelocity.Z
+        )
+
+        root.RotVelocity = Vector3.zero
+    end
+end)
+
+-----------------------------------------------------
+-- SAFE COMBAT MOMENTUM
+-----------------------------------------------------
+RunService.Heartbeat:Connect(function()
+    if not getgenv().BoxConfig.CombatMomentum then return end
+    if not hum or not root then return end
+    if hum.MoveDirection.Magnitude < 0.1 then return end
+
+    local blocking = UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+    local targetSpeed = blocking and getgenv().BoxConfig.BlockSpeed or getgenv().BoxConfig.CombatSpeed
+
+    root.AssemblyLinearVelocity = Vector3.new(
+        hum.MoveDirection.X * targetSpeed,
+        root.AssemblyLinearVelocity.Y,
+        hum.MoveDirection.Z * targetSpeed
+    )
+end)
+
+-----------------------------------------------------
+-- AUTO DODGE PUNCHES (PREDICTIVE)
+-----------------------------------------------------
+local function getPunchThreat()
+    local closest = nil
+    local closestDist = math.huge
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            
+            local hrp = plr.Character.HumanoidRootPart
+            local hum2 = plr.Character:FindFirstChild("Humanoid")
+            if not hum2 then continue end
+
+            local dist = (hrp.Position - root.Position).Magnitude
+            if dist < 8 and dist < closestDist then
+
+                local dir = (root.Position - hrp.Position).Unit
+                local facing = hrp.CFrame.LookVector:Dot(dir)
+
+                local speed = hrp.AssemblyLinearVelocity.Magnitude
+                local rot = math.abs(hrp.AssemblyAngularVelocity.Y)
+
+                if facing > 0.82 or speed > 16 or rot > 0.18 then
+                    closest = plr
+                    closestDist = dist
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+RunService.Heartbeat:Connect(function()
+    if not getgenv().BoxConfig.AutoDodgePunches then return end
+    if not hum or not root then return end
+
+    local threat = getPunchThreat()
+    if threat then
+        local hrp = threat.Character.HumanoidRootPart
+        local away = (root.Position - hrp.Position).Unit
+        hum:Move(away * 2.3, true)
+    end
+end)
+
+-----------------------------------------------------
+-- DODGE AURA (OPTIONAL)
+-----------------------------------------------------
+RunService.Heartbeat:Connect(function()
+    if not getgenv().BoxConfig.DodgeAura then return end
+    if not hum or not root then return end
+
+    local closest, dist = nil, math.huge
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = plr.Character.HumanoidRootPart
+            local mag = (hrp.Position - root.Position).Magnitude
+            if mag < dist then
+                dist = mag
+                closest = plr
+            end
+        end
+    end
+
+    if closest and dist < 6 then
+        local away = (root.Position - closest.Character.HumanoidRootPart.Position).Unit
+        hum:Move(away * 1.8, true)
+    end
+end)
+
+-----------------------------------------------------
+-- EXTRA TAB
+-----------------------------------------------------
+local ExtraTab = Window:CreateTab("Extra")
+
+ExtraTab:CreateToggle({
+    Name = "Anti AFK",
+    CurrentValue = true,
+    Callback = function(v)
+        if v then
+            player.Idled:Connect(function()
+                game:GetService("VirtualUser"):Button2Down(Vector2.new(), workspace.CurrentCamera.CFrame)
+                task.wait(0.1)
+                game:GetService("VirtualUser"):Button2Up(Vector2.new(), workspace.CurrentCamera.CFrame)
+            end)
+        end
+    end,
+})
+
+ExtraTab:CreateButton({
+    Name = "Infinite Yield",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    end,
+})
