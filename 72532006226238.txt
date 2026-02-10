@@ -1,0 +1,91 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Leaf Collector",
+   LoadingTitle = "",
+   LoadingSubtitle = "",
+   ConfigurationSaving = { Enabled = false }
+})
+
+local MainTab = Window:CreateTab("Farm de XP", 4483362458)
+
+-- Variáveis de controle
+_G.AutoFarmXP = false
+_G.AutoGold = false
+
+local Remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("LifecycleInvokeServerFunctionFunction")
+local SID = "Session::8912825020"
+
+MainTab:CreateSection("Otimizador de Folhas e Maçãs")
+
+MainTab:CreateToggle({
+   Name = "Ultra XP Farm (Folhas + Maçãs)",
+   CurrentValue = false,
+   Flag = "XPFarm", 
+   Callback = function(Value)
+      _G.AutoFarmXP = Value
+      if Value then
+         task.spawn(function()
+            local leafIds = {103, 79, 82, 81}
+            while _G.AutoFarmXP do
+               -- O segredo do XP: Enviar as folhas em blocos e as maçãs simultaneamente
+               task.spawn(function()
+                  pcall(function() 
+                     Remote:InvokeServer(SID, "CollectLeafBatch", leafIds) 
+                  end)
+               end)
+               
+               task.spawn(function()
+                  pcall(function() 
+                     Remote:InvokeServer(SID, "CollectApple") 
+                  end)
+               end)
+               
+               -- Delay de 0.02s é o "limite" para o servidor registrar o ganho de XP sem pular itens
+               task.wait(0.02)
+            end
+         end)
+      end
+   end,
+})
+
+MainTab:CreateSection("Ouro")
+
+MainTab:CreateToggle({
+   Name = "Turbo Click Miner",
+   CurrentValue = false,
+   Flag = "GoldFarm", 
+   Callback = function(Value)
+      _G.AutoGold = Value
+      if Value then
+         task.spawn(function()
+            while _G.AutoGold do
+               -- 5 Cliques por ciclo para não sobrecarregar
+               for i = 1, 5 do
+                  task.spawn(function()
+                     pcall(function() Remote:InvokeServer(SID, "ClickGold") end)
+                  end)
+               end
+               task.wait(0.03)
+            end
+         end)
+      end
+   end,
+})
+
+MainTab:CreateSection("Utilitários")
+
+MainTab:CreateButton({
+   Name = "Fechar Hub",
+   Callback = function()
+      _G.AutoFarmXP = false
+      _G.AutoGold = false
+      Rayfield:Destroy()
+   end,
+})
+
+Rayfield:Notify({
+   Title = "Hub Ativado",
+   Content = "Foco em XP e Folhas ativado com sucesso!",
+   Duration = 5
+})
