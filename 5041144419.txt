@@ -1,0 +1,323 @@
+--================================================--
+--   VODKA HUB | ADVANCED AIMBOT + ESP + HITBOX  --
+--================================================--
+
+--// UI
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+--// SERVICES
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local Toggles = Library.Toggles
+local Options = Library.Options
+
+--================================================--
+-- UI
+--================================================--
+
+local Window = Library:CreateWindow({
+    Title = "",
+    Footer = "",
+    Icon = 95816097006870,
+    NotifySide = "Right",
+    ShowCustomCursor = true,
+})
+
+local Tabs = {
+    Main = Window:AddTab("Main", "crosshair"),
+    Visuals = Window:AddTab("Visuals", "eye"),
+}
+
+--================================================--
+-- AIMBOT
+--================================================--
+
+local AimbotBox = Tabs.Main:AddLeftGroupbox("Aimbot")
+
+AimbotBox:AddToggle("Aimbot", { Text = "Enable Aimbot" })
+
+AimbotBox:AddSlider("AimbotFOV", {
+    Text = "FOV Radius",
+    Default = 150,
+    Min = 30,
+    Max = 400,
+    Rounding = 0,
+})
+
+AimbotBox:AddSlider("AimbotSmooth", {
+    Text = "Smoothness",
+    Default = 15,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+})
+
+AimbotBox:AddSlider("Prediction", {
+    Text = "Prediction",
+    Default = 15,
+    Min = 0,
+    Max = 30,
+    Rounding = 0,
+})
+
+--================================================--
+-- FOV CIRCLE
+--================================================--
+
+local FOV = Drawing.new("Circle")
+FOV.Thickness = 1
+FOV.Filled = false
+FOV.Color = Color3.fromRGB(255,255,255)
+
+RunService.RenderStepped:Connect(function()
+    local vp = Camera.ViewportSize
+    FOV.Position = Vector2.new(vp.X/2, vp.Y/2)
+    FOV.Radius = Options.AimbotFOV.Value
+    FOV.Visible = Toggles.Aimbot.Value
+end)
+
+--================================================--
+-- VISIBILITY CHECK
+--================================================--
+
+local function isVisible(part)
+    local origin = Camera.CFrame.Position
+    local dir = part.Position - origin
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { LocalPlayer.Character, Camera }
+    params.IgnoreWater = true
+
+    local result = workspace:Raycast(origin, dir, params)
+    return not result or result.Instance:IsDescendantOf(part.Parent)
+end
+
+--================================================--
+-- TARGET LOCK AIMBOT
+--================================================--
+
+local CurrentTarget, LastScan = nil, 0
+local SCAN_INTERVAL = 0.15
+
+local function getAimPart(char)
+    return char:FindFirstChild("Head")
+        or char:FindFirstChild("UpperTorso")
+        or char:FindFirstChild("HumanoidRootPart")
+end
+
+local function acquireTarget()
+    local best, bestScore = nil, math.huge
+    local center = Camera.ViewportSize / 2
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character then
+            local char = p.Character
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local aimPart = getAimPart(char)
+
+            if hum and hrp and aimPart and hum.Health > 0 and isVisible(aimPart) then
+                local pos, onScreen = Camera:WorldToViewportPoint(aimPart.Position)
+                if onScreen then
+                    local dist2D = (Vector2.new(pos.X,pos.Y) - center).Magnitude
+                    local dist3D = (Camera.CFrame.Position - hrp.Position).Magnitude
+                    local score = dist2D + dist3D * 0.05
+
+                    if score < bestScore and dist2D <= Options.AimbotFOV.Value then
+                        bestScore = score
+                        best = aimPart
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+RunService.RenderStepped:Connect(function()
+    if not Toggles.Aimbot.Value then
+        CurrentTarget = nil
+        return
+    end
+
+    if not CurrentTarget or not CurrentTarget.Parent or tick() - LastScan > SCAN_INTERVAL then
+        CurrentTarget = acquireTarget()
+        LastScan = tick()
+    end
+
+    if not CurrentTarget then return end
+
+    local velocity = CurrentTarget.AssemblyLinearVelocity or Vector3.zero
+    local prediction = velocity * (Options.Prediction.Value / 100)
+
+    local camPos = Camera.CFrame.Position
+    local targetCF = CFrame.new(camPos, CurrentTarget.Position + prediction)
+
+    Camera.CFrame = Camera.CFrame:Lerp(
+        targetCF,
+        Options.AimbotSmooth.Value / 100
+    )
+end)
+
+--================================================--
+-- ESP (NAME + HEALTH)
+--================================================--
+
+local ESPBox = Tabs.Visuals:AddLeftGroupbox("ESP")
+
+ESPBox:AddToggle("ESP", { Text = "Enable ESP" })
+
+ESPBox:AddSlider("ESPDistance", {
+    Text = "Max Distance",
+    Default = 3000,
+    Min = 500,
+    Max = 10000,
+    Rounding = 0,
+})
+
+local ESP = {}
+
+local function newDraw(t,p)
+    local d = Drawing.new(t)
+    for i,v in pairs(p) do d[i] = v end
+    return d
+end
+
+for _,p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        ESP[p] = {
+            Name = newDraw("Text",{Size=13,Center=true,Outline=true}),
+            HP = newDraw("Line",{Thickness=2})
+        }
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if not Toggles.ESP.Value then
+        for _,e in pairs(ESP) do e.Name.Visible=false e.HP.Visible=false end
+        return
+    end
+
+    for p,e in pairs(ESP) do
+        local c = p.Character
+        local h = c and c:FindFirstChildOfClass("Humanoid")
+        local r = c and c:FindFirstChild("HumanoidRootPart")
+
+        if not c or not h or not r or h.Health<=0 or p.Team==LocalPlayer.Team then
+            e.Name.Visible=false e.HP.Visible=false
+            continue
+        end
+
+        local d = (Camera.CFrame.Position - r.Position).Magnitude
+        if d > Options.ESPDistance.Value then
+            e.Name.Visible=false e.HP.Visible=false
+            continue
+        end
+
+        local pos,on = Camera:WorldToViewportPoint(r.Position + Vector3.new(0,3,0))
+        if not on then
+            e.Name.Visible=false e.HP.Visible=false
+            continue
+        end
+
+        e.Name.Text = p.Name.." ["..math.floor(d).."]"
+        e.Name.Position = Vector2.new(pos.X,pos.Y-10)
+        e.Name.Visible=true
+
+        local hp = h.Health/h.MaxHealth
+        e.HP.From = Vector2.new(pos.X-14,pos.Y+12)
+        e.HP.To = Vector2.new(pos.X-14,pos.Y+12-(25*hp))
+        e.HP.Color = Color3.fromRGB(255-255*hp,255*hp,0)
+        e.HP.Visible=true
+    end
+end)
+
+--================================================--
+-- HITBOX EXPANDER (TEAM SAFE)
+--================================================--
+
+local HitboxBox = Tabs.Visuals:AddRightGroupbox("Hitbox Expander")
+
+HitboxBox:AddToggle("Hitbox", { Text = "Enable Hitbox Expander" })
+
+HitboxBox:AddSlider("HitboxSize", {
+    Text = "Hitbox Size",
+    Default = 6,
+    Min = 2,
+    Max = 15,
+    Rounding = 0,
+})
+
+HitboxBox:AddSlider("HitboxTransparency", {
+    Text = "Transparency",
+    Default = 6,
+    Min = 0,
+    Max = 9,
+    Rounding = 0,
+})
+
+local Original = {}
+local VALID = { Head=true, UpperTorso=true, HumanoidRootPart=true }
+local LAST = 0
+local RATE = 0.25
+
+RunService.Heartbeat:Connect(function()
+    if tick() - LAST < RATE then return end
+    LAST = tick()
+
+    if not Toggles.Hitbox.Value then
+        for part,data in pairs(Original) do
+            if part and part.Parent then
+                part.Size = data.Size
+                part.Transparency = data.Transparency
+                part.CanCollide = data.CanCollide
+            end
+            Original[part] = nil
+        end
+        return
+    end
+
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character then
+            for _,part in ipairs(p.Character:GetChildren()) do
+                if part:IsA("BasePart") and VALID[part.Name] then
+                    if not Original[part] then
+                        Original[part] = {
+                            Size = part.Size,
+                            Transparency = part.Transparency,
+                            CanCollide = part.CanCollide
+                        }
+                    end
+                    local s = Options.HitboxSize.Value
+                    part.Size = Vector3.new(s,s,s)
+                    part.Transparency = Options.HitboxTransparency.Value / 10
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+--================================================--
+-- DISCORD INVITE BUTTON
+--================================================--
+
+local InfoBox = Tabs.Visuals:AddRightGroupbox("Info")
+
+--================================================--
+-- SAVE / THEME
+--================================================--
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+ThemeManager:SetFolder("VodkaHub")
+SaveManager:SetFolder("VodkaHub")
+
+Library:Notify("", 3)
