@@ -1,0 +1,7 @@
+getgenv().dupe = true -- set to "false" to disable it
+
+while getgenv().dupe do
+    game:GetService("ReplicatedStorage").Events.SkipDay:FireServer()
+    task.wait(0.01)
+end
+-- Set "true" to "false" To stop getting money. (sound kinda annoying and loud)
