@@ -1,0 +1,242 @@
+-- // BACON HUB //
+local ScreenName = "BaconHub_Final_Clean"
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+if LocalPlayer.PlayerGui:FindFirstChild(ScreenName) then
+    LocalPlayer.PlayerGui[ScreenName]:Destroy()
+end
+
+local Toggles = {
+    God = false,
+    Fly = false,
+    Speed = false,
+    Jump = false,
+    Reveal = false,
+    Dir = false,
+    Plat = false,
+    Noclip = false,
+    Desync = false,
+    ShiftLock = false
+}
+local Config = {WS = 65, JP = 125, FS = 70, Color = Color3.fromRGB(255, 0, 80), Alert = Color3.fromRGB(0, 255, 0)}
+
+-- // UI CONSTRUCTION //
+local Screen = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+Screen.Name = ScreenName
+Screen.ResetOnSpawn = false
+local OpenBtn = Instance.new("TextButton", Screen)
+OpenBtn.Size = UDim2.new(0, 150, 0, 35)
+OpenBtn.Position = UDim2.new(0.5, -75, 0, 15)
+OpenBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+OpenBtn.Text = ""
+OpenBtn.TextColor3 = Config.Color
+OpenBtn.Font = Enum.Font.GothamBold
+OpenBtn.TextSize = 12
+Instance.new("UICorner", OpenBtn)
+Instance.new("UIStroke", OpenBtn).Color = Config.Color
+
+local Main = Instance.new("Frame", Screen)
+Main.Size = UDim2.new(0, 250, 0, 420)
+Main.Position = UDim2.new(0.5, -125, 0.5, -210)
+Main.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+Main.Visible = true
+Instance.new("UICorner", Main)
+Instance.new("UIStroke", Main).Color = Config.Color
+local Head = Instance.new("Frame", Main)
+Head.Size = UDim2.new(1, 0, 0, 40)
+Head.BackgroundTransparency = 1
+local Title = Instance.new("TextLabel", Head)
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Text = ""
+Title.TextColor3 = Config.Color
+Title.Font = Enum.Font.GothamBold
+Title.BackgroundTransparency = 1
+Title.TextXAlignment = 0
+Title.Position = UDim2.new(0, 10, 0, 0)
+local Close = Instance.new("TextButton", Head)
+Close.Size = UDim2.new(0, 26, 0, 26)
+Close.Position = UDim2.new(1, -33, 0.5, -13)
+Close.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Close.Text = "X"
+Close.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", Close)
+
+local List = Instance.new("ScrollingFrame", Main)
+List.Size = UDim2.new(1, -20, 1, -55)
+List.Position = UDim2.new(0, 10, 0, 50)
+List.BackgroundTransparency = 1
+List.ScrollBarThickness = 0
+Instance.new("UIListLayout", List).Padding = UDim.new(0, 5)
+
+-- LOGIC
+local function toggleMenu()
+    Main.Visible = not Main.Visible
+end
+Close.MouseButton1Click:Connect(toggleMenu)
+OpenBtn.MouseButton1Click:Connect(toggleMenu)
+UIS.InputBegan:Connect(
+    function(i, g)
+        if not g and i.KeyCode == Enum.KeyCode.K then
+            toggleMenu()
+        end
+    end
+)
+
+local d, s, sp, di
+Main.InputBegan:Connect(
+    function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            d = true
+            s = i.Position
+            sp = Main.Position
+        end
+    end
+)
+UIS.InputChanged:Connect(
+    function(i)
+        if d and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            di = i
+        end
+    end
+)
+UIS.InputEnded:Connect(
+    function()
+        d = false
+    end
+)
+RunService.RenderStepped:Connect(
+    function()
+        if d and di then
+            local delta = di.Position - s
+            Main.Position = UDim2.new(sp.X.Scale, sp.X.Offset + delta.X, sp.Y.Scale, sp.Y.Offset + delta.Y)
+        end
+    end
+)
+
+local function addBtn(txt, tag, callback)
+    local b = Instance.new("TextButton", List)
+    b.Size = UDim2.new(1, 0, 0, 35)
+    b.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    b.Text = txt
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.Gotham
+    b.TextSize = 11
+    Instance.new("UICorner", b)
+    b.MouseButton1Click:Connect(
+        function()
+            if tag then
+                Toggles[tag] = not Toggles[tag]
+                b.BackgroundColor3 = Toggles[tag] and Config.Color or Color3.fromRGB(25, 25, 25)
+                b.TextColor3 = Toggles[tag] and Color3.new(0, 0, 0) or Color3.new(1, 1, 1)
+            end
+            if callback then
+                callback()
+            end
+        end
+    )
+end
+
+addBtn("GHOST GOD (ANTI-HUG)", "God")
+addBtn("SHIFT LOCK", "ShiftLock")
+addBtn("DESYNC (VISUAL LAG)", "Desync")
+addBtn("SMOOTH FLY", "Fly")
+addBtn("SPEED ONLY", "Speed")
+addBtn("JUMP ONLY", "Jump")
+addBtn("NOCLIP", "Noclip")
+addBtn("REVEAL PLAYERS", "Reveal")
+addBtn("DIRECTION SPHERE", "Dir")
+addBtn("SAFE PLATFORM", "Plat")
+addBtn(
+    "RESET CHARACTER",
+    nil,
+    function()
+        if LocalPlayer.Character then
+            LocalPlayer.Character:BreakJoints()
+        end
+    end
+)
+
+-- // MAIN ENGINE //
+RunService.Heartbeat:Connect(
+    function()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then
+            return
+        end
+        local hum = char.Humanoid
+        local hrp = char.HumanoidRootPart
+
+        -- GHOST GOD / ANTI-TOUCH
+        if Toggles.God then
+            -- This moves your velocity so fast that "Touch" events fail to trigger
+            hrp.Velocity = Vector3.new(0, 0.01, 0)
+            -- Makes your character parts non-touchable to the server
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanTouch = false
+                end
+            end
+        else
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanTouch = true
+                end
+            end
+        end
+
+        -- SHIFT LOCK & MOVEMENT
+        hum.CameraOffset = Toggles.ShiftLock and Vector3.new(1.7, 0.5, 0) or Vector3.new(0, 0, 0)
+        UIS.MouseBehavior = Toggles.ShiftLock and Enum.MouseBehavior.LockCenter or Enum.MouseBehavior.Default
+
+        if Toggles.Noclip then
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = false
+                end
+            end
+        end
+
+        if not Toggles.Fly then
+            hum.WalkSpeed = Toggles.Speed and Config.WS or 16
+            hum.JumpPower = Toggles.Jump and Config.JP or 50
+        else
+            hum.WalkSpeed = 0
+            hrp.Velocity = workspace.CurrentCamera.CFrame.LookVector * (hum.MoveDirection.Magnitude * Config.FS)
+        end
+
+        -- PLAYER REVEAL & DIRECTION
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local pc = p.Character
+                local prp = pc.HumanoidRootPart
+                if Toggles.Reveal then
+                    for _, v in pairs(pc:GetDescendants()) do
+                        if v:IsA("BasePart") or v:IsA("Decal") then
+                            v.LocalTransparencyModifier = 0
+                            v.Transparency = 0
+                        end
+                    end
+                end
+                local s = pc:FindFirstChild("BaconSphere")
+                if not s and Toggles.Dir then
+                    s = Instance.new("Part", pc)
+                    s.Name = "BaconSphere"
+                    s.Shape = Enum.PartType.Ball
+                    s.Size = Vector3.new(2, 2, 2)
+                    s.Material = Enum.Material.Neon
+                    s.Anchored = true
+                    s.CanCollide = false
+                end
+                if s then
+                    s.Transparency = Toggles.Dir and 0.4 or 1
+                    s.CFrame = prp.CFrame * CFrame.new(0, 1.5, -2.5)
+                    local toMe = (hrp.Position - prp.Position).Unit
+                    s.Color = (prp.CFrame.LookVector:Dot(toMe) > 0.75) and Config.Alert or Config.Color
+                end
+            end
+        end
+    end
+)
