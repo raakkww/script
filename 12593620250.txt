@@ -1,0 +1,125 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local pGui = player:WaitForChild("PlayerGui")
+
+-- // CONFIG RT HUB
+getgenv().farmMoto = false
+local plataforma = nil
+local velocidadeAtual = 0 
+local dinheiroInicial = 0
+local tempoInicial = 0
+
+-- // CORES
+local COR_ROXA = Color3.fromRGB(110, 0, 255) 
+local COR_FUNDO = Color3.fromRGB(12, 12, 14)
+local COR_OBJETO = Color3.fromRGB(25, 25, 30)
+
+-- // FUNÃÃO DRAG
+local function makeDraggable(frame)
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; dragStart = input.Position; startPos = frame.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- // INTERFACE (SEM KEY)
+if pGui:FindFirstChild("RT_NO_KEY") then pGui["RT_NO_KEY"]:Destroy() end
+local sg = Instance.new("ScreenGui", pGui); sg.Name = "RT_NO_KEY"
+
+local mf = Instance.new("Frame", sg); mf.Size = UDim2.new(0, 450, 0, 320)
+mf.Position = UDim2.new(0.5, -225, 0.5, -160); mf.BackgroundColor3 = COR_FUNDO
+mf.Visible = true; Instance.new("UICorner", mf); makeDraggable(mf)
+
+-- Sidebar
+local sb = Instance.new("Frame", mf); sb.Size = UDim2.new(0, 130, 1, 0)
+sb.BackgroundColor3 = COR_OBJETO; Instance.new("UICorner", sb)
+
+-- Monitor de Dinheiro/Hora ($100k/h)
+local profitLabel = Instance.new("TextLabel", mf)
+profitLabel.Size = UDim2.new(0, 300, 0, 100); profitLabel.Position = UDim2.new(0, 140, 0, 80)
+profitLabel.BackgroundTransparency = 1; profitLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+profitLabel.Font = Enum.Font.GothamBold; profitLabel.TextSize = 28; profitLabel.Text = "$0K / HORA"
+
+local infoLabel = Instance.new("TextLabel", mf)
+infoLabel.Size = UDim2.new(0, 300, 0, 60); infoLabel.Position = UDim2.new(0, 140, 0, 15)
+infoLabel.BackgroundTransparency = 1; infoLabel.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+infoLabel.Font = Enum.Font.Code; infoLabel.TextSize = 12; infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- // LÃGICA
+local function getMoney()
+    local stats = player:FindFirstChild("leaderstats")
+    return stats and (stats:FindFirstChild("Money") or stats:FindFirstChild("Cash") or stats:FindFirstChild("Dinheiro"))
+end
+
+RunService.RenderStepped:Connect(function()
+    if getgenv().farmMoto and player.Character then
+        local mObj = getMoney()
+        if mObj and tempoInicial > 0 then
+            local lucroAtual = mObj.Value - dinheiroInicial
+            local tempoPassado = tick() - tempoInicial
+            local lucroPorHora = (lucroAtual / tempoPassado) * 3600
+            profitLabel.Text = string.format("$%.1fK / HORA", lucroPorHora / 1000)
+            
+            local p = player.Character.HumanoidRootPart.Position
+            infoLabel.Text = string.format("POS: %.0f, %.0f\nSPEED: %.0f KM/H\nSESSÃO: $%d", p.X, p.Z, velocidadeAtual, lucroAtual)
+        end
+    end
+end)
+
+local function addBtn(txt, y, cb)
+    local b = Instance.new("TextButton", sb); b.Size = UDim2.new(0.9, 0, 0, 40)
+    b.Position = UDim2.new(0.05, 0, 0, y); b.BackgroundColor3 = COR_FUNDO; b.Text = txt
+    b.TextColor3 = Color3.new(1,1,1); b.Font = Enum.Font.GothamBold; b.TextSize = 8; Instance.new("UICorner", b)
+    b.MouseButton1Click:Connect(cb)
+end
+
+addBtn("INICIAR FARM", 20, function()
+    getgenv().farmMoto = not getgenv().farmMoto
+    if getgenv().farmMoto then
+        local mObj = getMoney()
+        dinheiroInicial = mObj and mObj.Value or 0
+        tempoInicial = tick()
+        task.spawn(function()
+            if not plataforma then
+                plataforma = Instance.new("Part", workspace)
+                plataforma.Size = Vector3.new(600, 2, 600); plataforma.Anchored = true
+                plataforma.Material = Enum.Material.Neon; plataforma.Color = COR_ROXA
+            end
+            while getgenv().farmMoto do
+                local char = player.Character
+                local seat = char and char.Humanoid.SeatPart
+                if seat then
+                    local mv = seat.Parent.PrimaryPart or seat
+                    if velocidadeAtual < 450 then velocidadeAtual = velocidadeAtual + 2 end
+                    mv.Velocity = mv.CFrame.LookVector * velocidadeAtual
+                    plataforma.CFrame = CFrame.new(mv.Position.X, mv.Position.Y - 3.5, mv.Position.Z)
+                end
+                task.wait()
+            end
+            if plataforma then plataforma:Destroy(); plataforma = nil end
+            velocidadeAtual = 0
+        end)
+    end
+end)
+
+addBtn("", 70, function() mf.Visible = false end)
+
+-- Anti-AFK incluso
+player.Idled:Connect(function()
+    game:GetService("VirtualUser"):CaptureController()
+    game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+end)
+
+UserInputService.InputBegan:Connect(function(i, g) if not g and i.KeyCode == Enum.KeyCode.K then mf.Visible = not mf.Visible end end)
