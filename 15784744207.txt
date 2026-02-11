@@ -1,0 +1,8 @@
+local players = game:GetService("Players")
+local stamina = players.LocalPlayer.ServerVariables.Sprint.Stamina
+
+stamina.Changed:Connect(function()
+    if stamina.Value == 0 then
+        stamina.Value = 100
+    end
+end)
