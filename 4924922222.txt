@@ -1,0 +1,262 @@
+-- Brookhaven RP GUI | Fly + Others Fly + Bus + Sky Changer + Avatar (2026 Style)
+-- Paste into your Executor â LocalScript
+
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+local flying = false
+local othersFlying = {}
+local flySpeed = 50
+local bodyVelocity = nil
+local bodyGyro = nil
+
+-- Simple Fly function (for LocalPlayer or others)
+local function startFly(targetPlayer)
+    local char = targetPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local root = char.HumanoidRootPart
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    humanoid.PlatformStand = true
+    
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bodyVelocity.Velocity = Vector3.new(0,0,0)
+    bodyVelocity.Parent = root
+    
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    bodyGyro.CFrame = root.CFrame
+    bodyGyro.Parent = root
+    
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        if not flying and targetPlayer \~= LocalPlayer then return end
+        if targetPlayer \~= LocalPlayer and not othersFlying[targetPlayer] then connection:Disconnect() return end
+        
+        local cam = workspace.CurrentCamera
+        local moveDir = Vector3.new(0,0,0)
+        
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then
+            moveDir = moveDir + cam.CFrame.LookVector
+        end
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then
+            moveDir = moveDir - cam.CFrame.LookVector
+        end
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then
+            moveDir = moveDir - cam.CFrame.RightVector
+        end
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then
+            moveDir = moveDir + cam.CFrame.RightVector
+        end
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0,1,0)
+        end
+        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDir = moveDir - Vector3.new(0,1,0)
+        end
+        
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit * flySpeed
+        end
+        
+        bodyVelocity.Velocity = moveDir
+        bodyGyro.CFrame = cam.CFrame
+    end)
+end
+
+local function stopFly(targetPlayer)
+    local char = targetPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local root = char.HumanoidRootPart
+    if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+    if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+    
+    if char:FindFirstChild("Humanoid") then
+        char.Humanoid.PlatformStand = false
+    end
+end
+
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "BrookhavenCoolGUI"
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 280, 0, 380)
+Frame.Position = UDim2.new(0.5, -140, 0.5, -190)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 80)
+Title.Text = "Brookhaven RP"
+Title.TextColor3 = Color3.fromRGB(200, 200, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 24
+Title.Parent = Frame
+
+-- Fly Button (yourself)
+local FlyBtn = Instance.new("TextButton")
+FlyBtn.Size = UDim2.new(0.9, 0, 0, 40)
+FlyBtn.Position = UDim2.new(0.05, 0, 0.13, 0)
+FlyBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+FlyBtn.Text = "Fly: OFF"
+FlyBtn.TextColor3 = Color3.new(1,1,1)
+FlyBtn.Font = Enum.Font.SourceSans
+FlyBtn.TextSize = 20
+FlyBtn.Parent = Frame
+
+FlyBtn.MouseButton1Click:Connect(function()
+    flying = not flying
+    if flying then
+        FlyBtn.Text = "Fly: ON"
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(80, 220, 80)
+        startFly(LocalPlayer)
+    else
+        FlyBtn.Text = "Fly: OFF"
+        FlyBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+        stopFly(LocalPlayer)
+    end
+end)
+
+-- Fly Others
+local OthersFlyBtn = Instance.new("TextButton")
+OthersFlyBtn.Size = UDim2.new(0.9, 0, 0, 40)
+OthersFlyBtn.Position = UDim2.new(0.05, 0, 0.26, 0)
+OthersFlyBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+OthersFlyBtn.Text = "Fly Others: OFF"
+OthersFlyBtn.TextColor3 = Color3.new(1,1,1)
+OthersFlyBtn.TextSize = 20
+OthersFlyBtn.Parent = Frame
+
+local othersFlyActive = false
+OthersFlyBtn.MouseButton1Click:Connect(function()
+    othersFlyActive = not othersFlyActive
+    if othersFlyActive then
+        OthersFlyBtn.Text = "Fly Others: ON"
+        OthersFlyBtn.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr \~= LocalPlayer then
+                othersFlying[plr] = true
+                startFly(plr)
+            end
+        end
+    else
+        OthersFlyBtn.Text = "Fly Others: OFF"
+        OthersFlyBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+        for plr, _ in pairs(othersFlying) do
+            stopFly(plr)
+        end
+        othersFlying = {}
+    end
+end)
+
+-- Spawn Bus
+local BusBtn = Instance.new("TextButton")
+BusBtn.Size = UDim2.new(0.9, 0, 0, 40)
+BusBtn.Position = UDim2.new(0.05, 0, 0.39, 0)
+BusBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+BusBtn.Text = "Spawn Bus"
+BusBtn.TextColor3 = Color3.new(1,1,1)
+BusBtn.TextSize = 20
+BusBtn.Parent = Frame
+
+BusBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local pos = char.HumanoidRootPart.Position + Vector3.new(0, 5, 0)
+    
+    -- Brookhaven often uses a RemoteEvent like this (name may have changed)
+    local success, err = pcall(function()
+        game:GetService("ReplicatedStorage").SpawnVehicle:FireServer("Bus", pos)
+    end)
+    
+    if not success then
+        print("Bus spawn failed. Remote might be named differently now.")
+    end
+end)
+
+-- Sky Changer
+local SkyBtn = Instance.new("TextButton")
+SkyBtn.Size = UDim2.new(0.9, 0, 0, 40)
+SkyBtn.Position = UDim2.new(0.05, 0, 0.52, 0)
+SkyBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+SkyBtn.Text = "Change Sky"
+SkyBtn.TextColor3 = Color3.new(1,1,1)
+SkyBtn.TextSize = 20
+SkyBtn.Parent = Frame
+
+local skyIndex = 1
+local skies = {
+    "rbxassetid://600830446",   -- Normal Day
+    "rbxassetid://600831635",   -- Night
+    "rbxassetid://600832720",   -- Sunset
+    "rbxassetid://1012890",     -- Space
+    "rbxassetid://600833862"    -- Purple / Nebula
+}
+
+SkyBtn.MouseButton1Click:Connect(function()
+    local newSky = Instance.new("Sky")
+    newSky.SkyboxBk = skies[skyIndex]
+    newSky.SkyboxDn = skies[skyIndex]
+    newSky.SkyboxFt = skies[skyIndex]
+    newSky.SkyboxLf = skies[skyIndex]
+    newSky.SkyboxRt = skies[skyIndex]
+    newSky.SkyboxUp = skies[skyIndex]
+    newSky.Parent = Lighting
+    
+    for _, obj in ipairs(Lighting:GetChildren()) do
+        if obj:IsA("Sky") and obj \~= newSky then
+            obj:Destroy()
+        end
+    end
+    
+    skyIndex = skyIndex + 1
+    if skyIndex > #skies then skyIndex = 1 end
+    SkyBtn.Text = "Sky: " .. skyIndex
+end)
+
+-- Random Avatar / Reset
+local AvatarBtn = Instance.new("TextButton")
+AvatarBtn.Size = UDim2.new(0.9, 0, 0, 40)
+AvatarBtn.Position = UDim2.new(0.05, 0, 0.65, 0)
+AvatarBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 200)
+AvatarBtn.Text = "Random Avatar"
+AvatarBtn.TextColor3 = Color3.new(1,1,1)
+AvatarBtn.TextSize = 20
+AvatarBtn.Parent = Frame
+
+AvatarBtn.MouseButton1Click:Connect(function()
+    -- Most reliable way in 2026 is usually just resetting character
+    if LocalPlayer.Character then
+        LocalPlayer.Character:BreakJoints()
+    end
+    print("Character reset â may load random/default avatar")
+end)
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.new(1,1,1)
+CloseBtn.Parent = Frame
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+print("Brookhaven GUI loaded! Have fun (but watch out for bans!)")
