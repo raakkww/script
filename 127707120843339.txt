@@ -1,0 +1,518 @@
+local userInputService = game:GetService("UserInputService")
+local player = game.Players.LocalPlayer
+local container = workspace.Map.Functional.Screen.SurfaceGui.MainFrame.MainGameContainer.MainTxtContainer
+local questionText = container.QuestionText
+local pcTextBoxContainer = player.PlayerGui.MainGui.GameFrame.PCTextBoxContainer
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TextChatService = game:GetService("TextChatService")
+
+if userInputService.TouchEnabled and not userInputService.KeyboardEnabled and not userInputService.MouseEnabled then
+    player:Kick("this script is only supported for pc users")
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local TitleBar = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+local ChangelogsButton = Instance.new("TextButton")
+local AutoSolverButton = Instance.new("TextButton")
+local TomatoButton = Instance.new("TextButton")
+local AutoSayButton = Instance.new("TextButton")
+local CreditLabel = Instance.new("TextLabel")
+
+local ChangelogsFrame = Instance.new("Frame")
+local ChangelogsTitleBar = Instance.new("Frame")
+local ChangelogsTitleLabel = Instance.new("TextLabel")
+local ChangelogsCloseButton = Instance.new("TextButton")
+local ChangelogsContent = Instance.new("ScrollingFrame")
+local ChangelogsText = Instance.new("TextLabel")
+
+ScreenGui.Name = "AutoMathGui"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+MainFrame.BorderSizePixel = 3
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -150)
+MainFrame.Size = UDim2.new(0, 300, 0, 290)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+TitleBar.Name = "TitleBar"
+TitleBar.Parent = MainFrame
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.BorderColor3 = Color3.fromRGB(0, 0, 0)
+TitleBar.BorderSizePixel = 2
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+
+TitleLabel.Name = "TitleLabel"
+TitleLabel.Parent = TitleBar
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.Size = UDim2.new(1, -90, 1, 0)
+TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.Text = "Math Die Script"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 18
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+ChangelogsButton.Name = "ChangelogsButton"
+ChangelogsButton.Parent = TitleBar
+ChangelogsButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+ChangelogsButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+ChangelogsButton.BorderSizePixel = 2
+ChangelogsButton.Position = UDim2.new(1, -80, 0, 4)
+ChangelogsButton.Size = UDim2.new(0, 75, 0, 27)
+ChangelogsButton.Font = Enum.Font.SourceSansBold
+ChangelogsButton.Text = "Changelogs"
+ChangelogsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ChangelogsButton.TextSize = 13
+
+AutoSolverButton.Name = "AutoSolverButton"
+AutoSolverButton.Parent = MainFrame
+AutoSolverButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+AutoSolverButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+AutoSolverButton.BorderSizePixel = 3
+AutoSolverButton.Position = UDim2.new(0.5, -120, 0, 50)
+AutoSolverButton.Size = UDim2.new(0, 240, 0, 45)
+AutoSolverButton.Font = Enum.Font.SourceSansBold
+AutoSolverButton.Text = "Auto Solver [OFF]"
+AutoSolverButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoSolverButton.TextSize = 18
+
+TomatoButton.Name = "TomatoButton"
+TomatoButton.Parent = MainFrame
+TomatoButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+TomatoButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+TomatoButton.BorderSizePixel = 3
+TomatoButton.Position = UDim2.new(0.5, -120, 0, 105)
+TomatoButton.Size = UDim2.new(0, 240, 0, 45)
+TomatoButton.Font = Enum.Font.SourceSansBold
+TomatoButton.Text = "No Cooldown Tomato [OFF]"
+TomatoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+TomatoButton.TextSize = 16
+
+AutoSayButton.Name = "AutoSayButton"
+AutoSayButton.Parent = MainFrame
+AutoSayButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+AutoSayButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+AutoSayButton.BorderSizePixel = 3
+AutoSayButton.Position = UDim2.new(0.5, -120, 0, 160)
+AutoSayButton.Size = UDim2.new(0, 240, 0, 45)
+AutoSayButton.Font = Enum.Font.SourceSansBold
+AutoSayButton.Text = "Auto Say Respond [OFF]"
+AutoSayButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoSayButton.TextSize = 16
+
+CreditLabel.Name = "CreditLabel"
+CreditLabel.Parent = MainFrame
+CreditLabel.BackgroundTransparency = 1
+CreditLabel.Position = UDim2.new(0, 0, 1, -25)
+CreditLabel.Size = UDim2.new(1, 0, 0, 25)
+CreditLabel.Font = Enum.Font.SourceSansItalic
+CreditLabel.Text = "creator script: @loduadro in scriptblox"
+CreditLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+CreditLabel.TextSize = 14
+CreditLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+ChangelogsFrame.Name = "ChangelogsFrame"
+ChangelogsFrame.Parent = ScreenGui
+ChangelogsFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ChangelogsFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+ChangelogsFrame.BorderSizePixel = 3
+ChangelogsFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+ChangelogsFrame.Size = UDim2.new(0, 400, 0, 300)
+ChangelogsFrame.Active = true
+ChangelogsFrame.Draggable = true
+ChangelogsFrame.Visible = false
+
+ChangelogsTitleBar.Name = "ChangelogsTitleBar"
+ChangelogsTitleBar.Parent = ChangelogsFrame
+ChangelogsTitleBar.BackgroundColor3 = Color3.fromRGB(0, 102, 204)
+ChangelogsTitleBar.BorderColor3 = Color3.fromRGB(0, 0, 0)
+ChangelogsTitleBar.BorderSizePixel = 2
+ChangelogsTitleBar.Size = UDim2.new(1, 0, 0, 35)
+
+ChangelogsTitleLabel.Name = "ChangelogsTitleLabel"
+ChangelogsTitleLabel.Parent = ChangelogsTitleBar
+ChangelogsTitleLabel.BackgroundTransparency = 1
+ChangelogsTitleLabel.Position = UDim2.new(0, 8, 0, 0)
+ChangelogsTitleLabel.Size = UDim2.new(1, -43, 1, 0)
+ChangelogsTitleLabel.Font = Enum.Font.SourceSansBold
+ChangelogsTitleLabel.Text = "Changelogs"
+ChangelogsTitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+ChangelogsTitleLabel.TextSize = 20
+ChangelogsTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+ChangelogsCloseButton.Name = "ChangelogsCloseButton"
+ChangelogsCloseButton.Parent = ChangelogsTitleBar
+ChangelogsCloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+ChangelogsCloseButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+ChangelogsCloseButton.BorderSizePixel = 2
+ChangelogsCloseButton.Position = UDim2.new(1, -32, 0, 4)
+ChangelogsCloseButton.Size = UDim2.new(0, 28, 0, 27)
+ChangelogsCloseButton.Font = Enum.Font.SourceSansBold
+ChangelogsCloseButton.Text = "X"
+ChangelogsCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ChangelogsCloseButton.TextSize = 18
+
+ChangelogsContent.Name = "ChangelogsContent"
+ChangelogsContent.Parent = ChangelogsFrame
+ChangelogsContent.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+ChangelogsContent.BorderColor3 = Color3.fromRGB(0, 0, 0)
+ChangelogsContent.BorderSizePixel = 2
+ChangelogsContent.Position = UDim2.new(0, 8, 0, 45)
+ChangelogsContent.Size = UDim2.new(1, -16, 1, -53)
+ChangelogsContent.ScrollBarThickness = 10
+ChangelogsContent.CanvasSize = UDim2.new(0, 0, 0, 100)
+
+ChangelogsText.Name = "ChangelogsText"
+ChangelogsText.Parent = ChangelogsContent
+ChangelogsText.BackgroundTransparency = 1
+ChangelogsText.Position = UDim2.new(0, 10, 0, 10)
+ChangelogsText.Size = UDim2.new(1, -20, 0, 80)
+ChangelogsText.Font = Enum.Font.SourceSans
+ChangelogsText.Text = "1.0v Create Gui :-)"
+ChangelogsText.TextColor3 = Color3.fromRGB(0, 0, 0)
+ChangelogsText.TextSize = 18
+ChangelogsText.TextXAlignment = Enum.TextXAlignment.Left
+ChangelogsText.TextYAlignment = Enum.TextYAlignment.Top
+ChangelogsText.TextWrapped = true
+
+local autoSolverEnabled = false
+local noCooldownEnabled = false
+local autoSayEnabled = false
+local noCooldownConnections = {}
+local autoSolverConnection = nil
+local autoSayConnection = nil
+
+local function sendChatMessage(message)
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        local textChannel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+        if textChannel then
+            textChannel:SendAsync(tostring(message))
+        end
+    else
+        game.ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(tostring(message), "All")
+    end
+end
+
+AutoSolverButton.MouseButton1Click:Connect(function()
+    autoSolverEnabled = not autoSolverEnabled
+    
+    if autoSolverEnabled then
+        AutoSolverButton.Text = "Auto Solver [ON]"
+        AutoSolverButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        
+        if autoSolverConnection then
+            autoSolverConnection:Disconnect()
+        end
+        
+        autoSolverConnection = pcTextBoxContainer:GetPropertyChangedSignal("Visible"):Connect(function()
+            if not pcTextBoxContainer.Visible or not autoSolverEnabled then return end
+            
+            local question = questionText.Text
+            question = question:gsub("x", "*"):gsub("=", "")
+            
+            local func = loadstring("return " .. question)
+            if func then
+                local success, answer = pcall(func)
+                pcTextBoxContainer.TextBox.Text = ""
+                if success then
+                    task.wait(0.5)
+                    for i = 1, #tostring(answer) do
+                        task.wait(math.random())
+                        pcTextBoxContainer.TextBox.Text ..= tostring(answer):sub(i, i)
+                    end
+                    task.wait(0.5)
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+                    task.wait(0.05)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+                end
+            end
+        end)
+    else
+        AutoSolverButton.Text = "Auto Solver [OFF]"
+        AutoSolverButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        
+        if autoSolverConnection then
+            autoSolverConnection:Disconnect()
+            autoSolverConnection = nil
+        end
+    end
+end)
+
+AutoSolverButton.MouseEnter:Connect(function()
+    if autoSolverEnabled then
+        AutoSolverButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+    else
+        AutoSolverButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    end
+end)
+
+AutoSolverButton.MouseLeave:Connect(function()
+    if autoSolverEnabled then
+        AutoSolverButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        AutoSolverButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+AutoSayButton.MouseButton1Click:Connect(function()
+    autoSayEnabled = not autoSayEnabled
+    
+    if autoSayEnabled then
+        AutoSayButton.Text = "Auto Say Respond [ON]"
+        AutoSayButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        
+        if autoSayConnection then
+            autoSayConnection:Disconnect()
+        end
+        
+        autoSayConnection = questionText:GetPropertyChangedSignal("Text"):Connect(function()
+            if not autoSayEnabled then return end
+            
+            task.wait(0.5)
+            
+            local question = questionText.Text
+            if question == "" or question == " " then return end
+            
+            question = question:gsub("x", "*"):gsub("=", "")
+            
+            local func = loadstring("return " .. question)
+            if func then
+                local success, answer = pcall(func)
+                if success then
+                    sendChatMessage(tostring(answer))
+                end
+            end
+        end)
+    else
+        AutoSayButton.Text = "Auto Say Respond [OFF]"
+        AutoSayButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        
+        if autoSayConnection then
+            autoSayConnection:Disconnect()
+            autoSayConnection = nil
+        end
+    end
+end)
+
+AutoSayButton.MouseEnter:Connect(function()
+    if autoSayEnabled then
+        AutoSayButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+    else
+        AutoSayButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    end
+end)
+
+AutoSayButton.MouseLeave:Connect(function()
+    if autoSayEnabled then
+        AutoSayButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        AutoSayButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+local function applyNoCooldown(tool)
+    if tool.Name ~= "Tomato" then return end
+    
+    if tool:FindFirstChild("Cooldown") then
+        tool.Cooldown:Destroy()
+    end
+    
+    local cooldownValue = tool:FindFirstChild("CooldownValue")
+    if cooldownValue and cooldownValue:IsA("NumberValue") then
+        cooldownValue.Value = 0
+    end
+    
+    for _, descendant in pairs(tool:GetDescendants()) do
+        if descendant:IsA("NumberValue") then
+            if descendant.Name:lower():find("cooldown") or descendant.Name:lower():find("delay") or descendant.Name:lower():find("wait") then
+                descendant.Value = 0
+                
+                table.insert(noCooldownConnections, descendant:GetPropertyChangedSignal("Value"):Connect(function()
+                    if noCooldownEnabled and descendant.Value > 0 then
+                        descendant.Value = 0
+                    end
+                end))
+            end
+        elseif descendant:IsA("IntValue") then
+            if descendant.Name:lower():find("cooldown") or descendant.Name:lower():find("delay") or descendant.Name:lower():find("wait") then
+                descendant.Value = 0
+                
+                table.insert(noCooldownConnections, descendant:GetPropertyChangedSignal("Value"):Connect(function()
+                    if noCooldownEnabled and descendant.Value > 0 then
+                        descendant.Value = 0
+                    end
+                end))
+            end
+        end
+    end
+    
+    table.insert(noCooldownConnections, tool.ChildAdded:Connect(function(child)
+        if noCooldownEnabled and child.Name == "Cooldown" then
+            task.wait()
+            child:Destroy()
+        end
+    end))
+    
+    table.insert(noCooldownConnections, tool.Activated:Connect(function()
+        if noCooldownEnabled then
+            task.spawn(function()
+                task.wait(0.05)
+                if tool:FindFirstChild("Cooldown") then
+                    tool.Cooldown:Destroy()
+                end
+                for _, descendant in pairs(tool:GetDescendants()) do
+                    if descendant:IsA("NumberValue") or descendant:IsA("IntValue") then
+                        if descendant.Name:lower():find("cooldown") or descendant.Name:lower():find("delay") or descendant.Name:lower():find("wait") then
+                            descendant.Value = 0
+                        end
+                    end
+                end
+            end)
+        end
+    end))
+end
+
+TomatoButton.MouseButton1Click:Connect(function()
+    noCooldownEnabled = not noCooldownEnabled
+    
+    if noCooldownEnabled then
+        TomatoButton.Text = "No Cooldown Tomato [ON]"
+        TomatoButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        
+        local character = player.Character or player.CharacterAdded:Wait()
+        local backpack = player.Backpack
+        
+        for _, tool in pairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                applyNoCooldown(tool)
+            end
+        end
+        
+        for _, tool in pairs(character:GetChildren()) do
+            if tool:IsA("Tool") then
+                applyNoCooldown(tool)
+            end
+        end
+        
+        table.insert(noCooldownConnections, backpack.ChildAdded:Connect(function(tool)
+            if noCooldownEnabled and tool:IsA("Tool") then
+                task.wait(0.1)
+                applyNoCooldown(tool)
+            end
+        end))
+        
+        table.insert(noCooldownConnections, character.ChildAdded:Connect(function(tool)
+            if noCooldownEnabled and tool:IsA("Tool") then
+                task.wait(0.1)
+                applyNoCooldown(tool)
+            end
+        end))
+        
+        table.insert(noCooldownConnections, player.CharacterAdded:Connect(function(newChar)
+            if noCooldownEnabled then
+                task.wait(1)
+                for _, tool in pairs(newChar:GetChildren()) do
+                    if tool:IsA("Tool") then
+                        applyNoCooldown(tool)
+                    end
+                end
+                
+                table.insert(noCooldownConnections, newChar.ChildAdded:Connect(function(tool)
+                    if noCooldownEnabled and tool:IsA("Tool") then
+                        task.wait(0.1)
+                        applyNoCooldown(tool)
+                    end
+                end))
+            end
+        end))
+        
+        task.spawn(function()
+            while noCooldownEnabled do
+                task.wait(0.5)
+                local char = player.Character
+                if char then
+                    for _, tool in pairs(char:GetChildren()) do
+                        if tool:IsA("Tool") and tool.Name == "Tomato" then
+                            if tool:FindFirstChild("Cooldown") then
+                                tool.Cooldown:Destroy()
+                            end
+                        end
+                    end
+                end
+                
+                for _, tool in pairs(backpack:GetChildren()) do
+                    if tool:IsA("Tool") and tool.Name == "Tomato" then
+                        if tool:FindFirstChild("Cooldown") then
+                            tool.Cooldown:Destroy()
+                        end
+                    end
+                end
+            end
+        end)
+        
+    else
+        TomatoButton.Text = "No Cooldown Tomato [OFF] (PATCHED)"
+        TomatoButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        
+        for _, connection in pairs(noCooldownConnections) do
+            if connection and connection.Connected then
+                connection:Disconnect()
+            end
+        end
+        noCooldownConnections = {}
+    end
+end)
+
+TomatoButton.MouseEnter:Connect(function()
+    if noCooldownEnabled then
+        TomatoButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+    else
+        TomatoButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    end
+end)
+
+TomatoButton.MouseLeave:Connect(function()
+    if noCooldownEnabled then
+        TomatoButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        TomatoButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+ChangelogsButton.MouseButton1Click:Connect(function()
+    ChangelogsFrame.Visible = true
+end)
+
+ChangelogsButton.MouseEnter:Connect(function()
+    ChangelogsButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+end)
+
+ChangelogsButton.MouseLeave:Connect(function()
+    ChangelogsButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+end)
+
+ChangelogsCloseButton.MouseButton1Click:Connect(function()
+    ChangelogsFrame.Visible = false
+end)
+
+ChangelogsCloseButton.MouseEnter:Connect(function()
+    ChangelogsCloseButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+end)
+
+ChangelogsCloseButton.MouseLeave:Connect(function()
+    ChangelogsCloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+end)
+
+game.StarterGui:SetCore("SendNotification", {
+  Title = "duadro89kfun",
+  Text = "creator script:@loduadro in scriptblox ",
+  Duration = 10
+})
