@@ -1,0 +1,54 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local noclip = false
+
+spawn(function()
+    while true do
+        pcall(function()
+            local cc = ReplicatedStorage:WaitForChild("Scripts", 5):FindFirstChild("CharacterCollision")
+            if cc then
+                cc:Destroy()
+            end
+        end)
+        task.wait(0.05)
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.Parent == char then
+                    for _, conn in pairs(getconnections(part:GetPropertyChangedSignal("CanCollide"))) do
+                        conn:Disable()
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+RunService.Stepped:Connect(function()
+    if noclip then
+        local char = LocalPlayer.Character
+        if char and char.Parent then
+            for _, part in pairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.N then
+        noclip = not noclip
+    end
+end)
