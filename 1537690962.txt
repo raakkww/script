@@ -1,0 +1,345 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+   LoadingTitle = "",
+   LoadingSubtitle = "",
+   ShowText = "Rayfield", -- for mobile users to unhide rayfield, change if you'd like
+   Theme = "Serenity", -- Check https://docs.sirius.menu/rayfield/configuration/themes
+
+   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
+
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false, -- Prevents Rayfield from warning when the script has a version mismatch with the interface
+
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil, -- Create a custom folder for your hub/game
+      FileName = "Big Hub"
+   },
+
+   Discord = {
+      Enabled = false, -- Prompt the user to join your Discord server if their executor supports it
+      Invite = "noinvitelink", -- The Discord invite code, do not include discord.gg/. E.g. discord.gg/ ABCD would be ABCD
+      RememberJoins = true -- Set this to false to make them join the discord every time they load it up
+   },
+
+   KeySystem = true, -- Set this to true to use our key system
+   KeySettings = {
+      Title = "HoneyKey",
+      Subtitle = "Key System",
+      Note = "Get key @ Scriptblox/discord", -- Use this to tell the user how to get a key
+      FileName = "Key", -- It is recommended to use something unique as other scripts using Rayfield may overwrite your key file
+      SaveKey = false, -- The user's key will be saved, but if you change the key, they will be unable to use your script
+      GrabKeyFromSite = true, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
+      Key = {"https://pastebin.com/raw/3Dg3kfgM"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
+   }
+})
+
+local MainTab = Window:CreateTab("Main", "home")
+local AutoTab = Window:CreateTab("AutoFarm", "tractor")
+local SettingsTab = Window:CreateTab("Settings", "settings")
+local MiscTab = Window:CreateTab("Misc", "link")
+
+local SelectedField = "Sunflower Field"
+local SelectedPattern = "(None)"
+local CurrentLoopID = 0
+
+-- Services needed for Auto-Dig
+local replicatedstorage = game:GetService("ReplicatedStorage")
+local ToolEvent = replicatedstorage:WaitForChild("Events"):WaitForChild("ToolCollect")
+
+-- 1. Field Dropdown
+local FieldDropdown = AutoTab:CreateDropdown({
+   Name = "Target Field",
+   Options = {"Sunflower Field", "Mushroom Field", "Clover Field", "Blue Flower Field", "Bamboo Field", "Strawberry Field", "Spider Field", "Pineapple Patch", "Stump Field", "Cactus Field", "Pumpkin Patch", "Pine Tree Forest", "Rose Field", "Mountain Top Field", "Coconut Field", "Pepper Patch"},
+   CurrentOption = "Sunflower Field",
+   MultiSelection = false,
+   Flag = "Dropdown1",
+   Callback = function(Option)
+      SelectedField = type(Option) == "table" and Option[1] or Option
+   end,
+})
+
+-- 2. Pattern Dropdown
+local PatternDropdown = AutoTab:CreateDropdown({
+   Name = "Farm Pattern",
+   Options = {"(None)", "Circle", "Square", "ZigZag"},
+   CurrentOption = "(None)",
+   MultiSelection = false,
+   Flag = "DropdownPattern",
+   Callback = function(Option)
+      SelectedPattern = type(Option) == "table" and Option[1] or Option
+   end,
+})
+
+-- 3. Integrated Toggle
+local Toggle = AutoTab:CreateToggle({
+   Name = "AutoFarm + AutoDig",
+   CurrentValue = false,
+   Flag = "Toggle1",
+   Callback = function(Value)
+      _G.AutoFarm = Value
+      if not Value then return end
+      
+      CurrentLoopID = CurrentLoopID + 1
+      local MyLoopID = CurrentLoopID
+      
+      local Character = game.Players.LocalPlayer.Character
+      local Hum = Character:WaitForChild("Humanoid")
+      local HRP = Character:WaitForChild("HumanoidRootPart")
+      local Step = 0
+
+      -- Instant TP on Start
+      local Field = workspace:FindFirstChild("FlowerZones") and workspace.FlowerZones:FindFirstChild(SelectedField)
+      if Field then HRP.CFrame = Field.CFrame * CFrame.new(0, 5, 0) end
+
+      -- Separate Thread for Auto-Digging (Remote Spaming)
+      task.spawn(function()
+         while _G.AutoFarm and CurrentLoopID == MyLoopID do
+            -- Firing the server event directly (Silent Dig)
+            ToolEvent:FireServer()
+            
+            -- Also try to activate tool for visual consistency (Optional)
+            local Tool = Character:FindFirstChildOfClass("Tool")
+            if Tool then Tool:Activate() end
+            
+            task.wait() -- Firing every frame for max pollen
+         end
+      end)
+
+      -- Main Movement Loop
+      while _G.AutoFarm and CurrentLoopID == MyLoopID do
+         local Field = workspace:FindFirstChild("FlowerZones") and workspace.FlowerZones:FindFirstChild(SelectedField)
+         if Field then
+            local FieldPos = Field.Position
+            local FieldSize = Field.Size
+            local RadiusX = FieldSize.X * 0.3
+            local RadiusZ = FieldSize.Z * 0.3
+            local TargetPoint = FieldPos
+
+            -- Pattern Logic
+            if SelectedPattern == "Circle" then
+               Step = Step + 0.4
+               TargetPoint = FieldPos + Vector3.new(math.cos(Step) * RadiusX, 0, math.sin(Step) * RadiusZ)
+            elseif SelectedPattern == "Square" then
+               Step = (Step % 4) + 1
+               local Corners = {Vector3.new(RadiusX,0,RadiusZ), Vector3.new(-RadiusX,0,RadiusZ), Vector3.new(-RadiusX,0,-RadiusZ), Vector3.new(RadiusX,0,-RadiusZ)}
+               TargetPoint = FieldPos + Corners[Step]
+            elseif SelectedPattern == "ZigZag" then
+               Step = (Step % 4) + 1
+               local Zags = {Vector3.new(RadiusX,0,RadiusZ), Vector3.new(-RadiusX,0,RadiusZ/2), Vector3.new(RadiusX,0,0), Vector3.new(-RadiusX,0,-RadiusZ)}
+               TargetPoint = FieldPos + Zags[Step]
+            else
+               TargetPoint = FieldPos + Vector3.new(math.random(-RadiusX, RadiusX), 0, math.random(-RadiusZ, RadiusZ))
+            end
+
+            Hum:MoveTo(TargetPoint)
+            
+            -- Timeout for movement
+            local start = tick()
+            repeat task.wait() until (HRP.Position - TargetPoint).Magnitude < 5 or tick() - start > 8 or not _G.AutoFarm
+         end
+         task.wait(0.1)
+      end
+   end,
+})
+
+
+local Toggle = AutoTab:CreateToggle({
+   Name = "Kill StumpSnail",
+   CurrentValue = false,
+   Flag = "Toggle3",
+   Callback = function(Value)
+      _G.KillSnail = Value
+      
+      -- Function to find the Snail by checking all models in the game
+      local function GetSnail()
+         for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Model") and (v.Name == "Stump Snail" or v.Name == "Snail") then
+               local hum = v:FindFirstChildOfClass("Humanoid")
+               if hum and hum.Health > 0 then
+                  return v
+               end
+            end
+         end
+         return nil
+      end
+
+      while _G.KillSnail do
+         local Snail = GetSnail()
+         local Character = game.Players.LocalPlayer.Character
+         local HRP = Character and Character:FindFirstChild("HumanoidRootPart")
+
+         if Snail and HRP then
+            local Root = Snail:FindFirstChild("HumanoidRootPart") or Snail.PrimaryPart
+            local Hum = Snail:FindFirstChildOfClass("Humanoid")
+
+            -- Teleport and Stick to the Snail
+            while _G.KillSnail and Snail.Parent and Hum.Health > 0 do
+               HRP.CFrame = Root.CFrame * CFrame.new(0, 12, 0) -- Hover 12 studs high
+               task.wait()
+            end
+         else
+            -- FALLBACK: If Snail isn't found, TP to the Stump Field center to bait it out
+            if HRP then
+               HRP.CFrame = CFrame.new(420, 35, -180) -- Typical Stump Field coordinates
+            end
+            task.wait(2)
+         end
+         task.wait(1)
+      end
+   end,
+})
+
+local Toggle = AutoTab:CreateToggle({
+   Name = "AutoCrab (Bad)",
+   CurrentValue = false,
+   Flag = "ToggleCrabSafe",
+   Callback = function(Value)
+      _G.KillCrab = Value
+      
+      -- Create an invisible floating floor
+      local Platform = Instance.new("Part")
+      Platform.Size = Vector3.new(15, 1, 15)
+      Platform.Transparency = 1
+      Platform.Anchored = true
+      Platform.Parent = workspace
+
+      local Angle = 0 -- Used for the circular dodging movement
+
+      while _G.KillCrab do
+         task.wait()
+         local Monsters = workspace:FindFirstChild("Monsters")
+         local Crab = Monsters and Monsters:FindFirstChild("Coconut Crab")
+         local Character = game.Players.LocalPlayer.Character
+         local HRP = Character and Character:FindFirstChild("HumanoidRootPart")
+
+         if HRP and _G.KillCrab then
+            if Crab and Crab:FindFirstChild("HumanoidRootPart") then
+               local Hum = Crab:FindFirstChildOfClass("Humanoid")
+               
+               -- Dodging Loop
+               while _G.KillCrab and Hum and Hum.Health > 0 do
+                  -- 1. Create a Circular Dodge Pattern 20 studs in the air
+                  -- This keeps you moving so falling coconuts always miss your previous spot
+                  Angle = Angle + 0.05
+                  local OffsetX = math.cos(Angle) * 20
+                  local OffsetZ = math.sin(Angle) * 20
+                  
+                  local TargetCFrame = Crab.HumanoidRootPart.CFrame * CFrame.new(OffsetX, 20, OffsetZ)
+                  
+                  HRP.CFrame = TargetCFrame
+                  Platform.CFrame = TargetCFrame * CFrame.new(0, -3.5, 0)
+                  
+                  -- Face the crab to keep bees attacking
+                  HRP.CFrame = CFrame.lookAt(HRP.Position, Crab.HumanoidRootPart.Position)
+                  
+                  task.wait()
+               end
+            else
+               -- Stay high in the center of Coconut Field if crab is missing
+               HRP.CFrame = CFrame.new(-255, 100, 475)
+               Platform.CFrame = HRP.CFrame * CFrame.new(0, -3.5, 0)
+               task.wait(1)
+            end
+         end
+      end
+      Platform:Destroy()
+   end,
+})
+
+local Toggle = SettingsTab:CreateToggle({
+   Name = "Collect Tokens (Dont use Pattern With this)",
+   CurrentValue = false,
+   Flag = "Toggle4", 
+   Callback = function(Value)
+      _G.CollectTokens = Value
+      
+      local Character = game.Players.LocalPlayer.Character
+      local Hum = Character:WaitForChild("Humanoid")
+      local HRP = Character:WaitForChild("HumanoidRootPart")
+
+      while _G.CollectTokens do
+         task.wait(1)
+         
+         -- ONLY RUN IF AUTOFARM IS ALSO ON
+         if _G.AutoFarm then
+            local Collectibles = workspace:FindFirstChild("Collectibles")
+            if Collectibles and HRP then
+               local closestToken = nil
+               local shortestDist = 25 -- Distance to walk to tokens
+
+               for _, token in pairs(Collectibles:GetChildren()) do
+                  if token:IsA("BasePart") and token.Transparency < 1 then
+                     local dist = (token.Position - HRP.Position).Magnitude
+                     if dist < shortestDist then
+                        shortestDist = dist
+                        closestToken = token
+                     end
+                  end
+               end
+
+               if closestToken then
+                  -- Hijack movement to grab token
+                  Hum:MoveTo(closestToken.Position)
+                  
+                  -- Stay on token until collected or toggle off
+                  repeat 
+                     task.wait() 
+                  until not closestToken.Parent or (HRP.Position - closestToken.Position).Magnitude < 3 or not _G.CollectTokens or not _G.AutoFarm
+               end
+            end
+         end
+      end
+   end,
+})
+
+local Toggle = SettingsTab:CreateToggle({
+   Name = "Farm Bubbles (Might be bugged)",
+   CurrentValue = false,
+   Flag = "Toggle5",
+   Callback = function(Value)
+      _G.FarmBubbles = Value
+      
+      local Character = game.Players.LocalPlayer.Character
+      local Hum = Character:WaitForChild("Humanoid")
+      local HRP = Character:WaitForChild("HumanoidRootPart")
+
+      while _G.FarmBubbles do
+         task.wait(0.1) -- Frequency of bubble scanning
+         
+         -- ONLY act if AutoFarm is ON and we have a valid character
+         if _G.AutoFarm and Character and HRP then
+            local Effects = workspace:FindFirstChild("Particles") or workspace:FindFirstChild("Effects")
+            local closestBubble = nil
+            local shortestDist = 30 
+
+            if Effects then
+               for _, v in pairs(Effects:GetChildren()) do
+                  -- Standard BSS naming check
+                  if v.Name == "Bubble" and v:IsA("BasePart") and v.Transparency < 1 then
+                     local dist = (v.Position - HRP.Position).Magnitude
+                     if dist < shortestDist then
+                        shortestDist = dist
+                        closestBubble = v
+                     end
+                  end
+               end
+
+               if closestBubble then
+                  -- ONLY hijack movement if a bubble actually exists
+                  Hum:MoveTo(closestBubble.Position)
+                  
+                  -- Stay until popped or conditions change
+                  repeat 
+                     task.wait() 
+                  until not closestBubble.Parent or (HRP.Position - closestBubble.Position).Magnitude < 3 or not _G.FarmBubbles or not _G.AutoFarm
+               end
+               -- If no closestBubble is found, we do NOT call MoveTo.
+               -- This allows the AutoFarm pattern to run without interruption.
+            end
+         end
+      end
+   end,
+})
