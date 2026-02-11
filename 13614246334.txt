@@ -1,0 +1,92 @@
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = game.Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+ScreenGui.Name = "MoneyFarmer_RaiseAMorty"
+
+local moneyEnabled = false
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 250, 0, 180)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -90)
+MainFrame.BackgroundTransparency = 1
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local BackgroundImage = Instance.new("ImageLabel", MainFrame)
+BackgroundImage.Size = UDim2.new(1, 0, 1, 0)
+BackgroundImage.Image = "https://www.roblox.com/asset-thumbnail/image?assetId=10442802383&width=420&height=420&format=png"
+BackgroundImage.ScaleType = Enum.ScaleType.Stretch
+local Corner = Instance.new("UICorner", BackgroundImage)
+Corner.CornerRadius = UDim.new(0, 15)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Position = UDim2.new(0, 0, 0, 5)
+Title.BackgroundTransparency = 1
+Title.Text = "Raise A Morty"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 22
+local TitleStroke = Instance.new("UIStroke", Title)
+TitleStroke.Thickness = 2
+TitleStroke.Transparency = 0.5
+
+local ToggleBtn = Instance.new("TextButton", MainFrame)
+ToggleBtn.Size = UDim2.new(0, 220, 0, 45)
+ToggleBtn.Position = UDim2.new(0.5, -110, 0.5, 5) 
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ToggleBtn.BackgroundTransparency = 0.4
+ToggleBtn.Text = "Infinite Money"
+ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleBtn.Font = Enum.Font.Ubuntu
+ToggleBtn.TextSize = 18
+ToggleBtn.TextXAlignment = Enum.TextXAlignment.Left 
+ToggleBtn.AutoButtonColor = false
+Instance.new("UICorner", ToggleBtn)
+
+local Padding = Instance.new("UIPadding", ToggleBtn)
+Padding.PaddingLeft = UDim.new(0, 15)
+
+local SwitchBase = Instance.new("Frame", ToggleBtn)
+SwitchBase.Size = UDim2.new(0, 40, 0, 20)
+SwitchBase.Position = UDim2.new(1, -55, 0.5, -10)
+SwitchBase.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Instance.new("UICorner", SwitchBase).CornerRadius = UDim.new(1, 0)
+
+local SwitchCircle = Instance.new("Frame", SwitchBase)
+SwitchCircle.Size = UDim2.new(0, 16, 0, 16)
+SwitchCircle.Position = UDim2.new(0, 2, 0.5, -8)
+SwitchCircle.BackgroundColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", SwitchCircle).CornerRadius = UDim.new(1, 0)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    moneyEnabled = not moneyEnabled
+    local targetPos = moneyEnabled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    local targetColor = moneyEnabled and Color3.fromRGB(224, 50, 255) or Color3.fromRGB(40, 40, 40)
+    
+    TweenService:Create(SwitchCircle, TweenInfo.new(0.2), {Position = targetPos}):Play()
+    TweenService:Create(SwitchBase, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+end)
+
+task.spawn(function()
+    local daily = game.ReplicatedStorage:WaitForChild("Events"):FindFirstChild("DailyReward")
+    while true do
+        if moneyEnabled and daily then
+            for i = 1, 50 do
+                if not moneyEnabled then break end 
+                daily:FireServer()
+                if i % 10 == 0 then task.wait() end 
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and (input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt) then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
