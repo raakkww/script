@@ -1,0 +1,6 @@
+local LocalPlayer = game.Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+local Height = 99999999999999999999999999999999999999
+RootPart.CFrame = CFrame.new(RootPart.Position.X, Height, RootPart.Position.Z)
+---thank you for using my script :D---
