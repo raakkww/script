@@ -1,0 +1,175 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LP = game.Players.LocalPlayer
+
+-- // GHOST V4 CONFIG //
+getgenv().GhostConfig = {
+    Enabled = false,
+    VelocityMultiplier = 8,
+    MaxSpeed = 400,
+    SteerSens = 0.07,
+    NitroPower = 25,
+    NitroDuration = 2,
+    NitroTopSpeed = 1000,
+    CarColor = Color3.fromRGB(255, 255, 255),
+    RainbowMode = false,
+    NeonEnabled = false,
+    DraggableUI = false,
+    StabilizerEnabled = true,
+    AutoBrake = false 
+}
+
+local isThrottling, isBraking, steerDir, curSpeed = false, false, 0, 0
+local nitroActive = false
+
+-- // WINDOW SETUP //
+local Window = Rayfield:CreateWindow({
+    Name = "",
+    LoadingTitle = "Driving Empire Script",
+    LoadingSubtitle = "Movement Logic Fixed",
+})
+
+local Tab = Window:CreateTab("Tuning", 4483362458)
+local NitroTab = Window:CreateTab("Nitro Settings", 4483362458)
+local VisualTab = Window:CreateTab("Customization", 4483362458)
+
+--- // PERFORMANCE TAB // ---
+Tab:CreateSection("Main Controls")
+Tab:CreateToggle({Name = "Enable Script", CurrentValue = false, Callback = function(v) getgenv().GhostConfig.Enabled = v end})
+Tab:CreateToggle({Name = "Auto-Brake (Instant Stop)", CurrentValue = false, Callback = function(v) getgenv().GhostConfig.AutoBrake = v end})
+Tab:CreateToggle({Name = "Car Stabilizer", CurrentValue = true, Callback = function(v) getgenv().GhostConfig.StabilizerEnabled = v end})
+Tab:CreateSlider({Name = "Max Speed", Range = {100, 2000}, Increment = 1, CurrentValue = 400, Callback = function(v) getgenv().GhostConfig.MaxSpeed = v end})
+Tab:CreateSlider({Name = "Acceleration", Range = {0.1, 50}, Increment = 0.1, CurrentValue = 8, Callback = function(v) getgenv().GhostConfig.VelocityMultiplier = v end})
+Tab:CreateSlider({Name = "Steer Sensitivity", Range = {0.01, 0.5}, Increment = 0.01, CurrentValue = 0.07, Callback = function(v) getgenv().GhostConfig.SteerSens = v end})
+
+Tab:CreateSection("Interface")
+local MobileGui = Instance.new("ScreenGui", (game:GetService("CoreGui") or LP.PlayerGui))
+MobileGui.Enabled = false
+Tab:CreateToggle({Name = "Show Mobile Buttons", CurrentValue = false, Callback = function(v) MobileGui.Enabled = v end})
+Tab:CreateToggle({Name = "Enable Button Dragging", CurrentValue = false, Callback = function(v) getgenv().GhostConfig.DraggableUI = v end})
+
+--- // NITRO TAB // ---
+NitroTab:CreateSection("Nitro Burst Tuning")
+NitroTab:CreateSlider({Name = "Nitro Power", Range = {1, 100}, Increment = 1, CurrentValue = 25, Callback = function(v) getgenv().GhostConfig.NitroPower = v end})
+NitroTab:CreateSlider({Name = "Nitro Top Speed", Range = {100, 5000}, Increment = 10, CurrentValue = 1000, Callback = function(v) getgenv().GhostConfig.NitroTopSpeed = v end})
+NitroTab:CreateSlider({Name = "Nitro Duration", Range = {0.1, 10}, Increment = 0.1, CurrentValue = 2, Callback = function(v) getgenv().GhostConfig.NitroDuration = v end})
+
+--- // CUSTOMIZATION TAB // ---
+VisualTab:CreateSection("Visuals")
+VisualTab:CreateToggle({Name = "Rainbow Mode", CurrentValue = false, Callback = function(v) getgenv().GhostConfig.RainbowMode = v end})
+VisualTab:CreateToggle({Name = "Neon Mode", CurrentValue = false, Callback = function(v) getgenv().GhostConfig.NeonEnabled = v end})
+VisualTab:CreateColorPicker({Name = "Body Color", Color = Color3.fromRGB(255,255,255), Callback = function(Value) getgenv().GhostConfig.CarColor = Value end})
+
+-- // DRAGGABLE LOGIC //
+local function MakeDraggable(gui)
+    local dragging, dragStart, startPos
+    gui.InputBegan:Connect(function(input)
+        if getgenv().GhostConfig.DraggableUI and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            dragging = true; dragStart = input.Position; startPos = gui.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    gui.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+local function CreateBtn(name, pos, size, text, color)
+    local btn = Instance.new("TextButton", MobileGui); btn.Position = pos; btn.Size = size
+    btn.BackgroundColor3 = color or Color3.fromRGB(30, 30, 30); btn.BackgroundTransparency = 0.4
+    btn.Text = text; btn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", btn)
+    MakeDraggable(btn); return btn
+end
+
+local Gas = CreateBtn("Gas", UDim2.new(0.8, 0, 0.7, 0), UDim2.new(0, 100, 0, 100), "GAS")
+local NitroBtn = CreateBtn("Nitro", UDim2.new(0.8, 0, 0.55, 0), UDim2.new(0, 100, 0, 50), "NITRO", Color3.fromRGB(0, 150, 255))
+local Stop = CreateBtn("Brake", UDim2.new(0.65, 0, 0.75, 0), UDim2.new(0, 80, 0, 80), "STOP")
+local Left = CreateBtn("Left", UDim2.new(0.05, 0, 0.75, 0), UDim2.new(0, 80, 0, 80), "<")
+local Right = CreateBtn("Right", UDim2.new(0.15, 0, 0.75, 0), UDim2.new(0, 80, 0, 80), ">")
+
+local function ActivateNitro()
+    if nitroActive then return end
+    nitroActive = true
+    task.delay(getgenv().GhostConfig.NitroDuration, function() nitroActive = false end)
+end
+
+Gas.InputBegan:Connect(function() if not getgenv().GhostConfig.DraggableUI then isThrottling = true end end)
+Gas.InputEnded:Connect(function() isThrottling = false end)
+Stop.InputBegan:Connect(function() if not getgenv().GhostConfig.DraggableUI then isBraking = true end end)
+Stop.InputEnded:Connect(function() isBraking = false end)
+Left.InputBegan:Connect(function() if not getgenv().GhostConfig.DraggableUI then steerDir = -1 end end)
+Left.InputEnded:Connect(function() steerDir = 0 end)
+Right.InputBegan:Connect(function() if not getgenv().GhostConfig.DraggableUI then steerDir = 1 end end)
+Right.InputEnded:Connect(function() steerDir = 0 end)
+NitroBtn.MouseButton1Click:Connect(ActivateNitro)
+
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.W then isThrottling = true
+    elseif input.KeyCode == Enum.KeyCode.S then isBraking = true
+    elseif input.KeyCode == Enum.KeyCode.A then steerDir = -1
+    elseif input.KeyCode == Enum.KeyCode.D then steerDir = 1
+    elseif input.KeyCode == Enum.KeyCode.LeftShift then ActivateNitro() end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.W then isThrottling = false
+    elseif input.KeyCode == Enum.KeyCode.S then isBraking = false
+    elseif input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.D then steerDir = 0 end
+end)
+
+-- // FIXED PHYSICS ENGINE //
+RunService.Stepped:Connect(function()
+    if not getgenv().GhostConfig.Enabled then return end
+    local seat = (LP.Character and LP.Character:FindFirstChild("Humanoid") and LP.Character.Humanoid.SeatPart)
+    if seat and seat:IsA("VehicleSeat") then
+        local root = seat.Parent.PrimaryPart or seat
+        local currentLimit = nitroActive and getgenv().GhostConfig.NitroTopSpeed or getgenv().GhostConfig.MaxSpeed
+        
+        -- Fixed Priority Logic
+        if isThrottling or nitroActive then
+            local accel = (isThrottling and getgenv().GhostConfig.VelocityMultiplier or 0) + (nitroActive and getgenv().GhostConfig.NitroPower or 0)
+            curSpeed = math.min(curSpeed + accel, currentLimit)
+        elseif isBraking then
+            curSpeed = math.max(curSpeed - 30, -50)
+        else
+            -- Auto-Brake only activates when no movement keys are pressed
+            if getgenv().GhostConfig.AutoBrake then
+                curSpeed = 0
+            else
+                curSpeed = curSpeed * 0.98
+            end
+        end
+
+        local direction = root.CFrame.LookVector
+        local downForce = getgenv().GhostConfig.StabilizerEnabled and -1.5 or 0
+        root.AssemblyLinearVelocity = Vector3.new(direction.X * curSpeed, root.AssemblyLinearVelocity.Y + downForce, direction.Z * curSpeed)
+        
+        if steerDir ~= 0 then
+            seat.Parent:PivotTo(seat.Parent:GetPivot() * CFrame.Angles(0, -steerDir * getgenv().GhostConfig.SteerSens, 0))
+        end
+        
+        if getgenv().GhostConfig.StabilizerEnabled then
+            root.AssemblyAngularVelocity = Vector3.new(0, root.AssemblyAngularVelocity.Y, 0)
+        end
+    else
+        curSpeed = 0
+    end
+end)
+
+-- Visuals
+task.spawn(function()
+    while task.wait(0.1) do
+        local seat = (LP.Character and LP.Character:FindFirstChild("Humanoid") and LP.Character.Humanoid.SeatPart)
+        if seat and seat.Parent then
+            local color = getgenv().GhostConfig.RainbowMode and Color3.fromHSV(tick() % 5 / 5, 1, 1) or getgenv().GhostConfig.CarColor
+            local mat = getgenv().GhostConfig.NeonEnabled and Enum.Material.Neon or Enum.Material.SmoothPlastic
+            for _, p in pairs(seat.Parent:GetDescendants()) do
+                if p:IsA("BasePart") and p.Name ~= "Wheel" then p.Color = color p.Material = mat end
+            end
+        end
+    end
+end)
