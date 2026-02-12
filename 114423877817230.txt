@@ -1,0 +1,66 @@
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Folders
+local DummiesFolder = ReplicatedStorage:WaitForChild("dummies")
+local RemotesFolder = ReplicatedStorage:WaitForChild("remotes")
+
+-- RemoteEvents
+local CharChange = RemotesFolder:WaitForChild("CharChange")
+local Morph = RemotesFolder:WaitForChild("morph")
+local Action = RemotesFolder:WaitForChild("action")
+
+-- Load Rayfield
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+-- Window
+local Window = Rayfield:CreateWindow({
+	Name = "",
+	LoadingTitle = "Rayfield GUI",
+	LoadingSubtitle = "Sonic Characters",
+	ConfigurationSaving = {
+		Enabled = false
+	}
+})
+
+-- Tab
+local Tab = Window:CreateTab("Characters", 4483362458)
+
+-- Character list
+local Characters = {
+	"amy",
+	"blaze",
+	"charmy",
+	"cheese",
+	"choco",
+	"cream",
+	"eggman",
+	"epsio",
+	"exodus",
+	"knuckles",
+	"metalSonic",
+	"rouge",
+	"sally",
+	"shadow",
+	"sonic",
+	"tails",
+	"tailsDoll"
+}
+
+-- Create buttons
+for _, charName in ipairs(Characters) do
+	Tab:CreateButton({
+		Name = charName,
+		Callback = function()
+			local dummy = DummiesFolder:FindFirstChild(charName)
+			if dummy then
+				-- Fire all remotes
+				CharChange:FireServer(charName)
+				Morph:FireServer(charName)
+				Action:FireServer(charName)
+			else
+				warn("Dummy not found: " .. charName)
+			end
+		end
+	})
+end
