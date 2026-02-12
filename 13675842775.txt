@@ -1,0 +1,25 @@
+local op = 1000 --[[ Change this number to however you like (don't put above 100000)]]--
+
+
+
+
+
+
+--[[DO NOT REMOVE THIS PART]]--
+local pl = game.Players.LocalPlayer
+pl.Backpack:Destroy()
+pl.PlayerGui.Gui:Destroy()
+wait(0.3)
+
+
+
+
+for I = 1,op do
+
+local args = {
+	game:GetService("Players").LocalPlayer:WaitForChild("leaderstats"):WaitForChild("Rebirths"),
+	game:GetService("ReplicatedStorage").CurrentTrack,
+	game:GetService("ReplicatedStorage").CurrentTrack
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Rebirth"):FireServer(unpack(args))
+end
