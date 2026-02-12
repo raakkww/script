@@ -1,0 +1,52 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Meditate = {}
+Meditate.__index = Meditate
+
+function Meditate.new()
+	local self = setmetatable({}, Meditate)
+	self.player = Players.LocalPlayer
+	self.keyGui = self.player.PlayerGui:WaitForChild("Key Spam")
+	self.meditateRemote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("Meditate")
+	self.createKeyRemote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("Create Key")
+	self.active = true
+	self.keyDetected = false
+	self:keyListener()
+	self:startLoop()
+	return self
+end
+
+function Meditate:keyListener()
+	self.keyGui.ChildAdded:Connect(function(child)
+		if string.find(child.Name, "Key") and self.active then
+			self.keyDetected = true
+			self.createKeyRemote:FireServer("Complete")
+		end
+	end)
+end
+
+function Meditate:startLoop()
+	task.spawn(function()
+		while self.active do
+			self.keyDetected = false
+			self.meditateRemote:FireServer("Start")
+			local startTime = tick()
+			while tick() - startTime < 15 do
+				if self.keyDetected or not self.active then
+					break
+				end
+				task.wait(0.2)
+			end
+			if self.keyDetected then
+				break
+			end
+		end
+	end)
+end
+
+function Meditate:stop()
+	self.active = false
+end
+
+getgenv().medi = Meditate.new()
