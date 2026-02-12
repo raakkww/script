@@ -1,0 +1,5 @@
+local args = {
+	math.huge,
+	game:GetService("Players"):WaitForChild("Denisca16Alternative")
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Sending"):FireServer(unpack(args))
