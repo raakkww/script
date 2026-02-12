@@ -1,0 +1,152 @@
+--// SETTINGS
+local Flags = {
+    Farm = "Self"
+}
+
+--// SERVICES
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Client = Players.LocalPlayer
+
+--// STATE
+shared.afy = false
+local Connections = {}
+
+--// FUNCTIONS
+local function GetRoot(Character)
+    return Character and Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function GetHumanoid(Character)
+    return Character and Character:FindFirstChild("Humanoid")
+end
+
+local function Cast()
+    local Character = Client.Character
+    local Humanoid = GetHumanoid(Character)
+    local Root = GetRoot(Character)
+    if not Root then return end
+
+    local Rod = Character:FindFirstChild("Rod")
+    if not Rod then return end
+
+    local Farming = Flags.Farm == "Self"
+        and Root
+        or workspace.Galaxies:FindFirstChild(Flags.Farm)
+        or Root
+
+    local Position = Farming:GetPivot().Position + Vector3.new(0,5,0)
+    local Look = Farming:GetPivot().LookVector
+
+    ReplicatedStorage.Events.Global.Cast:FireServer(
+        Humanoid,
+        Position,
+        Look,
+        Rod.Model.Nodes.RodTip.Attachment
+    )
+
+    ReplicatedStorage.Events.Global.WithdrawBobber:FireServer(Humanoid)
+end
+
+-- Auto Confirm Fish
+local ClientRecieveItems = ReplicatedStorage.Events.Global.ClientRecieveItems
+table.insert(Connections, ClientRecieveItems.OnClientEvent:Connect(function(...)
+    local Data = {...}
+    local Info = Data[4] or {}
+    local TimingTbl = Data[6] or {}
+
+    for Index, StarData in pairs(Info) do
+        local Id = StarData["id"]
+        if Id then
+            task.wait(TimingTbl[Index] or 3)
+            ReplicatedStorage.Events.Global.ClientItemConfirm:FireServer(Id)
+        end
+    end
+end))
+
+-- Loop
+task.spawn(function()
+    while true do
+        if shared.afy then
+            Cast()
+        end
+        task.wait()
+    end
+end)
+
+--// =========================
+--// GUI
+--// =========================
+
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "AutoFishGUI"
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 250, 0, 180)
+Frame.Position = UDim2.new(0.5, -125, 0.5, -90)
+Frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+Frame.Active = true
+Frame.Draggable = true
+
+local UIStroke = Instance.new("UIStroke", Frame)
+UIStroke.Color = Color3.fromRGB(0,170,255)
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1,0,0,30)
+Title.BackgroundTransparency = 1
+Title.Text = "Auto Fish"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+
+-- Dropdown
+local Dropdown = Instance.new("TextButton", Frame)
+Dropdown.Size = UDim2.new(0.9,0,0,30)
+Dropdown.Position = UDim2.new(0.05,0,0,50)
+Dropdown.Text = "Farm: Self"
+Dropdown.BackgroundColor3 = Color3.fromRGB(45,45,45)
+Dropdown.TextColor3 = Color3.new(1,1,1)
+Dropdown.Font = Enum.Font.Gotham
+Dropdown.TextSize = 14
+
+local Options = {
+    "Self",
+    "Milky Way",
+    "Andromeda",
+    "Centaurus A",
+    "Hoag's Object",
+    "Negative Galaxy",
+    "The Eye"
+}
+
+local Index = 1
+
+Dropdown.MouseButton1Click:Connect(function()
+    Index += 1
+    if Index > #Options then
+        Index = 1
+    end
+    Flags.Farm = Options[Index]
+    Dropdown.Text = "Farm: "..Flags.Farm
+end)
+
+-- Toggle Button
+local Toggle = Instance.new("TextButton", Frame)
+Toggle.Size = UDim2.new(0.9,0,0,35)
+Toggle.Position = UDim2.new(0.05,0,0,100)
+Toggle.BackgroundColor3 = Color3.fromRGB(0,170,0)
+Toggle.Text = "START"
+Toggle.TextColor3 = Color3.new(1,1,1)
+Toggle.Font = Enum.Font.GothamBold
+Toggle.TextSize = 16
+
+Toggle.MouseButton1Click:Connect(function()
+    shared.afy = not shared.afy
+    if shared.afy then
+        Toggle.Text = "STOP"
+        Toggle.BackgroundColor3 = Color3.fromRGB(170,0,0)
+    else
+        Toggle.Text = "START"
+        Toggle.BackgroundColor3 = Color3.fromRGB(0,170,0)
+    end
+end)
