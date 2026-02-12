@@ -1,0 +1,10 @@
+local time = tick()
+
+if hookfunction then
+    hookfunction(tick, function()
+        time += 100
+        return time
+    end)
+else
+    game.Players.LocalPlayer:Kick("ass exec")
+end
