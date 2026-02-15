@@ -1,0 +1,93 @@
+-- FunÃ§Ã£o para buscar Remotes em qualquer pasta do ReplicatedStorage
+local function findRemote(name)
+    for _, obj in ipairs(game.ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then
+            return obj
+        end
+    end
+    return nil
+end
+
+local winRemote = findRemote("[C-S]WinArea")
+local rewardRemote = findRemote("[C-S]GetGroupReward")
+
+-- GUI Principal
+local gui = Instance.new("ScreenGui", game.CoreGui)
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 180)
+frame.Position = UDim2.new(0.4, 0, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active = true
+frame.Draggable = true
+
+-- Borda arredondada simples (Opcional)
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0, 8)
+
+-- BotÃ£o Fechar
+local close = Instance.new("TextButton", frame)
+close.Size = UDim2.new(0, 30, 0, 30)
+close.Position = UDim2.new(1, -35, 0, 5)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+close.TextColor3 = Color3.new(1, 1, 1)
+close.MouseButton1Click:Connect(function() gui:Destroy() end)
+
+--- --- --- SEÃÃO AUTO WIN --- --- ---
+
+local botaoWin = Instance.new("TextButton", frame)
+botaoWin.Size = UDim2.new(0.85, 0, 0.35, 0)
+botaoWin.Position = UDim2.new(0.075, 0, 0.2, 0)
+botaoWin.Text = "AUTO WIN: OFF"
+botaoWin.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+botaoWin.TextColor3 = Color3.new(1, 1, 1)
+
+local winAtivo = false
+botaoWin.MouseButton1Click:Connect(function()
+    winAtivo = not winAtivo
+    botaoWin.Text = winAtivo and "AUTO WIN: ON" or "AUTO WIN: OFF"
+    botaoWin.BackgroundColor3 = winAtivo and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+
+    if winAtivo then
+        task.spawn(function()
+            while winAtivo do
+                if winRemote then
+                    for i = 1, 11 do
+                        if not winAtivo then break end
+                        winRemote:FireServer("Area"..i)
+                        task.wait(0.1)
+                    end
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+end)
+
+--- --- --- SEÃÃO GROUP REWARD --- --- ---
+
+local botaoReward = Instance.new("TextButton", frame)
+botaoReward.Size = UDim2.new(0.85, 0, 0.35, 0)
+botaoReward.Position = UDim2.new(0.075, 0, 0.6, 0)
+botaoReward.Text = "LOOP REWARD: OFF"
+botaoReward.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+botaoReward.TextColor3 = Color3.new(1, 1, 1)
+
+local rewardAtivo = false
+botaoReward.MouseButton1Click:Connect(function()
+    rewardAtivo = not rewardAtivo
+    botaoReward.Text = rewardAtivo and "LOOP REWARD: ON" or "LOOP REWARD: OFF"
+    botaoReward.BackgroundColor3 = rewardAtivo and Color3.fromRGB(0, 120, 200) or Color3.fromRGB(60, 60, 60)
+
+    if rewardAtivo then
+        task.spawn(function()
+            while rewardAtivo do
+                if rewardRemote then
+                    rewardRemote:FireServer()
+                end
+                -- Espera 5 segundos antes de pedir de novo para evitar lag/kick
+                task.wait(5) 
+            end
+        end)
+    end
+end)
