@@ -1,0 +1,83 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- 1. Create the GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AnimationGui"
+screenGui.ResetOnSpawn = false 
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- PLAY/NEXT BUTTON (Your Original)
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 50, 0, 50)
+button.Position = UDim2.new(0, 60, 0, 5)
+button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Text = "Play"
+button.Parent = screenGui
+
+-- SCREAM BUTTON (New)
+local screamBtn = Instance.new("TextButton")
+screamBtn.Size = UDim2.new(0, 100, 0, 40)
+screamBtn.Position = UDim2.new(1, -110, 0, 10)
+screamBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+screamBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+screamBtn.Text = "Scream"
+screamBtn.Parent = screenGui
+
+-- 2. Setup Animation Objects
+local anim1 = Instance.new("Animation")
+anim1.AnimationId = "rbxassetid://13797112660"
+
+local anim2 = Instance.new("Animation")
+anim2.AnimationId = "rbxassetid://17417380129"
+
+local screamAnim = Instance.new("Animation")
+screamAnim.AnimationId = "rbxassetid://13968470664"
+
+local track1, track2, screamTrack
+local isFirstAnim = true
+local isScreaming = false
+
+-- 3. Load Function
+local function loadAnims(character)
+    local humanoid = character:WaitForChild("Humanoid")
+    local animator = humanoid:WaitForChild("Animator")
+    track1 = animator:LoadAnimation(anim1)
+    track2 = animator:LoadAnimation(anim2)
+    screamTrack = animator:LoadAnimation(screamAnim)
+end
+
+if player.Character then loadAnims(player.Character) end
+player.CharacterAdded:Connect(loadAnims)
+
+-- 4. Play/Next Logic
+button.MouseButton1Click:Connect(function()
+    if not track1 or not track2 then return end
+    track1:Stop()
+    track2:Stop()
+
+    if isFirstAnim then
+        track1:Play()
+        button.Text = "Next"
+    else
+        track2:Play()
+        button.Text = "Play"
+    end
+    isFirstAnim = not isFirstAnim
+end)
+
+-- 5. Scream Toggle Logic
+screamBtn.MouseButton1Click:Connect(function()
+    if not screamTrack then return end
+    
+    if not isScreaming then
+        screamTrack:Play()
+        screamBtn.Text = "Stop"
+        isScreaming = true
+    else
+        screamTrack:Stop()
+        screamBtn.Text = "Scream"
+        isScreaming = false
+    end
+end)
