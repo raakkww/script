@@ -1,0 +1,329 @@
+-- VODKA HUB (FINAL – CUSTOM ESP INTEGRATED)
+
+repeat task.wait() until game:IsLoaded()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-------------------------------------------------
+-- LOAD UI
+-------------------------------------------------
+
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(request({
+    Url = repo .. "Library.lua",
+    Method = "GET"
+}).Body)()
+
+local Window = Library:CreateWindow({
+    Title = "",
+    Footer = "",
+    Icon = 95816097006870,
+    NotifySide = "Right",
+    ShowCustomCursor = true,
+    AutoShow = true
+})
+
+-------------------------------------------------
+-- RIGHT SHIFT TOGGLE
+-------------------------------------------------
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        Library:Toggle()
+    end
+end)
+
+-------------------------------------------------
+-- TABS
+-------------------------------------------------
+
+local Tabs = {
+    Combat = Window:AddTab("Combat", "crosshair"),
+    Visuals = Window:AddTab("Visuals", "eye"),
+    Community = Window:AddTab("Community", "users")
+}
+
+local Toggles = Library.Toggles
+local Options = Library.Options
+
+-------------------------------------------------
+-- COMBAT
+-------------------------------------------------
+
+local CombatBox = Tabs.Combat:AddLeftGroupbox("Combat")
+
+CombatBox:AddToggle("Aimbot", {Text="Enable Aimbot"})
+CombatBox:AddSlider("FOV", {Text="FOV", Default=150, Min=20, Max=600})
+CombatBox:AddSlider("Smooth", {Text="Smoothness", Default=8, Min=1, Max=30})
+CombatBox:AddToggle("WallCheck", {Text="Wall Check"})
+
+-------------------------------------------------
+-- VISUALS
+-------------------------------------------------
+
+local VisualBox = Tabs.Visuals:AddLeftGroupbox("Visuals")
+
+VisualBox:AddToggle("ESP", {Text="Enable ESP", Default=true})
+
+-------------------------------------------------
+-- MOVEMENT
+-------------------------------------------------
+
+local MoveBox = Tabs.Visuals:AddRightGroupbox("Movement")
+
+MoveBox:AddSlider("Speed", {
+    Text="Walk Speed",
+    Default=16,
+    Min=16,
+    Max=200
+})
+
+MoveBox:AddToggle("Noclip", {Text="Noclip (Platform)"})
+
+-------------------------------------------------
+-- SPEED
+-------------------------------------------------
+
+RunService.Heartbeat:Connect(function()
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = Options.Speed.Value
+    end
+end)
+
+-------------------------------------------------
+-- NOCLIP
+-------------------------------------------------
+
+local platform
+
+RunService.Heartbeat:Connect(function()
+    if Toggles.Noclip.Value and LocalPlayer.Character then
+        for _,v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            if not platform then
+                platform = Instance.new("Part")
+                platform.Size = Vector3.new(6,1,6)
+                platform.Anchored = true
+                platform.CanCollide = true
+                platform.Transparency = 0.5
+                platform.Parent = Workspace
+            end
+            platform.Position = hrp.Position - Vector3.new(0,3.5,0)
+        end
+    else
+        if platform then
+            platform:Destroy()
+            platform = nil
+        end
+    end
+end)
+
+-------------------------------------------------
+-- WALLCHECK
+-------------------------------------------------
+
+local function IsVisible(targetPart, targetCharacter)
+    if not Toggles.WallCheck.Value then
+        return true
+    end
+
+    local origin = Camera.CFrame.Position
+    local direction = targetPart.Position - origin
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {
+        LocalPlayer.Character,
+        targetCharacter
+    }
+
+    local ray = Workspace:Raycast(origin, direction, params)
+    return not ray
+end
+
+-------------------------------------------------
+-- AIMBOT
+-------------------------------------------------
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.new(1,1,1)
+FOVCircle.Thickness = 1
+FOVCircle.Filled = false
+
+RunService.RenderStepped:Connect(function()
+
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    FOVCircle.Radius = Options.FOV.Value
+    FOVCircle.Visible = Toggles.Aimbot.Value
+
+    if not Toggles.Aimbot.Value then return end
+
+    local closest = nil
+    local shortest = math.huge
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    for _,plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local char = plr.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+            if hum and hrp and hum.Health > 0 then
+                local pos, visible = Camera:WorldToViewportPoint(hrp.Position)
+                if visible then
+                    local distance = (Vector2.new(pos.X,pos.Y) - center).Magnitude
+                    if distance < Options.FOV.Value and distance < shortest then
+                        if IsVisible(hrp, char) then
+                            shortest = distance
+                            closest = hrp
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if closest then
+        Camera.CFrame = Camera.CFrame:Lerp(
+            CFrame.new(Camera.CFrame.Position, closest.Position),
+            1 / Options.Smooth.Value
+        )
+    end
+end)
+
+-------------------------------------------------
+-- CUSTOM ESP (YOUR SCRIPT)
+-------------------------------------------------
+
+local espElements = {}
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+
+    local espTable = {}
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Visible = false
+    nameTag.Center = true
+    nameTag.Outline = true
+    nameTag.Size = 18
+    nameTag.Color = Color3.fromRGB(255,255,255)
+    nameTag.Text = player.Name
+    espTable.nameTag = nameTag
+
+    local teamTag = Drawing.new("Text")
+    teamTag.Visible = false
+    teamTag.Center = true
+    teamTag.Outline = true
+    teamTag.Size = 16
+    teamTag.Color = Color3.fromRGB(128,128,128)
+    espTable.teamTag = teamTag
+
+    local lines = {}
+    for i = 1,4 do
+        local line = Drawing.new("Line")
+        line.Visible = false
+        line.Thickness = 2
+        line.Transparency = 1
+        table.insert(lines, line)
+    end
+    espTable.lines = lines
+
+    espElements[player] = espTable
+end
+
+local function removeESP(player)
+    if espElements[player] then
+        espElements[player].nameTag:Remove()
+        espElements[player].teamTag:Remove()
+        for _, line in ipairs(espElements[player].lines) do
+            line:Remove()
+        end
+        espElements[player] = nil
+    end
+end
+
+for _, player in pairs(Players:GetPlayers()) do
+    createESP(player)
+end
+
+Players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(removeESP)
+
+RunService.RenderStepped:Connect(function()
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+
+            local espData = espElements[player]
+            if not espData then continue end
+
+            local character = player.Character
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            local head = character:FindFirstChild("Head")
+            if not hrp or not head then continue end
+
+            local rootPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+            local nameTag = espData.nameTag
+            local teamTag = espData.teamTag
+            local lines = espData.lines
+
+            if onScreen and Toggles.ESP.Value then
+
+                local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,0.5,0))
+                nameTag.Position = Vector2.new(headPos.X, headPos.Y - 30)
+                nameTag.Visible = true
+
+                teamTag.Text = player.Team and player.Team.Name or "No Team"
+                teamTag.Position = Vector2.new(headPos.X, headPos.Y - 15)
+                teamTag.Visible = true
+
+                local teamColor = player.Team and player.Team.TeamColor.Color or Color3.fromRGB(255,255,255)
+                for _, line in ipairs(lines) do
+                    line.Color = teamColor
+                end
+
+                local points = {
+                    Camera:WorldToViewportPoint(hrp.Position + Vector3.new(-1,2,0)),
+                    Camera:WorldToViewportPoint(hrp.Position + Vector3.new(1,2,0)),
+                    Camera:WorldToViewportPoint(hrp.Position + Vector3.new(-1,-2,0)),
+                    Camera:WorldToViewportPoint(hrp.Position + Vector3.new(1,-2,0)),
+                }
+
+                lines[1].From = Vector2.new(points[1].X, points[1].Y)
+                lines[1].To = Vector2.new(points[2].X, points[2].Y)
+                lines[2].From = Vector2.new(points[2].X, points[2].Y)
+                lines[2].To = Vector2.new(points[4].X, points[4].Y)
+                lines[3].From = Vector2.new(points[4].X, points[4].Y)
+                lines[3].To = Vector2.new(points[3].X, points[3].Y)
+                lines[4].From = Vector2.new(points[3].X, points[3].Y)
+                lines[4].To = Vector2.new(points[1].X, points[1].Y)
+
+                for _, line in ipairs(lines) do
+                    line.Visible = true
+                end
+            else
+                nameTag.Visible = false
+                teamTag.Visible = false
+                for _, line in ipairs(lines) do
+                    line.Visible = false
+                end
+            end
+        end
+    end
+end)
