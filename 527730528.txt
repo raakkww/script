@@ -1,0 +1,539 @@
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local TextChatService = game:GetService("TextChatService")
+local HttpService = game:GetService("HttpService")
+
+-- Script-wide variables
+local Keybinds = {} 
+local BindingTarget = nil 
+local ScreenGui 
+local KeybindGui 
+local SpellButtons = {} 
+local KeybindListFrame 
+
+-- CONFIGURATION
+local ConfigFile = "SpellBinder/Config.json"
+
+-- === SAVE & LOAD SYSTEM ===
+
+local function SaveKeybinds()
+    local Data = {}
+    for Spell, Key in pairs(Keybinds) do
+        Data[Spell] = Key.Name
+    end
+    
+    local JSON = HttpService:JSONEncode(Data)
+    
+    local success, err = pcall(function()
+        makefolder("SpellBinder") 
+        writefile(ConfigFile, JSON)
+    end)
+    
+    if success then
+        -- print("Saved")
+    else
+        -- print("Save failed:", err)
+    end
+end
+
+local function LoadKeybinds()
+    if not readfile then return end 
+    
+    local success, result = pcall(function()
+        return readfile(ConfigFile)
+    end)
+    
+    if success and result then
+        local successDecode, Data = pcall(function()
+            return HttpService:JSONDecode(result)
+        end)
+        
+        if successDecode and Data then
+            local Count = 0
+            for Spell, KeyName in pairs(Data) do
+                if Enum.KeyCode[KeyName] then
+                    Keybinds[Spell] = Enum.KeyCode[KeyName]
+                    Count = Count + 1
+                end
+            end
+            print("Spell Binder: Loaded " .. Count .. " keybinds.")
+        end
+    end
+end
+
+-- === END SAVE & LOAD ===
+
+-- Audio Feedback
+local SoundId = "rbxassetid://6895079853" 
+local BindSound = Instance.new("Sound")
+BindSound.SoundId = SoundId
+BindSound.Volume = 0.5
+BindSound.Parent = game:GetService("CoreGui")
+
+local function PlayFeedback()
+    if BindSound then
+        BindSound:Play()
+    end
+end
+
+-- SPELL DATA
+local Spells = {
+    ["Stunning"] = {
+        "Duro", "Ebublio", "Glacius", "Impedimenta", "Incarcerous", 
+        "Levicorpus", "Locomotor Wibbly", "Petrificus Totalus", 
+        "Stupefy", "Tarantallegra"
+    },
+    ["Killing"] = {
+        "Avada Kedavra", "Defodio", "Deletrius", "Sectumsempra"
+    },
+    ["Damaging"] = {
+        "Alarte Ascendare", "Baubillious", "Bombarda", "Confringo", 
+        "Crucio", "Depulso", "Diffindo", "Everte Statum", "Expulso", 
+        "Flare", "Incendio", "Reducto", "Tonitro", "Verdimillious"
+    },
+    ["Utility"] = {
+        "Carpe Retractum", "Confundo", "Expelliarmus", "Flipendo", 
+        "Rictusempra", "Obliviate", "Obscuro", "Silencio", 
+        "Protego", "Protego Totalum", "Appa", "Ascendio", 
+        "Episkey", "Finite Incantatem", "Liberacorpus", "Relashio", 
+        "Rennervate", "Vulnera Sanentur", "Aboleo", "Accio", "Calvorio", 
+        "Diminuendo", "Engorgio Skullus", "Lumos", "Melofors", 
+        "Morsmordre", "Nox"
+    }
+}
+
+-- CHAT FUNCTION
+local function CastSpell(spellName)
+    local Char = LocalPlayer.Character
+    if not Char then return end
+
+    local Tool = Char:FindFirstChildWhichIsA("Tool")
+
+    if not Tool then
+        local Backpack = LocalPlayer:FindFirstChild("Backpack")
+        if Backpack then
+            local BackpackTool = Backpack:FindFirstChildWhichIsA("Tool")
+            if BackpackTool then
+                BackpackTool.Parent = Char
+                wait(0.05) 
+            end
+        end
+    end
+
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        local TextChannels = TextChatService:FindFirstChild("TextChannels")
+        if TextChannels then
+            local RBXGeneral = TextChannels:FindFirstChild("RBXGeneral")
+            if RBXGeneral then
+                RBXGeneral:SendAsync(spellName)
+                return
+            end
+        end
+    end
+
+    local Chat = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+    if Chat then
+        local SayMessage = Chat:FindFirstChild("SayMessageRequest")
+        if SayMessage then
+            SayMessage:FireServer(spellName, "All")
+        end
+    end
+end
+
+-- UPDATE SEPARATE KEYBIND LIST
+local function UpdateKeybindList()
+    if not KeybindListFrame then return end
+    
+    for _, child in pairs(KeybindListFrame:GetChildren()) do
+        if child:IsA("TextLabel") then
+            child:Destroy()
+        end
+    end
+    
+    local SortedBinds = {}
+    for Spell, Key in pairs(Keybinds) do
+        table.insert(SortedBinds, {Key = Key, Spell = Spell})
+    end
+    table.sort(SortedBinds, function(a, b) return a.Key.Name < b.Key.Name end)
+    
+    if #SortedBinds == 0 then
+        local EmptyLabel = Instance.new("TextLabel")
+        EmptyLabel.Size = UDim2.new(1, 0, 0, 18)
+        EmptyLabel.BackgroundTransparency = 1
+        EmptyLabel.Text = "No active keybinds"
+        EmptyLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
+        EmptyLabel.Font = Enum.Font.Gotham
+        EmptyLabel.TextSize = 11
+        EmptyLabel.Parent = KeybindListFrame
+    else
+        for _, Data in ipairs(SortedBinds) do
+            local Row = Instance.new("TextLabel")
+            Row.Size = UDim2.new(1, 0, 0, 18)
+            Row.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+            Row.BackgroundTransparency = 0.5
+            Row.BorderSizePixel = 0
+            Row.Text = "[" .. tostring(Data.Key.Name) .. "] " .. Data.Spell
+            Row.TextColor3 = Color3.new(1, 1, 1)
+            Row.Font = Enum.Font.Gotham
+            Row.TextSize = 11
+            Row.TextXAlignment = Enum.TextXAlignment.Left
+            Row.Parent = KeybindListFrame
+            
+            local RowCorner = Instance.new("UICorner")
+            RowCorner.CornerRadius = UDim.new(0, 2)
+            RowCorner.Parent = Row
+            
+            local Pad = Instance.new("UIPadding")
+            Pad.PaddingLeft = UDim.new(0, 5)
+            Pad.Parent = Row
+        end
+    end
+    
+    local Layout = KeybindListFrame:FindFirstChildOfClass("UIListLayout")
+    if Layout then
+        KeybindListFrame.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 5)
+    end
+end
+
+-- Helper to update button text/color
+local function UpdateButtonVisuals(SpellName)
+    if not ScreenGui then return end
+    local Btn = SpellButtons[SpellName]
+    
+    if Btn then
+        local bind = Keybinds[SpellName]
+        
+        if BindingTarget == SpellName then
+            Btn.Text = "[KEY?] " .. SpellName
+            Btn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) 
+            Btn.TextColor3 = Color3.new(1, 1, 1)
+            Btn.BackgroundTransparency = 0
+        elseif bind then
+            Btn.Text = "[" .. tostring(bind.Name) .. "] " .. SpellName 
+            Btn.BackgroundColor3 = Color3.fromRGB(30, 100, 30) 
+            Btn.BackgroundTransparency = 0.2
+            Btn.TextColor3 = Color3.new(1, 1, 1)
+        else
+            Btn.Text = SpellName
+            Btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20) 
+            Btn.BackgroundTransparency = 0.5
+            Btn.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+        end
+    end
+end
+
+-- SEARCH LOGIC
+local function UpdateSearch(query)
+    query = string.lower(query)
+    
+    for SpellName, Btn in pairs(SpellButtons) do
+        if string.find(string.lower(SpellName), query) ~= nil then
+            Btn.Visible = true
+        else
+            Btn.Visible = false
+        end
+    end
+
+    for Category, SpellList in pairs(Spells) do
+        local hasVisibleSpell = false
+        for _, SpellName in pairs(SpellList) do
+            local Btn = SpellButtons[SpellName]
+            if Btn and Btn.Visible then
+                hasVisibleSpell = true
+                break
+            end
+        end
+        local Header = ScreenGui.MainFrame.ScrollFrame:FindFirstChild("Header_" .. Category)
+        if Header then Header.Visible = hasVisibleSpell end
+    end
+end
+
+-- CUSTOM DRAG FUNCTION (Better than Active = true)
+local function MakeDraggable(Frame, Header)
+    local dragging = false
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
+
+    Header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    Header.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- UI CREATION (Main Spell List)
+local function CreateSpellGUI()
+    if ScreenGui then ScreenGui:Destroy() end
+
+    ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "SpellBinderMain"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 220, 0, 400)
+    MainFrame.Position = UDim2.new(0, 10, 1, -410) 
+    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true -- Needed for inputs, but drag is custom
+    MainFrame.Parent = ScreenGui
+
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(80, 80, 80)
+    Stroke.Thickness = 1
+    Stroke.Parent = MainFrame
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = MainFrame
+
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, 0, 0, 25)
+    Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Title.TextColor3 = Color3.new(1, 1, 1)
+    Title.Text = "SPELL BINDER [F5]"
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 12
+    Title.Parent = MainFrame
+
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 4)
+    TitleCorner.Parent = Title
+
+    -- Apply Custom Drag
+    MakeDraggable(MainFrame, Title)
+
+    local SearchBox = Instance.new("TextBox")
+    SearchBox.Name = "SearchBox"
+    SearchBox.Size = UDim2.new(1, -10, 0, 20)
+    SearchBox.Position = UDim2.new(0, 5, 0, 27)
+    SearchBox.BackgroundTransparency = 1
+    SearchBox.Text = ""
+    SearchBox.PlaceholderText = ""
+    SearchBox.TextColor3 = Color3.new(1, 1, 1)
+    SearchBox.Font = Enum.Font.Gotham
+    SearchBox.TextSize = 11
+    SearchBox.ClearTextOnFocus = false
+    SearchBox.Parent = MainFrame
+
+    SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        UpdateSearch(SearchBox.Text)
+    end)
+
+    local ScrollFrame = Instance.new("ScrollingFrame")
+    ScrollFrame.Name = "ScrollFrame"
+    ScrollFrame.Size = UDim2.new(1, -5, 1, -55)
+    ScrollFrame.Position = UDim2.new(0, 0, 0, 50)
+    ScrollFrame.BackgroundTransparency = 1
+    ScrollFrame.ScrollBarThickness = 3
+    ScrollFrame.ScrollBarImageColor3 = Color3.new(0.4, 0.4, 0.4)
+    ScrollFrame.Parent = MainFrame
+
+    local Layout = Instance.new("UIListLayout")
+    Layout.Padding = UDim.new(0, 2)
+    Layout.Parent = ScrollFrame
+
+    for Category, SpellList in pairs(Spells) do
+        local CatLabel = Instance.new("TextLabel")
+        CatLabel.Name = "Header_" .. Category
+        CatLabel.Size = UDim2.new(1, 0, 0, 15)
+        CatLabel.BackgroundTransparency = 1
+        CatLabel.Text = Category
+        CatLabel.TextColor3 = Color3.fromRGB(255, 200, 0) 
+        CatLabel.TextXAlignment = Enum.TextXAlignment.Left
+        CatLabel.Font = Enum.Font.GothamBold
+        CatLabel.TextSize = 10
+        CatLabel.Parent = ScrollFrame
+
+        for _, SpellName in pairs(SpellList) do
+            local Btn = Instance.new("TextButton")
+            Btn.Name = SpellName
+            Btn.Size = UDim2.new(1, 0, 0, 18)
+            Btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+            Btn.BackgroundTransparency = 0.5
+            Btn.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+            Btn.Font = Enum.Font.Gotham
+            Btn.TextSize = 11
+            Btn.Text = SpellName
+            Btn.TextXAlignment = Enum.TextXAlignment.Left
+            Btn.Parent = ScrollFrame
+
+            local BtnCorner = Instance.new("UICorner")
+            BtnCorner.CornerRadius = UDim.new(0, 2)
+            BtnCorner.Parent = Btn
+
+            local BtnPadding = Instance.new("UIPadding")
+            BtnPadding.PaddingLeft = UDim.new(0, 5)
+            BtnPadding.Parent = Btn
+
+            SpellButtons[SpellName] = Btn
+
+            Btn.MouseButton1Click:Connect(function()
+                CastSpell(SpellName)
+            end)
+
+            Btn.MouseButton2Click:Connect(function()
+                if BindingTarget == SpellName then
+                    BindingTarget = nil
+                else
+                    BindingTarget = SpellName
+                end
+                for s, _ in pairs(SpellButtons) do UpdateButtonVisuals(s) end
+            end)
+        end
+    end
+    
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 5)
+end
+
+-- UI CREATION (Keybind List)
+local function CreateKeybindGUI()
+    if KeybindGui then KeybindGui:Destroy() end
+    
+    KeybindGui = Instance.new("ScreenGui")
+    KeybindGui.Name = "KeybindListGui"
+    KeybindGui.ResetOnSpawn = false
+    KeybindGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 180, 0, 250) 
+    MainFrame.Position = UDim2.new(0, 10, 0, 10) 
+    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Parent = KeybindGui
+    
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(80, 80, 80)
+    Stroke.Thickness = 1
+    Stroke.Parent = MainFrame
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = MainFrame
+    
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 0, 20)
+    Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Title.TextColor3 = Color3.new(1, 1, 1)
+    Title.Text = "ACTIVE BINDS"
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 11
+    Title.Parent = MainFrame
+    
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 4)
+    TitleCorner.Parent = Title
+    
+    -- Apply Custom Drag
+    MakeDraggable(MainFrame, Title)
+    
+    KeybindListFrame = Instance.new("ScrollingFrame")
+    KeybindListFrame.Name = "ListFrame"
+    KeybindListFrame.Size = UDim2.new(1, -5, 1, -25)
+    KeybindListFrame.Position = UDim2.new(0, 0, 0, 25)
+    KeybindListFrame.BackgroundTransparency = 1
+    KeybindListFrame.ScrollBarThickness = 3
+    KeybindListFrame.ScrollBarImageColor3 = Color3.new(0.4, 0.4, 0.4)
+    KeybindListFrame.Parent = MainFrame
+    
+    local Layout = Instance.new("UIListLayout")
+    Layout.Padding = UDim.new(0, 2)
+    Layout.Parent = KeybindListFrame
+    
+    UpdateKeybindList()
+end
+
+-- INPUT HANDLING
+UserInputService.InputBegan:Connect(function(Input, GameProcessed)
+    if GameProcessed then return end
+
+    if Input.KeyCode == Enum.KeyCode.F5 then
+        ScreenGui.Enabled = not ScreenGui.Enabled
+        return
+    end
+
+    -- UNBIND
+    if Input.KeyCode == Enum.KeyCode.LeftControl and BindingTarget then
+        Keybinds[BindingTarget] = nil
+        
+        local target = BindingTarget
+        BindingTarget = nil 
+        
+        UpdateButtonVisuals(target)
+        UpdateKeybindList()
+        SaveKeybinds()
+        PlayFeedback()
+        return
+    end
+
+    -- BIND
+    if BindingTarget then
+        if Input.KeyCode ~= Enum.KeyCode.Unknown and Input.UserInputType == Enum.UserInputType.Keyboard then
+            local NewKey = Input.KeyCode
+
+            local OldSpell = nil
+            for SpellName, Key in pairs(Keybinds) do
+                if Key == NewKey then
+                    OldSpell = SpellName
+                    break
+                end
+            end
+
+            if OldSpell then
+                Keybinds[OldSpell] = nil
+                UpdateButtonVisuals(OldSpell)
+            end
+
+            Keybinds[BindingTarget] = NewKey
+            local BoundSpell = BindingTarget
+            BindingTarget = nil
+            
+            UpdateButtonVisuals(BoundSpell)
+            UpdateKeybindList()
+            SaveKeybinds()
+            PlayFeedback()
+        end
+        return
+    end
+
+    -- CAST
+    for SpellName, Key in pairs(Keybinds) do
+        if Input.KeyCode == Key then
+            CastSpell(SpellName)
+            return
+        end
+    end
+end)
+
+-- Start
+LoadKeybinds()
+CreateSpellGUI()
+CreateKeybindGUI()
