@@ -1,0 +1,12 @@
+local Remotes = game:GetService("ReplicatedStorage").FrameWork_Shared.Remotes
+local Battle = Remotes.Battle.RE_PlayerFinishBattle
+local Train = Remotes.Train.RE_ApplyOnceTrain
+local Rebirth = Remotes.Rebirth.RE_RebirthUpgradeRequest
+local Trophy = Remotes.Battle.RE_PlayerTriggerTrophy
+
+for i = 1, 100 do
+    Battle:FireServer(0/0)
+    Train:FireServer(0/0)
+    Rebirth:FireServer()
+    Trophy:FireServer()
+end
