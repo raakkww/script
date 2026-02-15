@@ -1,0 +1,249 @@
+local player = game:GetService("Players").LocalPlayer
+
+-- Popup GUI
+local popupGui = Instance.new("ScreenGui")
+popupGui.Name = "WarningPopup"
+popupGui.ResetOnSpawn = false
+popupGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Main cube frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromScale(0.42, 0.3)
+frame.Position = UDim2.fromScale(0.29, 0.35)
+frame.BackgroundColor3 = Color3.fromRGB(22, 22, 26) -- modern dark
+frame.BorderSizePixel = 0
+frame.Parent = popupGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 22)
+corner.Parent = frame
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(60, 60, 70)
+stroke.Thickness = 1.5
+stroke.Parent = frame
+
+-- Warning text
+local text = Instance.new("TextLabel")
+text.Size = UDim2.fromScale(0.88, 0.55)
+text.Position = UDim2.fromScale(0.06, 0.06)
+text.BackgroundTransparency = 1
+text.TextWrapped = true
+text.TextScaled = true
+text.Font = Enum.Font.Gotham
+text.TextColor3 = Color3.fromRGB(220, 220, 230)
+text.Text = "Before executing. People may notice you when your underground because if your user. and you will still get hit even your on underground. Use this at your OWN RISK."
+text.Parent = frame
+
+-- Execute button
+local executeBtn = Instance.new("TextButton")
+executeBtn.Size = UDim2.fromScale(0.4, 0.22)
+executeBtn.Position = UDim2.fromScale(0.07, 0.7)
+executeBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 80)
+executeBtn.BorderSizePixel = 0
+executeBtn.Text = "Execute Script"
+executeBtn.TextScaled = true
+executeBtn.Font = Enum.Font.GothamMedium
+executeBtn.TextColor3 = Color3.fromRGB(235, 235, 235)
+executeBtn.Parent = frame
+
+local execCorner = Instance.new("UICorner")
+execCorner.CornerRadius = UDim.new(0, 16)
+execCorner.Parent = executeBtn
+
+-- Close button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.fromScale(0.4, 0.22)
+closeBtn.Position = UDim2.fromScale(0.53, 0.7)
+closeBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 40)
+closeBtn.BorderSizePixel = 0
+closeBtn.Text = "Close Window"
+closeBtn.TextScaled = true
+closeBtn.Font = Enum.Font.GothamMedium
+closeBtn.TextColor3 = Color3.fromRGB(235, 235, 235)
+closeBtn.Parent = frame
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 16)
+closeCorner.Parent = closeBtn
+
+-- Execute button behavior
+executeBtn.MouseButton1Click:Connect(function()
+	popupGui:Destroy()
+
+	loadstring([[
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local active = false
+local targetIndex = 0
+local targetPlayer = nil
+local originalCameraSubject
+local renderConnection
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "UndergroundGui"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 999
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.fromScale(0.3, 0.08)
+button.Position = UDim2.fromScale(0.35, 0.88)
+button.Text = "Activate Underground"
+button.TextScaled = true
+button.BackgroundColor3 = Color3.fromRGB(50,50,50)
+button.TextColor3 = Color3.new(1,1,1)
+button.Parent = gui
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.fromScale(0.3, 0.05)
+status.Position = UDim2.fromScale(0.35, 0.82)
+status.Text = "Inactive"
+status.TextScaled = true
+status.BackgroundColor3 = Color3.fromRGB(40,40,40)
+status.TextColor3 = Color3.fromRGB(255,100,100)
+status.Parent = gui
+
+-- FULL RESET (called on death)
+local function fullReset()
+active = false
+targetPlayer = nil
+targetIndex = 0
+
+if originalCameraSubject then  
+	camera.CameraSubject = originalCameraSubject  
+end  
+
+if renderConnection then  
+	renderConnection:Disconnect()  
+end  
+
+if gui then gui:Destroy() end  
+script:Destroy()
+
+end
+
+-- helpers
+local function getTargets()
+local t = {}
+for _,p in ipairs(Players:GetPlayers()) do
+if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+table.insert(t,p)
+end
+end
+return t
+end
+
+local function nextTarget()
+local list = getTargets()
+if #list == 0 then
+targetPlayer = nil
+status.Text = "No Targets"
+return
+end
+
+targetIndex += 1  
+if targetIndex > #list then targetIndex = 1 end  
+
+targetPlayer = list[targetIndex]  
+status.Text = "Tracking: "..targetPlayer.Name  
+status.TextColor3 = Color3.fromRGB(100,255,100)
+
+end
+
+local function deactivate()
+active = false
+targetPlayer = nil
+targetIndex = 0
+
+button.Text = "Activate Underground"  
+status.Text = "Inactive"  
+status.TextColor3 = Color3.fromRGB(255,100,100)  
+
+if originalCameraSubject then  
+	camera.CameraSubject = originalCameraSubject  
+end
+
+end
+
+-- button behavior
+button.MouseButton1Click:Connect(function()
+if not active then
+active = true
+button.Text = "Switch Target"
+
+local char = player.Character  
+	if char and char:FindFirstChildOfClass("Humanoid") then  
+		originalCameraSubject = char.Humanoid  
+	end  
+
+	nextTarget()  
+else  
+	nextTarget()  
+end
+
+end)
+
+button.MouseButton2Click:Connect(deactivate)
+
+-- follow loop (fixed movement)
+renderConnection = RunService.RenderStepped:Connect(function()
+if not active or not targetPlayer then return end
+
+local myChar = player.Character  
+local targetChar = targetPlayer.Character  
+if not myChar or not targetChar then return end  
+
+local myRoot = myChar:FindFirstChild("HumanoidRootPart")  
+local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")  
+local targetHum = targetChar:FindFirstChildOfClass("Humanoid")  
+
+if myRoot and targetRoot then  
+	local depth = 6 -- closer underground  
+	local pos = targetRoot.Position - Vector3.new(0, depth, 0)  
+
+	myRoot:PivotTo(CFrame.lookAt(pos, targetRoot.Position))  
+
+	myRoot.AssemblyLinearVelocity = Vector3.zero  
+	myRoot.AssemblyAngularVelocity = Vector3.zero  
+end  
+
+if targetHum then  
+	camera.CameraSubject = targetHum  
+end
+
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+if p == targetPlayer then
+nextTarget()
+end
+end)
+
+-- death detection
+local function hookDeath(character)
+local hum = character:WaitForChild("Humanoid")
+
+hum.Died:Connect(function()  
+	fullReset()  
+end)
+
+end
+
+if player.Character then
+hookDeath(player.Character)
+end
+
+player.CharacterAdded:Connect(hookDeath)
+]])()
+end)
+
+-- Close button behavior
+closeBtn.MouseButton1Click:Connect(function()
+	popupGui:Destroy()
+end)
