@@ -1,0 +1,3 @@
+local S = game:GetService("ReplicatedStorage").Remote.Event.Climb.RE_GrantSlideReward
+S:FireServer("coin", 9e308)
+S:FireServer("wins", 9e308)
