@@ -1,0 +1,212 @@
+-----------------------------------------------------------
+-- SETTINGS (Adjust these values here)
+-----------------------------------------------------------
+_G.FarmSpeed = 50    -- Character travel speed
+_G.TweenDelay = 0 -- Time spent "touching" each coin
+-----------------------------------------------------------
+
+-- Services
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local LogService = game:GetService("LogService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+-- State Variables
+local activeFarms = {Coins = false, CandyCane = false, Hearts = false}
+local noclipEnabled = false
+
+-- Update character reference
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+end)
+
+-- GHOST MONITOR
+LogService.MessageOut:Connect(function(Message, Type)
+    if Message:find("Infinite yield possible on") and Message:find("CoinHolder") then
+        StarterGui:SetCore("SendNotification", {Title = "Alert", Text = "you are ghost can't load", Duration = 5})
+    end
+end)
+
+-- SAFE EXIT & NOCLIP DISABLE
+local function disableFarmPhysics()
+    noclipEnabled = false -- Instantly stops the Stepped loop from disabling collisions
+    
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local root = character.HumanoidRootPart
+        local hum = character:FindFirstChildOfClass("Humanoid")
+        
+        root.Anchored = false
+        
+        -- Force collisions back on immediately for all parts
+        for _, v in pairs(character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = true
+                v.Velocity = Vector3.zero
+            end
+        end
+        
+        -- Teleport up to avoid getting stuck in the floor
+        root.CFrame = root.CFrame * CFrame.new(0, 10, 0)
+        
+        -- Reset State to standing
+        if hum then 
+            hum:ChangeState(Enum.HumanoidStateType.GettingUp) 
+        end
+    end
+end
+
+-- GUI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CollectorUI_v22"
+ScreenGui.Parent = CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 446, 0, 331)
+MainFrame.Position = UDim2.new(0.5, -223, 0.5, -165)
+MainFrame.BackgroundColor3 = Color3.fromRGB(79, 79, 79)
+MainFrame.BackgroundTransparency = 0.2
+MainFrame.Active = true
+MainFrame.Draggable = true 
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.BackgroundTransparency = 1
+Title.Text = "auto coin & candy cane collector"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 20
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -40, 0, 10)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+CloseBtn.Text = ""
+CloseBtn.Parent = MainFrame
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+local function createCategory(name, yPos)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 100, 0, 20)
+    label.Position = UDim2.new(0, 50, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.Text = name:upper()
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamBold
+    label.Parent = MainFrame
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 160, 0, 50)
+    btn.Position = UDim2.new(0, 50, 0, yPos + 20)
+    btn.BackgroundColor3 = Color3.fromRGB(216, 255, 215)
+    btn.Text = "START"
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 24
+    btn.Parent = MainFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    return btn
+end
+
+local CoinBtn = createCategory("coins", 70)
+local CaneBtn = createCategory("candycane", 150)
+local HeartBtn = createCategory("hearts", 230)
+
+-- CONTINUOUS NOCLIP LOOP
+RunService.Stepped:Connect(function()
+    if noclipEnabled and character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+        end
+        for _, v in pairs(character:GetDescendants()) do
+            if v:IsA("BasePart") then 
+                v.CanCollide = false 
+                v.Velocity = Vector3.zero
+            end
+        end
+    end
+end)
+
+local function getNextTarget()
+    local holder = Workspace:FindFirstChild("CoinHolder")
+    if not holder then return nil end
+    local items = holder:GetChildren()
+    if activeFarms.Coins then
+        for _, i in pairs(items) do if i.Name == "GoldCoin" then return i end end
+    end
+    if activeFarms.Hearts then
+        for _, i in pairs(items) do if i.Name == "Heart" then return i end end
+    end
+    if activeFarms.CandyCane then
+        for _, i in pairs(items) do if i.Name == "CandyCane" then return i end end
+    end
+    if activeFarms.Coins then
+        for _, i in pairs(items) do if i.Name == "DankCoin" then return i end end
+    end
+    return nil
+end
+
+task.spawn(function()
+    while true do
+        local target = getNextTarget()
+        if target then
+            local root = character and character:FindFirstChild("HumanoidRootPart")
+            local head = character and character:FindFirstChild("Head")
+            if root and head then
+                noclipEnabled = true
+                local targetPos = (target:IsA("BasePart") and target.Position or target:GetPivot().Position)
+                local headOffset = head.Position.Y - root.Position.Y
+                local targetCF = CFrame.new(targetPos.X, targetPos.Y - headOffset, targetPos.Z)
+                
+                local dist = (root.Position - targetCF.Position).Magnitude
+                
+                root.Anchored = true
+                local tween = TweenService:Create(root, TweenInfo.new(dist/_G.FarmSpeed, Enum.EasingStyle.Linear), {CFrame = targetCF})
+                tween:Play()
+                tween.Completed:Wait()
+                
+                root.Anchored = false
+                task.wait(_G.TweenDelay)
+            else
+                task.wait(1)
+            end
+        else
+            if noclipEnabled then
+                disableFarmPhysics() -- Disable everything once the map is clear
+            end
+            task.wait(0.5)
+        end
+        task.wait(0.01)
+    end
+end)
+
+local function setupToggle(btn, key)
+    btn.MouseButton1Click:Connect(function()
+        activeFarms[key] = not activeFarms[key]
+        btn.Text = activeFarms[key] and "STOP" or "START"
+        btn.BackgroundColor3 = activeFarms[key] and Color3.fromRGB(255, 216, 216) or Color3.fromRGB(216, 255, 215)
+        
+        if not (activeFarms.Coins or activeFarms.CandyCane or activeFarms.Hearts) then
+            disableFarmPhysics()
+        end
+    end)
+end
+
+setupToggle(CoinBtn, "Coins")
+setupToggle(CaneBtn, "CandyCane")
+setupToggle(HeartBtn, "Hearts")
+
+CloseBtn.MouseButton1Click:Connect(function()
+    activeFarms.Coins = false activeFarms.CandyCane = false activeFarms.Hearts = false
+    disableFarmPhysics()
+    ScreenGui:Destroy()
+end)
