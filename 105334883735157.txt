@@ -1,0 +1,5 @@
+local args = {
+	"homer",
+	"Bort"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("setskin"):FireServer(unpack(args))
