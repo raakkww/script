@@ -1,0 +1,11 @@
+local replicatedStorageService = game:GetService("ReplicatedStorage");
+local rayCastHandlerModule = require(replicatedStorageService.Modules.Utils.RayCastHandler);
+local touchDetectHandlerModule = require(replicatedStorageService.Modules.Utils.TouchDetectHandler);
+--
+touchDetectHandlerModule.init = newcclosure(function()
+    return newcclosure(function() return end)
+end)
+--
+rayCastHandlerModule.init = newcclosure(function()
+    return newcclosure(function() return end)
+end)
