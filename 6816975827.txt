@@ -1,0 +1,5 @@
+local player = game:GetService("Players").LocalPlayer
+
+if player:FindFirstChild("RocketFuelValue") then
+    player.RocketFuelValue.Value = 9999 -- Set to any number
+end
