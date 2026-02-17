@@ -1,0 +1,142 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Globals for loops
+getgenv().StrengthLoop = false
+local StrengthConnection = nil
+
+-- Teleport function (Exact CFrame positions)
+local player = game.Players.LocalPlayer
+local function tpToPosition(x, y, z, areaName)
+   if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+      player.Character.HumanoidRootPart.CFrame = CFrame.new(x, y, z) + Vector3.new(0, 5, 0)
+      return true
+   end
+   return false
+end
+
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   LoadingTitle = "Loading Rasengan Tools + Teleports...",
+   LoadingSubtitle = "Infinite Strength & All Areas",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "RasenganSandman",
+      FileName = "v1.3"
+   },
+   Discord = { Enabled = false },
+   KeySystem = false
+})
+
+-- Tab 1: Strength
+local MainTab = Window:CreateTab("ð Strength", 4483362458)
+local SectionLoops = MainTab:CreateSection("ð Auto Farm")
+
+MainTab:CreateToggle({
+   Name = "ðª Auto Infinite Strength Loop",
+   CurrentValue = false,
+   Flag = "AutoStrength",
+   Callback = function(Value)
+      getgenv().StrengthLoop = Value
+      if Value then
+         StrengthConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            if getgenv().StrengthLoop then
+               pcall(function()
+                  game:GetService("ReplicatedStorage"):WaitForChild("StrengthIncrease"):FireServer()
+               end)
+            end
+         end)
+         Rayfield:Notify({
+            Title = "Infinite Strength ACTIVE",
+            Content = "Spamming StrengthIncrease... (Toggle OFF to stop)",
+            Duration = 3
+         })
+      else
+         if StrengthConnection then
+            StrengthConnection:Disconnect()
+            StrengthConnection = nil
+         end
+         Rayfield:Notify({
+            Title = "Infinite Strength STOPPED",
+            Content = "Loop disconnected.",
+            Duration = 2
+         })
+      end
+   end
+})
+
+-- Tab 2: Teleports (Clean titles - no coords in button text)
+local TeleportsTab = Window:CreateTab("ð Teleports", 4483362458)
+local SectionQuickTP = TeleportsTab:CreateSection("ð Training Areas")
+
+TeleportsTab:CreateButton({
+   Name = "ðï¸ TP to Clash Of Sharingan",
+   Callback = function()
+      if tpToPosition(-297, 9, -397, "Clash Of Sharingan") then
+         Rayfield:Notify({Title = "ðï¸ Teleported!", Content = "Clash Of Sharingan Area", Duration = 3})
+      end
+   end
+})
+
+TeleportsTab:CreateButton({
+   Name = "ð¢ TP to Ninja Office",
+   Callback = function()
+      if tpToPosition(-134, 38, -448, "Ninja Office") then
+         Rayfield:Notify({Title = "ð¢ Teleported!", Content = "Ninja Office Area", Duration = 3})
+      end
+   end
+})
+
+TeleportsTab:CreateButton({
+   Name = "ð TP to King Area",
+   Callback = function()
+      if tpToPosition(-21, 27, -399, "King Area") then
+         Rayfield:Notify({Title = "ð Teleported!", Content = "King Area", Duration = 3})
+      end
+   end
+})
+
+TeleportsTab:CreateButton({
+   Name = "ð  TP to Naruto's House",
+   Callback = function()
+      if tpToPosition(244, 16, -332, "Naruto's House") then
+         Rayfield:Notify({Title = "ð  Teleported!", Content = "Naruto's House Area", Duration = 3})
+      end
+   end
+})
+
+TeleportsTab:CreateButton({
+   Name = "ð TP to Vip Area",
+   Callback = function()
+      if tpToPosition(239, 32, -89, "Vip Area") then
+         Rayfield:Notify({Title = "ð Teleported!", Content = "Vip Area", Duration = 3})
+      end
+   end
+})
+
+TeleportsTab:CreateButton({
+   Name = "ðï¸ TP to Gym Zone",
+   Callback = function()
+      if tpToPosition(157, 6, -228, "Gym Zone") then
+         Rayfield:Notify({Title = "ðï¸ Teleported!", Content = "Gym Zone Area", Duration = 3})
+      end
+   end
+})
+
+TeleportsTab:CreateButton({
+   Name = "ð TP to Ramen Shop",
+   Callback = function()
+      if tpToPosition(-316, 4, -43, "Ramen Shop") then
+         Rayfield:Notify({Title = "ð Teleported!", Content = "Ramen Shop Area", Duration = 3})
+      end
+   end
+})
+
+-- Utils Tab
+local UtilsTab = Window:CreateTab("âï¸ Utils", 4483362458)
+UtilsTab:CreateButton({
+   Name = "ð Rejoin Server",
+   Callback = function()
+      Rayfield:Notify({Title = "Rejoining...", Content = "Back to Rasengan grind!", Duration = 2})
+      game:GetService("TeleportService"):Teleport(game.PlaceId)
+   end
+})
