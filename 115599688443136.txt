@@ -1,0 +1,1 @@
+local B=game:GetService("ReplicatedStorage").Events.Buy for i=1,1000 do task.spawn(function()B:FireServer("Universe Seed",true)end)end
