@@ -1,0 +1,86 @@
+-- Mr.SandMan's ð¸Millionaire Empire Tycoon GUI v1.2
+-- Infinite Money Loop
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Globals
+getgenv().InfMoneyLoop = false
+
+local rs = game:GetService("ReplicatedStorage")
+local remote = rs:WaitForChild("fewjnfejwb3")
+
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   LoadingTitle = "",
+   LoadingSubtitle = "",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "MillionaireTycoonSandman",
+      FileName = "v1.2"
+   },
+   Discord = { Enabled = false },
+   KeySystem = false
+})
+
+local FarmTab = Window:CreateTab("ð° Farm")
+FarmTab:CreateSection("ð Auto Loops")
+
+-- Infinite Money Toggle
+FarmTab:CreateToggle({
+   Name = "Infinite Money",
+   CurrentValue = false,
+   Flag = "InfMoney",
+   Callback = function(Value)
+      getgenv().InfMoneyLoop = Value
+      if Value then
+         task.spawn(function()
+            while getgenv().InfMoneyLoop do
+               pcall(function()
+                  local args = { 160000000000000 }
+                  remote:FireServer(unpack(args))
+               end)
+               task.wait(0.15)
+            end
+         end)
+         Rayfield:Notify({
+            Title = "Infinite Money ACTIVE",
+            Content = "Spamming money remote...",
+            Duration = 4
+         })
+      else
+         Rayfield:Notify({
+            Title = "Infinite Money STOPPED",
+            Duration = 2
+         })
+      end
+   end
+})
+
+-- Quick burst button
+FarmTab:CreateButton({
+   Name = "Quick 50x Money Burst",
+   Callback = function()
+      for i = 1, 50 do
+         pcall(function()
+            local args = { 160000000000000 }
+            remote:FireServer(unpack(args))
+         end)
+         task.wait(0.02)
+      end
+      Rayfield:Notify({
+         Title = "50x Money Burst Sent!",
+         Content = "Instant cash boost.",
+         Duration = 3
+      })
+   end
+})
+
+-- Utils Tab
+local UtilsTab = Window:CreateTab("âï¸ Utils")
+UtilsTab:CreateButton({
+   Name = "ð Rejoin Server",
+   Callback = function()
+      Rayfield:Notify({Title = "Rejoining...", Duration = 2})
+      game:GetService("TeleportService"):Teleport(game.PlaceId)
+   end
+})
