@@ -1,0 +1,122 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local useDisplayName = false
+local nametags = {}
+
+-- =========================
+-- UI
+-- =========================
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "NameToggleUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 180, 0, 60)
+frame.Position = UDim2.new(0, 20, 0, 200)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+frame.Parent = gui
+frame.Active = true
+frame.Draggable = true
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 25)
+title.BackgroundTransparency = 1
+title.Text = "Nametag Mode"
+title.TextColor3 = Color3.fromRGB(200, 200, 200)
+title.TextSize = 14
+title.Font = Enum.Font.Gotham
+title.Parent = frame
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(1, -20, 0, 25)
+button.Position = UDim2.new(0, 10, 0, 30)
+button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.TextSize = 13
+button.Font = Enum.Font.GothamBold
+button.Text = "Showing: Username"
+button.Parent = frame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 8)
+buttonCorner.Parent = button
+
+-- =========================
+-- Nametag Logic
+-- =========================
+
+local function updateTagText(plr)
+	if nametags[plr] then
+		nametags[plr].Text = useDisplayName and plr.DisplayName or plr.Name
+	end
+end
+
+local function createNametag(character, plr)
+	local head = character:WaitForChild("Head", 5)
+	if not head then return end
+	
+	if head:FindFirstChild("ClientNameTag") then
+		head.ClientNameTag:Destroy()
+	end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ClientNameTag"
+	billboard.Size = UDim2.new(0, 120, 0, 25)
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = math.huge
+	billboard.Parent = head
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	label.TextStrokeTransparency = 0
+	label.TextScaled = false
+	label.TextSize = 14
+	label.Font = Enum.Font.GothamBold
+	label.Parent = billboard
+
+	nametags[plr] = label
+	updateTagText(plr)
+end
+
+local function setupPlayer(plr)
+	if plr.Character then
+		createNametag(plr.Character, plr)
+	end
+	
+	plr.CharacterAdded:Connect(function(char)
+		createNametag(char, plr)
+	end)
+end
+
+for _, plr in ipairs(Players:GetPlayers()) do
+	setupPlayer(plr)
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+
+-- =========================
+-- Toggle Button
+-- =========================
+
+button.MouseButton1Click:Connect(function()
+	useDisplayName = not useDisplayName
+	
+	button.Text = useDisplayName and 
+		"Showing: DisplayName" or 
+		"Showing: Username"
+	
+	for plr, _ in pairs(nametags) do
+		updateTagText(plr)
+	end
+end)
