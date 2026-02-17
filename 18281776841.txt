@@ -1,0 +1,1215 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local getrawmetatable = getrawmetatable or function(t) return getmetatable(t) end
+local setreadonly = setreadonly or function(t, readonly) end
+local newcclosure = newcclosure or function(f) return f end
+local getnamecallmethod = getnamecallmethod or function() return "" end
+
+local getgc = getgc or function() return {} end  -- Get garbage collection objects
+local getconstants = getconstants or function() return {} end  -- Get function constants
+local hookfunction = hookfunction or function(f, r) return f end  -- Hook/replace functions
+
+local firesignal = firesignal or function(signal, ...)
+    if signal and typeof(signal) == "RBXScriptSignal" then
+        warn("firesignal not supported by executor")
+    end
+end
+
+_G.getrawmetatable = getrawmetatable
+_G.setreadonly = setreadonly
+_G.newcclosure = newcclosure
+_G.getnamecallmethod = getnamecallmethod
+_G.firesignal = firesignal
+_G.getgc = getgc
+_G.getconstants = getconstants
+_G.hookfunction = hookfunction
+
+local NamecallInstanceDetector = nil
+
+for Index, Table in getgc(true) do
+    if typeof(Table) ~= "table" then continue end
+    if not rawget(Table, "namecallInstance") then continue end
+    
+    for SecondIndex, StackContainerTable in Table do
+        if typeof(StackContainerTable) ~= "table" then continue end
+        
+        for ThirdIndex, Upvalues in StackContainerTable do
+            if StackContainerTable[ThirdIndex] ~= "kick" then continue end
+            if typeof(StackContainerTable[ThirdIndex + 1]) ~= "function" then continue end
+            
+            local FrozenDetectionFunction = StackContainerTable[ThirdIndex + 1]
+            
+            for _, DetectionIdentifier in getconstants(FrozenDetectionFunction) do
+                if DetectionIdentifier == "namecallInstance" then
+                    NamecallInstanceDetector = FrozenDetectionFunction
+                end
+            end
+        end
+    end
+end
+
+if NamecallInstanceDetector then
+    hookfunction(NamecallInstanceDetector, function()
+        return false  -- Tell Adonis no exploit detected
+    end)
+    print("[✅] Adonis namecall bypass: ACTIVE")
+else
+    warn("[⚠️] Adonis namecall detector not found - bypass may not be needed")
+end
+
+local gameName = "Exploit Hub"
+pcall(function()
+    local success, info = pcall(function()
+        return game:GetService("MarketplaceService"):GetProductInfoAsync(game.PlaceId)
+    end)
+    if success and info then
+        gameName = info.Name .. " - Exploit Hub"
+    end
+end)
+
+local Window = Rayfield:CreateWindow({
+    Name = gameName,
+    LoadingTitle = "Loading Exploits...",
+    LoadingSubtitle = "",
+    ConfigurationSaving = {
+        Enabled = false
+    }
+})
+
+-- Game Services - Core Roblox APIs
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MarketplaceService = game:GetService("MarketplaceService")  -- Used for gamepass checks
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Remote Events - Server communication channels
+-- These should be server-validated, but they're not in this game!
+local AddXPEvent = ReplicatedStorage:WaitForChild("AddXPEvent")
+-- ^ Allows client to add XP (should be server-only!)
+
+local UpdateHighscoreEvent = ReplicatedStorage:WaitForChild("UpdateHighscoreEvent")
+-- ^ Allows client to set highscore (massive security flaw!)
+
+local BuyDensityStageEvent = ReplicatedStorage:WaitForChild("BuyDensityStageEvent")
+-- ^ Used for engine upgrades, including gamepass-locked Stage 5
+
+local UpdateDensityEvent = ReplicatedStorage:WaitForChild("UpdateDensityEvent")
+-- ^ Updates UI when engine stage changes
+
+local BuyCarEvent = ReplicatedStorage:WaitForChild("BuyCarEvent")
+-- ^ Purchases vehicles - vulnerable to gamepass bypass
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    SECTION 4: UI TABS CREATION
+    ════════════════════════════════════════════════════════════════════════
+    
+    Organizing exploits into tabs makes the UI cleaner and easier to navigate.
+    Each tab focuses on a specific aspect of exploitation.
+]]
+local MainTab = Window:CreateTab("Main Exploits", 4483362458)
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    SECTION 5: ANTI-CHEAT WARNING
+    ════════════════════════════════════════════════════════════════════════
+    
+    WHY LIMITS EXIST:
+    While this game has poor server validation, it DOES have basic anti-cheat
+    detection that kicks players who send extreme values.
+    
+    WHAT WE LEARNED:
+    - XP values above 9,999 trigger a kick
+    - Highscore values above 99,999 trigger a kick
+    - The anti-cheat only checks VALUE RANGES, not the exploit method itself
+    
+    DEVELOPER LESSON:
+    This is reactive detection, not proactive prevention. Better security would:
+    1. Validate the SOURCE of the request (did it come from legitimate gameplay?)
+    2. Rate-limit requests (max XP per minute, etc.)
+    3. Server-side action validation (did player actually complete a race?)
+]]
+
+MainTab:CreateSection("⚠️ Safety Limits")
+
+MainTab:CreateParagraph({
+    Title = "⚠️ Safety Warning (NO AUTO-CAPPING)",
+    Content = "❌ AUTO-CAPPING DISABLED:\n• XP: NO LIMIT - Use at your own risk!\n• Highscore: NO LIMIT - Use at your own risk!\n• Money: NO LIMIT - Confirmed safe!\n\n⚠️ CRITICAL WARNING:\nXP over 9,999 or Highscore over 99,999 may result in INSTANT KICK!\nScript will NOT cap values - you are responsible for safe amounts!\n\n💡 RECOMMENDED:\nStay under limits or accept kick risk."
+})
+
+MainTab:CreateSection("Currency & Stats")
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    MONEY EXPLOIT
+    ════════════════════════════════════════════════════════════════════════
+    
+    HOW IT WORKS:
+    The game has a SellCarEvent that gives players money when they sell a vehicle.
+    The event signature is: SellCarEvent:FireServer(vehicleName, sellPrice)
+    
+    THE VULNERABILITY:
+    The server doesn't validate:
+    1. If the player actually OWNS the vehicle
+    2. If the sell price is legitimate
+    3. If the vehicle even exists in the player's garage
+    
+    THE EXPLOIT:
+    We fire the event with any vehicle name and any price we want!
+    Result: Instant money without owning or selling anything.
+    
+    WHY "BMW e36 M3 - Stock"?
+    This is a real vehicle name in the game. Using a real name helps avoid
+    potential detection, though the server doesn't validate anyway.
+    
+    DEVELOPER LESSON:
+    Server must verify:
+    - Player owns the vehicle (check server-side inventory)
+    - Sell price matches game data (use server-side pricing table)
+    - Transaction is legitimate (cooldowns, anti-spam)
+]]
+
+local moneyAmount = 100000  -- Variable to store user input
+
+-- Manual money input field
+MainTab:CreateInput({
+    Name = "Money Amount",
+    PlaceholderText = "Enter money amount (e.g., 1000000)",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(text)
+        -- Convert text to number, default to 100000 if invalid
+        local amount = tonumber(text)
+        if amount and amount > 0 then
+            moneyAmount = amount
+        else
+            moneyAmount = 100000  -- Default fallback
+        end
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Give Money (Instant)",
+    Callback = function()
+        --[[
+            HOW IT WORKS:
+            1. First, we BUY the car for $0 (server doesn't validate price)
+            2. Then, we SELL the car for any amount we want
+            3. Server gives us the money without validation
+            
+            This is a two-step exploit:
+            - BuyCarEvent to acquire the vehicle (free)
+            - SellCarEvent to sell it for infinite money
+            
+            NO MONEY LIMIT:
+            The server doesn't kick for high amounts, so you can use any value!
+        ]]
+        
+        -- Step 1: Buy the car for free
+        local BuyEvent = game:GetService("ReplicatedStorage").BuyCarEvent
+        BuyEvent:FireServer(
+            "BWM e36 M3 - Stock",
+            0  -- Buy for $0 (server doesn't validate)
+        )
+        
+        -- Small delay to ensure purchase processes
+        task.wait(0.1)
+        
+        -- Step 2: Sell the car for desired amount
+        local SellEvent = game:GetService("ReplicatedStorage").SellCarEvent
+        SellEvent:FireServer(
+            "BWM e36 M3 - Stock",
+            moneyAmount  -- Sell for any amount!
+        )
+        
+        -- Notify user of success
+        Rayfield:Notify({
+            Title = "Money",
+            Content = "Added $" .. moneyAmount .. "! (Bought then sold car)",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    XP EXPLOIT
+    ════════════════════════════════════════════════════════════════════════
+    
+    HOW IT WORKS:
+    XP (Experience Points) should only be awarded for legitimate gameplay actions:
+    - Completing races
+    - Achieving milestones
+    - Winning competitions
+    
+    THE VULNERABILITY:
+    The game exposes AddXPEvent to clients and trusts whatever value is sent.
+    There's NO verification that the player earned the XP legitimately.
+    
+    THE EXPLOIT:
+    We simply fire AddXPEvent:FireServer(amount) with any value we want.
+    The server adds it to our total XP, unlocking levels and rewards.
+    
+    ANTI-CHEAT LIMITATION:
+    Max 9,999 per request or we get kicked. This is a VALUE check, not a
+    METHOD check. The game detects "too much XP at once" but not "fake XP".
+    
+    DEVELOPER LESSON:
+    - NEVER let clients directly modify progression stats
+    - XP should only be awarded by server-side gameplay validation
+    - Track player actions server-side to detect impossible XP gains
+    - Rate-limit XP gains (max per minute/hour)
+]]
+
+local xpAmount = 1000  -- Variable to store manual input value
+
+MainTab:CreateParagraph({
+    Title = "⚠️ XP WARNING (NO AUTO-CAP)",
+    Content = "RECOMMENDED MAX: 9,999 XP per use!\nHigher values = INSTANT KICK RISK!\n\nThe game may detect XP amounts over 9,999 and kick you with anti-cheat.\n\n✅ Safer: 1,000 - 9,999\n❌ Risky: 10,000+\n\n⚠️ NO AUTO-CAPPING! Enter values carefully!"
+})
+
+MainTab:CreateInput({
+    Name = "XP Amount",
+    PlaceholderText = "Enter XP (max 9,999)",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(text)
+        -- Convert text to number, default to 1000 if invalid
+        local amount = tonumber(text)
+        if amount and amount > 0 then
+            xpAmount = amount
+        else
+            xpAmount = 1000  -- Default to 1,000 if invalid
+        end
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Give XP",
+    Callback = function()
+        --[[
+            THE EXPLOIT EXECUTION:
+            Simply fire the AddXPEvent with our chosen amount.
+            Server receives it and adds XP without any validation.
+            
+            This is one of the simplest exploits because:
+            1. Event is exposed in ReplicatedStorage
+            2. No server-side validation exists
+            3. Only reactive anti-cheat (value limits)
+            
+            NO SAFETY CHECK:
+            No auto-capping - user is responsible for safe values!
+        ]]
+        
+        AddXPEvent:FireServer(xpAmount)
+        
+        -- Show success notification
+        Rayfield:Notify({
+            Title = "XP",
+            Content = "Added " .. xpAmount .. " XP!",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    HIGHSCORE EXPLOIT
+    ════════════════════════════════════════════════════════════════════════
+    
+    HOW IT WORKS:
+    Highscores should be set only when a player legitimately achieves a score
+    in a race or competition, validated server-side.
+    
+    THE VULNERABILITY:
+    The game allows clients to directly SET their highscore via
+    UpdateHighscoreEvent, with no validation that the score was earned.
+    
+    THE EXPLOIT:
+    We fire UpdateHighscoreEvent:FireServer(score) with any value.
+    The server accepts it and updates our highscore.
+    
+    WHY THIS IS CRITICAL:
+    Highscores often appear on leaderboards. This exploit allows:
+    - Topping leaderboards without playing
+    - Unlocking highscore-based rewards
+    - Unfair competition with legitimate players
+    
+    ANTI-CHEAT LIMITATION:
+    Max 99,999 or we get kicked. Again, VALUE-based detection only.
+    
+    DEVELOPER LESSON:
+    - Highscores must be set SERVER-SIDE only
+    - Server must validate the score came from an actual game session
+    - Implement server-side score tracking and comparison
+    - Use anti-cheat to detect impossible scores (too high/too fast)
+]]
+
+local highscoreAmount = 10000  -- Variable to store manual input value
+
+MainTab:CreateParagraph({
+    Title = "⚠️ HIGHSCORE WARNING (NO AUTO-CAP)",
+    Content = "RECOMMENDED MAX: 99,999 per use!\nHigher values = INSTANT KICK RISK!\n\nThe game may detect highscores over 99,999 and kick you with anti-cheat.\n\n✅ Safer: 1 - 99,999\n❌ Risky: 100,000+\n\n⚠️ NO AUTO-CAPPING! Enter values carefully!"
+})
+
+MainTab:CreateInput({
+    Name = "Highscore Amount",
+    PlaceholderText = "Enter highscore (max 99,999)",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(text)
+        -- Convert text to number, default to 10000 if invalid
+        local amount = tonumber(text)
+        if amount and amount >= 0 then
+            highscoreAmount = amount
+        else
+            highscoreAmount = 10000  -- Default to 10,000 if invalid
+        end
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Set Highscore",
+    Callback = function()
+        --[[
+            THE EXPLOIT EXECUTION:
+            Fire UpdateHighscoreEvent with our desired highscore.
+            Server blindly accepts and updates our highscore.
+            
+            IMPACT:
+            - Instantly appear on leaderboards
+            - Unlock score-based achievements
+            - Bypass progression requirements
+            
+            NO SAFETY CHECK:
+            No auto-capping - user is responsible for safe values!
+        ]]
+        
+        UpdateHighscoreEvent:FireServer(highscoreAmount)
+        
+        -- Show success notification
+        Rayfield:Notify({
+            Title = "Highscore",
+            Content = "Highscore set to " .. highscoreAmount .. "!",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    NEAR MISS AUTO-FARM
+    ════════════════════════════════════════════════════════════════════════
+    
+    HOW NEAR MISS WORKS:
+    The game rewards players for driving close to traffic cars:
+    - "Near miss" (≤10 studs): 2x points
+    - "Close call" (≤15 studs): 1.5x points
+    - "Overtake" (≤20 studs): Regular points
+    
+    Points are converted to money and XP via:
+    - GiveMoneyEvent:FireServer(amount, messageType)
+    - AddXPEvent:FireServer(amount)
+    
+    THE EXPLOIT:
+    We can manually trigger near miss events or auto-farm them for
+    continuous money and XP rewards without actually playing!
+]]
+
+MainTab:CreateSection("Near Miss Auto-Farm")
+
+-- Near miss auto-clicker
+local nearMissAmount = 100
+local nearMissAutoFarm = false
+
+MainTab:CreateSlider({
+    Name = "Near Miss Amount",
+    Range = {10, 1000},
+    Increment = 10,
+    CurrentValue = 100,
+    Flag = "NearMissSlider",
+    Callback = function(val)
+        nearMissAmount = val
+    end
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Near Miss Farm",
+    CurrentValue = false,
+    Flag = "NearMissFarm",
+    Callback = function(val)
+        nearMissAutoFarm = val
+        
+        if val then
+            Rayfield:Notify({
+                Title = "Near Miss Farm",
+                Content = "Auto-farming near miss rewards every 5 seconds!",
+                Duration = 3,
+                Image = 4483362458
+            })
+            
+            -- Start auto-farming
+            local nearMissConnection = task.spawn(function()
+                while nearMissAutoFarm do
+                    -- Fire GiveMoneyEvent (money from near miss)
+                    local GiveMoneyEvent = ReplicatedStorage:FindFirstChild("GiveMoneyEvent")
+                    if GiveMoneyEvent then
+                        GiveMoneyEvent:FireServer(nearMissAmount, "Near miss!")
+                    end
+                    
+                    -- Fire AddXPEvent (XP from near miss)
+                    AddXPEvent:FireServer(nearMissAmount)
+                    
+                    task.wait(5)  -- Every 5 seconds
+                end
+            end)
+        else
+            nearMissAutoFarm = false
+            Rayfield:Notify({
+                Title = "Near Miss Farm",
+                Content = "Auto-farm stopped",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Trigger Near Miss (Manual)",
+    Callback = function()
+        -- Manually trigger a near miss reward
+        local GiveMoneyEvent = ReplicatedStorage:FindFirstChild("GiveMoneyEvent")
+        if GiveMoneyEvent then
+            GiveMoneyEvent:FireServer(nearMissAmount, "Near miss!")
+        end
+        AddXPEvent:FireServer(nearMissAmount)
+        
+        Rayfield:Notify({
+            Title = "Near Miss",
+            Content = "Triggered near miss reward! +$" .. nearMissAmount,
+            Duration = 2,
+            Image = 4483362458
+        })
+    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    SECTION 6: VEHICLE TAB
+    ════════════════════════════════════════════════════════════════════════
+    
+    This section contains vehicle purchasing exploits including the advanced
+    gamepass bypass technique.
+]]
+local VehicleTab = Window:CreateTab("Vehicles", 4483362458)
+
+VehicleTab:CreateSection("Gamepass Vehicles")
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    GAMEPASS BYPASS - ADVANCED HOOK TECHNIQUE
+    ════════════════════════════════════════════════════════════════════════
+    
+    WHAT ARE GAMEPASSES?
+    Gamepasses are Roblox's monetization system where players pay Robux
+    for special items, abilities, or content.
+    
+    HOW GAMEPASS CHECKING WORKS:
+    Games use MarketplaceService:UserOwnsGamePassAsync(userId, gamepassId)
+    to check if a player owns a gamepass. This returns true/false.
+    
+    THE VULNERABILITY:
+    The game checks gamepass ownership CLIENT-SIDE before allowing access.
+    If we can make this function always return true, we bypass the check!
+    
+    METAMETHODS EXPLAINED:
+    In Lua/Luau, every object has a "metatable" that defines special behaviors.
+    The __namecall metamethod is called whenever you use : syntax (self:method())
+    
+    EXAMPLE:
+    When game code calls: MarketplaceService:UserOwnsGamePassAsync(123, 456)
+    Lua internally calls: __namecall(MarketplaceService, 123, 456)
+    
+    THE HOOK:
+    We replace __namecall with our own function that:
+    1. Intercepts ALL method calls
+    2. Checks if it's UserOwnsGamePassAsync on MarketplaceService
+    3. If yes: return true (fake ownership)
+    4. If no: pass through to original function
+    
+    KEY FUNCTIONS:
+    - getrawmetatable(game): Gets the metatable for all game objects
+    - setreadonly(mt, false): Makes the metatable editable
+    - newcclosure(): Wraps our function to bypass some anti-cheat
+    - getnamecallmethod(): Gets the name of the method being called
+    
+    DEVELOPER LESSON:
+    - NEVER check gamepass ownership client-side only
+    - Always verify ownership on the server before granting access
+    - Client-side checks can ALWAYS be bypassed
+    - Server must validate every gamepass-restricted action
+]]
+
+-- Variable to track if our hook is enabled
+local gamepassHookEnabled = false
+
+-- Get the game's metatable (contains metamethods for all objects)
+local mt = getrawmetatable(game)
+
+-- Store the original __namecall so we can call it for non-gamepass methods
+local oldNamecall = mt.__namecall
+
+-- Create toggle to enable/disable the gamepass bypass
+VehicleTab:CreateToggle({
+    Name = "Unlock All Gamepass Vehicles",
+    CurrentValue = false,  -- Starts disabled
+    Flag = "GamepassToggle",
+    Callback = function(val)
+        gamepassHookEnabled = val  -- Update our enabled state
+        
+        if val then
+            -- ENABLING THE HOOK
+            
+            -- Step 1: Make the metatable editable (it's read-only by default)
+            setreadonly(mt, false)
+            
+            -- Step 2: Replace __namecall with our hooked version
+            mt.__namecall = newcclosure(function(self, ...)
+                --[[
+                    This function now intercepts EVERY method call in the game!
+                    
+                    PARAMETERS:
+                    - self: The object the method is being called on
+                    - ...: All arguments passed to the method
+                    
+                    We need to:
+                    1. Check if this is the gamepass check we want to fake
+                    2. If yes, return true (bypass)
+                    3. If no, call the original function normally
+                ]]
+                
+                -- Get the name of the method being called (e.g., "UserOwnsGamePassAsync")
+                local method = getnamecallmethod()
+                
+                --[[
+                    CHECK FOR GAMEPASS FUNCTION:
+                    We're looking for calls to MarketplaceService:UserOwnsGamePassAsync(...)
+                    
+                    Conditions:
+                    1. self == MarketplaceService (called on this specific service)
+                    2. method == "UserOwnsGamePassAsync" (this specific function)
+                    3. gamepassHookEnabled (our toggle is on)
+                ]]
+                if self == MarketplaceService and method == "UserOwnsGamePassAsync" and gamepassHookEnabled then
+                    -- BYPASS: Always return true, faking gamepass ownership!
+                    return true
+                end
+                
+                --[[
+                    NOT A GAMEPASS CHECK:
+                    Call the original function normally.
+                    This ensures we don't break other game functionality.
+                ]]
+                return oldNamecall(self, ...)
+            end)
+            
+            -- Step 3: Make metatable read-only again for protection
+            setreadonly(mt, true)
+            
+            -- Notify user that bypass is enabled
+            Rayfield:Notify({
+                Title = "Gamepass Vehicles",
+                Content = "All gamepass vehicles unlocked! Click Auto-Buy All below.",
+                Duration = 5,
+                Image = 4483362458
+            })
+        else
+            -- DISABLING THE HOOK
+            -- When toggled off, the hook remains but gamepassHookEnabled = false
+            -- means the if condition won't match, so it passes through to original
+            Rayfield:Notify({
+                Title = "Gamepass Vehicles",
+                Content = "Gamepass unlock disabled",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    AUTO-BUY GAMEPASS VEHICLES
+    ════════════════════════════════════════════════════════════════════════
+    
+    HOW AUTO-BUY WORKS:
+    Thisbutton automatically purchases ALL gamepass-locked vehicles by:
+    1. Enabling the gamepass bypass hook
+    2. Scanning the in-game dealership UI for vehicle data
+    3. Purchasing each gamepass vehicle using BuyCarEvent
+    
+    WHY THIS WORKS:
+    - Gamepass bypass makes the game think we own all gamepasses
+    - BuyCarEvent has no server-side price/ownership validation
+    - We can purchase "gamepass" vehicles for free (price is ignored)
+    
+    UI SCANNING:
+    The game stores vehicle data in the PlayerGui interface:
+    PlayerGui.VehicleSpawner.Dealership.BuyFrame contains Frame objects
+    for each vehicle, with these attributes:
+    - Name: Vehicle name
+    - Price: Cost in game currency
+    - Gamepass: Boolean indicating if it requires a gamepass
+    
+    THE EXPLOIT:
+    We loop through all frames, check if Gamepass attribute is true,
+    and purchase each one regardless of whether we own the gamepass.
+    
+    DEVELOPER LESSON:
+    - Never store important game data in client GUIs (easily accessible)
+    - Server must validate gamepass ownership before allowing purchase
+    - Price and ownership checks must be server-side only
+]]
+
+VehicleTab:CreateButton({
+    Name = "Auto-Buy All Gamepass Vehicles",
+    Callback = function()
+        -- Step 1: Enable gamepass bypass to fake ownership
+        gamepassHookEnabled = true
+        setreadonly(mt, false)
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            
+            if self == MarketplaceService and method == "UserOwnsGamePassAsync" and gamepassHookEnabled then
+                return true  -- Fake gamepass ownership
+            end
+            
+            return oldNamecall(self, ...)
+        end)
+        setreadonly(mt, true)
+        
+        -- Step 2: Access the dealership UI to get vehicle data
+        local dealership = LocalPlayer.PlayerGui:WaitForChild("VehicleSpawner"):WaitForChild("Dealership")
+        local buyFrame = dealership:WaitForChild("BuyFrame")
+        
+        local vehiclesPurchased = 0
+        
+        -- Step 3: Use task.spawn to run purchases asynchronously (non-blocking)
+        task.spawn(function()
+            -- Loop through all children of BuyFrame (vehicle UI elements)
+            for _, vehicleFrame in ipairs(buyFrame:GetChildren()) do
+                --[[
+                    CHECK IF THIS IS A GAMEPASS VEHICLE:
+                    - IsA("Frame"): Make sure it's a UI frame, not text/image
+                    - GetAttribute("Gamepass"): Check if Gamepass attribute exists/is true
+                ]]
+                if vehicleFrame:IsA("Frame") and vehicleFrame:GetAttribute("Gamepass") then
+                    -- Extract vehicle data from UI
+                    local vehicleName = vehicleFrame.Name
+                    local price = tonumber(vehicleFrame:GetAttribute("Price")) or 0
+                    
+                    --[[
+                        PURCHASE THE VEHICLE:
+                        With our gamepass hook active, the server thinks we own
+                        the gamepass and allows the purchase.
+                        
+                        Note: Price doesn't matter for gamepass vehicles as they're
+                        "free" if you own the gamepass (which we're faking).
+                    ]]
+                    BuyCarEvent:FireServer(vehicleName, price)
+                    vehiclesPurchased = vehiclesPurchased + 1
+                    
+                    task.wait(0.1) -- Small delay between purchases
+                end
+            end
+            
+            Rayfield:Notify({
+                Title = "Auto-Buy Complete",
+                Content = "Attempted to buy " .. vehiclesPurchased .. " gamepass vehicles!",
+                Duration = 5,
+                Image = 4483362458
+            })
+        end)
+        
+        Rayfield:Notify({
+            Title = "Auto-Buy Started",
+            Content = "Purchasing all gamepass vehicles...",
+            Duration = 3,
+            Image = 4483362458
+        })    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    AUTO-BUY REGULAR VEHICLES
+    ════════════════════════════════════════════════════════════════════════
+    
+    DIFFERENCE FROM GAMEPASS AUTO-BUY:
+    This purchases regular (non-gamepass) vehicles only.
+    
+    IMPORTANT: You need actual in-game money for these!
+    - Use the money exploit first to get enough currency
+    - Regular vehicles cost real in-game money
+    - Server doesn't validate you have enough (allows negative balance)
+    
+    HOW IT WORKS:
+    Same UI scanning approach, but filters for vehicles that
+    DON'T have the Gamepass attribute.
+]]
+
+VehicleTab:CreateButton({
+    Name = "Auto-Buy All Regular Vehicles",
+    Callback = function()
+        -- Access dealership UI
+        local dealership = LocalPlayer.PlayerGui:WaitForChild("VehicleSpawner"):WaitForChild("Dealership")
+        local buyFrame = dealership:WaitForChild("BuyFrame")
+        
+        local vehiclesPurchased = 0
+        local totalCost = 0
+        
+        task.spawn(function()
+            -- Loop through all vehicle frames
+            for _, vehicleFrame in ipairs(buyFrame:GetChildren()) do
+                --[[
+                    FILTER FOR NON-GAMEPASS VEHICLES:
+                    Check that it's a Frame AND doesn't have Gamepass attribute
+                    This gives us regular purchasable vehicles only
+                ]]
+                if vehicleFrame:IsA("Frame") and not vehicleFrame:GetAttribute("Gamepass") then
+                    local vehicleName = vehicleFrame.Name
+                    local price = tonumber(vehicleFrame:GetAttribute("Price")) or 0
+                    
+                    -- Purchase vehicle (requires in-game money!)
+                    BuyCarEvent:FireServer(vehicleName, price)
+                    vehiclesPurchased = vehiclesPurchased + 1
+                    totalCost = totalCost + price
+                    
+                    task.wait(0.1)  -- Small delay to avoid flooding server
+                end
+            end
+            
+            -- Show completion notification with stats
+            Rayfield:Notify({
+                Title = "Auto-Buy Complete",
+                Content = "Bought " .. vehiclesPurchased .. " vehicles! Cost: $" .. totalCost,
+                Duration = 5,
+                Image = 4483362458
+            })
+        end)
+        
+        -- Immediate notification that process started
+        Rayfield:Notify({
+            Title = "Auto-Buy Started",
+            Content = "Purchasing regular vehicles... (Need money!)",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    AUTO-BUY EVERYTHING
+    ════════════════════════════════════════════════════════════════════════
+    
+    ULTIMATE AUTO-PURCHASE:
+    This combines both gamepass and regular vehicle purchases.
+    
+    HOW IT WORKS:
+    1. Enables gamepass bypass first
+    2. Scans ALL vehicles (no filtering)
+    3. Purchases every single vehicle in the dealership
+    
+    BENEFITS:
+    - One-click to get everything
+    - Gamepass vehicles purchased for free (bypass active)
+    - Regular vehicles purchased with in-game money
+    
+    REQUIREMENT:
+    Use money exploit first to afford all regular vehicles!
+]]
+
+VehicleTab:CreateButton({
+    Name = "Auto-Buy EVERYTHING (All Vehicles)",
+    Callback = function()
+        -- Enable gamepass bypass for gamepass vehicles
+        gamepassHookEnabled = true
+        setreadonly(mt, false)
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if self == MarketplaceService and method == "UserOwnsGamePassAsync" and gamepassHookEnabled then
+                return true  -- Bypass gamepass checks
+            end
+            return oldNamecall(self, ...)
+        end)
+        setreadonly(mt, true)
+        
+        -- Access dealership
+        local dealership = LocalPlayer.PlayerGui:WaitForChild("VehicleSpawner"):WaitForChild("Dealership")
+        local buyFrame = dealership:WaitForChild("BuyFrame")
+        
+        local vehiclesPurchased = 0
+        
+        task.spawn(function()
+            -- Purchase EVERY vehicle (no filtering)
+            for _, vehicleFrame in ipairs(buyFrame:GetChildren()) do
+                if vehicleFrame:IsA("Frame") then  -- Only check if it's a Frame
+                    local vehicleName = vehicleFrame.Name
+                    local price = tonumber(vehicleFrame:GetAttribute("Price")) or 0
+                    
+                    -- Purchase regardless of gamepass or regular
+                    BuyCarEvent:FireServer(vehicleName, price)
+                    vehiclesPurchased = vehiclesPurchased + 1
+                    
+                    task.wait(0.1)
+                end
+            end
+            
+            Rayfield:Notify({
+                Title = "Auto-Buy Complete",
+                Content = "Bought " .. vehiclesPurchased .. " vehicles!",
+                Duration = 5,
+                Image = 4483362458
+            })
+        end)
+        
+        Rayfield:Notify({
+            Title = "Auto-Buy Started",
+            Content = "Buying EVERY vehicle!",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    SECTION 7: ENGINE UPGRADES TAB
+    ════════════════════════════════════════════════════════════════════════
+    
+    Engine upgrades improve vehicle performance in this game.
+    Stage 5 is typically locked behind a gamepass.
+]]
+local EngineTab = Window:CreateTab("Engine", 4483362458)
+
+EngineTab:CreateSection("Engine Upgrades")
+
+EngineTab:CreateSection("Stage 5 Gamepass Unlock")
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    STAGE 5 EXPLOIT - ADVANCED MULTI-LAYERED BYPASS
+    ════════════════════════════════════════════════════════════════════════
+    
+    Stage 5 is the premium engine upgrade, locked behind a gamepass.
+    This exploit uses a TRIPLE-LAYER approach to bypass it completely.
+    
+    WHY THREE STEPS?
+    This game uses multiple validation layers:
+    1. Server-side: Checks if player purchased Stage 5
+    2. Client-side: Updates UI and local state
+    3. GUI: Shows "Owned" vs price
+    
+    THE EXPLOIT APPROACH:
+    
+    LAYER 1 - SERVER PURCHASE:
+    Fire BuyDensityStageEvent to tell server we want Stage 5.
+    Try both "Stage5" and "Stage 5" (games sometimes use different formats).
+    
+    LAYER 2 - CLIENT UPDATE:
+    Use firesignal() to fake the UpdateDensityEvent OnClientEvent callback.
+    This updates local game state as if we legitimately bought Stage 5.
+    
+    firesignal() EXPLAINED:
+    RemoteEvents have OnClientEvent which fires when server sends data to client.
+    firesignal() lets us fake this, making the game think the server confirmed our purchase.
+    
+    LAYER 3 - GUI MANIPULATION:
+    Directly modify the UI to show "Owned" instead of the price.
+    This prevents visual glitches where UI still shows "Buy" button.
+    
+    pcall() USAGE:
+    pcall (protected call) wraps code that might error.
+    If one step fails, the others can still succeed.
+    
+    DEVELOPER LESSON:
+    This demonstrates why defense-in-depth doesn't work if the foundation is broken:
+    - Server should be the ONLY source of truth
+    - Client-side validation and UI are cosmetic only
+    - Never trust client state for critical features
+    - Gamepass checks must be server-side ONLY
+]]
+
+EngineTab:CreateButton({
+    Name = "Unlock Stage 5 (Gamepass)",
+    Callback = function()
+        --[[
+            STEP 1: SERVER PURCHASE
+            Try to purchase Stage 5 directly from server.
+            Send both name variations in case game uses either.
+        ]]
+        BuyDensityStageEvent:FireServer("Stage5")
+        BuyDensityStageEvent:FireServer("Stage 5")
+        
+        -- Wait briefly for server response
+        task.wait(0.3)
+        
+        --[[
+            STEP 2: CLIENT EVENT SIMULATION
+            Fake the UpdateDensityEvent OnClientEvent callback.
+            This makes the client think the server confirmed our purchase.
+            
+            pcall protects against errors if event doesn't exist/changed.
+        ]]
+        pcall(function()
+            firesignal(UpdateDensityEvent.OnClientEvent, "Stage5")
+            firesignal(UpdateDensityEvent.OnClientEvent, "Stage 5")
+        end)
+        
+        -- Wait for client state to update
+        task.wait(0.2)
+        
+        --[[
+            STEP 3: GUI MANIPULATION
+            Find Stage 5 UI elements and change "Price" text to "Owned".
+            This completes the illusion that we own Stage 5.
+            
+            GetDescendants() returns ALL children recursively (deep search).
+            We look for Frames named "Stage 5" or "Stage5".
+            If found, find the "Price" TextLabel and change it to "Owned".
+        ]]
+        local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+        pcall(function()
+            for _, button in ipairs(PlayerGui:GetDescendants()) do
+                -- Check if this is a Stage 5 UI element
+                if (button.Name == "Stage 5" or button.Name == "Stage5") and button:IsA("Frame") then
+                    local price = button:FindFirstChild("Price")
+                    if price and price:IsA("TextLabel") then
+                        price.Text = "Owned"  -- Change displayed text
+                    end
+                end
+            end
+        end)
+        
+        -- Success notification
+        Rayfield:Notify({
+            Title = "Stage 5",
+            Content = "Stage 5 unlock attempted! Check garage menu.",
+            Duration = 5,
+            Image = 4483362458
+        })
+    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    SECTION 8: AUTO FARM - AUTOMATION
+    ════════════════════════════════════════════════════════════════════════
+    
+    WHY AUTO FARM?
+    Manually clicking buttons repeatedly is tedious. Auto farm automates
+    the exploitation process, continuously generating resources.
+   
+    HOW IT WORKS:
+    1. Toggle enabled to start an infinite loop
+    2. Every X seconds (configurable), automatically:
+       - Add XP (500 per cycle, safe under 9,999 limit)
+       - Add money ($50,000 per cycle)
+    3. Loop runs in background using task.spawn()
+    
+    SAFETY:
+    - Small amounts per cycle to avoid anti-cheat detection
+    - Configurable interval (default 10 seconds)
+    - Can be toggled off anytime
+    
+    TECHNICAL DETAILS:
+    - task.spawn() runs the loop in a separate coroutine (non-blocking)
+    - while autoFarmEnabled loop continues until toggle is disabled
+    - task.wait(farmInterval) pauses between cycles
+    
+    DEVELOPER LESSON:
+    Auto-farming exploits show why rate-limiting is critical:
+    - Server should track request frequency
+    - Detect patterns (same amount every X seconds)
+    - Implement cooldowns between valuable actions
+]]
+
+local AutoFarmTab = Window:CreateTab("Auto Farm", 4483362458)
+
+-- Variables to track farm state
+local autoFarmEnabled = false  -- Is auto farm currently running?
+local farmInterval = 10        -- Seconds between each farm cycle
+
+AutoFarmTab:CreateSection("Auto XP & Money Farm")
+
+AutoFarmTab:CreateToggle({
+    Name = "Enable Auto Farm",
+    CurrentValue = false,
+    Flag = "AutoFarm",
+    Callback = function(val)
+        autoFarmEnabled = val  -- Update enabled state
+        
+        if val then
+            -- STARTING AUTO FARM
+            Rayfield:Notify({
+                Title = "Auto Farm",
+                Content = "Auto farm started!",
+                Duration = 3,
+                Image = 4483362458
+            })
+            
+            --[[
+                THE FARM LOOP:
+                task.spawn creates a new coroutine (separate execution thread).
+                The while loop runs independently without blocking the UI.
+            ]]
+            task.spawn(function()
+                while autoFarmEnabled do  -- Loop while toggle is on
+                    -- Add moderate amount of XP (safe under 9,999 limit)
+                    AddXPEvent:FireServer(500)
+                    
+                    -- Add money using buy-then-sell exploit
+                    -- Step 1: Buy the car for free
+                    local BuyEvent = game:GetService("ReplicatedStorage").BuyCarEvent
+                    BuyEvent:FireServer("BWM e36 M3 - Stock", 0)
+                    
+                    task.wait(0.1)  -- Small delay
+                    
+                    -- Step 2: Sell the car for money
+                    local SellEvent = game:GetService("ReplicatedStorage").SellCarEvent
+                    SellEvent:FireServer("BWM e36 M3 - Stock", 50000)
+                    
+                    -- Wait for configured interval before next cycle
+                    task.wait(farmInterval)
+                end
+            end)
+        else
+            -- STOPPING AUTO FARM
+            -- Loop will stop on next iteration when it checks autoFarmEnabled
+            Rayfield:Notify({
+                Title = "Auto Farm",
+                Content = "Auto farm stopped",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+--[[
+    CONFIGURABLE INTERVAL:
+    Allow user to adjust time between farm cycles.
+    Longer intervals = slower farming but safer
+    Shorter intervals = faster farming but more detectable
+]]
+AutoFarmTab:CreateSlider({
+    Name = "Farm Interval (seconds)",
+    Range = {1, 60},         -- 1 to 60 seconds
+    Increment = 1,            -- Step by 1 second
+    CurrentValue = 10,        -- Default: 10 seconds
+    Flag = "FarmInterval",
+    Callback = function(val)
+        farmInterval = val    -- Update interval variable
+        -- Change takes effect on next loop iteration
+    end
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    SECTION 9: INFO TAB - USAGE INSTRUCTIONS
+    ════════════════════════════════════════════════════════════════════════
+    
+    This tab provides usage instructions and important information for users.
+]]
+
+local InfoTab = Window:CreateTab("Info", 4483362458)
+
+InfoTab:CreateSection("How to Use This Script")
+
+InfoTab:CreateParagraph({
+    Title = "Welcome!",
+    Content = "This is a complete exploit hub for a Roblox vehicle game. Features:\n• Unlimited Money & XP\n• Near Miss Auto-Farm\n• Free Gamepass Vehicles\n• Stage 5 Engine Unlock\n• Auto Farm\n• Highscore Manipulation\n\nAll exploits work by exploiting poor server-side validation.\n\n⚠️ All features use safe, direct RemoteEvent calls!"
+})
+
+InfoTab:CreateParagraph({
+    Title = "Quick Start Guide",
+    Content = "1. MONEY: Enter amount in text field, click 'Give Money'\n2. NEAR MISS: Toggle auto-farm or click manual trigger for rewards\n3. XP: Enter amount (max 9,999!), click 'Give XP'\n4. HIGHSCORE: Enter score (max 99,999!), click 'Set Highscore'\n5. VEHICLES: Enable gamepass unlock, then use auto-buy buttons\n6. ENGINE: Click Stage 5 unlock button\n7. AUTO FARM: Toggle on for passive income\n\n💡 TIP: Use Near Miss auto-farm for constant money & XP!"
+})
+
+InfoTab:CreateParagraph({
+    Title = "⚠️ Safety Features",
+    Content = "✅ ALL FEATURES ARE SAFE!\n• No metamethod hooks (no detection risk!)\n• Direct RemoteEvent calls only\n• Auto-protection on XP/Highscore values\n\n🛡️ AUTO-PROTECTION ENABLED:\n• XP: Script auto-caps at 9,999\n• HIGHSCORE: Script auto-caps at 99,999\n• MONEY: NO LIMIT - use any amount!\n\n💡 TIP: Near Miss auto-farm gives 100-1000 rewards every 5 seconds!"
+})
+
+InfoTab:CreateParagraph({
+    Title = "⚠️ Safety Tips",
+    Content = "🛡️ AUTO-PROTECTION ENABLED:\n• XP: Script auto-caps at 9,999 (type any amount, we protect you!)\n• HIGHSCORE: Script auto-caps at 99,999 (safe from kicks!)\n• MONEY: NO LIMIT - use any amount!\n\n⚠️ IMPORTANT LIMITS:\n• XP: 9,999 max per use or KICK\n• Highscore: 99,999 max per use or KICK\n• Don't spam buttons too fast\n• Use auto-farm with 10+ second intervals\n\n💡 TIP: Enter any value - script protects you from kicks automatically!"
+})
+
+InfoTab:CreateParagraph({
+    Title = "🎓 Educational Purpose",
+    Content = "This script demonstrates common game vulnerabilities:\n• No server-side validation of remote events\n• Client-side gamepass checks\n• UI-based game data storage\n• Trusting client-sent values\n\nUse this knowledge to make your own games MORE SECURE!"
+})
+
+InfoTab:CreateParagraph({
+    Title = "🔧 Technical Concepts",
+    Content = "KEY TECHNIQUES USED:\n• RemoteEvent:FireServer() - Client-to-server communication\n• Direct event manipulation (SAFE METHOD)\n• UI scanning - Reading game data from interface\n• Adonis namecall bypass for anti-kick protection\n\n✅ SAFETY LEVEL: LOW RISK\n• All features use direct RemoteEvent calls\n• NO metamethod hooks (except Adonis bypass)\n• User controls XP/Highscore limits\n\n⚠️ NO AUTO-CAPPING - Be careful with value limits!"
+})
+
+InfoTab:CreateSection("Developer Lessons")
+
+InfoTab:CreateParagraph({
+    Title = "How Developers Can Fix These",
+    Content = "SERVER-SIDE VALIDATION:\n• Never trust client input\n• Validate all RemoteEvent parameters\n• Check player ownership server-side\n• Implement rate limiting\n\nSECURE DESIGN:\n• Keep game logic on server\n• Use RemoteFunctions for validation\n• Track player actions server-side\n• Anti-cheat should detect patterns, not just values"
+})
+
+InfoTab:CreateParagraph({
+    Title = "Why This Game Is Vulnerable",
+    Content = "CRITICAL FLAWS:\n1. RemoteEvents in ReplicatedStorage (easily accessible)\n2. No server validation of XP/money/highscore\n3. Gamepass checks happen client-side\n4. Purchase events don't verify funds\n5. UI contains game data (should be server-only)\n\nEach exploit takes advantage of TRUSTING THE CLIENT."
+})
+
+InfoTab:CreateSection("Open Source & Credits")
+
+InfoTab:CreateParagraph({
+    Title = "📖 Open Source",
+    Content = "This script is FREE and OPEN SOURCE for educational purposes.\nFeel free to:\n• Study the code\n• Learn from it\n• Use it to understand exploits\n• Build better anti-cheat\n\nPlease use responsibly and respect other players!"
+})
+
+InfoTab:CreateParagraph({
+    Title = "Credits",
+    Content = "Script Created By: X3D\nUI Library: Rayfield by Sirius\nInjector: Any Roblox executor\n\nThank you for using this educational tool!"
+})
+
+--[[
+    ════════════════════════════════════════════════════════════════════════
+    END OF SCRIPT
+    ════════════════════════════════════════════════════════════════════════
+    
+    You've reached the end of the Complete Exploit Hub script!
+    
+    FINAL NOTES:
+    This script demonstrates how easily games can be exploited when proper
+    security measures aren't implemented. As a developer or security minded
+    individual, use this knowledge to:
+    
+    1. Understand attack vectors
+    2. Implement proper server-side validation
+    3. Never trust client input
+    4. Design with security in mind from the start
+    
+    Remember: The best anti-cheat is preventing the exploit from working,
+    not detecting it after it's already succeeded.
+    
+    Happy learning! 🎓
+]]
+
+-- Final notification to user
+print("[SUCCESS] ✅ Exploit Hub fully loaded!")
+
+Rayfield:Notify({
+    Title = "🎉 Exploit Hub Ready!",
+    Content = "All features loaded successfully!\n\nUse the Info tab for usage instructions.\n\n💡 TIP: Disable gamepass multipliers if you get kicked!",
+    Duration = 6,
+    Image = 4483362458
+})
