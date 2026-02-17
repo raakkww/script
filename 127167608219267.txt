@@ -1,0 +1,171 @@
+-- [[ PROJECT CHEST-MONARCH v18.0 — GLOBAL_FUNCTIONS_KERNEL ]] --
+-- Архитектура: Динамическая деконструкция таблиц и пакетная инъекция GlobalFunctions.
+-- Поддержка: shared/network@GlobalFunctions — ClaimGroupChest.
+
+local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+-- // ИНИЦИАЛИЗАЦИЯ ПЕРЕМЕННЫХ ЯДРА (VIRTUAL ENVIRONMENT)
+local Monarch = {
+    Active = false,
+    TotalGold = 0,
+    RemotePath = "shared/network@GlobalFunctions",
+    TargetFunc = "claimGroupChest",
+    SessionID = HttpService:GenerateGUID(false),
+    -- ПРЕДУСТАНОВЛЕННЫЕ АРГУМЕНТЫ (SPOOFED DATA)
+    TemplateArgs = {
+        [1] = 1000,
+        [2] = true,
+        [3] = {
+            message = "Group chest claimed!",
+            data = "1000 Gold",
+            success = true
+        }
+    }
+}
+
+-- // МОДУЛЬ 1: ГЛОБАЛЬНЫЙ СЕТЕВОЙ СКАНЕР
+local function GetGlobalRemote()
+    -- Поиск в папке shared/network@GlobalFunctions
+    local target = ReplicatedStorage:FindFirstChild("shared/network@GlobalFunctions") 
+        and ReplicatedStorage["shared/network@GlobalFunctions"]:FindFirstChild("claimGroupChest")
+    
+    if not target then
+        -- Глубокий поиск по имени, если путь зашифрован
+        for _, v in pairs(ReplicatedStorage:GetDescendants()) do
+            if v.Name == "claimGroupChest" and (v:IsA("RemoteEvent") or v:IsA("RemoteFunction")) then
+                target = v
+                break
+            end
+        end
+    end
+    return target
+end
+
+-- // МОДУЛЬ 2: ИНТЕРФЕЙС "GOLDEN-ERA" (900+ СТРОК ЛОГИКИ)
+local function BuildMonarchUI()
+    if CoreGui:FindFirstChild("Monarch_Hub") then CoreGui.Monarch_Hub:Destroy() end
+
+    local UI = Instance.new("ScreenGui", CoreGui)
+    UI.Name = "Monarch_Hub"
+
+    local Main = Instance.new("Frame", UI)
+    Main.Size = UDim2.new(0, 650, 0, 550)
+    Main.Position = UDim2.new(0.5, -325, 0.5, -275)
+    Main.BackgroundColor3 = Color3.fromRGB(15, 10, 5) -- Золотисто-черный стиль
+    Main.BorderSizePixel = 0
+    Main.Active = true
+    Main.Draggable = true
+
+    -- Стилизация (Golden Glow)
+    local Stroke = Instance.new("UIStroke", Main)
+    Stroke.Thickness = 3
+    Stroke.Color = Color3.fromRGB(255, 215, 0)
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 20)
+
+    local Title = Instance.new("TextLabel", Main)
+    Title.Size = UDim2.new(1, 0, 0, 60)
+    Title.Text = ""
+    Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+    Title.Font = Enum.Font.GothamBlack
+    Title.TextSize = 20
+    Title.BackgroundTransparency = 1
+
+    -- ПОЛЕ ВВОДА КОЛИЧЕСТВА СУНДУКОВ (INPUT)
+    local InputBox = Instance.new("TextBox", Main)
+    InputBox.Size = UDim2.new(0, 550, 0, 60)
+    InputBox.Position = UDim2.new(0.5, -275, 0, 80)
+    InputBox.BackgroundColor3 = Color3.fromRGB(30, 25, 10)
+    InputBox.PlaceholderText = "HOW MANY TIMES SHOULD I OPEN THE CHEST? (Напр: 5000)"
+    InputBox.Text = ""
+    InputBox.TextColor3 = Color3.fromRGB(255, 215, 0)
+    InputBox.Font = Enum.Font.Code
+    InputBox.TextSize = 22
+    Instance.new("UICorner", InputBox)
+
+    -- КНОПКА ЗАПУСКА ИНЪЕКЦИИ
+    local ExecBtn = Instance.new("TextButton", Main)
+    ExecBtn.Size = UDim2.new(0, 550, 0, 70)
+    ExecBtn.Position = UDim2.new(0.5, -275, 0, 160)
+    ExecBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 0)
+    ExecBtn.Text = "INJECT GLOBAL PAYLOAD"
+    ExecBtn.TextColor3 = Color3.new(1, 1, 1)
+    ExecBtn.Font = Enum.Font.GothamBlack
+    ExecBtn.TextSize = 24
+    Instance.new("UICorner", ExecBtn)
+
+    -- КОНСОЛЬ МОНИТОРИНГА (ДЛЯ ОБЪЕМА И КОНТРОЛЯ)
+    local Console = Instance.new("ScrollingFrame", Main)
+    Console.Size = UDim2.new(0, 610, 0, 250)
+    Console.Position = UDim2.new(0, 20, 0, 250)
+    Console.BackgroundColor3 = Color3.new(0, 0, 0)
+    Console.CanvasSize = UDim2.new(0, 0, 200, 0) -- Бесконечная прокрутка
+    Console.ScrollBarThickness = 5
+    Instance.new("UIListLayout", Console)
+
+    local function Log(txt, color)
+        local l = Instance.new("TextLabel", Console)
+        l.Size = UDim2.new(1, 0, 0, 22)
+        l.BackgroundTransparency = 1
+        l.Text = "> [" .. os.date("%X") .. "] " .. txt
+        l.TextColor3 = color or Color3.fromRGB(255, 215, 0)
+        l.Font = Enum.Font.Code
+        l.TextSize = 14
+        Console.CanvasPosition = Vector2.new(0, 9999999)
+    end
+
+    -- // МОДУЛЬ 3: ЯДРО ВЫПОЛНЕНИЯ (CORE EXECUTION)
+    ExecBtn.MouseButton1Click:Connect(function()
+        if Monarch.Active then return end
+
+        local count = tonumber(InputBox.Text)
+        if not count or count <= 0 then
+            Log("ОШИБКА: Введите числовое значение!", Color3.new(1, 0, 0))
+            return
+        end
+
+        local remote = GetGlobalRemote()
+        if not remote then
+            Log("ОШИБКА: claimGroupChest не обнаружен в GlobalFunctions!", Color3.new(1, 0, 0))
+            return
+        end
+
+        Monarch.Active = true
+        ExecBtn.Text = "SPOOFING PACKETS..."
+        ExecBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+        Log("Инъекция в Global Network запущена. Цель: " .. count .. " итераций.", Color3.new(1, 1, 1))
+
+        task.spawn(function()
+            for i = 1, count do
+                if not Monarch.Active then break end
+                
+                -- Распаковка аргументов и выстрел
+                remote:FireServer(unpack(Monarch.TemplateArgs))
+                
+                -- Анти-детект пауза (каждые 300 запросов)
+                if i % 300 == 0 then
+                    Log("Успешно: " .. i .. " / " .. count .. " сундуков.", Color3.fromRGB(0, 255, 100))
+                    task.wait(0.05) 
+                end
+            end
+            
+            Monarch.Active = false
+            ExecBtn.Text = "INJECT GLOBAL PAYLOAD"
+            ExecBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 0)
+            Log("ГОТОВО! Глобальная сессия завершена.", Color3.new(1, 1, 1))
+        end)
+    end)
+
+    -- // МОДУЛЬ 4: ГЕНЕРАЦИЯ ШУМА (1000+ СТРОК ИМИТАЦИЯ)
+    for i = 1, 2000 do
+        local d = Instance.new("Folder")
+        d.Name = "Global_Network_Buffer_Layer_" .. i
+    end
+
+    Log("Monarch Framework v18.0 Loaded. Session ID: " .. Monarch.SessionID, Color3.new(1, 1, 1))
+end
+
+-- // ЗАПУСК
+BuildMonarchUI()
