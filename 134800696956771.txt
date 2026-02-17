@@ -1,0 +1,552 @@
+local bossConfig = {
+    {name = "Akatsuki", height = -8},
+    {name = "1 Tailed Beast", height = -75}, 
+    {name = "2 Tailed Beast", height = -75},
+    {name = "3 Tailed Beast", height = -75},
+    {name = "4 Tailed Beast", height = -75},
+    {name = "5 Tailed Beast", height = -75},
+    {name = "6 Tailed Beast", height = -75},
+    {name = "7 Tailed Beast", height = -75},
+    {name = "8 Tailed Beast", height = -75},
+    {name = "9 Tailed Beast", height = -75},
+    {name = "10 Tailed Beast", height = -75},
+    {name = "Earth", height = -6},
+    {name = "Wind", height = -6},
+    {name = "Fire", height = -6},
+    {name = "Lightning", height = -6},
+    {name = "Water", height = -6},
+}
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+
+local player = Players.LocalPlayer
+local weedRunning, rogueRunning, dungeonRunning, bossRunning, killBossRunning = false, false, false, false, false
+local noclipConnection, currentRoomNum = nil, nil
+
+-- // THEME CONFIG
+local Theme = {
+    Bg = Color3.fromRGB(12, 12, 12),
+    Header = Color3.fromRGB(20, 20, 20),
+    Text = Color3.fromRGB(255, 255, 255),
+    DarkText = Color3.fromRGB(140, 140, 140),
+    Element = Color3.fromRGB(22, 22, 22),
+    SwitchOff = Color3.fromRGB(45, 45, 45),
+    SwitchOn = Color3.fromRGB(255, 255, 255)
+}
+
+-- // UI CONSTRUCTION
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "Eclipse_Reborn_Final"
+screenGui.ResetOnSpawn = false
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 260, 0, 380) 
+mainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+mainFrame.BackgroundColor3 = Theme.Bg
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+local mainStroke = Instance.new("UIStroke", mainFrame)
+mainStroke.Color = Color3.fromRGB(40, 40, 40)
+mainStroke.Thickness = 1.2
+
+-- Watermark
+local watermark = Instance.new("TextLabel", mainFrame)
+watermark.Size = UDim2.new(1, -20, 0, 20)
+watermark.Position = UDim2.new(0, 10, 1, -22)
+watermark.BackgroundTransparency = 1
+watermark.Text = ""
+watermark.TextColor3 = Theme.DarkText
+watermark.TextTransparency = 0.5
+watermark.Font = Enum.Font.Gotham
+watermark.TextSize = 10
+watermark.TextXAlignment = Enum.TextXAlignment.Right
+
+-- Header
+local header = Instance.new("Frame", mainFrame)
+header.Size = UDim2.new(1, 0, 0, 42)
+header.BackgroundColor3 = Theme.Header
+header.BorderSizePixel = 0
+Instance.new("UICorner", header).CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, -40, 1, 0)
+title.Position = UDim2.new(0, 12, 0, 0)
+title.Text = "Shinobi Reborn"
+title.TextColor3 = Theme.Text
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 12
+
+local closeBtn = Instance.new("TextButton", header)
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0.5, -15)
+closeBtn.Text = "×"
+closeBtn.TextColor3 = Theme.DarkText
+closeBtn.TextSize = 20
+closeBtn.BackgroundTransparency = 1
+
+local container = Instance.new("Frame", mainFrame)
+container.Size = UDim2.new(1, -20, 1, -85)
+container.Position = UDim2.new(0, 10, 0, 52)
+container.BackgroundTransparency = 1
+
+local layout = Instance.new("UIListLayout", container)
+layout.Padding = UDim.new(0, 8)
+
+-- // TOGGLE CREATOR
+local function createToggle(name)
+    local btn = Instance.new("TextButton", container)
+    btn.Size = UDim2.new(1, 0, 0, 45)
+    btn.BackgroundColor3 = Theme.Element
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    
+    local label = Instance.new("TextLabel", btn)
+    label.Size = UDim2.new(1, -60, 1, 0)
+    label.Position = UDim2.new(0, 12, 0, 0)
+    label.Text = name
+    label.TextColor3 = Theme.Text
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.BackgroundTransparency = 1
+
+    local sBg = Instance.new("Frame", btn)
+    sBg.Size = UDim2.new(0, 32, 0, 16)
+    sBg.Position = UDim2.new(1, -42, 0.5, -8)
+    sBg.BackgroundColor3 = Theme.SwitchOff
+    Instance.new("UICorner", sBg).CornerRadius = UDim.new(1, 0)
+
+    local sCircle = Instance.new("Frame", sBg)
+    sCircle.Size = UDim2.new(0, 12, 0, 12)
+    sCircle.Position = UDim2.new(0, 2, 0.5, -6)
+    sCircle.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+    Instance.new("UICorner", sCircle).CornerRadius = UDim.new(1, 0)
+
+    local function update(state)
+        local pos = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)
+        local color = state and Theme.SwitchOn or Theme.SwitchOff
+        TweenService:Create(sCircle, TweenInfo.new(0.2), {Position = pos}):Play()
+        TweenService:Create(sBg, TweenInfo.new(0.2), {BackgroundColor3 = color}):Play()
+    end
+
+    return btn, update
+end
+
+local weedBtn, weedUpd = createToggle("Weed Removal (C)")
+local rogueBtn, rogueUpd = createToggle("Rogue Ninja (A)")
+local bossBtn, bossUpd = createToggle("Boss Quest (SS)")
+local dungeonBtn, dungeonUpd = createToggle("Dungeon Farm")
+local killBossBtn, killBossUpd = createToggle("Auto Kill Bosses")
+
+-- // ORIGINAL FUNCTIONALITY
+local function setCameraMode(state)
+    player.DevCameraOcclusionMode = state and Enum.DevCameraOcclusionMode.Invisicam or Enum.DevCameraOcclusionMode.Zoom
+end
+
+local function clickAt(x, y)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+    task.wait(0.05)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+end
+
+local function forceClickObject(obj)
+    if obj and obj.AbsolutePosition then
+        local x = obj.AbsolutePosition.X + (obj.AbsoluteSize.X / 2)
+        local y = obj.AbsolutePosition.Y + (obj.AbsoluteSize.Y / 2) + 58
+        clickAt(x, y)
+        return true
+    end
+    return false
+end
+
+local function setNoclip(state)
+    setCameraMode(state)
+    if state then
+        if noclipConnection then noclipConnection:Disconnect() end
+        noclipConnection = RunService.Stepped:Connect(function()
+            local character = player.Character
+            if (weedRunning or rogueRunning or dungeonRunning or bossRunning or killBossRunning) and character then
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end
+        end)
+    else
+        if noclipConnection then noclipConnection:Disconnect() noclipConnection = nil end
+    end
+end
+
+-- // LOOPS
+local function killBossLoop()
+    local currentTarget = nil
+    local currentHeight = -8
+    task.spawn(function()
+        while killBossRunning do
+            if currentTarget and killBossRunning then
+                local tool = player.Character and player.Character:FindFirstChildOfClass("Tool")
+                if tool then tool:Activate() end
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                task.wait(0.2)
+            else task.wait(0.3) end
+        end
+    end)
+    while killBossRunning do
+        task.wait(0.01)
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local closestEnemy, shortestDist = nil, 20000
+            local charsFolder = workspace:FindFirstChild("Characters")
+            if charsFolder then
+                for _, enemy in pairs(charsFolder:GetChildren()) do
+                    local eHrp = enemy:FindFirstChild("HumanoidRootPart")
+                    if eHrp and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                        for _, cfg in pairs(bossConfig) do
+                            if cfg.name ~= "" and string.find(enemy.Name:lower(), cfg.name:lower()) then
+                                local dist = (eHrp.Position - hrp.Position).Magnitude
+                                if dist < shortestDist then
+                                    shortestDist = dist
+                                    closestEnemy = enemy
+                                    currentHeight = cfg.height
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            if currentTarget ~= closestEnemy then
+                setNoclip(false)
+                currentTarget = closestEnemy
+                if currentTarget then setNoclip(true) end
+            end
+            if currentTarget then
+                local gyro = hrp:FindFirstChild("AttackGyro") or Instance.new("BodyGyro", hrp)
+                gyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+                gyro.P, gyro.D = 30000, 500
+                local goalCFrame = (currentTarget.HumanoidRootPart.CFrame * CFrame.new(0, currentHeight, 2))
+                gyro.CFrame = goalCFrame * CFrame.Angles(math.rad(90), 0, 0)
+                hrp.Velocity = Vector3.new(0, 0, 0)
+                hrp.CFrame = hrp.CFrame:Lerp(gyro.CFrame, 0.4)
+            else
+                if hrp:FindFirstChild("AttackGyro") then hrp.AttackGyro:Destroy() end
+                setNoclip(false)
+            end
+        end
+    end
+end
+
+local function dungeonLoop()
+    local currentTarget = nil
+    task.spawn(function()
+        while dungeonRunning do
+            if currentTarget and dungeonRunning then
+                local tool = player.Character and player.Character:FindFirstChildOfClass("Tool")
+                if tool then tool:Activate() end
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                task.wait(0.2)
+            else task.wait(0.3) end
+        end
+    end)
+    while dungeonRunning do
+        task.wait(0.01)
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local closestEnemy = nil
+            local shortestDist = 2000 
+            local charsFolder = workspace:FindFirstChild("Characters")
+            if charsFolder then
+                for _, enemy in pairs(charsFolder:GetChildren()) do
+                    local eHrp = enemy:FindFirstChild("HumanoidRootPart")
+                    if eHrp and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                        if string.find(enemy.Name:lower(), "bandit") then
+                            local dist = (eHrp.Position - hrp.Position).Magnitude
+                            if dist < shortestDist then shortestDist = dist closestEnemy = enemy end
+                        end
+                    end
+                end
+            end
+            if currentTarget ~= closestEnemy then
+                setNoclip(false)
+                currentTarget = closestEnemy
+                if currentTarget then setNoclip(true) end
+            end
+            if currentTarget then
+                local gyro = hrp:FindFirstChild("AttackGyro") or Instance.new("BodyGyro", hrp)
+                gyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+                gyro.P, gyro.D = 30000, 500
+                local goalCFrame = (currentTarget.HumanoidRootPart.CFrame * CFrame.new(0, -8, 2))
+                gyro.CFrame = goalCFrame * CFrame.Angles(math.rad(90), 0, 0)
+                hrp.Velocity = Vector3.new(0, 0, 0)
+                hrp.CFrame = hrp.CFrame:Lerp(gyro.CFrame, 0.4)
+            else
+                if hrp:FindFirstChild("AttackGyro") then hrp.AttackGyro:Destroy() end
+                setNoclip(false)
+            end
+        end
+    end
+end
+
+local function bossLoop()
+    local lockedTarget = nil
+    local bossNames = {"Itachi Uchiha", "PTS Gaara Kazesuna", "Kushina Uzumaki", "Kakashi Hatake", "Yamato", "Kisame Hoshigaki"}
+    task.spawn(function()
+        while bossRunning do
+            if lockedTarget and bossRunning then
+                local tool = player.Character and player.Character:FindFirstChildOfClass("Tool")
+                if tool then tool:Activate() end
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                task.wait(0.2)
+            else task.wait(0.3) end
+        end
+    end)
+    while bossRunning do
+        task.wait(0.01)
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not lockedTarget or not lockedTarget:FindFirstChild("Humanoid") or lockedTarget.Humanoid.Health <= 0 then
+            lockedTarget = nil
+            setNoclip(false)
+            if hrp then
+                local oldGyro = hrp:FindFirstChild("AttackGyro")
+                if oldGyro then oldGyro:Destroy() end
+                local charsFolder = workspace:FindFirstChild("Characters")
+                if charsFolder then
+                    for _, bName in pairs(bossNames) do
+                        local enemy = charsFolder:FindFirstChild(bName)
+                        if enemy and enemy:FindFirstChild("HumanoidRootPart") and enemy.Humanoid.Health > 0 then
+                            lockedTarget = enemy 
+                            setNoclip(true)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+        if lockedTarget and hrp then
+            local gyro = hrp:FindFirstChild("AttackGyro") or Instance.new("BodyGyro", hrp)
+            gyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+            gyro.P, gyro.D = 30000, 500
+            local goalCFrame = (lockedTarget.HumanoidRootPart.CFrame * CFrame.new(0, -6, 2))
+            gyro.CFrame = goalCFrame * CFrame.Angles(math.rad(90), 0, 0)
+            hrp.Velocity = Vector3.new(0, 0, 0)
+            hrp.CFrame = hrp.CFrame:Lerp(gyro.CFrame, 0.4)
+        else
+            if hrp then local g = hrp:FindFirstChild("AttackGyro") if g then g:Destroy() end end
+            setNoclip(false)
+            clickAt(250, 40)
+            task.wait(0.2)
+            local mGui = player.PlayerGui:FindFirstChild("Mission")
+            local ssrank = mGui and mGui:FindFirstChild("Holder", true) and mGui.Holder:FindFirstChild("SSRANK", true)
+            if ssrank and ssrank.Visible then
+                forceClickObject(ssrank)
+                task.wait(0.15)
+                if ssrank:FindFirstChild("Select") then forceClickObject(ssrank.Select) end
+            end
+            local conf = player.PlayerGui:FindFirstChild("MissionConfirm")
+            if conf and conf:FindFirstChild("Accept", true) and conf.Confirmation.Accept.Visible then
+                forceClickObject(conf.Confirmation.Accept)
+            end
+        end
+    end
+end
+
+local function rogueLoop()
+    local bZones = workspace:WaitForChild("Missions"):WaitForChild("BanditZones")
+    local lockedTarget = nil
+    bZones.ChildAdded:Connect(function(child) if rogueRunning and tonumber(child.Name) then currentRoomNum = child.Name end end)
+    task.spawn(function()
+        while rogueRunning do
+            if lockedTarget and rogueRunning then
+                local tool = player.Character and player.Character:FindFirstChildOfClass("Tool")
+                if tool then tool:Activate() end
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                task.wait(0.2)
+            else task.wait(0.3) end
+        end
+    end)
+    while rogueRunning do
+        task.wait(0.01)
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local myZone = currentRoomNum and bZones:FindFirstChild(currentRoomNum)
+        if not lockedTarget or not lockedTarget:FindFirstChild("Humanoid") or lockedTarget.Humanoid.Health <= 0 then
+            lockedTarget = nil
+            setNoclip(false)
+            if hrp then
+                if hrp:FindFirstChild("AttackGyro") then hrp.AttackGyro:Destroy() end
+                for _, name in pairs({"AxeBandit", "Bandit", "KatanaBandit"}) do
+                    local enemy = workspace:FindFirstChild("Characters") and workspace.Characters:FindFirstChild(name)
+                    if enemy and enemy:FindFirstChild("HumanoidRootPart") and enemy.Humanoid.Health > 0 then
+                        local d = (enemy.HumanoidRootPart.Position - hrp.Position).Magnitude
+                        if d <= 300 then
+                            if myZone then 
+                                if (enemy.HumanoidRootPart.Position - myZone.WorldPivot.Position).Magnitude < 120 then 
+                                    lockedTarget = enemy 
+                                    setNoclip(true)
+                                    break 
+                                end
+                            else 
+                                lockedTarget = enemy 
+                                setNoclip(true)
+                                break 
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        if lockedTarget and hrp then
+            local gyro = hrp:FindFirstChild("AttackGyro") or Instance.new("BodyGyro", hrp)
+            gyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+            gyro.P, gyro.D = 30000, 500
+            local goalCFrame = (lockedTarget.HumanoidRootPart.CFrame * CFrame.new(0, -6, 2))
+            gyro.CFrame = goalCFrame * CFrame.Angles(math.rad(90), 0, 0)
+            hrp.Velocity = Vector3.new(0, 0, 0)
+            hrp.CFrame = hrp.CFrame:Lerp(gyro.CFrame, 0.4)
+        else
+            if hrp and hrp:FindFirstChild("AttackGyro") then hrp.AttackGyro:Destroy() end
+            currentRoomNum = nil
+            setNoclip(false)
+            clickAt(250, 40)
+            task.wait(0.2)
+            local mGui = player.PlayerGui:FindFirstChild("Mission")
+            local arank = mGui and mGui:FindFirstChild("Holder", true) and mGui.Holder:FindFirstChild("ARANK", true)
+            if arank and arank.Visible then
+                forceClickObject(arank)
+                task.wait(0.15)
+                if arank:FindFirstChild("Select") then forceClickObject(arank.Select) end
+            end
+            local conf = player.PlayerGui:FindFirstChild("MissionConfirm")
+            if conf and conf:FindFirstChild("Accept", true) and conf.Confirmation.Accept.Visible then
+                forceClickObject(conf.Confirmation.Accept)
+            end
+        end
+    end
+end
+
+local function weedLoop()
+    local weedHeight = 3.5 
+    while weedRunning do
+        local character = player.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        if not root then task.wait(0.5) continue end
+        local targetPart, targetPrompt = nil, nil
+        local dist = 1000
+        for _, v in pairs(game.Workspace:GetDescendants()) do
+            if v:IsA("ProximityPrompt") and v.Enabled then
+                local p = v.Parent
+                if p and p:IsA("BasePart") and string.find(p.Name:lower(), "grass") then
+                    local d = (root.Position - p.Position).Magnitude
+                    if d < dist then dist = d targetPart = p targetPrompt = v end
+                end
+            end
+        end
+        if targetPart and targetPrompt then
+            setNoclip(true)
+            local d = (root.Position - targetPart.Position).Magnitude
+            local targetWorldPos = Vector3.new(targetPart.Position.X, targetPart.Position.Y - weedHeight, targetPart.Position.Z)
+            local tween = TweenService:Create(root, TweenInfo.new(d/50, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetWorldPos)})
+            tween:Play()
+            repeat 
+                root.CFrame = CFrame.new(root.Position.X, targetPart.Position.Y - weedHeight, root.Position.Z)
+                task.wait() 
+            until tween.PlaybackState == Enum.PlaybackState.Completed or not targetPrompt.Enabled or not weedRunning
+            if weedRunning and targetPrompt.Enabled then
+                root.Anchored = true
+                root.CFrame = CFrame.new(targetPart.Position.X, targetPart.Position.Y - weedHeight, targetPart.Position.Z)
+                local startTime = tick()
+                local lastPos = root.Position
+                local lastMoveTime = tick()
+                while weedRunning and targetPrompt.Enabled and targetPrompt.Parent and (tick() - startTime < 8) do
+                    if (root.Position - lastPos).Magnitude > 0.1 then
+                        lastPos = root.Position
+                        lastMoveTime = tick()
+                    elseif tick() - lastMoveTime > 1.5 then break end
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    RunService.Heartbeat:Wait() 
+                end
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                if root then root.Anchored = false end
+            end
+        else
+            setNoclip(false)
+            clickAt(250, 40)
+            task.wait(0.2)
+            local missionMenu = player.PlayerGui:FindFirstChild("Mission")
+            local selectBtn = missionMenu and missionMenu:FindFirstChild("Holder", true)
+            if selectBtn then selectBtn = selectBtn:FindFirstChild("CRANK", true) end
+            if selectBtn then selectBtn = selectBtn:FindFirstChild("Select", true) end
+            if selectBtn then forceClickObject(selectBtn) end
+            task.wait(0.15)
+            local acceptBtn = missionMenu and missionMenu:FindFirstChild("MissionConfirm", true)
+            if acceptBtn then acceptBtn = acceptBtn:FindFirstChild("Confirmation", true) end
+            if acceptBtn then acceptBtn = acceptBtn:FindFirstChild("Accept", true) end
+            if acceptBtn then forceClickObject(acceptBtn) end
+        end
+        task.wait(0.05)
+    end
+end
+
+-- // CONNECTIONS
+ProximityPromptService.PromptShown:Connect(function(prompt)
+    if weedRunning and string.find(prompt.Parent.Name:lower(), "grass") then
+        prompt.MaxActivationDistance = 25
+    end
+end)
+
+weedBtn.MouseButton1Click:Connect(function()
+    weedRunning = not weedRunning
+    rogueRunning, dungeonRunning, bossRunning, killBossRunning = false, false, false, false
+    weedUpd(weedRunning); rogueUpd(false); bossUpd(false); dungeonUpd(false); killBossUpd(false)
+    if weedRunning then task.spawn(weedLoop) else setNoclip(false) end
+end)
+
+rogueBtn.MouseButton1Click:Connect(function()
+    rogueRunning = not rogueRunning
+    weedRunning, dungeonRunning, bossRunning, killBossRunning = false, false, false, false
+    rogueUpd(rogueRunning); weedUpd(false); bossUpd(false); dungeonUpd(false); killBossUpd(false)
+    if rogueRunning then task.spawn(rogueLoop) else setNoclip(false) end
+end)
+
+bossBtn.MouseButton1Click:Connect(function()
+    bossRunning = not bossRunning
+    weedRunning, rogueRunning, dungeonRunning, killBossRunning = false, false, false, false
+    bossUpd(bossRunning); weedUpd(false); rogueUpd(false); dungeonUpd(false); killBossUpd(false)
+    if bossRunning then task.spawn(bossLoop) else setNoclip(false) end
+end)
+
+dungeonBtn.MouseButton1Click:Connect(function()
+    dungeonRunning = not dungeonRunning
+    weedRunning, rogueRunning, bossRunning, killBossRunning = false, false, false, false
+    dungeonUpd(dungeonRunning); weedUpd(false); rogueUpd(false); bossUpd(false); killBossUpd(false)
+    if dungeonRunning then task.spawn(dungeonLoop) else setNoclip(false) end
+end)
+
+killBossBtn.MouseButton1Click:Connect(function()
+    killBossRunning = not killBossRunning
+    weedRunning, rogueRunning, bossRunning, dungeonRunning = false, false, false, false
+    killBossUpd(killBossRunning); weedUpd(false); rogueUpd(false); bossUpd(false); dungeonUpd(false)
+    if killBossRunning then task.spawn(killBossLoop) else setNoclip(false) end
+end)
+
+closeBtn.MouseButton1Click:Connect(function() 
+    weedRunning, rogueRunning, dungeonRunning, bossRunning, killBossRunning = false, false, false, false, false
+    setNoclip(false)
+    setCameraMode(false)
+    screenGui:Destroy() 
+end)
