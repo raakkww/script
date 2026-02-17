@@ -1,0 +1,1468 @@
+-- ============================================================
+--  PONG HUB v2  |  LocalScript
+-- ============================================================
+
+-- ============================================================
+--  PLACE ID GUARD
+-- ============================================================
+local REQUIRED_PLACE_ID = 127809219596493
+if game.PlaceId ~= REQUIRED_PLACE_ID then
+    error("[PongHub v2] This script only runs in the correct Pong game (PlaceId: " .. REQUIRED_PLACE_ID .. "). Current: " .. game.PlaceId)
+    return
+end
+
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService  = game:GetService("UserInputService")
+local TweenService      = game:GetService("TweenService")
+local RunService        = game:GetService("RunService")
+
+local plr       = Players.LocalPlayer
+local character = plr.Character or plr.CharacterAdded:Wait()
+
+-- ============================================================
+--  WORKSPACE REFERENCES
+-- ============================================================
+
+local plot             = workspace:FindFirstChild("Plot_" .. plr.Name)
+local tsunamisFolder   = workspace:FindFirstChild("Tsunamis")
+local wackyWavesFolder = workspace:FindFirstChild("WackyWaves")
+local VIPDoors         = workspace:FindFirstChild("VIP")
+local WinsFolder       = workspace:FindFirstChild("Wins")
+local ItemSpawners     = workspace:FindFirstChild("ItemSpawners")
+local CollectionZones  = workspace:FindFirstChild("CollectionZones")
+
+local Events       = ReplicatedStorage:WaitForChild("Events")
+local UpgradeEvent = Events:WaitForChild("RequestSlotUpgrade")
+local RebirthEvent = Events:WaitForChild("RequestRebirth")
+local SellEvent    = Events:WaitForChild("RequestSell")
+local SpeedEvent   = Events:WaitForChild("PurchaseSpeed")
+
+-- ============================================================
+--  STATE
+-- ============================================================
+
+local autoCollectEnabled = false
+local autoDestroyEnabled = false
+local autoPickUpEnabled  = false
+local autoRebirthEnabled = false
+local autoSellEnabled    = false
+local autoSpeedEnabled   = false
+local autoVipEnabled     = false
+local autoBossEnabled    = false
+local scriptDestroyed    = false
+local abortTasks         = false -- Flag to stop one-time actions
+
+-- Settings
+local autoPickUpRarity   = "Divine"
+local autoPickUpMutation = "All"
+local pickUpMethod       = "FireProximity"
+local pickUpReturn       = "Last Position" -- "Last Position" or "Plot Spawn"
+local actionDelay        = 0.5             -- Time between actions
+local carryAmount        = 1              -- How many items to carry before going to platform
+local bossDistance       = 6              -- Studs above boss head during fight
+
+-- Sell Settings
+local sellType           = "Equipped"
+local sellCustomMutation = "All"
+local sellCustomRarity   = "All"
+local sellCustomLevel    = ""
+
+local autoCollectThread  = nil
+local autoDestroyThread  = nil
+local autoPickUpThread   = nil
+local autoRebirthThread  = nil
+local autoSellThread     = nil
+local autoSpeedThread    = nil
+local autoVipThread      = nil
+local autoBossThread     = nil
+
+-- ============================================================
+--  PLATFORM & UTILS
+-- ============================================================
+
+local function getSafePlatform()
+    local pName = "PongHubSafePlat"
+    local p = workspace:FindFirstChild(pName)
+    if not p then
+        p = Instance.new("Part")
+        p.Name = pName
+        p.Size = Vector3.new(2048, 1, 2048)
+        p.Position = Vector3.new(-114, 0, -478)
+        p.Anchored = true
+        p.Transparency = 1 -- Invisible
+        p.CanCollide = true
+        p.Parent = workspace
+    end
+    return p
+end
+
+local SUFFIXES = {"K","M","B","T","Qa","Qi","Sx","Sp","Oc","No"}
+
+local function abbreviate(value, unabbreviate)
+    if unabbreviate then
+        local str = tostring(value):gsub("%$",""):gsub("%s+","")
+        for i = #SUFFIXES, 1, -1 do
+            local suf = SUFFIXES[i]
+            if str:sub(-#suf) == suf then
+                local num = tonumber(str:sub(1, -#suf-1))
+                if num then return num * (1000^i) end
+            end
+        end
+        return tonumber(str) or 0
+    else
+        local num = tonumber(value) or 0
+        if num == 0 then return "0" end
+        for i = #SUFFIXES, 1, -1 do
+            if math.abs(num) >= 1000^i then
+                local d = num / (1000^i)
+                return ((d%1==0) and tostring(math.floor(d)) or string.format("%.1f",d)) .. SUFFIXES[i]
+            end
+        end
+        return tostring(math.floor(num))
+    end
+end
+
+-- ============================================================
+--  CORE FUNCTIONS
+-- ============================================================
+
+-- DESTROY WAVES
+local function destroyWaves()
+    if not tsunamisFolder or not wackyWavesFolder then return 0 end
+    local n = 0
+    for _, v in ipairs(tsunamisFolder:GetChildren()) do
+        if v.Name ~= "Start" and v.Name ~= "End" then v:Destroy(); n += 1 end
+    end
+    for _, v in ipairs(wackyWavesFolder:GetChildren()) do
+        if v.Name ~= "Start" and v.Name ~= "End" then v:Destroy(); n += 1 end
+    end
+    return n
+end
+
+-- DESTROY VIP DOORS
+local function destroyVipDoors()
+    local n = 0
+    if VIPDoors then
+        for _, d in ipairs(VIPDoors:GetChildren()) do
+            if d.Name == "VIPPart" then d:Destroy(); n += 1 end
+        end
+    end
+    if WinsFolder then
+        for _, v in ipairs(WinsFolder:GetChildren()) do
+            v:Destroy(); n += 1
+        end
+    end
+    return n
+end
+
+-- COLLECT ALL
+local function collectAll()
+    abortTasks = false
+    if not plot then warn("No plot found."); return 0 end
+    local total = 0
+    local hrp = character:FindFirstChild("LeftLeg") or character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return 0 end
+
+    for _, t in ipairs(plot:GetDescendants()) do
+        if abortTasks then break end -- Stop check
+        if t.Name == "CollectTouch" then
+            local pl = t:FindFirstChild("CollectGUI")
+                and t.CollectGUI:FindFirstChild("CollectFrame")
+                and t.CollectGUI.CollectFrame:FindFirstChild("Price")
+            if pl then total += abbreviate(pl.Text, true) end
+            
+            firetouchinterest(hrp, t, 0)
+            task.wait(0.05)
+            firetouchinterest(hrp, t, 1)
+            task.wait(actionDelay / 5) -- Small delay for collection
+        end
+    end
+    return total
+end
+
+-- Helper: count CarryModel children on head
+local function countCarried(head)
+    if not head then return 0 end
+    local count = 0
+    for _, child in ipairs(head:GetChildren()) do
+        if child.Name:find("CarryModel") then
+            count += 1
+        end
+    end
+    return count
+end
+
+-- Helper: wait until carried items drop to zero or timeout
+local function waitUntilDropped(head, maxWait)
+    maxWait = maxWait or 5
+    local elapsed = 0
+    while countCarried(head) > 0 and elapsed < maxWait do
+        task.wait(0.1)
+        elapsed += 0.1
+    end
+end
+
+-- PICK UP ITEMS (with Carry Amount support)
+local function pickUp(rarity, mutation)
+    abortTasks = false
+    if not ItemSpawners then return 0 end
+    rarity   = rarity   or "All"
+    mutation = mutation or "All"
+
+    local hrp  = character:FindFirstChild("HumanoidRootPart")
+    local head = character:FindFirstChild("Head")
+    if not hrp then return 0 end
+
+    local safePlat   = getSafePlatform()
+    local startCFrame = hrp.CFrame -- Remember where we started
+    local n = 0
+    local carry = math.max(1, math.min(6, carryAmount)) -- Clamp 1-6
+
+    -- Build a flat list of all matching items first
+    local matchingItems = {}
+    for _, spawner in ipairs(ItemSpawners:GetChildren()) do
+        if rarity ~= "All" and spawner.Name ~= rarity then continue end
+        for _, item in ipairs(spawner:GetChildren()) do
+            if item.Name ~= "SpawnedItem" then continue end
+            local ig = item:FindFirstChild("InfoGUI")
+            local ih = item:FindFirstChild("HumanoidRootPart")
+            if not (ig and ih) then continue end
+            local pr = ih:FindFirstChildOfClass("ProximityPrompt")
+            if not pr then continue end
+            -- Mutation check
+            if mutation ~= "All" then
+                local ml = ig:FindFirstChild("TextLabels") and ig.TextLabels:FindFirstChild("Mutation")
+                if not ml or ml.Text ~= mutation then continue end
+            end
+            table.insert(matchingItems, {item = item, ih = ih, pr = pr})
+        end
+    end
+
+    local i = 1
+    while i <= #matchingItems do
+        if abortTasks then break end
+
+        local batch = {}
+        -- Build a batch of up to 'carry' items
+        for b = 1, carry do
+            if i > #matchingItems then break end
+            table.insert(batch, matchingItems[i])
+            i += 1
+        end
+
+        -- Pick up each item in the batch
+        for _, entry in ipairs(batch) do
+            if abortTasks then break end
+            local ih = entry.ih
+            local pr = entry.pr
+
+            -- 1. Teleport to Item
+            hrp.CFrame = ih.CFrame + Vector3.new(0, 1, 0)
+            task.wait(actionDelay)
+
+            -- 2. Fire Prompt
+            if pickUpMethod == "HoldPrompt" then
+                pr:InputHoldBegin()
+                task.wait((pr.HoldDuration or 0.5) + 0.1)
+                pr:InputHoldEnd()
+            else
+                fireproximityprompt(pr)
+            end
+            task.wait(0.2) -- Wait for server to attach item
+        end
+
+        -- After picking up the batch, go to the safe platform (teleport down 30 studs)
+        if abortTasks then break end
+
+        -- Teleport -30 studs down from current position
+        hrp.CFrame = hrp.CFrame + Vector3.new(0, -30, 0)
+        task.wait(0.1)
+
+        -- Wait until all carried CarryModel items are gone
+        waitUntilDropped(head, 5)
+
+        n += #batch
+    end
+
+    -- Return Logic
+    if not abortTasks then
+        if pickUpReturn == "Plot Spawn" and plot and plot:FindFirstChild("Spawn") then
+            hrp.CFrame = plot.Spawn.CFrame + Vector3.new(0, 3, 0)
+        else
+            hrp.CFrame = startCFrame -- Last Position
+        end
+    end
+
+    print("-- [PickUp] " .. n .. " items processed.")
+    return n
+end
+
+-- UPGRADE ALL
+local function upgradeAll(level)
+    abortTasks = false
+    if not plot then return end
+    level = tonumber(level) or 1
+    
+    for _, part in ipairs(plot:GetDescendants()) do
+        if abortTasks then break end -- Stop check
+        if part.Name ~= "UpgradePart" then continue end
+        
+        local slot  = part.Parent
+        local floor = slot and slot.Parent and slot.Parent.Parent
+        if not floor then continue end
+        
+        local levels = part:FindFirstChild("UpgradeGUI")
+            and part.UpgradeGUI:FindFirstChild("UpgradeButton")
+            and part.UpgradeGUI.UpgradeButton:FindFirstChild("Levels")
+        
+        if not levels then continue end
+
+        local target = "Level " .. level .. " > Level " .. (level+1)
+        
+        -- Individual slot loop
+        local t = 0
+        repeat
+            if abortTasks then break end
+            UpgradeEvent:FireServer(floor.Name, slot.Name)
+            task.wait(actionDelay / 2) -- Faster than pickup
+            t += 1
+        until levels.Text == target or t > 20
+    end
+end
+
+-- TELEPORT
+local function teleportToZone(partName)
+    local part = CollectionZones and CollectionZones:FindFirstChild(partName)
+    if not part then warn("Zone not found: " .. partName); return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+end
+
+-- REBIRTH
+local function tryRebirth()
+    local ls = plr:FindFirstChild("leaderstats")
+    local spVal = ls and ls:FindFirstChild("Speed")
+    local cur = spVal and tonumber(spVal.Value) or 0
+
+    local barLabel = plr.PlayerGui:FindFirstChild("GUI")
+        and plr.PlayerGui.GUI:FindFirstChild("Frames")
+        and plr.PlayerGui.GUI.Frames:FindFirstChild("Rebirth")
+        and plr.PlayerGui.GUI.Frames.Rebirth:FindFirstChild("Bar")
+        and plr.PlayerGui.GUI.Frames.Rebirth.Bar:FindFirstChild("Text")
+
+    if not barLabel then return false end
+    local required = tonumber(barLabel.Text:match("/(%d+)"))
+    if not required then return false end
+
+    if cur >= required then
+        RebirthEvent:FireServer()
+        return true
+    end
+    return false
+end
+
+-- SELL
+local function doSell(sType, customMut, customRar, customLvl)
+    sType = sType or "Equipped"
+
+    -- Teleport to Sell NPC before selling
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local sellMesh = workspace:FindFirstChild("Sell") and workspace.Sell:FindFirstChild("Mesh")
+    if hrp and sellMesh then
+        hrp.CFrame = CFrame.new(sellMesh.Position + Vector3.new(0, 3, 0))
+        task.wait(0.1)
+    end
+
+    if sType == "Custom" then
+        -- Move all tools from character to backpack first
+        local charTools = {}
+        for _, obj in ipairs(character:GetChildren()) do
+            if obj:IsA("Tool") then
+                table.insert(charTools, obj)
+            end
+        end
+        for _, tool in ipairs(charTools) do
+            tool.Parent = plr.Backpack
+        end
+
+        -- Check backpack for matching tools by attributes
+        local matchedTool = nil
+        for _, tool in ipairs(plr.Backpack:GetChildren()) do
+            if not tool:IsA("Tool") then continue end
+            local mutAttr = tool:GetAttribute("Mutation")
+            local rarAttr = tool:GetAttribute("Rarity")
+            local lvlAttr = tool:GetAttribute("Level")
+
+            local mutMatch = (customMut == "All" or mutAttr == customMut)
+            local rarMatch = (customRar == "All" or rarAttr == customRar)
+            local lvlMatch = (customLvl == "" or tostring(lvlAttr) == tostring(customLvl))
+
+            if mutMatch and rarMatch and lvlMatch then
+                matchedTool = tool
+                break
+            end
+        end
+
+        if matchedTool then
+            matchedTool.Parent = character
+            SellEvent:FireServer("Equipped")
+        else
+            warn("[PongHub] No matching tool found in backpack for Custom sell.")
+        end
+    else
+        SellEvent:FireServer(sType)
+    end
+end
+
+-- BUY SPEED
+local function buySpeed()
+    local gui = plr.PlayerGui:FindFirstChild("GUI")
+    if not gui then return end
+    local frames = gui:FindFirstChild("Frames")
+    if not frames then return end
+    local speedFrame = frames:FindFirstChild("Speed")
+    if not speedFrame then return end
+    local scrolling = speedFrame:FindFirstChild("Scrolling")
+    if not scrolling then return end
+
+    local ls = plr:FindFirstChild("leaderstats")
+    local moneyVal = ls and ls:FindFirstChild("Money")
+    local currentMoney = moneyVal and abbreviate(tostring(moneyVal.Value), true) or 0
+
+    local bestValue = -math.huge
+    local bestOption = nil
+
+    for _, desc in ipairs(scrolling:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Parent and desc.Parent.Name == "Money" then
+            local itemCost = abbreviate(desc.Text, true)
+            if itemCost <= currentMoney and itemCost > bestValue then
+                bestValue = itemCost
+                bestOption = desc.Parent.Parent.Parent -- TextLabel -> Money -> ... -> Option_N
+            end
+        end
+    end
+
+    if bestOption then
+        local optionNum = tonumber(bestOption.Name:match("_(%d+)"))
+        if optionNum then
+            SpeedEvent:FireServer(optionNum)
+            print("-- [Speed] Purchased speed option: " .. optionNum)
+        else
+            warn("[PongHub] Could not parse option number from: " .. bestOption.Name)
+        end
+    else
+        warn("[PongHub] No affordable speed upgrade found.")
+    end
+end
+
+-- ============================================================
+--  AUTO THREADS
+-- ============================================================
+
+local function startAutoCollect()
+    if autoCollectThread then task.cancel(autoCollectThread) end
+    autoCollectThread = task.spawn(function()
+        while autoCollectEnabled and not scriptDestroyed do collectAll(); task.wait(1) end
+    end)
+end
+local function stopAutoCollect()
+    autoCollectEnabled = false
+    if autoCollectThread then task.cancel(autoCollectThread); autoCollectThread = nil end
+end
+
+-- Wave destroy connections (event-driven — fires the instant a wave is added)
+local waveConns = {}
+local function startAutoDestroy()
+    -- Disconnect any old connections first
+    for _, c in ipairs(waveConns) do c:Disconnect() end
+    waveConns = {}
+
+    local function onChildAdded(child)
+        if not autoDestroyEnabled then return end
+        if child.Name == "Start" or child.Name == "End" then return end
+        -- Destroy as fast as possible on the next heartbeat to avoid race conditions
+        task.defer(function()
+            if child and child.Parent then child:Destroy() end
+        end)
+    end
+
+    if tsunamisFolder then
+        -- Destroy any already-existing waves immediately
+        for _, v in ipairs(tsunamisFolder:GetChildren()) do
+            if v.Name ~= "Start" and v.Name ~= "End" then v:Destroy() end
+        end
+        table.insert(waveConns, tsunamisFolder.ChildAdded:Connect(onChildAdded))
+    end
+    if wackyWavesFolder then
+        for _, v in ipairs(wackyWavesFolder:GetChildren()) do
+            if v.Name ~= "Start" and v.Name ~= "End" then v:Destroy() end
+        end
+        table.insert(waveConns, wackyWavesFolder.ChildAdded:Connect(onChildAdded))
+    end
+end
+local function stopAutoDestroy()
+    autoDestroyEnabled = false
+    for _, c in ipairs(waveConns) do c:Disconnect() end
+    waveConns = {}
+end
+
+local function startAutoPickUp()
+    if autoPickUpThread then task.cancel(autoPickUpThread) end
+    autoPickUpThread = task.spawn(function()
+        while autoPickUpEnabled and not scriptDestroyed do
+            pickUp(autoPickUpRarity, autoPickUpMutation); task.wait(1)
+        end
+    end)
+end
+local function stopAutoPickUp()
+    autoPickUpEnabled = false
+    if autoPickUpThread then task.cancel(autoPickUpThread); autoPickUpThread = nil end
+end
+
+local function startAutoRebirth()
+    if autoRebirthThread then task.cancel(autoRebirthThread) end
+    autoRebirthThread = task.spawn(function()
+        while autoRebirthEnabled and not scriptDestroyed do
+            tryRebirth(); task.wait(3)
+        end
+    end)
+end
+local function stopAutoRebirth()
+    autoRebirthEnabled = false
+    if autoRebirthThread then task.cancel(autoRebirthThread); autoRebirthThread = nil end
+end
+
+local function startAutoSell()
+    if autoSellThread then task.cancel(autoSellThread) end
+    autoSellThread = task.spawn(function()
+        while autoSellEnabled and not scriptDestroyed do
+            doSell(sellType, sellCustomMutation, sellCustomRarity, sellCustomLevel)
+            task.wait(1)
+        end
+    end)
+end
+local function stopAutoSell()
+    autoSellEnabled = false
+    if autoSellThread then task.cancel(autoSellThread); autoSellThread = nil end
+end
+
+local function startAutoSpeed()
+    if autoSpeedThread then task.cancel(autoSpeedThread) end
+    autoSpeedThread = task.spawn(function()
+        while autoSpeedEnabled and not scriptDestroyed do
+            buySpeed(); task.wait(3)
+        end
+    end)
+end
+local function stopAutoSpeed()
+    autoSpeedEnabled = false
+    if autoSpeedThread then task.cancel(autoSpeedThread); autoSpeedThread = nil end
+end
+
+local function startAutoVip()
+    if autoVipThread then task.cancel(autoVipThread) end
+    autoVipThread = task.spawn(function()
+        while autoVipEnabled and not scriptDestroyed do destroyVipDoors(); task.wait(5) end
+    end)
+end
+local function stopAutoVip()
+    autoVipEnabled = false
+    if autoVipThread then task.cancel(autoVipThread); autoVipThread = nil end
+end
+
+-- BOSS KILL
+local function killBoss()
+    -- Track the current character reference locally so we survive respawns
+    local function getHRP()
+        return character and character:FindFirstChild("HumanoidRootPart")
+    end
+    local function getHead()
+        return character and character:FindFirstChild("Head")
+    end
+
+    -- Save a return position at the start (updated on each new boss fight)
+    local preFightCFrame = nil
+
+    -- Tilt -90 degrees around X axis (face tilted downward toward boss)
+    local tiltCF = CFrame.Angles(math.rad(-90), 0, 0)
+
+    -- Handle respawn: reconnect character and re-equip bat
+    local respawnConn
+    respawnConn = plr.CharacterAdded:Connect(function(newChar)
+        character = newChar
+        -- Wait for HRP to be ready
+        newChar:WaitForChild("HumanoidRootPart", 10)
+        task.wait(0.2) -- brief settle after spawn
+
+        -- Re-equip bat
+        task.spawn(function()
+            local bat = character:FindFirstChild("Bat")
+            if not bat then
+                local batInBag = plr.Backpack:FindFirstChild("Bat")
+                if batInBag then
+                    batInBag.Parent = character
+                end
+            end
+        end)
+    end)
+
+    while autoBossEnabled and not scriptDestroyed do
+        local boss = workspace:FindFirstChild("WorldBoss")
+
+        if not boss then
+            -- No boss present — wait for one to appear
+            task.wait(1)
+            continue
+        end
+
+        local bossHead = boss:FindFirstChild("Head")
+        if not bossHead then task.wait(0.5); continue end
+
+        -- Save position before fight (only if we have a valid HRP)
+        local hrp = getHRP()
+        if hrp then
+            preFightCFrame = hrp.CFrame
+        end
+
+        -- Equip Bat tool if not already in character
+        local batInChar = character and character:FindFirstChild("Bat")
+        if not batInChar then
+            local batInBag = plr.Backpack:FindFirstChild("Bat")
+            if batInBag then
+                batInBag.Parent = character
+                task.wait(0.1)
+            end
+        end
+        local bat = character and character:FindFirstChild("Bat")
+
+        -- Stay above boss head and swing until dead
+        while autoBossEnabled and not scriptDestroyed do
+            boss = workspace:FindFirstChild("WorldBoss")
+            if not boss then break end -- Boss died/removed
+
+            bossHead = boss:FindFirstChild("Head")
+            if not bossHead then break end
+
+            hrp = getHRP()
+            if hrp then
+                -- Stay at configured distance above boss head, tilted -90° (facing down)
+                local targetPos = bossHead.Position + Vector3.new(0, bossDistance, 0)
+                hrp.CFrame = CFrame.new(targetPos) * tiltCF
+            else
+                -- Dead / respawning — just wait for character to come back
+                task.wait(0.1)
+                continue
+            end
+
+            -- Activate bat
+            bat = character and character:FindFirstChild("Bat")
+            if bat and bat.Parent == character then
+                bat:Activate()
+            elseif character then
+                -- Re-find bat in case it got unequipped
+                if not bat then
+                    local batInBag = plr.Backpack:FindFirstChild("Bat")
+                    if batInBag then batInBag.Parent = character; bat = character:FindFirstChild("Bat") end
+                end
+            end
+
+            task.wait() -- Minimum delay (next frame)
+        end
+
+        -- Boss gone — return to pre-fight position
+        hrp = getHRP()
+        if hrp and preFightCFrame then
+            hrp.CFrame = preFightCFrame
+        end
+
+        print("-- [Boss] WorldBoss defeated or gone. Waiting for next spawn.")
+        task.wait(1) -- Brief pause before checking again
+    end
+
+    -- Clean up respawn listener when boss auto is stopped
+    if respawnConn then respawnConn:Disconnect() end
+end
+
+local function startAutoBoss()
+    if autoBossThread then task.cancel(autoBossThread) end
+    autoBossThread = task.spawn(killBoss)
+end
+local function stopAutoBoss()
+    autoBossEnabled = false
+    if autoBossThread then task.cancel(autoBossThread); autoBossThread = nil end
+end
+
+-- ============================================================
+--  GUI SETUP
+-- ============================================================
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name           = "PongHubV2"
+screenGui.ResetOnSpawn   = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.IgnoreGuiInset = true
+screenGui.Parent         = plr.PlayerGui
+
+local C = {
+    BG      = Color3.fromRGB(13, 13, 20),
+    HEADER  = Color3.fromRGB(18, 18, 28),
+    SURF    = Color3.fromRGB(22, 22, 34),
+    SURF2   = Color3.fromRGB(30, 30, 46),
+    ACCENT  = Color3.fromRGB(80, 130, 255),
+    ACCENT2 = Color3.fromRGB(110, 75, 255),
+    SUCCESS = Color3.fromRGB(55, 200, 110),
+    DANGER  = Color3.fromRGB(220, 60, 60),
+    WARNING = Color3.fromRGB(235, 165, 45),
+    TEXT    = Color3.fromRGB(228, 228, 242),
+    MUTED   = Color3.fromRGB(110, 110, 145),
+    BORDER  = Color3.fromRGB(42, 42, 65),
+    TOG_OFF = Color3.fromRGB(48, 48, 72),
+    TOG_ON  = Color3.fromRGB(55, 200, 110),
+    REBIRTH = Color3.fromRGB(180, 80, 255),
+    SELL    = Color3.fromRGB(235, 165, 45),
+    SPEED   = Color3.fromRGB(80, 200, 180),
+    VIP     = Color3.fromRGB(255, 195, 0),
+    BOSS    = Color3.fromRGB(220, 60, 60),
+}
+
+-- ============================================================
+--  GUI HELPERS
+-- ============================================================
+
+local function corner(p, r)
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 8); c.Parent = p
+end
+local function stroke(p, col, t)
+    local s = Instance.new("UIStroke"); s.Color = col or C.BORDER; s.Thickness = t or 1; s.Parent = p
+end
+local function pad(p, t, b, l, r)
+    local u = Instance.new("UIPadding")
+    u.PaddingTop    = UDim.new(0, t or 6)
+    u.PaddingBottom = UDim.new(0, b or 6)
+    u.PaddingLeft   = UDim.new(0, l or 6)
+    u.PaddingRight  = UDim.new(0, r or 6)
+    u.Parent = p
+end
+local function vList(p, sp)
+    local l = Instance.new("UIListLayout")
+    l.FillDirection       = Enum.FillDirection.Vertical
+    l.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    l.VerticalAlignment   = Enum.VerticalAlignment.Top
+    l.Padding             = UDim.new(0, sp or 6)
+    l.SortOrder           = Enum.SortOrder.LayoutOrder
+    l.Parent = p; return l
+end
+local function tw(obj, props, dur)
+    TweenService:Create(obj,
+        TweenInfo.new(dur or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        props):Play()
+end
+
+-- Registry of currently-open dropdowns so they track the window while dragging
+-- Each entry: { listFrame, getAnchorRow } where getAnchorRow returns the row Frame
+local openDropdowns = {}
+RunService.RenderStepped:Connect(function()
+    for _, entry in ipairs(openDropdowns) do
+        local lf  = entry.listFrame
+        local row = entry.row
+        if lf and lf.Parent and row and row.Parent then
+            local abs = row.AbsolutePosition
+            local sz  = row.AbsoluteSize
+            lf.Position = UDim2.new(0, abs.X, 0, abs.Y + sz.Y + 2)
+        end
+    end
+end)
+
+local function makeDraggable(frame, handle)
+    handle = handle or frame
+    local dragging, ds, sp = false, nil, nil
+    handle.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; ds = i.Position; sp = frame.Position
+            i.Changed:Connect(function()
+                if i.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
+            or i.UserInputType == Enum.UserInputType.Touch) then
+            local d = i.Position - ds
+            frame.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
+        end
+    end)
+end
+
+-- ============================================================
+--  MAIN WINDOW
+-- ============================================================
+
+local anchor = Instance.new("Frame")
+anchor.Name        = "PongHubAnchor"
+anchor.AnchorPoint = Vector2.new(0.5, 0.5)
+anchor.Position    = UDim2.new(0.5, 0, 0.5, 0)
+anchor.Size        = UDim2.new(0.48, 0, 0.65, 0) -- Slightly taller
+anchor.BackgroundTransparency = 1
+anchor.Active      = false
+anchor.Parent      = screenGui
+
+local sc = Instance.new("UISizeConstraint")
+sc.MaxSize = Vector2.new(480, 580); sc.MinSize = Vector2.new(220, 260); sc.Parent = anchor
+
+local win = Instance.new("Frame")
+win.Size             = UDim2.new(1, 0, 1, 0)
+win.BackgroundColor3 = C.BG
+win.BorderSizePixel  = 0
+win.ClipsDescendants = true
+win.Active           = false
+win.Parent           = anchor
+corner(win, 12); stroke(win, C.BORDER, 1.5)
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 40); titleBar.BackgroundColor3 = C.HEADER
+titleBar.BorderSizePixel = 0; titleBar.Active = true; titleBar.ZIndex = 5; titleBar.Parent = win
+corner(titleBar, 12)
+
+local titleLbl = Instance.new("TextLabel")
+titleLbl.Size = UDim2.new(1,-80,1,0); titleLbl.Position = UDim2.new(0,20,0,0)
+titleLbl.BackgroundTransparency = 1; titleLbl.Text = ""
+titleLbl.TextColor3 = C.TEXT; titleLbl.Font = Enum.Font.GothamBold; titleLbl.TextSize = 15
+titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+titleLbl.Active = false; titleLbl.ZIndex = 6; titleLbl.Parent = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0,28,0,28); closeBtn.AnchorPoint = Vector2.new(1,0.5)
+closeBtn.Position = UDim2.new(1,-7,0.5,0); closeBtn.BackgroundColor3 = C.DANGER
+closeBtn.Text = "✕"; closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Font = Enum.Font.GothamBold; closeBtn.TextSize = 13
+closeBtn.AutoButtonColor = false; closeBtn.BorderSizePixel = 0
+closeBtn.Active = true; closeBtn.ZIndex = 7; closeBtn.Parent = titleBar
+corner(closeBtn, 7)
+closeBtn.MouseButton1Click:Connect(function() anchor.Visible = false end)
+
+makeDraggable(anchor, titleBar)
+
+-- Scroll
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, 0, 1, -40); scroll.Position = UDim2.new(0, 0, 0, 40)
+scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 4; scroll.ScrollBarImageColor3 = C.ACCENT
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0); scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.ClipsDescendants = false; scroll.Active = true; scroll.Parent = win
+vList(scroll, 0); pad(scroll, 10, 14, 12, 12)
+
+local dropOverlay = Instance.new("Frame")
+dropOverlay.Name = "DropOverlay"; dropOverlay.Size = UDim2.new(1,0,1,0)
+dropOverlay.BackgroundTransparency = 1; dropOverlay.Active = false
+dropOverlay.ZIndex = 100; dropOverlay.Parent = screenGui
+
+-- ============================================================
+--  COMPONENTS
+-- ============================================================
+
+local lo = 0
+local function nextLO() lo += 1; return lo end
+
+local function mkSection(icon, title)
+    local wrap = Instance.new("Frame")
+    wrap.Size = UDim2.new(1,0,0,28); wrap.BackgroundTransparency = 1
+    wrap.Active = false; wrap.LayoutOrder = nextLO(); wrap.Parent = scroll
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1,-12,1,0); lbl.Position = UDim2.new(0,10,0,0)
+    lbl.BackgroundTransparency = 1; lbl.Text = icon .. "  " .. title
+    lbl.TextColor3 = C.TEXT; lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Active = false; lbl.Parent = wrap
+end
+
+local function mkSpacer(h)
+    local f = Instance.new("Frame"); f.Size = UDim2.new(1,0,0,h or 6)
+    f.BackgroundTransparency = 1; f.Active = false; f.LayoutOrder = nextLO(); f.Parent = scroll
+end
+
+local function mkSep()
+    local f = Instance.new("Frame"); f.Size = UDim2.new(1,0,0,1)
+    f.BackgroundColor3 = C.BORDER; f.BorderSizePixel = 0; f.Active = false; f.LayoutOrder = nextLO(); f.Parent = scroll
+end
+
+local function mkBtn(parent, text, bgCol, txtCol)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1,0,0,38); btn.BackgroundColor3 = bgCol or C.ACCENT
+    btn.TextColor3 = txtCol or C.TEXT; btn.Text = text
+    btn.Font = Enum.Font.GothamBold; btn.TextSize = 13
+    btn.AutoButtonColor = false; btn.BorderSizePixel = 0
+    btn.Active = true; btn.LayoutOrder = nextLO(); btn.Parent = parent
+    corner(btn, 8)
+    return btn
+end
+
+local function mkInput(parent, labelTxt, default, onFocusLost)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1,0,0,38); row.BackgroundColor3 = C.SURF2
+    row.BorderSizePixel = 0; row.Active = false; row.LayoutOrder = nextLO(); row.Parent = parent
+    corner(row, 8); stroke(row)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.55,0,1,0); lbl.Position = UDim2.new(0,12,0,0)
+    lbl.BackgroundTransparency = 1; lbl.Text = labelTxt
+    lbl.TextColor3 = C.TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Active = false; lbl.Parent = row
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0.36,0,0,28); box.Position = UDim2.new(0.6,0,0.5,-14)
+    box.BackgroundColor3 = C.BG; box.Text = tostring(default or "")
+    box.TextColor3 = C.ACCENT; box.Font = Enum.Font.GothamBold; box.TextSize = 13
+    box.ClearTextOnFocus = false; box.BorderSizePixel = 0
+    box.Active = true; box.Parent = row
+    corner(box, 6); stroke(box)
+    
+    if onFocusLost then
+        box.FocusLost:Connect(function() onFocusLost(box.Text) end)
+    end
+    return row, box
+end
+
+-- mkInputHidden: like mkInput but the row starts invisible and height=0 to avoid gaps
+local function mkInputHidden(parent, labelTxt, default, onFocusLost)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1,0,0,0); row.BackgroundColor3 = C.SURF2
+    row.BorderSizePixel = 0; row.Active = false; row.LayoutOrder = nextLO()
+    row.ClipsDescendants = true; row.Visible = true -- Visible but 0 height
+    row.Parent = parent
+    corner(row, 8); stroke(row)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.55,0,0,38); lbl.Position = UDim2.new(0,12,0,0)
+    lbl.BackgroundTransparency = 1; lbl.Text = labelTxt
+    lbl.TextColor3 = C.TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Active = false; lbl.Parent = row
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0.36,0,0,28); box.Position = UDim2.new(0.6,0,0,5)
+    box.BackgroundColor3 = C.BG; box.Text = tostring(default or "")
+    box.TextColor3 = C.ACCENT; box.Font = Enum.Font.GothamBold; box.TextSize = 13
+    box.ClearTextOnFocus = false; box.BorderSizePixel = 0
+    box.Active = true; box.Parent = row
+    corner(box, 6); stroke(box)
+    
+    if onFocusLost then
+        box.FocusLost:Connect(function() onFocusLost(box.Text) end)
+    end
+    return row, box
+end
+
+local function mkDropdown(parent, labelTxt, options, default, onChange)
+    local selected = default or options[1]
+    local isOpen   = false
+    local ITEM_H   = 32
+
+    local placeholder = Instance.new("Frame")
+    placeholder.Size = UDim2.new(1,0,0,38); placeholder.BackgroundTransparency = 1
+    placeholder.ClipsDescendants = false; placeholder.Active = false
+    placeholder.LayoutOrder = nextLO(); placeholder.Parent = parent
+
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1,0,0,38); row.BackgroundColor3 = C.SURF2
+    row.BorderSizePixel = 0; row.Active = false; row.Parent = placeholder
+    corner(row, 8); stroke(row)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.45,0,1,0); lbl.Position = UDim2.new(0,12,0,0)
+    lbl.BackgroundTransparency = 1; lbl.Text = labelTxt
+    lbl.TextColor3 = C.TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Active = false; lbl.Parent = row
+
+    local selLbl = Instance.new("TextLabel")
+    selLbl.Size = UDim2.new(0.45,0,1,0); selLbl.Position = UDim2.new(0.45,0,0,0)
+    selLbl.BackgroundTransparency = 1; selLbl.Text = selected
+    selLbl.TextColor3 = C.ACCENT; selLbl.Font = Enum.Font.GothamBold; selLbl.TextSize = 13
+    selLbl.TextXAlignment = Enum.TextXAlignment.Right; selLbl.Active = false; selLbl.Parent = row
+
+    local listFrame = Instance.new("Frame")
+    listFrame.Size = UDim2.new(0,0,0,0); listFrame.BackgroundColor3 = C.SURF
+    listFrame.BorderSizePixel = 0; listFrame.ClipsDescendants = true
+    listFrame.ZIndex = 100; listFrame.Visible = false
+    listFrame.Active = true; listFrame.Parent = dropOverlay
+    corner(listFrame, 8); stroke(listFrame)
+    local ll = Instance.new("UIListLayout")
+    ll.Padding = UDim.new(0,2); ll.SortOrder = Enum.SortOrder.LayoutOrder; ll.Parent = listFrame
+    pad(listFrame, 4, 4, 4, 4)
+
+    local function toggle()
+        isOpen = not isOpen
+        if isOpen then
+            local abs = row.AbsolutePosition
+            local sz  = row.AbsoluteSize
+            listFrame.Position = UDim2.new(0, abs.X, 0, abs.Y + sz.Y + 2)
+            listFrame.Size = UDim2.new(0, sz.X, 0, 0)
+            listFrame.Visible = true
+            tw(listFrame, {Size=UDim2.new(0,sz.X,0, #options * (ITEM_H+2)+8)}, 0.15)
+            -- Register for live position tracking while window is dragged
+            table.insert(openDropdowns, {listFrame = listFrame, row = row})
+        else
+            tw(listFrame, {Size=UDim2.new(0,listFrame.AbsoluteSize.X,0,0)}, 0.12)
+            task.delay(0.13, function() listFrame.Visible = false end)
+            -- Unregister from tracker
+            for i, entry in ipairs(openDropdowns) do
+                if entry.listFrame == listFrame then
+                    table.remove(openDropdowns, i); break
+                end
+            end
+        end
+    end
+
+    local hit = Instance.new("TextButton")
+    hit.Size = UDim2.new(1,0,1,0); hit.BackgroundTransparency = 1; hit.Text = ""
+    hit.ZIndex = 10; hit.Active = true; hit.Parent = row
+    hit.MouseButton1Click:Connect(toggle)
+
+    for i, opt in ipairs(options) do
+        local ob = Instance.new("TextButton")
+        ob.Size = UDim2.new(1,0,0,ITEM_H); ob.BackgroundColor3 = C.SURF2; ob.Text = opt
+        ob.TextColor3 = (opt == selected) and C.ACCENT or C.TEXT
+        ob.Font = Enum.Font.Gotham; ob.TextSize = 13
+        ob.AutoButtonColor = false; ob.BorderSizePixel = 0
+        ob.ZIndex = 101; ob.LayoutOrder = i; ob.Active = true; ob.Parent = listFrame
+        corner(ob, 6)
+        ob.MouseButton1Click:Connect(function()
+            selected = opt; selLbl.Text = opt
+            toggle()
+            if onChange then onChange(opt) end
+        end)
+    end
+    return placeholder, function() return selected end
+end
+
+-- mkDropdownHidden: dropdown that starts with 0 height to avoid gaps
+local function mkDropdownHidden(parent, labelTxt, options, default, onChange)
+    local selected = default or options[1]
+    local isOpen   = false
+    local ITEM_H   = 32
+
+    local placeholder = Instance.new("Frame")
+    placeholder.Size = UDim2.new(1,0,0,0) -- Start at 0 height
+    placeholder.BackgroundTransparency = 1
+    placeholder.ClipsDescendants = true
+    placeholder.Active = false
+    placeholder.LayoutOrder = nextLO(); placeholder.Parent = parent
+
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1,0,0,38); row.BackgroundColor3 = C.SURF2
+    row.BorderSizePixel = 0; row.Active = false; row.Parent = placeholder
+    corner(row, 8); stroke(row)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.45,0,0,38); lbl.Position = UDim2.new(0,12,0,0)
+    lbl.BackgroundTransparency = 1; lbl.Text = labelTxt
+    lbl.TextColor3 = C.TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Active = false; lbl.Parent = row
+
+    local selLbl = Instance.new("TextLabel")
+    selLbl.Size = UDim2.new(0.45,0,0,38); selLbl.Position = UDim2.new(0.45,0,0,0)
+    selLbl.BackgroundTransparency = 1; selLbl.Text = selected
+    selLbl.TextColor3 = C.ACCENT; selLbl.Font = Enum.Font.GothamBold; selLbl.TextSize = 13
+    selLbl.TextXAlignment = Enum.TextXAlignment.Right; selLbl.Active = false; selLbl.Parent = row
+
+    local listFrame = Instance.new("Frame")
+    listFrame.Size = UDim2.new(0,0,0,0); listFrame.BackgroundColor3 = C.SURF
+    listFrame.BorderSizePixel = 0; listFrame.ClipsDescendants = true
+    listFrame.ZIndex = 100; listFrame.Visible = false
+    listFrame.Active = true; listFrame.Parent = dropOverlay
+    corner(listFrame, 8); stroke(listFrame)
+    local ll = Instance.new("UIListLayout")
+    ll.Padding = UDim.new(0,2); ll.SortOrder = Enum.SortOrder.LayoutOrder; ll.Parent = listFrame
+    pad(listFrame, 4, 4, 4, 4)
+
+    local function toggle()
+        isOpen = not isOpen
+        if isOpen then
+            local abs = row.AbsolutePosition
+            local sz  = row.AbsoluteSize
+            listFrame.Position = UDim2.new(0, abs.X, 0, abs.Y + sz.Y + 2)
+            listFrame.Size = UDim2.new(0, sz.X, 0, 0)
+            listFrame.Visible = true
+            tw(listFrame, {Size=UDim2.new(0,sz.X,0, #options * (ITEM_H+2)+8)}, 0.15)
+            table.insert(openDropdowns, {listFrame = listFrame, row = row})
+        else
+            tw(listFrame, {Size=UDim2.new(0,listFrame.AbsoluteSize.X,0,0)}, 0.12)
+            task.delay(0.13, function() listFrame.Visible = false end)
+            for i, entry in ipairs(openDropdowns) do
+                if entry.listFrame == listFrame then
+                    table.remove(openDropdowns, i); break
+                end
+            end
+        end
+    end
+
+    local hit = Instance.new("TextButton")
+    hit.Size = UDim2.new(1,0,0,38); hit.Position = UDim2.new(0,0,0,0)
+    hit.BackgroundTransparency = 1; hit.Text = ""
+    hit.ZIndex = 10; hit.Active = true; hit.Parent = row
+    hit.MouseButton1Click:Connect(toggle)
+
+    for i, opt in ipairs(options) do
+        local ob = Instance.new("TextButton")
+        ob.Size = UDim2.new(1,0,0,ITEM_H); ob.BackgroundColor3 = C.SURF2; ob.Text = opt
+        ob.TextColor3 = (opt == selected) and C.ACCENT or C.TEXT
+        ob.Font = Enum.Font.Gotham; ob.TextSize = 13
+        ob.AutoButtonColor = false; ob.BorderSizePixel = 0
+        ob.ZIndex = 101; ob.LayoutOrder = i; ob.Active = true; ob.Parent = listFrame
+        corner(ob, 6)
+        ob.MouseButton1Click:Connect(function()
+            selected = opt; selLbl.Text = opt
+            toggle()
+            if onChange then onChange(opt) end
+        end)
+    end
+
+    local function show(v)
+        if v then
+            tw(placeholder, {Size = UDim2.new(1,0,0,38+6)}, 0.15)
+        else
+            -- Close dropdown first if open
+            if isOpen then toggle() end
+            tw(placeholder, {Size = UDim2.new(1,0,0,0)}, 0.12)
+        end
+    end
+
+    return placeholder, function() return selected end, show
+end
+
+local function mkToggle(parent, text, init, onChange)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1,0,0,38); row.BackgroundColor3 = C.SURF2
+    row.BorderSizePixel = 0; row.Active = false; row.LayoutOrder = nextLO(); row.Parent = parent
+    corner(row, 8); stroke(row)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1,-62,1,0); lbl.Position = UDim2.new(0,12,0,0)
+    lbl.BackgroundTransparency = 1; lbl.Text = text
+    lbl.TextColor3 = C.TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Active = false; lbl.Parent = row
+    local track = Instance.new("Frame")
+    track.Size = UDim2.new(0,44,0,24); track.Position = UDim2.new(1,-54,0.5,-12)
+    track.BackgroundColor3 = init and C.TOG_ON or C.TOG_OFF
+    track.BorderSizePixel = 0; track.Active = false; track.Parent = row
+    corner(track, 12)
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0,20,0,20)
+    knob.Position = init and UDim2.new(0,22,0.5,-10) or UDim2.new(0,2,0.5,-10)
+    knob.BackgroundColor3 = Color3.new(1,1,1); knob.BorderSizePixel = 0
+    knob.Active = false; knob.Parent = track
+    corner(knob, 10)
+    local state = init or false
+    local hit = Instance.new("TextButton")
+    hit.Size = UDim2.new(1,0,1,0); hit.BackgroundTransparency = 1; hit.Text = ""
+    hit.ZIndex = 5; hit.Active = true; hit.Parent = row
+    hit.MouseButton1Click:Connect(function()
+        state = not state
+        tw(track, {BackgroundColor3 = state and C.TOG_ON or C.TOG_OFF})
+        tw(knob,  {Position = state and UDim2.new(0,22,0.5,-10) or UDim2.new(0,2,0.5,-10)})
+        if onChange then onChange(state) end
+    end)
+    return row
+end
+
+-- ============================================================
+--  BUILD UI CONTENT
+-- ============================================================
+
+-- STOP BUTTON
+mkSpacer(4)
+mkBtn(scroll, "⛔ STOP CURRENT ACTION", C.DANGER).MouseButton1Click:Connect(function()
+    abortTasks = true
+    print("-- [PongHub] Abort requested.")
+end)
+mkInput(scroll, "Action Delay (Sec)", tostring(actionDelay), function(txt)
+    local n = tonumber(txt)
+    if n and n >= 0 then actionDelay = n else actionDelay = 0.5 end
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- WAVES
+mkSection("🌊", "WAVES")
+mkBtn(scroll, "⚡  Destroy Waves Now", C.ACCENT).MouseButton1Click:Connect(destroyWaves)
+mkToggle(scroll, "Auto Destroy Waves", false, function(v)
+    autoDestroyEnabled = v; if v then startAutoDestroy() else stopAutoDestroy() end
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- VIP & WINS
+mkSection("🔑", "VIP & WINS")
+mkBtn(scroll, "🔑  Destroy VIP & Wins Now", C.VIP, C.BG).MouseButton1Click:Connect(destroyVipDoors)
+mkToggle(scroll, "Auto Destroy VIP & Wins", false, function(v)
+    autoVipEnabled = v; if v then startAutoVip() else stopAutoVip() end
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- COLLECT
+mkSection("💰", "COLLECT")
+mkBtn(scroll, "💰  Collect All Now", C.SUCCESS, C.BG).MouseButton1Click:Connect(collectAll)
+mkToggle(scroll, "Auto Collect All", false, function(v)
+    autoCollectEnabled = v; if v then startAutoCollect() else stopAutoCollect() end
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- PICK UP
+local rars = {"All","Common","Uncommon","Rare","Epic","Legendary","Mythical","Secret","Celestial","Divine"}
+local muts = {"All","Normal","Golden","Diamond","Ruby","Neon","Lightning"}
+local rets = {"Last Position", "Plot Spawn"}
+
+mkSection("📦", "PICK UP")
+mkDropdown(scroll, "Rarity", rars, "Divine", function(v) autoPickUpRarity = v end)
+mkDropdown(scroll, "Mutation", muts, "All", function(v) autoPickUpMutation = v end)
+mkDropdown(scroll, "Return To", rets, "Last Position", function(v) pickUpReturn = v end)
+mkDropdown(scroll, "Method", {"FireProximity", "HoldPrompt"}, "FireProximity", function(v) pickUpMethod = v end)
+mkInput(scroll, "Carry Amount (1-6)", tostring(carryAmount), function(txt)
+    local n = tonumber(txt)
+    if n then carryAmount = math.max(1, math.min(6, math.floor(n))) end
+end)
+
+mkBtn(scroll, "📦  Pick Up Now", C.ACCENT).MouseButton1Click:Connect(function()
+    task.spawn(function() pickUp(autoPickUpRarity, autoPickUpMutation) end)
+end)
+mkToggle(scroll, "Auto Pick Up", false, function(v)
+    autoPickUpEnabled = v; if v then startAutoPickUp() else stopAutoPickUp() end
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- UPGRADE
+mkSection("⬆", "UPGRADE")
+local _, lvlBox = mkInput(scroll, "Target Level", "25")
+mkBtn(scroll, "⬆  Upgrade All Slots", C.ACCENT2).MouseButton1Click:Connect(function()
+    task.spawn(function() upgradeAll(tonumber(lvlBox.Text) or 25) end)
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- SELL
+mkSection("💵", "SELL")
+
+-- Sell type dropdown - drives visibility of custom fields
+local sellTypeOptions = {"Equipped", "Inventory", "Custom"}
+
+-- Custom fields (hidden by default)
+local customRarDD, getCustomRar, showCustomRar = mkDropdownHidden(scroll, "Rarity", rars, "All", function(v)
+    sellCustomRarity = v
+end)
+local customMutDD, getCustomMut, showCustomMut = mkDropdownHidden(scroll, "Mutation", muts, "All", function(v)
+    sellCustomMutation = v
+end)
+
+-- Hidden level input
+local customLvlRow, customLvlBox = mkInputHidden(scroll, "Level", "", function(txt)
+    sellCustomLevel = txt
+end)
+
+local function setCustomVisible(visible)
+    showCustomRar(visible)
+    showCustomMut(visible)
+    if visible then
+        tw(customLvlRow, {Size = UDim2.new(1,0,0,38)}, 0.15)
+    else
+        tw(customLvlRow, {Size = UDim2.new(1,0,0,0)}, 0.12)
+    end
+end
+
+-- Sell type dropdown (placed above the hidden rows by LayoutOrder)
+-- We need to insert BEFORE the hidden rows, so we save LayoutOrder before them
+-- Re-assign the sell dropdown's LayoutOrder to come before custom fields
+local sellTypeDD = Instance.new("Frame")
+sellTypeDD.Size = UDim2.new(1,0,0,38); sellTypeDD.BackgroundTransparency = 1
+sellTypeDD.ClipsDescendants = false; sellTypeDD.Active = false
+sellTypeDD.LayoutOrder = nextLO()
+
+-- Move customRarDD, customMutDD, customLvlRow AFTER the sell type in layout order
+-- (they were already created with nextLO so order is correct: sellTypeDD -> rarDD -> mutDD -> lvlRow)
+-- Actually, we need sellTypeDD first. Let's set its LayoutOrder manually before the others.
+-- Since mkDropdownHidden already called nextLO() to reserve numbers, we insert sellTypeDD parent now.
+sellTypeDD.Parent = scroll
+
+do
+    local isOpen = false
+    local ITEM_H = 32
+    local options = sellTypeOptions
+    local selected = "Equipped"
+
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1,0,0,38); row.BackgroundColor3 = C.SURF2
+    row.BorderSizePixel = 0; row.Active = false; row.Parent = sellTypeDD
+    corner(row, 8); stroke(row)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.45,0,1,0); lbl.Position = UDim2.new(0,12,0,0)
+    lbl.BackgroundTransparency = 1; lbl.Text = "Sell Type"
+    lbl.TextColor3 = C.TEXT; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Active = false; lbl.Parent = row
+
+    local selLbl = Instance.new("TextLabel")
+    selLbl.Size = UDim2.new(0.45,0,1,0); selLbl.Position = UDim2.new(0.45,0,0,0)
+    selLbl.BackgroundTransparency = 1; selLbl.Text = selected
+    selLbl.TextColor3 = C.ACCENT; selLbl.Font = Enum.Font.GothamBold; selLbl.TextSize = 13
+    selLbl.TextXAlignment = Enum.TextXAlignment.Right; selLbl.Active = false; selLbl.Parent = row
+
+    local listFrame = Instance.new("Frame")
+    listFrame.Size = UDim2.new(0,0,0,0); listFrame.BackgroundColor3 = C.SURF
+    listFrame.BorderSizePixel = 0; listFrame.ClipsDescendants = true
+    listFrame.ZIndex = 100; listFrame.Visible = false
+    listFrame.Active = true; listFrame.Parent = dropOverlay
+    corner(listFrame, 8); stroke(listFrame)
+    local ll = Instance.new("UIListLayout")
+    ll.Padding = UDim.new(0,2); ll.SortOrder = Enum.SortOrder.LayoutOrder; ll.Parent = listFrame
+    pad(listFrame, 4, 4, 4, 4)
+
+    local function toggle()
+        isOpen = not isOpen
+        if isOpen then
+            local abs = row.AbsolutePosition
+            local sz  = row.AbsoluteSize
+            listFrame.Position = UDim2.new(0, abs.X, 0, abs.Y + sz.Y + 2)
+            listFrame.Size = UDim2.new(0, sz.X, 0, 0)
+            listFrame.Visible = true
+            tw(listFrame, {Size=UDim2.new(0,sz.X,0, #options * (ITEM_H+2)+8)}, 0.15)
+            table.insert(openDropdowns, {listFrame = listFrame, row = row})
+        else
+            tw(listFrame, {Size=UDim2.new(0,listFrame.AbsoluteSize.X,0,0)}, 0.12)
+            task.delay(0.13, function() listFrame.Visible = false end)
+            for i, entry in ipairs(openDropdowns) do
+                if entry.listFrame == listFrame then
+                    table.remove(openDropdowns, i); break
+                end
+            end
+        end
+    end
+
+    local hit = Instance.new("TextButton")
+    hit.Size = UDim2.new(1,0,1,0); hit.BackgroundTransparency = 1; hit.Text = ""
+    hit.ZIndex = 10; hit.Active = true; hit.Parent = row
+    hit.MouseButton1Click:Connect(toggle)
+
+    for i, opt in ipairs(options) do
+        local ob = Instance.new("TextButton")
+        ob.Size = UDim2.new(1,0,0,ITEM_H); ob.BackgroundColor3 = C.SURF2; ob.Text = opt
+        ob.TextColor3 = (opt == selected) and C.ACCENT or C.TEXT
+        ob.Font = Enum.Font.Gotham; ob.TextSize = 13
+        ob.AutoButtonColor = false; ob.BorderSizePixel = 0
+        ob.ZIndex = 101; ob.LayoutOrder = i; ob.Active = true; ob.Parent = listFrame
+        corner(ob, 6)
+        ob.MouseButton1Click:Connect(function()
+            selected = opt; selLbl.Text = opt; sellType = opt
+            toggle()
+            setCustomVisible(opt == "Custom")
+        end)
+    end
+end
+
+-- Move custom hidden rows' LayoutOrder AFTER the sell type dropdown
+-- (already done since sellTypeDD was created before them with nextLO reserving slots)
+
+mkBtn(scroll, "💵  Sell Now", C.SELL, C.BG).MouseButton1Click:Connect(function()
+    doSell(sellType, sellCustomMutation, sellCustomRarity, sellCustomLevel)
+end)
+mkToggle(scroll, "Auto Sell", false, function(v)
+    autoSellEnabled = v; if v then startAutoSell() else stopAutoSell() end
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- SPEED
+mkSection("🚀", "SPEED")
+mkBtn(scroll, "🚀  Buy Speed Now", C.SPEED, C.BG).MouseButton1Click:Connect(function()
+    task.spawn(buySpeed)
+end)
+mkToggle(scroll, "Auto Buy Speed", false, function(v)
+    autoSpeedEnabled = v; if v then startAutoSpeed() else stopAutoSpeed() end
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- BOSS
+mkSection("💀", "BOSS")
+mkInput(scroll, "Boss Distance (Studs)", tostring(bossDistance), function(txt)
+    local n = tonumber(txt)
+    if n and n > 0 then bossDistance = n end
+end)
+mkToggle(scroll, "Auto Kill Boss", false, function(v)
+    autoBossEnabled = v; if v then startAutoBoss() else stopAutoBoss() end
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- REBIRTH
+mkSection("✨", "REBIRTH")
+mkBtn(scroll, "✨  Rebirth Now", C.REBIRTH).MouseButton1Click:Connect(tryRebirth)
+mkToggle(scroll, "Auto Rebirth", false, function(v)
+    autoRebirthEnabled = v; if v then startAutoRebirth() else stopAutoRebirth() end
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- MISC
+mkSection("⚙", "MISC")
+mkBtn(scroll, "💀  Destroy GUI", C.DANGER).MouseButton1Click:Connect(function()
+    scriptDestroyed = true
+    stopAutoCollect(); stopAutoDestroy(); stopAutoPickUp(); stopAutoRebirth()
+    stopAutoSell(); stopAutoSpeed(); stopAutoVip(); stopAutoBoss()
+    screenGui:Destroy()
+end)
+mkSpacer(4); mkSep(); mkSpacer(4)
+
+-- CREDITS
+mkSection("★", "CREDITS")
+
+do
+    -- Credits text
+    local creditLbl = Instance.new("TextLabel")
+    creditLbl.Size = UDim2.new(1,0,0,28); creditLbl.BackgroundTransparency = 1
+    creditLbl.Text = ""
+    creditLbl.TextColor3 = C.MUTED; creditLbl.Font = Enum.Font.Gotham; creditLbl.TextSize = 12
+    creditLbl.TextXAlignment = Enum.TextXAlignment.Center
+    creditLbl.Active = false; creditLbl.LayoutOrder = nextLO(); creditLbl.Parent = scroll
+
+    -- Helper: icon button with image on left edge
+    local function mkIconBtn(iconId, btnText, bgCol, callback)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1,0,0,38); btn.BackgroundColor3 = bgCol or C.SURF2
+        btn.TextColor3 = C.TEXT; btn.Text = btnText
+        btn.Font = Enum.Font.GothamBold; btn.TextSize = 13
+        btn.AutoButtonColor = false; btn.BorderSizePixel = 0
+        btn.Active = true; btn.LayoutOrder = nextLO(); btn.Parent = scroll
+        corner(btn, 8); stroke(btn)
+
+        -- Icon image on left edge
+        local icon = Instance.new("ImageLabel")
+        icon.Size = UDim2.new(0,24,0,24)
+        icon.Position = UDim2.new(0,8,0.5,-12)
+        icon.BackgroundTransparency = 1
+        icon.Image = "rbxassetid://" .. iconId
+        icon.ScaleType = Enum.ScaleType.Fit
+        icon.ZIndex = btn.ZIndex + 1
+        icon.Parent = btn
+
+        btn.MouseButton1Click:Connect(function()
+            pcall(callback)
+        end)
+        return btn
+    end
+
+-- SIDE TOGGLE
+local sideBtn = Instance.new("Frame")
+sideBtn.Name = "SideToggle"; sideBtn.AnchorPoint = Vector2.new(1, 0.5)
+sideBtn.Position = UDim2.new(1,-4,0.5,0); sideBtn.Size = UDim2.new(0,26,0,58)
+sideBtn.BackgroundColor3 = C.HEADER; sideBtn.BorderSizePixel = 0
+sideBtn.Active = false; sideBtn.Parent = screenGui
+corner(sideBtn, 8); stroke(sideBtn)
+local sideAccent = Instance.new("Frame")
+sideAccent.Size = UDim2.new(0,3,0.5,0); sideAccent.Position = UDim2.new(0,0,0.25,0)
+sideAccent.BackgroundColor3 = C.ACCENT; sideAccent.BorderSizePixel = 0
+sideAccent.Active = false; sideAccent.Parent = sideBtn
+corner(sideAccent, 2)
+local sideHit = Instance.new("TextButton")
+sideHit.Size = UDim2.new(1,0,1,0); sideHit.BackgroundTransparency = 1
+sideHit.Text = ""; sideHit.Active = true; sideHit.Parent = sideBtn
+sideHit.MouseButton1Click:Connect(function() anchor.Visible = not anchor.Visible end)
+
+-- RESPAWN
+plr.CharacterAdded:Connect(function(c)
+    character = c
+    plot = workspace:FindFirstChild("Plot_" .. plr.Name)
+end)
+
+print("-- [PongHub v2] Loaded.")
