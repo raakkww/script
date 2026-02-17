@@ -1,0 +1,139 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local localPlayer = Players.LocalPlayer
+
+-- [[ SETTINGS ]]
+local Settings = {
+    HitboxEnabled = true,
+    TPWalkEnabled = true,
+    FullbrightEnabled = true,
+    HeadSize = 12,
+    TPWalkSpeed = 0.1
+}
+
+-- [[ UI CONTAINER ]]
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DreamNotifications"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+-- [[ NOTIFICATION FUNCTION (Self-Deleting) ]]
+local function notify(text)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 280, 0, 70)
+    frame.Position = UDim2.new(1, 20, 0.85, 0) -- Starts off-screen
+    frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    
+    local accent = Instance.new("Frame")
+    accent.Size = UDim2.new(0, 4, 1, 0)
+    accent.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    accent.BorderSizePixel = 0
+    accent.Parent = frame
+    
+    local titleL = Instance.new("TextLabel")
+    titleL.Size = UDim2.new(1, -20, 0.4, 0)
+    titleL.Position = UDim2.new(0, 15, 0.15, 0)
+    titleL.BackgroundTransparency = 1
+    titleL.Text = ""
+    titleL.TextColor3 = Color3.fromRGB(255, 0, 0)
+    titleL.Font = Enum.Font.GothamBold
+    titleL.TextSize = 14
+    titleL.TextXAlignment = Enum.TextXAlignment.Left
+    titleL.Parent = frame
+
+    local descL = Instance.new("TextLabel")
+    descL.Size = UDim2.new(1, -20, 0.4, 0)
+    descL.Position = UDim2.new(0, 15, 0.5, 0)
+    descL.BackgroundTransparency = 1
+    descL.Text = text .. " | by dragongod28xd"
+    descL.TextColor3 = Color3.fromRGB(200, 200, 200)
+    descL.Font = Enum.Font.Gotham
+    descL.TextSize = 12
+    descL.TextXAlignment = Enum.TextXAlignment.Left
+    descL.Parent = frame
+
+    -- Animate In
+    TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(1, -300, 0.85, 0) }):Play()
+    
+    -- Self-Destruct Logic
+    task.delay(3, function()
+        local out = TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(1, 20, 0.85, 0), BackgroundTransparency = 1 })
+        out:Play()
+        out.Completed:Wait()
+        frame:Destroy()
+    end)
+end
+
+-- [[ TOGGLE LOGIC ]]
+local function toggleHitbox()
+    Settings.HitboxEnabled = not Settings.HitboxEnabled
+    if not Settings.HitboxEnabled then
+        for _, v in pairs(Players:GetPlayers()) do
+            pcall(function() v.Character.Head.Size = Vector3.new(1, 1, 1) end)
+        end
+    end
+    notify("Hitbox: " .. (Settings.HitboxEnabled and "ENABLED" or "DISABLED"))
+end
+
+local function toggleTP()
+    Settings.TPWalkEnabled = not Settings.TPWalkEnabled
+    notify("TPWalk: " .. (Settings.TPWalkEnabled and "ENABLED" or "DISABLED"))
+end
+
+local function toggleFullbright()
+    Settings.FullbrightEnabled = not Settings.FullbrightEnabled
+    if Settings.FullbrightEnabled then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.GlobalShadows = false
+        notify("Fullbright: ON")
+    else
+        Lighting.Brightness = 1
+        Lighting.GlobalShadows = true
+        notify("Fullbright: OFF")
+    end
+end
+
+-- [[ KEYBOARD LISTENER ]]
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.P then toggleHitbox() end
+    if input.KeyCode == Enum.KeyCode.RightShift then toggleFullbright() end
+end)
+
+-- [[ LOOPS ]]
+RunService.RenderStepped:Connect(function()
+    if Settings.HitboxEnabled then
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= localPlayer and v.Character and v.Character:FindFirstChild("Head") then
+                local h = v.Character.Head
+                h.Size = Vector3.new(Settings.HeadSize, Settings.HeadSize, Settings.HeadSize)
+                h.Transparency = 0.8
+                h.BrickColor = BrickColor.new("Bright red")
+                h.Material = Enum.Material.Neon
+                h.CanCollide = false
+            end
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if Settings.TPWalkEnabled then
+        pcall(function()
+            local char = localPlayer.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hum and hrp and hum.MoveDirection.Magnitude > 0 then
+                hrp.CFrame = hrp.CFrame + (hum.MoveDirection * Settings.TPWalkSpeed)
+            end
+        end)
+    end
+end)
+
+notify("Script Active")
