@@ -1,0 +1,23 @@
+-- made by b ending with n
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local BuyItemRemote = ReplicatedStorage:WaitForChild("BuyItem")
+
+while true do
+    for i = 1, 18 do
+        local args = {
+            [1] = i, 
+            [2] = 0  
+        }
+        
+        
+        BuyItemRemote:FireServer(unpack(args))
+        
+        
+        task.wait(0.05) 
+    end
+    
+    print("give it a sec for next burst in like 5s")
+    
+    
+    task.wait(5) 
+end
