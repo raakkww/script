@@ -1,0 +1,255 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Dive Down",
+   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+   LoadingTitle = "Rayfield Interface Suite",
+   LoadingSubtitle = "by Zayn",
+   ShowText = "Zcript", -- for mobile users to unhide Rayfield, change if you'd like
+   Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
+
+   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
+
+   DisableRayfieldPrompts = false,
+   ConfigurationSaving = {
+      Enabled = false,
+      FolderName = nil, -- Create a custom folder for your hub/game
+      FileName = "Big Hub"
+   },
+
+   KeySystem = false, -- Set this to true to use our key system
+   KeySettings = {
+      Title = "Untitled",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided", -- Use this to tell the user how to get a key
+      FileName = "Key", -- It is recommended to use something unique, as other scripts using Rayfield may overwrite your key file
+      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
+      GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
+      Key = {"Hello"} -- List of keys that the system will accept, can be RAW file links (pastebin, github, etc.) or simple strings ("hello", "key22")
+   }
+})
+
+
+Rayfield:Notify({
+   Title = "Made by Zayn",
+   Content = "Script is free and keyless!",
+   Duration = 4,
+   Image = 4483362458,
+})
+
+local Tab = Window:CreateTab("Farm", 4483362458) 
+
+
+
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local rootPart = char:WaitForChild("HumanoidRootPart")
+
+
+local Toggle = Tab:CreateToggle({
+   Name = "Auto highest value fish",
+   CurrentValue = false,
+   Flag = "AutoBestFish",
+   Callback = function(Value)
+      getgenv().Best = Value
+
+      if Value then
+         task.spawn(function()
+            while getgenv().Best do
+               pcall(function() 
+
+                  local player = game.Players.LocalPlayer
+                  local char = player.Character
+                  if not char then return end
+
+                  local rootPart = char:FindFirstChild("HumanoidRootPart")
+                  if not rootPart then return end
+
+                  local oldCF = rootPart.CFrame
+
+                  local highV = -math.huge
+                  local highF = nil
+
+                  for _, v in pairs(workspace.Game.Fishes:GetChildren()) do
+                     if v:IsA("Model") then
+                        local cps = v:GetAttribute("CashPerSec")
+                        if cps and cps > highV then
+                           highV = cps
+                           highF = v
+                        end
+                     end
+                  end
+
+                  if highF then
+                     local fishRoot = highF:FindFirstChild("RootPart", true)
+                     if fishRoot then
+                        local prompt = fishRoot:FindFirstChildWhichIsA("ProximityPrompt", true)
+                        if prompt then
+                           rootPart.CFrame = fishRoot.CFrame
+                           task.wait(0.3)
+                           fireproximityprompt(prompt)
+                           task.wait(0.4)
+                           rootPart.CFrame = oldCF
+                        end
+                     end
+                  end
+
+               end)
+
+               task.wait(0.2)
+            end
+         end)
+      end
+   end,
+})
+
+
+
+
+
+
+local Button = Tab:CreateButton({
+    Name = "TP back to surface",  -- fixed the missing quote
+    Callback = function()
+        rootPart.CFrame = CFrame.new(-1929.92, 2544.52, -1430.08)
+    end,
+})
+
+local Section = Tab:CreateSection("Shop")
+
+
+local Toggle = Tab:CreateToggle({
+    Name = "Auto buy Worm",
+    CurrentValue = false,
+    Flag = "Worm",
+    Callback = function(Value)
+        getgenv().AutoBuyWorm = Value
+
+        task.spawn(function()
+            local player = game.Players.LocalPlayer
+            local worm = player.PlayerGui.PersistentUI.Shops.Treat.Content.ScrollingFrame.Worm
+            local remote = game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent
+
+            while true do
+                if getgenv().AutoBuyWorm then
+                    local stock = worm:GetAttribute("Stock") or 0
+                    while stock > 0 do
+                        remote:FireServer(buffer.fromstring("\004\005Treat\004Worm"))
+                        task.wait(0.05)
+                        stock = worm:GetAttribute("Stock") or 0
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end,
+})
+
+local Toggle = Tab:CreateToggle({
+    Name = "Auto buy Snail",
+    CurrentValue = false,
+    Flag = "Snail",
+    Callback = function(Value)
+        getgenv().AutoBuySnail = Value
+
+        task.spawn(function()
+            local player = game.Players.LocalPlayer
+            local snail = player.PlayerGui.PersistentUI.Shops.Treat.Content.ScrollingFrame.Snail
+            local remote = game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent
+
+            while true do
+                if getgenv().AutoBuySnail then
+                    local stock = snail:GetAttribute("Stock") or 0
+                    while stock > 0 do
+                        remote:FireServer(buffer.fromstring("\004\005Treat\005Snail"))
+                        task.wait(0.05)
+                        stock = snail:GetAttribute("Stock") or 0
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end,
+})
+
+
+local Toggle = Tab:CreateToggle({
+    Name = "Auto buy Spider",
+    CurrentValue = false,
+    Flag = "Spider",
+    Callback = function(Value)
+        getgenv().AutoBuySpider = Value
+
+        task.spawn(function()
+            local player = game.Players.LocalPlayer
+            local spider = player.PlayerGui.PersistentUI.Shops.Treat.Content.ScrollingFrame.Spider
+            local remote = game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent
+
+            while true do
+                if getgenv().AutoBuySpider then
+                    local stock = spider:GetAttribute("Stock") or 0
+                    while stock > 0 do
+                        remote:FireServer(buffer.fromstring("\004\005Treat\006Spider"))
+                        task.wait(0.05)
+                        stock = spider:GetAttribute("Stock") or 0
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end,
+})
+
+local Toggle = Tab:CreateToggle({
+    Name = "Auto buy Ladybug",
+    CurrentValue = false,
+    Flag = "Ladybug",
+    Callback = function(Value)
+        getgenv().AutoBuyLadybug = Value
+
+        task.spawn(function()
+            local player = game.Players.LocalPlayer
+            local ladybug = player.PlayerGui.PersistentUI.Shops.Treat.Content.ScrollingFrame.Ladybug
+            local remote = game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent
+
+            while true do
+                if getgenv().AutoBuyLadybug then
+                    local stock = ladybug:GetAttribute("Stock") or 0
+                    while stock > 0 do
+                        remote:FireServer(buffer.fromstring("\004\005Treat\aLadybug"))
+                        task.wait(0.05)
+                        stock = ladybug:GetAttribute("Stock") or 0
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end,
+})
+
+local Toggle = Tab:CreateToggle({
+    Name = "Auto buy Butterfly",
+    CurrentValue = false,
+    Flag = "Butterfly",
+    Callback = function(Value)
+        getgenv().AutoBuyButterfly = Value
+
+        task.spawn(function()
+            local player = game.Players.LocalPlayer
+            local butterfly = player.PlayerGui.PersistentUI.Shops.Treat.Content.ScrollingFrame.Butterfly
+            local remote = game:GetService("ReplicatedStorage").Packets.Packet.RemoteEvent
+
+            while true do
+                if getgenv().AutoBuyButterfly then
+                    local stock = butterfly:GetAttribute("Stock") or 0
+                    while stock > 0 do
+                        remote:FireServer(buffer.fromstring("\004\005Treat\tButterfly"))
+                        task.wait(0.05)
+                        stock = butterfly:GetAttribute("Stock") or 0
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end,
+})
