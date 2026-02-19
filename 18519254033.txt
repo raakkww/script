@@ -1,0 +1,759 @@
+-- LocalScript (place in StarterGui)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+if not player then return end
+
+-- ==================== PATH CONFIGURATION ====================
+local PATH_STRINGS = {
+	Boss = "Models.Chara",
+	FallingCrate = "Visuals.fallingcrate",
+	Crate = "Visuals.Crate",
+	Portal = "Visuals.Portal"
+}
+
+-- ==================== CUSTOM NAMES ====================
+local CUSTOM_NAMES = {
+	Boss = "â  Chara â ",
+	FallingCrate = "ð¦ Falling Crate",
+	Crate = "ð¦ Crate",
+	Portal = "ð Mystic Portal"
+}
+
+-- ==================== SOUNDS ====================
+local SOUND_VOLUME = 1.5
+local SOUNDS = {
+	BossSpawn = "rbxassetid://127863687687397",
+	LowHealth = "rbxassetid://104973625032761",
+	BossDeath = "rbxassetid://73834717157581"
+}
+
+local function getObjectFromPath(pathString)
+	local current = workspace
+	for part in string.gmatch(pathString, "[^%.]+") do
+		current = current:FindFirstChild(part)
+		if not current then return nil end
+	end
+	return current
+end
+
+-- Data stores
+local espCache = {}
+local connections = {}
+local soundCache = {}
+
+local bossWasPresent = false
+local lowHealthPlayed = {}          -- Ð¾Ð±ÑÐµÐºÑ -> true (Ð¾Ð´Ð¸Ð½ ÑÐ°Ð· Ð·Ð° Ð¶Ð¸Ð·Ð½Ñ)
+local lastLowHealthTime = 0         -- Ð°Ð½ÑÐ¸ÑÐ¿Ð°Ð¼ Ð¿Ð¾ Ð²ÑÐµÐ¼ÐµÐ½Ð¸
+local lastDeathTime = 0             -- Ð°Ð½ÑÐ¸ÑÐ¿Ð°Ð¼ ÑÐ¼ÐµÑÑÐ¸
+
+-- ==================== SOUND FUNCTIONS ====================
+local function playSound(soundName)
+	local soundId = SOUNDS[soundName]
+	if not soundId then return end
+	if not soundCache[soundName] then
+		local sound = Instance.new("Sound")
+		sound.SoundId = soundId
+		sound.Volume = SOUND_VOLUME
+		sound.Parent = player.PlayerGui
+		soundCache[soundName] = sound
+	else
+		soundCache[soundName].Volume = SOUND_VOLUME
+	end
+	local sound = soundCache[soundName]
+	sound:Stop()
+	sound:Play()
+end
+
+-- ==================== GUI CREATION ====================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "EventListGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Notifications
+local notificationHolder = Instance.new("Frame")
+notificationHolder.Name = "NotificationHolder"
+notificationHolder.Size = UDim2.new(0, 300, 1, -20)
+notificationHolder.Position = UDim2.new(1, -310, 0, 10)
+notificationHolder.BackgroundTransparency = 1
+notificationHolder.Parent = screenGui
+
+local notificationLayout = Instance.new("UIListLayout")
+notificationLayout.Parent = notificationHolder
+notificationLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+notificationLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+notificationLayout.SortOrder = Enum.SortOrder.LayoutOrder
+notificationLayout.Padding = UDim.new(0, 5)
+
+local function createNotification(title, text, duration, color)
+	duration = duration or 5
+	color = color or Color3.new(0.3, 0.6, 1)
+	
+	local frame = Instance.new("Frame")
+	frame.Name = "Notification"
+	frame.Size = UDim2.new(0, 280, 0, 60)
+	frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+	frame.BackgroundTransparency = 0.2
+	frame.BorderSizePixel = 0
+	frame.Parent = notificationHolder
+	frame.LayoutOrder = -os.clock()
+	frame.ClipsDescendants = true
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = frame
+	
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 2
+	stroke.Color = color
+	stroke.Parent = frame
+	
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "Title"
+	titleLabel.Size = UDim2.new(1, -10, 0, 20)
+	titleLabel.Position = UDim2.new(0, 5, 0, 5)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Text = title
+	titleLabel.TextColor3 = Color3.new(1, 1, 1)
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.TextScaled = true
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.Parent = frame
+	
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Name = "Text"
+	textLabel.Size = UDim2.new(1, -10, 0, 30)
+	textLabel.Position = UDim2.new(0, 5, 0, 25)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = text
+	textLabel.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+	textLabel.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel.TextWrapped = true
+	textLabel.TextScaled = true
+	textLabel.Font = Enum.Font.Gotham
+	textLabel.Parent = frame
+	
+	frame.Size = UDim2.new(0, 0, 0, 60)
+	local tween = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 280, 0, 60)})
+	tween:Play()
+	
+	task.wait(duration)
+	
+	local fadeOut = TweenService:Create(frame, TweenInfo.new(0.3), {BackgroundTransparency = 1})
+	fadeOut:Play()
+	local fadeTitle = TweenService:Create(titleLabel, TweenInfo.new(0.3), {TextTransparency = 1})
+	local fadeText = TweenService:Create(textLabel, TweenInfo.new(0.3), {TextTransparency = 1})
+	local fadeStroke = TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = 1})
+	fadeTitle:Play()
+	fadeText:Play()
+	fadeStroke:Play()
+	
+	fadeOut.Completed:Connect(function()
+		frame:Destroy()
+	end)
+end
+
+-- Show/Hide list button
+local showButton = Instance.new("TextButton")
+showButton.Name = "ShowListButton"
+showButton.Size = UDim2.new(0, 50, 0, 50)
+showButton.Position = UDim2.new(0, 10, 0, 10)
+showButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+showButton.BackgroundTransparency = 0.3
+showButton.Text = "ð"
+showButton.TextColor3 = Color3.new(1, 1, 1)
+showButton.TextScaled = true
+showButton.Visible = false
+showButton.Parent = screenGui
+
+local showCorner = Instance.new("UICorner")
+showCorner.CornerRadius = UDim.new(0, 8)
+showCorner.Parent = showButton
+
+-- Main list window
+local listFrame = Instance.new("Frame")
+listFrame.Name = "ListFrame"
+listFrame.Size = UDim2.new(0, 340, 0, 450)
+listFrame.Position = UDim2.new(0, 10, 0.5, -225)
+listFrame.BackgroundColor3 = Color3.new(0.05, 0.05, 0.1)
+listFrame.BackgroundTransparency = 0.1
+listFrame.BorderSizePixel = 0
+listFrame.ClipsDescendants = true
+listFrame.Parent = screenGui
+
+local shadow = Instance.new("ImageLabel")
+shadow.Name = "Shadow"
+shadow.Size = UDim2.new(1, 20, 1, 20)
+shadow.Position = UDim2.new(0, -10, 0, -10)
+shadow.BackgroundTransparency = 1
+shadow.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+shadow.ImageColor3 = Color3.new(0, 0, 0)
+shadow.ImageTransparency = 0.7
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10, 10, 10, 10)
+shadow.Parent = listFrame
+
+local listCorner = Instance.new("UICorner")
+listCorner.CornerRadius = UDim.new(0, 12)
+listCorner.Parent = listFrame
+
+local listGradient = Instance.new("UIGradient")
+listGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.new(0.1, 0.1, 0.15)),
+	ColorSequenceKeypoint.new(1, Color3.new(0.05, 0.05, 0.1))
+})
+listGradient.Rotation = 90
+listGradient.Parent = listFrame
+
+local listStroke = Instance.new("UIStroke")
+listStroke.Thickness = 2
+listStroke.Color = Color3.new(0.3, 0.3, 0.4)
+listStroke.Parent = listFrame
+
+-- Title bar
+local titleFrame = Instance.new("Frame")
+titleFrame.Name = "TitleFrame"
+titleFrame.Size = UDim2.new(1, 0, 0, 50)
+titleFrame.BackgroundTransparency = 1
+titleFrame.Parent = listFrame
+
+local listTitle = Instance.new("TextLabel")
+listTitle.Name = "Title"
+listTitle.Size = UDim2.new(1, -80, 0, 30)
+listTitle.Position = UDim2.new(0, 10, 0, 10)
+listTitle.BackgroundTransparency = 1
+listTitle.Text = "EVENTS & BOSSES"
+listTitle.TextColor3 = Color3.new(1, 1, 1)
+listTitle.TextXAlignment = Enum.TextXAlignment.Left
+listTitle.TextScaled = true
+listTitle.Font = Enum.Font.GothamBold
+listTitle.Parent = titleFrame
+
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -40, 0, 10)
+closeButton.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
+closeButton.BackgroundTransparency = 0.2
+closeButton.Text = "â"
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.TextScaled = true
+closeButton.Font = Enum.Font.GothamBold
+closeButton.Parent = titleFrame
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.Parent = closeButton
+
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Name = "MinimizeButton"
+minimizeButton.Size = UDim2.new(0, 30, 0, 30)
+minimizeButton.Position = UDim2.new(1, -75, 0, 10)
+minimizeButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.4)
+minimizeButton.BackgroundTransparency = 0.2
+minimizeButton.Text = "â"
+minimizeButton.TextColor3 = Color3.new(1, 1, 1)
+minimizeButton.TextScaled = true
+minimizeButton.Font = Enum.Font.GothamBold
+minimizeButton.Parent = titleFrame
+
+local minimizeCorner = Instance.new("UICorner")
+minimizeCorner.CornerRadius = UDim.new(0, 6)
+minimizeCorner.Parent = minimizeButton
+
+-- Scrolling list
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Name = "ScrollingFrame"
+scrollingFrame.Size = UDim2.new(1, -10, 1, -60)
+scrollingFrame.Position = UDim2.new(0, 5, 0, 55)
+scrollingFrame.BackgroundTransparency = 1
+scrollingFrame.ScrollBarThickness = 6
+scrollingFrame.ScrollBarImageColor3 = Color3.new(0.5, 0.5, 0.6)
+scrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollingFrame.Parent = listFrame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Parent = scrollingFrame
+listLayout.SortOrder = Enum.SortOrder.Name
+listLayout.Padding = UDim.new(0, 6)
+
+-- ==================== CORE FUNCTIONS ====================
+
+local function teleportTo(obj)
+	local character = player.Character
+	if not character then
+		createNotification("Error", "No character", 3, Color3.new(1, 0.3, 0.3))
+		return
+	end
+	local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+	if not rootPart then
+		createNotification("Error", "No root part", 3, Color3.new(1, 0.3, 0.3))
+		return
+	end
+	local success, pos = pcall(function() return obj:GetPivot().Position end)
+	if success and pos then
+		rootPart.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+		createNotification("Teleport", "Teleported to " .. obj.Name, 3, Color3.new(0.3, 0.8, 0.3))
+	else
+		createNotification("Error", "Could not determine position", 3, Color3.new(1, 0.3, 0.3))
+	end
+end
+
+local function createESP(obj, objType)
+	if espCache[obj] then return end
+
+	local isBoss = (objType == "Boss")
+	local billboardHeight = isBoss and 80 or 60
+	local displayName = CUSTOM_NAMES[objType] or obj.Name
+
+	local iconText = ""
+	if not isBoss then
+		iconText = (objType == "Portal") and "ð" or "ð¦"
+	end
+
+	-- Billboard
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ESP_" .. obj.Name
+	billboard.Size = UDim2.new(0, 240, 0, billboardHeight)
+	billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
+	billboard.Parent = obj
+
+	local background = Instance.new("Frame")
+	background.Name = "Background"
+	background.Size = UDim2.new(1, 0, 1, 0)
+	background.BackgroundTransparency = 0.15
+	background.BorderSizePixel = 0
+	background.Parent = billboard
+
+	local bgCorner = Instance.new("UICorner")
+	bgCorner.CornerRadius = UDim.new(0, 8)
+	bgCorner.Parent = background
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 2
+	stroke.Color = isBoss and Color3.new(1, 0.4, 0) or Color3.new(0, 1, 0)
+	stroke.Parent = background
+
+	local gradient = Instance.new("UIGradient")
+	if isBoss then
+		gradient.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.new(0.9, 0.3, 0)),
+			ColorSequenceKeypoint.new(1, Color3.new(0.6, 0.1, 0))
+		})
+	else
+		gradient.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.new(0.2, 0.8, 0.2)),
+			ColorSequenceKeypoint.new(1, Color3.new(0, 0.5, 0))
+		})
+	end
+	gradient.Rotation = 90
+	gradient.Parent = background
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Name = "Info"
+	textLabel.Size = isBoss and UDim2.new(1, -10, 0, 30) or UDim2.new(1, -10, 1, 0)
+	textLabel.Position = UDim2.new(0, 5, 0, 5)
+	textLabel.BackgroundTransparency = 1
+	textLabel.TextColor3 = Color3.new(1, 1, 1)
+	textLabel.TextStrokeTransparency = 0.3
+	textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+	textLabel.TextScaled = true
+	textLabel.Font = Enum.Font.GothamSemibold
+	textLabel.Parent = background
+
+	if iconText ~= "" then
+		local iconLabel = Instance.new("TextLabel")
+		iconLabel.Name = "Icon"
+		iconLabel.Size = UDim2.new(0, 20, 0, 20)
+		iconLabel.Position = UDim2.new(1, -25, 0, 5)
+		iconLabel.BackgroundTransparency = 1
+		iconLabel.TextColor3 = Color3.new(1, 1, 1)
+		iconLabel.TextStrokeTransparency = 0.3
+		iconLabel.TextScaled = true
+		iconLabel.Font = Enum.Font.GothamBold
+		iconLabel.Text = iconText
+		iconLabel.Parent = background
+	end
+
+	local healthBarFrame, healthPercentLabel
+	if isBoss then
+		local barBg = Instance.new("Frame")
+		barBg.Name = "HealthBarBg"
+		barBg.Size = UDim2.new(0.8, -10, 0, 12)
+		barBg.Position = UDim2.new(0, 5, 1, -20)
+		barBg.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+		barBg.BackgroundTransparency = 0.5
+		barBg.BorderSizePixel = 0
+		barBg.Parent = background
+		
+		local barBgCorner = Instance.new("UICorner")
+		barBgCorner.CornerRadius = UDim.new(0, 4)
+		barBgCorner.Parent = barBg
+		
+		local barFill = Instance.new("Frame")
+		barFill.Name = "HealthBarFill"
+		barFill.Size = UDim2.new(1, 0, 1, 0)
+		barFill.BackgroundColor3 = Color3.new(1, 0.2, 0.2)
+		barFill.BorderSizePixel = 0
+		barFill.Parent = barBg
+		
+		local barFillCorner = Instance.new("UICorner")
+		barFillCorner.CornerRadius = UDim.new(0, 4)
+		barFillCorner.Parent = barFill
+		
+		local percentLabel = Instance.new("TextLabel")
+		percentLabel.Name = "HealthPercent"
+		percentLabel.Size = UDim2.new(0.2, -5, 0, 14)
+		percentLabel.Position = UDim2.new(0.8, 0, 1, -22)
+		percentLabel.BackgroundTransparency = 1
+		percentLabel.TextColor3 = Color3.new(1, 1, 1)
+		percentLabel.TextStrokeTransparency = 0.3
+		percentLabel.TextScaled = true
+		percentLabel.Font = Enum.Font.GothamBold
+		percentLabel.Text = "100%"
+		percentLabel.Parent = background
+		
+		healthBarFrame = barFill
+		healthPercentLabel = percentLabel
+	end
+
+	-- Highlight
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "Highlight_" .. obj.Name
+	highlight.FillColor = isBoss and Color3.new(1, 0, 0) or Color3.new(0, 1, 0)
+	highlight.OutlineColor = Color3.new(1, 1, 1)
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = obj
+
+	-- List item
+	local listItem = Instance.new("Frame")
+	listItem.Name = obj.Name
+	listItem.Size = UDim2.new(1, 0, 0, 60)
+	listItem.BackgroundColor3 = Color3.new(0.15, 0.15, 0.2)
+	listItem.BackgroundTransparency = 0.3
+	listItem.BorderSizePixel = 0
+	listItem.Parent = scrollingFrame
+
+	local itemCorner = Instance.new("UICorner")
+	itemCorner.CornerRadius = UDim.new(0, 8)
+	itemCorner.Parent = listItem
+
+	local itemStroke = Instance.new("UIStroke")
+	itemStroke.Thickness = 1
+	itemStroke.Color = isBoss and Color3.new(1, 0.5, 0) or Color3.new(0, 1, 0)
+	itemStroke.Transparency = 0.7
+	itemStroke.Parent = listItem
+
+	local itemIcon = Instance.new("TextLabel")
+	itemIcon.Name = "Icon"
+	itemIcon.Size = UDim2.new(0, 40, 0, 40)
+	itemIcon.Position = UDim2.new(0, 5, 0.5, -20)
+	itemIcon.BackgroundTransparency = 1
+	itemIcon.TextColor3 = Color3.new(1, 1, 1)
+	itemIcon.TextStrokeTransparency = 0.3
+	itemIcon.TextScaled = true
+	itemIcon.Font = Enum.Font.GothamBold
+	itemIcon.Text = iconText
+	itemIcon.Parent = listItem
+
+	local itemText = Instance.new("TextLabel")
+	itemText.Name = "Info"
+	itemText.Size = UDim2.new(0.6, -50, 0, 20)
+	itemText.Position = UDim2.new(0, 50, 0, 10)
+	itemText.BackgroundTransparency = 1
+	itemText.TextColor3 = isBoss and Color3.new(1, 0.5, 0) or Color3.new(0, 1, 0)
+	itemText.TextXAlignment = Enum.TextXAlignment.Left
+	itemText.TextScaled = true
+	itemText.Font = Enum.Font.Gotham
+	itemText.Parent = listItem
+
+	local itemPercent = nil
+	if isBoss then
+		itemPercent = Instance.new("TextLabel")
+		itemPercent.Name = "Percent"
+		itemPercent.Size = UDim2.new(0.6, -50, 0, 16)
+		itemPercent.Position = UDim2.new(0, 50, 0, 32)
+		itemPercent.BackgroundTransparency = 1
+		itemPercent.TextColor3 = Color3.new(1, 1, 1)
+		itemPercent.TextXAlignment = Enum.TextXAlignment.Left
+		itemPercent.TextScaled = true
+		itemPercent.Font = Enum.Font.Gotham
+		itemPercent.Text = "100%"
+		itemPercent.Parent = listItem
+	end
+
+	local tpButton = Instance.new("TextButton")
+	tpButton.Name = "TeleportButton"
+	tpButton.Size = UDim2.new(0, 45, 0, 30)
+	tpButton.Position = UDim2.new(1, -50, 0.5, -15)
+	tpButton.BackgroundColor3 = Color3.new(0.3, 0.6, 1)
+	tpButton.BackgroundTransparency = 0.2
+	tpButton.Text = "TP"
+	tpButton.TextColor3 = Color3.new(1, 1, 1)
+	tpButton.TextScaled = true
+	tpButton.Font = Enum.Font.GothamBold
+	tpButton.Parent = listItem
+
+	local tpCorner = Instance.new("UICorner")
+	tpCorner.CornerRadius = UDim.new(0, 6)
+	tpCorner.Parent = tpButton
+
+	local tpConn = tpButton.MouseButton1Click:Connect(function()
+		if obj and obj.Parent then
+			teleportTo(obj)
+		else
+			createNotification("Error", "Object no longer exists", 3, Color3.new(1, 0.3, 0.3))
+		end
+	end)
+	table.insert(connections, tpConn)
+
+	espCache[obj] = {
+		billboard = billboard,
+		textLabel = textLabel,
+		healthBar = healthBarFrame,
+		healthPercent = healthPercentLabel,
+		highlight = highlight,
+		listItem = listItem,
+		itemText = itemText,
+		itemPercent = itemPercent,
+		type = objType,
+		customName = displayName
+	}
+end
+
+local function collectTargets()
+	local targets = {}
+	for objType, pathString in pairs(PATH_STRINGS) do
+		local obj = getObjectFromPath(pathString)
+		if obj then
+			if obj:IsA("BasePart") or obj:IsA("Model") then
+				table.insert(targets, {obj = obj, type = objType})
+			else
+				for _, child in ipairs(obj:GetChildren()) do
+					if child:IsA("BasePart") or child:IsA("Model") then
+						table.insert(targets, {obj = child, type = objType})
+					end
+				end
+			end
+		end
+	end
+	return targets
+end
+
+local function updateESP()
+	if not espCache then return end
+
+	local character = player.Character
+	if not character then return end
+	local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+	if not rootPart then return end
+
+	local targets = collectTargets()
+	local currentTargetsSet = {}
+	for _, target in ipairs(targets) do
+		currentTargetsSet[target.obj] = true
+	end
+
+	local bossCurrentlyPresent = false
+
+	-- Remove ESP for objects that are no longer targets
+	for obj, data in pairs(espCache) do
+		if not currentTargetsSet[obj] or not obj or not obj.Parent then
+			if data.billboard then pcall(function() data.billboard:Destroy() end) end
+			if data.listItem then pcall(function() data.listItem:Destroy() end) end
+			if data.highlight then pcall(function() data.highlight:Destroy() end) end
+			espCache[obj] = nil
+		end
+	end
+
+	-- Update existing and create new
+	for _, target in ipairs(targets) do
+		local obj = target.obj
+		local objType = target.type
+
+		if not espCache[obj] then
+			createESP(obj, objType)
+			if objType == "Boss" then
+				playSound("BossSpawn")
+				createNotification("Boss Spawned", CUSTOM_NAMES.Boss .. " has appeared!", 5, Color3.new(1, 0.5, 0))
+			end
+		end
+
+		local data = espCache[obj]
+		if data then
+			if not obj or not obj.Parent then
+				if data.billboard then pcall(function() data.billboard:Destroy() end) end
+				if data.listItem then pcall(function() data.listItem:Destroy() end) end
+				if data.highlight then pcall(function() data.highlight:Destroy() end) end
+				espCache[obj] = nil
+				continue
+			end
+
+			if objType == "Boss" then
+				bossCurrentlyPresent = true
+			end
+
+			local posSuccess, pos = pcall(function() return obj:GetPivot().Position end)
+			if not posSuccess then pos = rootPart.Position end
+			local dist = math.floor((pos - rootPart.Position).Magnitude)
+
+			local healthText = ""
+			local emoji = ""
+			local healthPercent = 100
+			if objType == "Boss" then
+				local humanoid = obj:FindFirstChildOfClass("Humanoid")
+				if humanoid then
+					local health = math.floor(humanoid.Health)
+					local maxHealth = math.floor(humanoid.MaxHealth)
+					if maxHealth > 0 then
+						healthText = string.format(" â¤ï¸ %d/%d", health, maxHealth)
+						healthPercent = math.floor((health / maxHealth) * 100)
+					end
+					-- Low health notification (once per boss life AND cooldown 10 sec)
+					if health < 450 and not lowHealthPlayed[obj] and os.clock() - lastLowHealthTime > 10 then
+						lastLowHealthTime = os.clock()
+						lowHealthPlayed[obj] = true
+						playSound("LowHealth")
+						createNotification("Low Health", CUSTOM_NAMES.Boss .. " is below 450 HP!", 5, Color3.new(1, 0.8, 0))
+					end
+					if health < 450 then emoji = " â¨" end
+				end
+			end
+
+			local displayName = data.customName or (objType == "Boss" and "Chara" or obj.Name)
+			local billboardText = string.format("%s [%dm]%s%s", displayName, dist, healthText, emoji)
+			data.textLabel.Text = billboardText
+
+			if objType == "Boss" and data.healthBar and data.healthPercent then
+				data.healthBar.Size = UDim2.new(healthPercent/100, 0, 1, 0)
+				data.healthPercent.Text = healthPercent .. "%"
+			end
+
+			local listText = string.format("%s [%dm]%s%s", displayName, dist, healthText, emoji)
+			data.itemText.Text = listText
+			if data.itemPercent then
+				data.itemPercent.Text = healthPercent .. "% HP"
+			end
+		end
+	end
+
+	-- Boss death notification with anti-spam (5 sec)
+	if bossWasPresent and not bossCurrentlyPresent and os.clock() - lastDeathTime > 5 then
+		lastDeathTime = os.clock()
+		playSound("BossDeath")
+		createNotification("Boss Defeated", CUSTOM_NAMES.Boss .. " has been defeated!", 5, Color3.new(1, 0.5, 0))
+		lowHealthPlayed = {}
+		lastLowHealthTime = 0  -- ÑÐ°Ð·ÑÐµÑÐ¸ÑÑ ÑÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ðµ Ð´Ð»Ñ Ð½Ð¾Ð²Ð¾Ð³Ð¾ Ð±Ð¾ÑÑÐ°
+	end
+	bossWasPresent = bossCurrentlyPresent
+
+	scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+end
+
+-- Start update loop
+local renderSteppedConnection = RunService.RenderStepped:Connect(updateESP)
+table.insert(connections, renderSteppedConnection)
+
+-- ==================== BUTTON CONNECTIONS ====================
+local function safeConnect(btn, func)
+	if btn and btn:IsA("TextButton") then
+		local conn = btn.MouseButton1Click:Connect(func)
+		table.insert(connections, conn)
+	end
+end
+
+safeConnect(closeButton, function()
+	listFrame.Visible = false
+	showButton.Visible = true
+end)
+
+safeConnect(showButton, function()
+	listFrame.Visible = true
+	showButton.Visible = false
+end)
+
+local minimized = false
+safeConnect(minimizeButton, function()
+	if minimized then
+		listFrame:TweenSize(UDim2.new(0, 340, 0, 450), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
+		minimized = false
+	else
+		listFrame:TweenSize(UDim2.new(0, 340, 0, 50), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
+		minimized = true
+	end
+end)
+
+-- Dragging
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function updateDrag(input)
+	local delta = input.Position - dragStart
+	listFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+if listFrame then
+	local dragBeginConn = listFrame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = listFrame.Position
+			local conn = input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+					if conn then conn:Disconnect() end
+				end
+			end)
+			if conn then table.insert(connections, conn) end
+		end
+	end)
+	table.insert(connections, dragBeginConn)
+
+	local dragChangeConn = listFrame.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+	table.insert(connections, dragChangeConn)
+
+	local inputChangeConn = UserInputService.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			updateDrag(input)
+		end
+	end)
+	table.insert(connections, inputChangeConn)
+end
+
+-- Cleanup
+script.Destroying:Connect(function()
+	if renderSteppedConnection then
+		renderSteppedConnection:Disconnect()
+	end
+	for _, conn in ipairs(connections) do
+		if conn then conn:Disconnect() end
+	end
+	if espCache then
+		for obj, data in pairs(espCache) do
+			if data then
+				if data.billboard then pcall(function() data.billboard:Destroy() end) end
+				if data.listItem then pcall(function() data.listItem:Destroy() end) end
+				if data.highlight then pcall(function() data.highlight:Destroy() end) end
+			end
+		end
+	end
+	if screenGui then
+		pcall(function() screenGui:Destroy() end)
+	end
+	for _, sound in pairs(soundCache) do
+		pcall(function() sound:Destroy() end)
+	end
+end)
