@@ -1,0 +1,85 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local buttonsFolder = workspace:WaitForChild("Buttons")
+
+local AUTO = false
+local delayTime = 0.05
+
+
+local BLOCK = {
+    "reset",
+    "new",
+    "currently",
+    "rebirth"
+}
+
+local function hasBlockedName(obj)
+    while obj and obj ~= workspace do
+        local n = string.lower(obj.Name)
+        for _, w in ipairs(BLOCK) do
+            if string.find(n, w) then
+                return true
+            end
+        end
+        obj = obj.Parent
+    end
+    return false
+end
+
+local function farm()
+    while AUTO do
+        for _, obj in ipairs(buttonsFolder:GetDescendants()) do
+            if obj:IsA("ClickDetector") and not hasBlockedName(obj) then
+                fireclickdetector(obj)
+            end
+        end
+        task.wait(delayTime)
+    end
+end
+
+
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromScale(0.25,0.2)
+frame.Position = UDim2.fromScale(0.38,0.42)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,30)
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,18)
+
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.fromScale(1,0.3)
+title.BackgroundTransparency = 1
+title.Text = "GOGO GAGA"
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.fromRGB(180,220,255)
+
+
+local credit = Instance.new("TextLabel", frame)
+credit.Size = UDim2.fromScale(1,0.2)
+credit.Position = UDim2.fromScale(0,0.28)
+credit.BackgroundTransparency = 1
+credit.Text = "by Siqisiwi"
+credit.TextScaled = true
+credit.Font = Enum.Font.Gotham
+credit.TextColor3 = Color3.fromRGB(140,140,160)
+
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.fromScale(0.9,0.35)
+btn.Position = UDim2.fromScale(0.05,0.6)
+btn.Text = "FARM ALL"
+btn.TextScaled = true
+btn.Font = Enum.Font.GothamBold
+btn.BackgroundColor3 = Color3.fromRGB(70,140,255)
+btn.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0,14)
+
+btn.MouseButton1Click:Connect(function()
+    AUTO = not AUTO
+    btn.Text = AUTO and "STOP" or "FARM ALL"
+    btn.BackgroundColor3 = AUTO and Color3.fromRGB(255,80,80) or Color3.fromRGB(70,140,255)
+    if AUTO then task.spawn(farm) end
+end)
