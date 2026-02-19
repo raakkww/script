@@ -1,0 +1,82 @@
+local plr = game.Players.LocalPlayer
+
+local function getHRP()
+    local char = plr.Character or plr.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart")
+end
+
+local hrp = getHRP()
+plr.CharacterAdded:Connect(function()
+    hrp = getHRP()
+end)
+
+local folder = workspace:WaitForChild("Buttons")
+
+local AUTO = false
+
+local function touch(part)
+    if part:IsA("BasePart") then
+        firetouchinterest(hrp, part, 0)
+        firetouchinterest(hrp, part, 1)
+    end
+end
+
+
+local gui = Instance.new("ScreenGui", plr.PlayerGui)
+gui.Name = "PainterGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromScale(0.28,0.18)
+frame.Position = UDim2.fromScale(0.36,0.4)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,35)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0,18)
+
+local grad = Instance.new("UIGradient", frame)
+grad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(70,120,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(160,70,255))
+}
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.fromScale(1,0.35)
+title.BackgroundTransparency = 1
+title.Text = "goGo GagA"
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.new(1,1,1)
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.fromScale(0.85,0.35)
+button.Position = UDim2.fromScale(0.075,0.5)
+button.Text = "OFF"
+button.TextScaled = true
+button.Font = Enum.Font.GothamBold
+button.BackgroundColor3 = Color3.fromRGB(40,40,50)
+button.TextColor3 = Color3.new(1,1,1)
+button.BorderSizePixel = 0
+
+local corner2 = Instance.new("UICorner", button)
+corner2.CornerRadius = UDim.new(0,14)
+
+button.MouseButton1Click:Connect(function()
+    AUTO = not AUTO
+    button.Text = AUTO and "ON" or "OFF"
+    button.BackgroundColor3 = AUTO and Color3.fromRGB(0,200,120) or Color3.fromRGB(40,40,50)
+end)
+
+
+task.spawn(function()
+    while true do
+        if AUTO then
+            for _,v in ipairs(folder:GetDescendants()) do
+                touch(v)
+            end
+        end
+        task.wait(0.25)
+    end
+end)
