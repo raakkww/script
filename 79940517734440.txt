@@ -1,0 +1,737 @@
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+
+pcall(function()
+    CoreGui:FindFirstChild("GZSSF_SPLASH"):Destroy()
+end)
+
+-- BLUR
+local blur = Instance.new("BlurEffect", Lighting)
+blur.Size = 0
+TweenService:Create(blur, TweenInfo.new(0.5), {Size = 18}):Play()
+
+-- GUI
+local gui = Instance.new("ScreenGui", CoreGui)
+gui.Name = "GZSSF_SPLASH"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+
+local bg = Instance.new("Frame", gui)
+bg.Size = UDim2.new(1,0,1,0)
+bg.BackgroundColor3 = Color3.fromRGB(5,6,10)
+
+-- LIGHTNING LAYER (FONDO)
+local lightningLayer = Instance.new("Frame", bg)
+lightningLayer.Size = UDim2.new(1,0,1,0)
+lightningLayer.BackgroundTransparency = 1
+lightningLayer.ZIndex = 1
+
+-- Rayos: zigzag sólido que caen hasta abajo
+local function spawnLightning()
+    local segments = math.random(8,11)
+    local x = math.random(15,85)/100
+    local y = -0.25
+    local lastX = x
+
+    for _ = 1, segments do
+        local segHeight = math.random(60,90)
+        local seg = Instance.new("Frame", lightningLayer)
+        seg.AnchorPoint = Vector2.new(0.5,0)
+        seg.Position = UDim2.new(lastX,0,y,0)
+        seg.Size = UDim2.new(0,4,0,segHeight)
+        seg.Rotation = math.random(-20,20)
+        seg.BackgroundColor3 = Color3.fromRGB(120,240,255) -- celeste sólido
+        seg.BorderSizePixel = 0
+        seg.ZIndex = 1
+
+        local glow = Instance.new("UIStroke", seg)
+        glow.Thickness = 3
+        glow.Color = Color3.fromRGB(120,255,255)
+        glow.Transparency = 0
+
+        local offset = math.random(-25,25)/1000
+        lastX += offset
+        y += segHeight / math.max(1, (game:GetService("Workspace").CurrentCamera and game:GetService("Workspace").CurrentCamera.ViewportSize.Y) or 720)
+
+        -- Desvanece después
+        TweenService:Create(seg, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
+        task.delay(0.3, function() if seg and seg.Parent then seg:Destroy() end end)
+    end
+end
+
+-- TITULOS
+local title = Instance.new("TextLabel", bg)
+title.Size = UDim2.new(0,400,0,70)
+title.Position = UDim2.new(0.5,-200,0.42,-60)
+title.BackgroundTransparency = 1
+title.Text = "GZSSF"
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 54
+title.TextColor3 = Color3.fromRGB(200,255,255)
+title.ZIndex = 2
+
+local sub = Instance.new("TextLabel", bg)
+sub.Size = UDim2.new(0,400,0,30)
+sub.Position = UDim2.new(0.5,-200,0.42,5)
+sub.BackgroundTransparency = 1
+sub.Text = "scripts"
+sub.Font = Enum.Font.Gotham
+sub.TextSize = 18
+sub.TextColor3 = Color3.fromRGB(160,220,220)
+sub.ZIndex = 2
+
+-- FLOAT ANIMATION PARA TEXTOS
+task.spawn(function()
+    while title.Parent do
+        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = title.Position + UDim2.new(0,0,0,-8)}):Play()
+        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = sub.Position + UDim2.new(0,0,0,-8)}):Play()
+        task.wait(2)
+        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = title.Position + UDim2.new(0,0,0,8)}):Play()
+        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = sub.Position + UDim2.new(0,0,0,8)}):Play()
+        task.wait(2)
+    end
+end)
+
+-- LOADING BAR (ABAJO)
+local barBG = Instance.new("Frame", bg)
+barBG.Size = UDim2.new(0,460,0,12)
+barBG.Position = UDim2.new(0.5,-230,0.72,0)
+barBG.BackgroundColor3 = Color3.fromRGB(30,40,50)
+barBG.BorderSizePixel = 0
+barBG.ZIndex = 2
+barBG.ClipsDescendants = true -- <<< muy importante: evita que la linea se "escape"
+Instance.new("UICorner", barBG)
+
+-- BARRA DE LLENADO REAL (progreso)
+local barFill = Instance.new("Frame", barBG)
+barFill.Size = UDim2.new(0,0,1,0)
+barFill.BackgroundColor3 = Color3.fromRGB(55,95,140)
+barFill.BorderSizePixel = 0
+Instance.new("UICorner", barFill)
+
+-- SHIMMER LINE (SIEMPRE DENTRO DE barBG)
+local shimmer = Instance.new("Frame", barBG)
+shimmer.Size = UDim2.new(0.25,0,1,0) -- 25% del ancho de la barra
+shimmer.Position = UDim2.new(-0.25,0,0,0)
+shimmer.BackgroundColor3 = Color3.fromRGB(150,255,255)
+shimmer.BorderSizePixel = 0
+Instance.new("UICorner", shimmer)
+shimmer.ZIndex = 3
+
+-- Texto porcentaje
+local percent = Instance.new("TextLabel", bg)
+percent.Size = UDim2.new(0,200,0,20)
+percent.Position = UDim2.new(0.5,-100,0.76,0)
+percent.BackgroundTransparency = 1
+percent.Text = "0%"
+percent.Font = Enum.Font.Gotham
+percent.TextSize = 14
+percent.TextColor3 = Color3.fromRGB(150,150,200)
+percent.ZIndex = 2
+
+-- SKIP BUTTON (ABAJO DERECHA)
+local skip = Instance.new("TextButton", bg)
+skip.Size = UDim2.new(0,90,0,32)
+skip.Position = UDim2.new(1,-110,1,-50)
+skip.Text = "SKIP"
+skip.Font = Enum.Font.GothamBold
+skip.TextSize = 14
+skip.TextColor3 = Color3.new(1,1,1)
+skip.BackgroundColor3 = Color3.fromRGB(60,60,60)
+skip.BorderSizePixel = 0
+skip.ZIndex = 4
+Instance.new("UICorner", skip)
+
+local closed = false
+local function closeSplash()
+    if closed then return end
+    closed = true
+    -- fade blur y GUI
+    TweenService:Create(blur, TweenInfo.new(0.35), {Size = 0}):Play()
+    -- fade gui elements (rápido)
+    for _, v in pairs(bg:GetDescendants()) do
+        if v:IsA("TextLabel") or v:IsA("TextButton") then
+            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {TextTransparency = 1}):Play() end)
+        elseif v:IsA("Frame") then
+            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play() end)
+        end
+    end
+    task.wait(0.36)
+    if blur and blur.Parent then blur:Destroy() end
+    if gui and gui.Parent then gui:Destroy() end
+end
+
+skip.MouseButton1Click:Connect(closeSplash)
+
+-- ANIMACION DEL SHIMMER (dentro de la barra; no puede escaparse por ClipsDescendants)
+local shimmerTweenTime = 1.1
+local shimmerTweenInfo = TweenInfo.new(shimmerTweenTime, Enum.EasingStyle.Linear)
+
+local shimmerLoop = task.spawn(function()
+    while shimmer.Parent and not closed do
+        -- from left outside to right outside of barBG's coordinates, but clipped by barBG
+        shimmer.Position = UDim2.new(-shimmer.Size.X.Scale, 0, 0, 0)
+        local targetPos = UDim2.new(1, 0, 0, 0)
+        local tw = TweenService:Create(shimmer, shimmerTweenInfo, {Position = targetPos})
+        tw:Play()
+        local ok, err = pcall(function() tw.Completed:Wait() end)
+        if not ok then break end
+        task.wait(0.05)
+    end
+end)
+
+-- RAYOS LOOP
+local lightningLoop = task.spawn(function()
+    while gui.Parent and not closed do
+        spawnLightning()
+        task.wait(math.random(12,20)/100) -- 0.12 - 0.20s
+    end
+end)
+
+-- CARGA (simulada): llena la barra y actualiza porcentaje
+for i = 1, 100 do
+    if closed then break end
+    local scale = i / 100
+    barFill.Size = UDim2.new(scale, 0, 1, 0)
+    percent.Text = tostring(i) .. "%"
+    task.wait(0.035)
+end
+
+-- AL FINAL: mini explosiones antes de cerrar
+if not closed then
+    local function miniExplosionAt(xScale)
+        local circ = Instance.new("Frame", bg)
+        circ.AnchorPoint = Vector2.new(0.5, 1)
+        circ.Position = UDim2.new(xScale, 0, 1, -18) -- justo encima del borde inferior
+        circ.Size = UDim2.new(0,12,0,12)
+        circ.BackgroundColor3 = Color3.fromRGB(140,255,255)
+        circ.BorderSizePixel = 0
+        local uic = Instance.new("UICorner", circ)
+        uic.CornerRadius = UDim.new(1,0)
+
+        -- expand & fade
+        TweenService:Create(circ, TweenInfo.new(0.35, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0,140,0,140),
+            BackgroundTransparency = 1,
+            Position = UDim2.new(xScale, 0, 1, -70)
+        }):Play()
+
+        task.delay(0.36, function()
+            if circ and circ.Parent then circ:Destroy() end
+        end)
+    end
+
+    -- dispara varias mini explosiones a lo largo de la parte baja (alineadas con la barra)
+    local n = 4
+    for k = 1, n do
+        local x = 0.5 - 230/460 + ( (k-1) * (460/(n-1)) ) / 460 -- mapea 0..460 a 0..1 centrado en la barra
+        x = math.clamp(x, 0.05, 0.95)
+        miniExplosionAt(x)
+        task.wait(0.14)
+    end
+
+    task.wait(0.45)
+end
+
+-- CERRAR SPLASH
+closeSplash()
+
+--[[
+    GZSSF Menu - Script para Roblox
+    Solo cambios: Farm (It's not mine) + Toggle con CTRL + UICorner chequeados
+]]
+-- Servicios
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- Configuración del UI
+local Config = {
+    Name = "GZSSF",
+    AccentColor = Color3.fromRGB(0, 170, 255),
+    BackgroundColor = Color3.fromRGB(25, 25, 35),
+    SecondaryColor = Color3.fromRGB(35, 35, 50),
+    TextColor = Color3.fromRGB(255, 255, 255),
+    SubTextColor = Color3.fromRGB(180, 180, 200),
+    ButtonColor = Color3.fromRGB(0, 150, 255),
+    ButtonHover = Color3.fromRGB(0, 190, 255),
+    CloseColor = Color3.fromRGB(255, 70, 70),
+    MinimizeColor = Color3.fromRGB(255, 180, 0),
+    CornerRadius = UDim.new(0, 8),
+    AnimationSpeed = 0.3
+}
+
+-- Crear ScreenGui principal
+local GZSSFMenu = Instance.new("ScreenGui")
+GZSSFMenu.Name = "GZSSFMenu"
+GZSSFMenu.Parent = CoreGui
+GZSSFMenu.ResetOnSpawn = false
+GZSSFMenu.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Marco principal
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 600, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+MainFrame.BackgroundColor3 = Config.BackgroundColor
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = GZSSFMenu
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = Config.CornerRadius
+MainCorner.Parent = MainFrame
+
+-- Sombra
+local Shadow = Instance.new("ImageLabel")
+Shadow.Name = "Shadow"
+Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+Shadow.BackgroundTransparency = 1
+Shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+Shadow.Size = UDim2.new(1, 40, 1, 40)
+Shadow.ZIndex = -1
+Shadow.Image = "rbxassetid://5554236805"
+Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+Shadow.ImageTransparency = 0.6
+Shadow.ScaleType = Enum.ScaleType.Slice
+Shadow.SliceCenter = Rect.new(23, 23, 277, 277)
+Shadow.Parent = MainFrame
+
+-- Barra superior
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, 45)
+TopBar.BackgroundColor3 = Config.SecondaryColor
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.Parent = TopBar
+
+local TopBarFix = Instance.new("Frame")
+TopBarFix.Size = UDim2.new(1, 0, 0, 10)
+TopBarFix.Position = UDim2.new(0, 0, 1, -10)
+TopBarFix.BackgroundColor3 = Config.SecondaryColor
+TopBarFix.BorderSizePixel = 0
+TopBarFix.Parent = TopBar
+
+-- Título
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "Title"
+TitleLabel.Size = UDim2.new(0, 200, 1, 0)
+TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = Config.Name
+TitleLabel.TextColor3 = Config.AccentColor
+TitleLabel.TextSize = 24
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TopBar
+
+-- Botón minimizar
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Name = "Minimize"
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Position = UDim2.new(1, -75, 0.5, -15)
+MinimizeBtn.BackgroundColor3 = Config.MinimizeColor
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.TextSize = 20
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.Parent = TopBar
+
+local MinimizeCorner = Instance.new("UICorner")
+MinimizeCorner.CornerRadius = UDim.new(0, 6)
+MinimizeCorner.Parent = MinimizeBtn
+
+-- Botón cerrar
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Name = "Close"
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -40, 0.5, -15)
+CloseBtn.BackgroundColor3 = Config.CloseColor
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = TopBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseBtn
+
+-- Contenedor principal
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Name = "Content"
+ContentFrame.Size = UDim2.new(1, 0, 1, -45)
+ContentFrame.Position = UDim2.new(0, 0, 0, 45)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+-- Sidebar
+local Sidebar = Instance.new("Frame")
+Sidebar.Name = "Sidebar"
+Sidebar.Size = UDim2.new(0, 150, 1, 0)
+Sidebar.BackgroundColor3 = Config.SecondaryColor
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = ContentFrame
+
+local SidebarCorner = Instance.new("UICorner")
+SidebarCorner.CornerRadius = UDim.new(0, 0)
+SidebarCorner.Parent = Sidebar
+
+local SidebarFix = Instance.new("Frame")
+SidebarFix.Size = UDim2.new(1, 0, 0, 10)
+SidebarFix.Position = UDim2.new(0, 0, 1, -10)
+SidebarFix.BackgroundColor3 = Config.SecondaryColor
+SidebarFix.BorderSizePixel = 0
+SidebarFix.Parent = Sidebar
+
+local SidebarList = Instance.new("UIListLayout")
+SidebarList.Padding = UDim.new(0, 5)
+SidebarList.FillDirection = Enum.FillDirection.Vertical
+SidebarList.SortOrder = Enum.SortOrder.LayoutOrder
+SidebarList.Parent = Sidebar
+
+local SidebarPadding = Instance.new("UIPadding")
+SidebarPadding.PaddingTop = UDim.new(0, 10)
+SidebarPadding.PaddingBottom = UDim.new(0, 10)
+SidebarPadding.PaddingLeft = UDim.new(0, 5)
+SidebarPadding.PaddingRight = UDim.new(0, 5)
+SidebarPadding.Parent = Sidebar
+
+-- Área de contenido derecho
+local TabContent = Instance.new("Frame")
+TabContent.Name = "TabContent"
+TabContent.Size = UDim2.new(1, -150, 1, 0)
+TabContent.Position = UDim2.new(0, 150, 0, 0)
+TabContent.BackgroundTransparency = 1
+TabContent.Parent = ContentFrame
+
+-- Variables de tabs
+local MenuButtons = {}
+local Tabs = {}
+local CurrentTab = nil
+
+local function CreateSidebarButton(name)
+    local Btn = Instance.new("TextButton")
+    Btn.Name = name.."Btn"
+    Btn.Size = UDim2.new(1, 0, 0, 40)
+    Btn.BackgroundColor3 = Config.BackgroundColor
+    Btn.Text = " "..name
+    Btn.TextColor3 = Config.TextColor
+    Btn.TextSize = 14
+    Btn.Font = Enum.Font.GothamSemibold
+    Btn.TextXAlignment = Enum.TextXAlignment.Left
+    Btn.Parent = Sidebar
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = Btn
+    
+    local ActiveIndicator = Instance.new("Frame")
+    ActiveIndicator.Name = "Indicator"
+    ActiveIndicator.Size = UDim2.new(0, 4, 0, 20)
+    ActiveIndicator.Position = UDim2.new(0, -2, 0.5, -10)
+    ActiveIndicator.BackgroundColor3 = Config.AccentColor
+    ActiveIndicator.BorderSizePixel = 0
+    ActiveIndicator.Visible = false
+    ActiveIndicator.Parent = Btn
+    
+    local IndicatorCorner = Instance.new("UICorner")
+    IndicatorCorner.CornerRadius = UDim.new(0, 2)
+    IndicatorCorner.Parent = ActiveIndicator
+    
+    table.insert(MenuButtons, {Button = Btn, Indicator = ActiveIndicator, Name = name})
+    
+    return Btn, ActiveIndicator
+end
+
+local function CreateTab(name)
+    local Tab = Instance.new("ScrollingFrame")
+    Tab.Name = name.."Tab"
+    Tab.Size = UDim2.new(1, -20, 1, -20)
+    Tab.Position = UDim2.new(0, 10, 0, 10)
+    Tab.BackgroundTransparency = 1
+    Tab.BorderSizePixel = 0
+    Tab.ScrollBarThickness = 4
+    Tab.ScrollBarImageColor3 = Config.AccentColor
+    Tab.CanvasSize = UDim2.new(0, 0, 0, 0)
+    Tab.Visible = false
+    Tab.Parent = TabContent
+    
+    local ListLayout = Instance.new("UIListLayout")
+    ListLayout.Padding = UDim.new(0, 10)
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Parent = Tab
+    
+    ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Tab.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 20)
+    end)
+    
+    Tabs[name] = Tab
+    return Tab
+end
+
+local function SwitchTab(tabName)
+    for _, btnData in ipairs(MenuButtons) do
+        if btnData.Name == tabName then
+            btnData.Indicator.Visible = true
+            TweenService:Create(btnData.Button, TweenInfo.new(0.2), {BackgroundColor3 = Config.AccentColor}):Play()
+        else
+            btnData.Indicator.Visible = false
+            TweenService:Create(btnData.Button, TweenInfo.new(0.2), {BackgroundColor3 = Config.BackgroundColor}):Play()
+        end
+    end
+    
+    for name, tab in pairs(Tabs) do
+        tab.Visible = (name == tabName)
+    end
+    
+    CurrentTab = tabName
+end
+
+-- Crear botones y tabs
+local FarmBtn, FarmIndicator = CreateSidebarButton("Farm")
+local IslandsBtn, IslandsIndicator = CreateSidebarButton("Islands")
+
+local FarmTab = CreateTab("Farm")
+local IslandsTab = CreateTab("Islands")
+
+-- Función para botones de acción
+local function CreateActionButton(parent, text, description, callback)
+    local Container = Instance.new("Frame")
+    Container.Size = UDim2.new(1, 0, 0, 70)
+    Container.BackgroundColor3 = Config.SecondaryColor
+    Container.BorderSizePixel = 0
+    Container.Parent = parent
+    
+    local ContainerCorner = Instance.new("UICorner")
+    ContainerCorner.CornerRadius = UDim.new(0, 8)
+    ContainerCorner.Parent = Container
+    
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, -100, 0, 25)
+    Title.Position = UDim2.new(0, 15, 0, 10)
+    Title.BackgroundTransparency = 1
+    Title.Text = text
+    Title.TextColor3 = Config.TextColor
+    Title.TextSize = 16
+    Title.Font = Enum.Font.GothamBold
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = Container
+    
+    local Desc = Instance.new("TextLabel")
+    Desc.Size = UDim2.new(1, -100, 0, 20)
+    Desc.Position = UDim2.new(0, 15, 0, 35)
+    Desc.BackgroundTransparency = 1
+    Desc.Text = description
+    Desc.TextColor3 = Config.SubTextColor
+    Desc.TextSize = 12
+    Desc.Font = Enum.Font.Gotham
+    Desc.TextXAlignment = Enum.TextXAlignment.Left
+    Desc.Parent = Container
+    
+    local ActionBtn = Instance.new("TextButton")
+    ActionBtn.Size = UDim2.new(0, 80, 0, 35)
+    ActionBtn.Position = UDim2.new(1, -95, 0.5, -17.5)
+    ActionBtn.BackgroundColor3 = Config.ButtonColor
+    ActionBtn.Text = "Ejecutar"
+    ActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ActionBtn.TextSize = 14
+    ActionBtn.Font = Enum.Font.GothamSemibold
+    ActionBtn.Parent = Container
+    
+    local ActionCorner = Instance.new("UICorner")
+    ActionCorner.CornerRadius = UDim.new(0, 6)
+    ActionCorner.Parent = ActionBtn
+    
+    ActionBtn.MouseEnter:Connect(function()
+        TweenService:Create(ActionBtn, TweenInfo.new(0.2), {BackgroundColor3 = Config.ButtonHover}):Play()
+    end)
+    
+    ActionBtn.MouseLeave:Connect(function()
+        TweenService:Create(ActionBtn, TweenInfo.new(0.2), {BackgroundColor3 = Config.ButtonColor}):Play()
+    end)
+    
+    ActionBtn.MouseButton1Click:Connect(callback)
+    
+    return Container
+end
+
+-- Función para botones de teleport
+local function CreateTeleportButton(parent, worldName, locationPath)
+    local Container = Instance.new("Frame")
+    Container.Size = UDim2.new(1, 0, 0, 50)
+    Container.BackgroundColor3 = Config.SecondaryColor
+    Container.BorderSizePixel = 0
+    Container.Parent = parent
+    
+    local ContainerCorner = Instance.new("UICorner")
+    ContainerCorner.CornerRadius = UDim.new(0, 8)
+    ContainerCorner.Parent = Container
+    
+    local WorldLabel = Instance.new("TextLabel")
+    WorldLabel.Size = UDim2.new(0, 100, 1, 0)
+    WorldLabel.Position = UDim2.new(0, 15, 0, 0)
+    WorldLabel.BackgroundTransparency = 1
+    WorldLabel.Text = worldName
+    WorldLabel.TextColor3 = Config.AccentColor
+    WorldLabel.TextSize = 16
+    WorldLabel.Font = Enum.Font.GothamBold
+    WorldLabel.TextXAlignment = Enum.TextXAlignment.Left
+    WorldLabel.Parent = Container
+    
+    local TpBtn = Instance.new("TextButton")
+    TpBtn.Size = UDim2.new(0, 100, 0, 30)
+    TpBtn.Position = UDim2.new(1, -115, 0.5, -15)
+    TpBtn.BackgroundColor3 = Config.ButtonColor
+    TpBtn.Text = "Teleport"
+    TpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TpBtn.TextSize = 14
+    TpBtn.Font = Enum.Font.GothamSemibold
+    TpBtn.Parent = Container
+    
+    local TpCorner = Instance.new("UICorner")
+    TpCorner.CornerRadius = UDim.new(0, 6)
+    TpCorner.Parent = TpBtn
+    
+    TpBtn.MouseEnter:Connect(function()
+        TweenService:Create(TpBtn, TweenInfo.new(0.2), {BackgroundColor3 = Config.ButtonHover}):Play()
+    end)
+    
+    TpBtn.MouseLeave:Connect(function()
+        TweenService:Create(TpBtn, TweenInfo.new(0.2), {BackgroundColor3 = Config.ButtonColor}):Play()
+    end)
+    
+    TpBtn.MouseButton1Click:Connect(function()
+        pcall(function()
+            local folder = Workspace:FindFirstChild("TouchCheck")
+            if folder then
+                local target = folder:FindFirstChild(locationPath)
+                if target and LocalPlayer.Character then
+                    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.CFrame = target.CFrame + Vector3.new(0, 5, 0)
+                    end
+                end
+            end
+        end)
+    end)
+    
+    return Container
+end
+
+-- ==================== CONTENIDO ====================
+
+-- Farm Tab - CAMBIO AQUÍ
+CreateActionButton(FarmTab, "Farm (It's not mine)", "Auto-farm para Slasher Blade Loot - Recolecta loot automáticamente", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/SlasherBladeLoot"))()
+    print("Script de farm cargado!")
+end)
+
+-- Islands Tab
+local IslandsData = {
+    {"World 1", "World1_12"},
+    {"World 2", "World2_1"},
+    {"World 3", "World4_1"},
+    {"World 4", "World5_1"},
+    {"World 5", "World6_1"},
+    {"World 6", "World7_1"},
+    {"World 7", "World8_1"},
+    {"World 8", "World9_1"},
+    {"World 9", "World10_1"},
+    {"World 10", "World11_1"},
+    {"World 11", "World12_1"},
+    {"World 12", "World13_1"},
+}
+
+for _, data in ipairs(IslandsData) do
+    CreateTeleportButton(IslandsTab, data[1], data[2])
+end
+
+-- Eventos
+FarmBtn.MouseButton1Click:Connect(function() SwitchTab("Farm") end)
+IslandsBtn.MouseButton1Click:Connect(function() SwitchTab("Islands") end)
+
+SwitchTab("Farm")
+
+-- Cerrar
+CloseBtn.MouseButton1Click:Connect(function()
+    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0,0,0,0)})
+    tween:Play()
+    tween.Completed:Connect(function()
+        GZSSFMenu:Destroy()
+    end)
+end)
+
+-- Minimizar
+local Minimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    if not Minimized then
+        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 600, 0, 45)}):Play()
+        ContentFrame.Visible = false
+        MinimizeBtn.Text = "+"
+    else
+        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 600, 0, 400)}):Play()
+        ContentFrame.Visible = true
+        MinimizeBtn.Text = "-"
+    end
+    Minimized = not Minimized
+end)
+
+-- Drag
+local Dragging, DragStart, StartPos
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = true
+        DragStart = input.Position
+        StartPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                Dragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - DragStart
+        MainFrame.Position = UDim2.new(
+            StartPos.X.Scale,
+            StartPos.X.Offset + delta.X,
+            StartPos.Y.Scale,
+            StartPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Animación de entrada
+MainFrame.Size = UDim2.new(0, 0, 0, 0)
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0, 600, 0, 400),
+    Position = UDim2.new(0.5, -300, 0.5, -200)
+}):Play()
+
+-- Toggle con CTRL (cambio aquí)
+local MenuVisible = true
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
+        MenuVisible = not MenuVisible
+        MainFrame.Visible = MenuVisible
+    end
+end)
+
+print("GZSSF Menu cargado! Presiona CTRL para ocultar/mostrar")
