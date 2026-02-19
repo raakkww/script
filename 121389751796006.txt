@@ -1,0 +1,70 @@
+-- ð SandMan's Era Of Supes GUI v2.2
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Global toggle var
+getgenv().EndRescueLoop = false
+
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   LoadingTitle = "",
+   LoadingSubtitle = "",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "SandManHub",
+      FileName = "v2.2"
+   },
+   Discord = {
+      Enabled = false,
+   },
+   KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Era Of Supes", nil)
+local SectionAntiArrest = MainTab:CreateSection("Inf Stuff")
+local SectionUtils = MainTab:CreateSection("âï¸ Utils")
+
+-- EndCrime Spam Toggle (SLOWER: 0.5s delay)
+MainTab:CreateToggle({
+   Name = "Inf Money And Levels",
+   CurrentValue = false,
+   Flag = "Inf STUFF",
+   Callback = function(Value)
+      getgenv().EndRescueLoop = Value
+      if Value then
+         task.spawn(function()
+            while getgenv().EndRescueLoop do
+               local args = { "EndCrime", {} }
+               pcall(function()
+                  game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("CrimeHandler"):FireServer(unpack(args))
+               end)
+               task.wait(0.5)  -- Slower loop (2x/sec max)
+            end
+         end)
+         Rayfield:Notify({
+            Title = "Inf ACTIVE",
+            Content = "Spamming EndCrime (slower loop)... (Toggle off to stop)",
+            Duration = 2.5,
+         })
+      else
+         Rayfield:Notify({
+            Title = "Inf STOPPED",
+            Content = "Loop disconnected safely.",
+            Duration = 2,
+         })
+      end
+   end,
+})
+
+-- Rejoin Button
+MainTab:CreateButton({
+   Name = "ð Rejoin Server (Safe Reboot)",
+   Callback = function()
+      Rayfield:Notify({
+         Title = "Rejoining...",
+         Content = "Teleporting back to Era of Supes.",
+         Duration = 1.5,
+      })
+      game:GetService("TeleportService"):Teleport(game.PlaceId)
+   end,
+})
