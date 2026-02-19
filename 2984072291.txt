@@ -1,0 +1,187 @@
+if getgenv().SLoaded then
+	return
+end
+getgenv().SLoaded = true
+
+local TweenService = cloneref(game:GetService("TweenService"))
+local HttpService = cloneref(game:GetService("HttpService"))
+local UserInputService = cloneref(game:GetService("UserInputService"))
+local Players = cloneref(game:GetService("Players"))
+local Player = Players.LocalPlayer
+local Char = Player.Character
+
+local CastRay = filtergc("function", {Name = "CastRay"}, true)
+if not CastRay then return end
+
+local BG = Color3.fromRGB(46, 52, 64)
+local TextCol = Color3.fromRGB(229, 233, 240)
+local Green = Color3.fromRGB(163, 190, 140)
+local Red = Color3.fromRGB(191, 97, 106)
+local Blue = Color3.fromRGB(136, 192, 208)
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = HttpService:GenerateGUID(false)
+Gui.ResetOnSpawn = false
+Gui.IgnoreGuiInset = true
+Gui.DisplayOrder = 999999
+Gui.Parent = typeof(gethui) == "function" and gethui() or game:GetService("CoreGui")
+
+local Holder = Instance.new("Frame", Gui)
+Holder.AnchorPoint = Vector2.new(0.5, 0)
+Holder.Position = UDim2.new(0.5, 0, 0, 50)
+Holder.Size = UDim2.new(0, 400, 0, 300)
+Holder.BackgroundTransparency = 1
+
+local Layout = Instance.new("UIListLayout", Holder)
+Layout.Padding = UDim.new(0, 8)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local Toasts = {}
+
+local function Notify(Msg, Dur, Col)
+	Dur = Dur or 3
+	Col = Col or Blue
+	if #Toasts >= 5 then
+		local Old = table.remove(Toasts, 1)
+		if Old then Old:Destroy() end
+	end
+	local Toast = Instance.new("Frame")
+	Toast.BackgroundColor3 = BG
+	Toast.Size = UDim2.new(1, 0, 0, 0)
+	Toast.ClipsDescendants = true
+	Toast.Parent = Holder
+	Instance.new("UICorner", Toast).CornerRadius = UDim.new(0, 6)
+	local Bar = Instance.new("Frame", Toast)
+	Bar.BackgroundColor3 = Col
+	Bar.Size = UDim2.new(0, 3, 0.6, 0)
+	Bar.Position = UDim2.new(0, 10, 0.2, 0)
+	Instance.new("UICorner", Bar).CornerRadius = UDim.new(1, 0)
+	local Txt = Instance.new("TextLabel", Toast)
+	Txt.BackgroundTransparency = 1
+	Txt.Position = UDim2.new(0, 24, 0, 0)
+	Txt.Size = UDim2.new(1, -34, 1, 0)
+	Txt.Font = Enum.Font.GothamMedium
+	Txt.TextSize = 14
+	Txt.TextColor3 = TextCol
+	Txt.TextXAlignment = Enum.TextXAlignment.Left
+	Txt.Text = Msg
+	Txt.TextTransparency = 1
+	Txt.RichText = true
+	Txt.TextWrapped = true
+	local Prog = Instance.new("Frame", Toast)
+	Prog.AnchorPoint = Vector2.new(0, 1)
+	Prog.Position = UDim2.new(0, 0, 1, 0)
+	Prog.Size = UDim2.new(1, 0, 0, 2)
+	Prog.BackgroundColor3 = Col
+	Prog.BackgroundTransparency = 0.5
+	table.insert(Toasts, Toast)
+	TweenService:Create(Toast, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Size = UDim2.new(1, 0, 0, 44)}):Play()
+	TweenService:Create(Txt, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+	local ProgTween = TweenService:Create(Prog, TweenInfo.new(Dur, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 2)})
+	ProgTween:Play()
+	ProgTween.Completed:Connect(function()
+		TweenService:Create(Toast, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0)}):Play()
+		task.wait(0.2)
+		for I, V in Toasts do
+			if V == Toast then table.remove(Toasts, I) break end
+		end
+		Toast:Destroy()
+	end)
+end
+
+local function GetClosestZombie()
+	local Closest = math.huge
+	local Target
+
+	local Zombies = workspace:FindFirstChild("Zombies")
+	local HRP = Char and Char:FindFirstChild("HumanoidRootPart")
+	if not Zombies or not HRP then return end
+
+	for _, Zombie in Zombies:GetChildren() do
+		local AimPart = Zombie:FindFirstChild(Config.AimPart)
+		if not AimPart then continue end
+
+		local Distance = (AimPart.Position - HRP.Position).Magnitude
+		if Closest > Distance then
+			Closest = Distance
+			Target = Zombie
+		end
+	end
+
+	return Target
+end
+
+local OgCast = clonefunction(CastRay)
+
+hookfunction(CastRay, newcclosure(function(Self, Cfg, Ignore)
+	if not Config.SilentAim then return OgCast(Self, Cfg, Ignore) end
+
+	Char = Player.Character
+	local Target = GetClosestZombie()
+	if not Target then return OgCast(Self, Cfg, Ignore) end
+
+	local AimPos, AimInst
+
+	if Target.Name == "ZT_ToxicZombie" then
+		local Ok, Hitbox = pcall(function() return Target.Hitboxes.Flesh.Head.HITBOX_Head end)
+		if Ok and Hitbox then
+			AimPos = Hitbox.Position
+			AimInst = Hitbox
+		end
+	end
+
+	if not AimPos then
+		local Part = Target:FindFirstChild(Config.AimPart)
+		if Part then
+			AimPos = Part.Position
+			AimInst = Part
+		end
+	end
+
+	if not AimPos then return OgCast(Self, Cfg, Ignore) end
+
+	if Config.Wallbang then
+		return {Position = AimPos, Instance = AimInst}
+	else
+		local Camera = workspace.CurrentCamera
+		local Origin = Camera.CFrame.Position
+		local Direction = (AimPos - Origin).Unit * 5000
+		local Params = RaycastParams.new()
+		Params.FilterType = Enum.RaycastFilterType.Blacklist
+		Params.FilterDescendantsInstances = {Char}
+		Params.IgnoreWater = true
+
+		if Ignore then
+			for _, Item in ipairs(Ignore) do
+				table.insert(Params.FilterDescendantsInstances, Item)
+			end
+		end
+
+		local IgnoreFolder = workspace:FindFirstChild("Ignore")
+		if IgnoreFolder then
+			table.insert(Params.FilterDescendantsInstances, IgnoreFolder)
+		end
+
+		local Result = workspace:Raycast(Origin, Direction, Params)
+
+		if Result and Result.Instance then
+			if Result.Instance:IsDescendantOf(Target) then
+				return {Position = AimPos, Instance = AimInst}
+			else
+				return OgCast(Self, Cfg, Ignore)
+			end
+		else
+			return {Position = AimPos}
+		end
+	end
+end))
+
+UserInputService.InputBegan:Connect(function(Input, GP)
+	if GP then return end
+	if Input.KeyCode == Config.ToggleBind then
+		Config.SilentAim = not Config.SilentAim
+		Notify(Config.SilentAim and "Silent Aim: ON" or "Silent Aim: OFF", 2, Config.SilentAim and Green or Red)
+	end
+end)
+
+Notify("fuck em zombies boii", 3.4, Blue)
