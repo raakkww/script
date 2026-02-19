@@ -1,0 +1,61 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Client = Players.LocalPlayer
+local Network = require(ReplicatedStorage.Modules.Utility.Network)
+getgenv().AutoFishGo = not getgenv().AutoFishGo
+print("Enabled:", getgenv().AutoFishGo)
+
+if getgenv().LoopReel then
+    getgenv().LoopReel:Disconnect()
+    getgenv().LoopReel = nil
+end
+
+function BuyBait()
+    for i,v in next, Workspace.World.Map.Bait:GetChildren() do
+        if v:IsA("Model") and v.Name:match("%d") then
+            local Label = v:FindFirstChild("Stockage",true)
+            if Label and Label.Text:match("%d") then
+                local BuyPrompt = v.CurrentPack:FindFirstChild("ProximityPrompt",true)
+                if BuyPrompt then
+                    fireproximityprompt(BuyPrompt)
+                end
+            end
+        end
+    end
+end
+
+getgenv().LoopReel = RunService.RenderStepped:Connect(function()
+    if not getgenv().AutoFishGo then return end
+    local Character = Client.Character
+    if not Character then return end
+    BuyBait()
+    local MaxSizeLabel = Client.PlayerGui.MainUi.Inventory.MaxSize
+    local text = MaxSizeLabel.Text
+    local current, max = text:match("(%d+)%/(%d+)")
+    current = tonumber(current)
+    max = tonumber(max)
+    if current and max and current >= max then
+        print("Inventory Full! Selling...")
+        Network.Send("SellInventory")
+        return
+    end
+
+    if not Workspace.Hooks:FindFirstChild(tostring(Client.UserId)) then
+        Network.Send("RodActivated", {
+            LuckMulti = 9e9;
+            Mouse = {
+                Target = Workspace.World.Map.Holder.Water;
+                Hit = CFrame.new(Vector3.zero)
+            }
+        })
+        return
+    end
+    local Head = Character:FindFirstChild("Head")
+    if Head and Head:FindFirstChild("Exclamation") then
+        Network.Send("GotFish")
+        Network.Send("DisconnectedFishing")
+        return
+    end
+end)
