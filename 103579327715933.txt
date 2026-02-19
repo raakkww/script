@@ -1,0 +1,33 @@
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- This waits until the "ToFind" folder actually exists in the Workspace
+local targetFolder = workspace:WaitForChild("ToFind", 10) 
+
+if targetFolder then
+    -- Send the notification first so you know it started
+    StarterGui:SetCore("SendNotification", {
+        Title = "Script Loaded",
+        Text = "made by c00ljj",
+        Duration = 5
+    })
+
+    -- Loop through everything inside the folder
+    local items = targetFolder:GetChildren()
+    for i = 1, #items do
+        local item = items[i]
+        
+        -- If it's a Model or a Part, move it to you
+        if item:IsA("Model") then
+            item:MoveTo(rootPart.Position)
+        elseif item:IsA("BasePart") then
+            item.CFrame = rootPart.CFrame
+        end
+    end
+else
+    warn("Could not find the folder named 'ToFind'!")
+end
