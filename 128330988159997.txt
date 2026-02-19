@@ -1,0 +1,18 @@
+--https://discord.gg/eTHyrcqXcA join to more random open source games
+--in buckshot has phantom forces, ar2, bad busniss and tc2.
+-- bad busniss and tc2 are full open source
+-- phantom forces and ar2 is not open source
+
+local p = game.Players.LocalPlayer
+
+p.DescendantAdded:Connect(function(o)
+	if o:GetAttribute("Recoil") then o:SetAttribute("Recoil",0) end
+	if o:GetAttribute("Spread") then o:SetAttribute("Spread",0) end
+	if o:GetAttribute("FireRate") then o:SetAttribute("FireRate",3000) end
+end)
+
+for _,o in pairs(p:GetDescendants()) do
+	if o:GetAttribute("Recoil") then o:SetAttribute("Recoil",0) end
+	if o:GetAttribute("Spread") then o:SetAttribute("Spread",0) end
+	if o:GetAttribute("FireRate") then o:SetAttribute("FireRate",3000) end
+end
