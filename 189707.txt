@@ -1,0 +1,486 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
+local HttpService = game:GetService("HttpService")
+
+local function safeCall(fn, ...)
+	local ok, res = pcall(fn, ...)
+	if not ok then warn("[Tsunami Error]:", res) end
+	return ok, res
+end
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+local ConfigFileName = "Tsunami_v4_Config.json"
+local Config = {
+	theme = { current = "tsunami", lastPosition = nil },
+	prediction = { enabled = true, lead_dist = 1.5 },
+	antiCheat = { fakeLag = false },
+	blackhole = { enabled = false, visualEffects = true },
+	dz7_ai = { enabled = false, aggression = 0.7 },
+	lightning = { enabled = false, group_mode = false },
+	cyber = { enabled = true, portals = true },
+	target_check = { 
+		auto_randomize = true, 
+		history = {}
+	},
+	bypass = {
+		vehicle_armor = true
+	}
+}
+
+pcall(function()
+	if isfile(ConfigFileName) then
+		local data = HttpService:JSONDecode(readfile(ConfigFileName))
+		for k,v in pairs(data) do Config[k] = v end
+	end
+end)
+
+local function SaveConfig()
+	safeCall(function()
+		writefile(ConfigFileName, HttpService:JSONEncode(Config))
+	end)
+end
+
+task.spawn(function()
+	while task.wait(30) do SaveConfig() end
+end)
+
+local Themes = {
+	tsunami = {
+		main = Color3.fromRGB(5,10,25), accent = Color3.fromRGB(15,25,40), 
+		text = Color3.fromRGB(0,255,230), glow = Color3.fromRGB(0,150,200),
+		highlight = Color3.fromRGB(50,200,255)
+	},
+	dark = {
+		main = Color3.fromRGB(25,25,25), accent = Color3.fromRGB(35,35,35),
+		text = Color3.fromRGB(255,255,255), glow = Color3.fromRGB(100,100,100),
+		highlight = Color3.fromRGB(200,200,200)
+	},
+	crimson = {
+		main = Color3.fromRGB(20,5,5), accent = Color3.fromRGB(40,10,10),
+		text = Color3.fromRGB(255,50,50), glow = Color3.fromRGB(200,0,0),
+		highlight = Color3.fromRGB(255,100,100)
+	}
+}
+
+local Visuals = {}
+
+function Visuals:CreatePortal(pos)
+	if not Config.cyber.portals then return end
+	task.spawn(function()
+		local p = Instance.new("Part")
+		p.Size = Vector3.new(1,1,1)
+		p.Shape = Enum.PartType.Ball
+		p.CFrame = CFrame.new(pos)
+		p.Anchored = true
+		p.CanCollide = false
+		p.Material = Enum.Material.Neon
+		p.Color = Themes[Config.theme.current].highlight
+		p.Transparency = 0.2
+		p.Parent = Workspace
+		
+		local t1 = TweenService:Create(p, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Size = Vector3.new(12,12,12), Transparency = 1})
+		t1:Play()
+		t1.Completed:Wait()
+		p:Destroy()
+	end)
+end
+
+function Visuals:FlashLightning()
+	if not Config.lightning.enabled then return end
+	local f = Instance.new("Frame")
+	f.Size = UDim2.new(1,0,1,0)
+	f.BackgroundColor3 = Themes[Config.theme.current].highlight
+	f.BackgroundTransparency = 0.6
+	f.Parent = game.CoreGui
+	
+	local t = TweenService:Create(f, TweenInfo.new(0.2), {BackgroundTransparency = 1})
+	t:Play()
+	t.Completed:Connect(function() f:Destroy() end)
+	
+	local s = Instance.new("Sound")
+	s.SoundId = "rbxassetid://9117053701"
+	s.Volume = 0.5
+	s.Parent = Workspace
+	s:Play()
+	Debris:AddItem(s, 1)
+end
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "Tsunami_v4_5"
+Gui.Parent = gethui and gethui() or game:GetService("CoreGui")
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.new(0,320,0,420)
+if Config.theme.lastPosition then
+	Main.Position = UDim2.new(Config.theme.lastPosition.X.Scale, Config.theme.lastPosition.X.Offset, Config.theme.lastPosition.Y.Scale, Config.theme.lastPosition.Y.Offset)
+else
+	Main.Position = UDim2.new(0.5,-160,0.5,-210)
+end
+Main.BackgroundColor3 = Themes[Config.theme.current].main
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = Gui
+
+Main:GetPropertyChangedSignal("Position"):Connect(function()
+	Config.theme.lastPosition = Main.Position
+end)
+
+local UIGlow = Instance.new("UIStroke", Main)
+UIGlow.Color = Themes[Config.theme.current].glow
+UIGlow.Thickness = 2
+UIGlow.Transparency = 0.5
+
+local UICorner = Instance.new("UICorner", Main) UICorner.CornerRadius = UDim.new(0,8)
+
+local Label = Instance.new("TextLabel", Main)
+Label.Size = UDim2.new(1,0,0,40)
+Label.BackgroundColor3 = Themes[Config.theme.current].accent
+Label.Text = "  ð TSUNAMI SYSTEM v4.5"
+Label.TextColor3 = Themes[Config.theme.current].text
+Label.Font = Enum.Font.GothamBold
+Label.TextSize = 14
+Label.TextXAlignment = Enum.TextXAlignment.Left
+local UICorner2 = Instance.new("UICorner", Label) UICorner2.CornerRadius = UDim.new(0,8)
+
+local MinBtn = Instance.new("TextButton", Main)
+MinBtn.Size = UDim2.new(0,30,0,30)
+MinBtn.Position = UDim2.new(1,-35,0,5)
+MinBtn.BackgroundTransparency = 1
+MinBtn.Text = "_"
+MinBtn.TextColor3 = Themes[Config.theme.current].text
+MinBtn.TextSize = 20
+MinBtn.Font = Enum.Font.GothamBold
+
+local CloseBtn = Instance.new("TextButton", Main)
+CloseBtn.Size = UDim2.new(0,30,0,30)
+CloseBtn.Position = UDim2.new(1,-65,0,5)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255,100,100)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.GothamBold
+
+local Content = Instance.new("Frame", Main)
+Content.Size = UDim2.new(1,0,1,-40)
+Content.Position = UDim2.new(0,0,0,40)
+Content.BackgroundTransparency = 1
+
+local Box = Instance.new("TextBox", Content)
+Box.Size = UDim2.new(0.65,0,0,35)
+Box.Position = UDim2.new(0.05,0,0.05,0)
+Box.BackgroundColor3 = Themes[Config.theme.current].accent
+Box.TextColor3 = Themes[Config.theme.current].text
+Box.PlaceholderText = "Target Name..."
+Box.Text = ""
+Box.Font = Enum.Font.GothamSemibold
+Box.TextSize = 14
+local BoxCorner = Instance.new("UICorner", Box) BoxCorner.CornerRadius = UDim.new(0,6)
+
+local Suggestion = Instance.new("TextLabel", Content)
+Suggestion.Size = UDim2.new(0.65,0,0,20)
+Suggestion.Position = UDim2.new(0.05,0,0.15,0)
+Suggestion.BackgroundTransparency = 1
+Suggestion.Text = ""
+Suggestion.TextColor3 = Color3.fromRGB(150,150,150)
+Suggestion.TextTransparency = 0.5
+Suggestion.Font = Enum.Font.Gotham
+Suggestion.TextSize = 12
+Suggestion.TextXAlignment = Enum.TextXAlignment.Left
+
+local RefreshBtn = Instance.new("TextButton", Content)
+RefreshBtn.Size = UDim2.new(0.2,0,0,35)
+RefreshBtn.Position = UDim2.new(0.75,0,0.05,0)
+RefreshBtn.BackgroundColor3 = Themes[Config.theme.current].button or Color3.fromRGB(0,80,120)
+RefreshBtn.Text = "RND"
+RefreshBtn.TextColor3 = Themes[Config.theme.current].text
+RefreshBtn.Font = Enum.Font.GothamBold
+local RefCorner = Instance.new("UICorner", RefreshBtn) RefCorner.CornerRadius = UDim.new(0,6)
+
+local function CreateToggle(name, text, yPos, configTable, configKey)
+	local btn = Instance.new("TextButton", Content)
+	btn.Size = UDim2.new(0.42,0,0,30)
+	local isRight = (yPos % 1 ~= 0)
+	btn.Position = UDim2.new(isRight and 0.53 or 0.05, 0, math.floor(yPos) * 0.11 + 0.18, 0)
+	
+	local state = configTable[configKey]
+	btn.BackgroundColor3 = state and Themes[Config.theme.current].highlight or Themes[Config.theme.current].accent
+	btn.Text = text .. (state and ": ON" or ": OFF")
+	btn.TextColor3 = Themes[Config.theme.current].text
+	btn.Font = Enum.Font.GothamSemibold
+	btn.TextSize = 12
+	local corner = Instance.new("UICorner", btn) corner.CornerRadius = UDim.new(0,6)
+	
+	btn.MouseButton1Click:Connect(function()
+		configTable[configKey] = not configTable[configKey]
+		local newState = configTable[configKey]
+		btn.Text = text .. (newState and ": ON" or ": OFF")
+		TweenService:Create(btn, TweenInfo.new(0.3), {
+			BackgroundColor3 = newState and Themes[Config.theme.current].highlight or Themes[Config.theme.current].accent
+		}):Play()
+	end)
+	return btn
+end
+
+CreateToggle("Pred", "PREDICTION", 0, Config.prediction, "enabled")
+CreateToggle("Walls", "ARMOR BYPASS", 0.5, Config.bypass, "vehicle_armor")
+CreateToggle("Portal", "PORTALS", 1, Config.cyber, "portals")
+CreateToggle("Light", "LIGHTNING", 1.5, Config.lightning, "enabled")
+CreateToggle("AI", "DZ7 AI", 2, Config.dz7_ai, "enabled")
+CreateToggle("BH", "BLACKHOLE", 2.5, Config.blackhole, "enabled")
+
+local DomainBtn = Instance.new("TextButton", Content)
+DomainBtn.Size = UDim2.new(0.9,0,0,40)
+DomainBtn.Position = UDim2.new(0.05,0,0.55,0)
+DomainBtn.BackgroundColor3 = Themes[Config.theme.current].highlight
+DomainBtn.Text = "ACTIVATE DOMAIN"
+DomainBtn.TextColor3 = Themes[Config.theme.current].main
+DomainBtn.Font = Enum.Font.GothamBold
+DomainBtn.TextSize = 16
+local DomCorner = Instance.new("UICorner", DomainBtn) DomCorner.CornerRadius = UDim.new(0,6)
+
+local TargetInfoFrame = Instance.new("Frame", Content)
+TargetInfoFrame.Size = UDim2.new(0.9,0,0,40)
+TargetInfoFrame.Position = UDim2.new(0.05,0,0.75,0)
+TargetInfoFrame.BackgroundTransparency = 1
+
+local TargetNameLabel = Instance.new("TextLabel", TargetInfoFrame)
+TargetNameLabel.Size = UDim2.new(1,0,0,20)
+TargetNameLabel.BackgroundTransparency = 1
+TargetNameLabel.Text = "Target: None"
+TargetNameLabel.TextColor3 = Themes[Config.theme.current].text
+TargetNameLabel.Font = Enum.Font.Gotham
+TargetNameLabel.TextSize = 12
+TargetNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local DistanceLabel = Instance.new("TextLabel", TargetInfoFrame)
+DistanceLabel.Size = UDim2.new(1,0,0,20)
+DistanceLabel.Position = UDim2.new(0,0,0,20)
+DistanceLabel.BackgroundTransparency = 1
+DistanceLabel.Text = "Distance: --"
+DistanceLabel.TextColor3 = Themes[Config.theme.current].text
+DistanceLabel.Font = Enum.Font.Gotham
+DistanceLabel.TextSize = 12
+DistanceLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local Status = Instance.new("TextLabel", Content)
+Status.Size = UDim2.new(0.9,0,0,20)
+Status.Position = UDim2.new(0.05,0,0.92,0)
+Status.BackgroundTransparency = 1
+Status.Text = "System Ready - v4.5"
+Status.TextColor3 = Themes[Config.theme.current].text
+Status.Font = Enum.Font.Code
+Status.TextSize = 11
+
+local isMinimized = false
+MinBtn.MouseButton1Click:Connect(function()
+	isMinimized = not isMinimized
+	if isMinimized then
+		Content.Visible = false
+		Main:TweenSize(UDim2.new(0,320,0,40), "Out", "Quad", 0.3, true)
+		MinBtn.Text = "+"
+	else
+		Main:TweenSize(UDim2.new(0,320,0,420), "Out", "Quad", 0.3, true)
+		task.wait(0.3)
+		Content.Visible = true
+		MinBtn.Text = "_"
+	end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+	SaveConfig()
+	Gui:Destroy()
+end)
+
+Box:GetPropertyChangedSignal("Text"):Connect(function()
+	local input = Box.Text:lower()
+	Suggestion.Text = ""
+	if input == "" then return end
+	
+	for _, name in ipairs(Config.target_check.history) do
+		if name:lower():sub(1, #input) == input then
+			Suggestion.Text = name
+			return
+		end
+	end
+	
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Name:lower():sub(1, #input) == input then
+			Suggestion.Text = plr.Name
+			return
+		end
+	end
+end)
+
+Box.FocusLost:Connect(function(enterPressed)
+	if enterPressed and Suggestion.Text ~= "" then
+		Box.Text = Suggestion.Text
+		Suggestion.Text = ""
+		table.insert(Config.target_check.history, 1, Box.Text)
+	end
+end)
+
+local function ApplyTheme(themeName)
+	Config.theme.current = themeName
+	local t = Themes[themeName]
+	Main.BackgroundColor3 = t.main
+	Label.BackgroundColor3 = t.accent
+	Label.TextColor3 = t.text
+	Box.TextColor3 = t.text
+	UIGlow.Color = t.glow
+	for _, btn in pairs(Content:GetChildren()) do
+		if btn:IsA("TextButton") and btn ~= DomainBtn then
+			if btn.Text:find("ON") then
+				btn.BackgroundColor3 = t.highlight
+			else
+				btn.BackgroundColor3 = t.accent
+			end
+			btn.TextColor3 = t.text
+		end
+	end
+	TargetNameLabel.TextColor3 = t.text
+	DistanceLabel.TextColor3 = t.text
+end
+
+local targets = {}
+local active = false
+local flingVelocity = Vector3.new(99999, 99999, 99999)
+
+local function GetTargetPart(char)
+	if not char then return nil end
+	
+	local hum = char:FindFirstChild("Humanoid")
+	if Config.bypass.vehicle_armor and hum and hum.SeatPart then
+		return char:FindFirstChild("Head")
+	end
+	
+	return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+end
+
+DomainBtn.MouseButton1Click:Connect(function()
+	active = not active
+	DomainBtn.Text = active and "DEACTIVATE DOMAIN" or "ACTIVATE DOMAIN"
+	DomainBtn.BackgroundColor3 = active and Color3.fromRGB(255,50,50) or Themes[Config.theme.current].highlight
+	
+	if active then
+		local txt = Box.Text
+		targets = {}
+		if txt == "ALL" or txt == "all" then
+			for _, p in ipairs(Players:GetPlayers()) do
+				if p ~= LocalPlayer then table.insert(targets, p.Name) end
+			end
+			Visuals:FlashLightning()
+		else
+			table.insert(targets, txt)
+		end
+		
+		if #targets > 0 and Players:FindFirstChild(targets[1]) then
+			local tChar = Players[targets[1]].Character
+			if tChar and tChar.PrimaryPart then
+				Visuals:CreatePortal(tChar.PrimaryPart.Position)
+			end
+		end
+	end
+end)
+
+RefreshBtn.MouseButton1Click:Connect(function()
+	local p = Players:GetPlayers()
+	local r = p[math.random(1, #p)]
+	if r ~= LocalPlayer then
+		Box.Text = r.Name
+	end
+end)
+
+Status.Text = "Loaded Config | Position Saved | v4.5"
+ApplyTheme(Config.theme.current)
+
+RunService.Stepped:Connect(function()
+	if active and LocalPlayer.Character then
+		for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+			if v:IsA("BasePart") then v.CanCollide = false end
+		end
+	end
+end)
+
+local function PhysicsLoop()
+	RunService.Heartbeat:Connect(function()
+		if not active then
+			TargetNameLabel.Text = "Target: None"
+			DistanceLabel.Text = "Distance: --"
+			
+			local myChar = LocalPlayer.Character
+			if myChar then
+				local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+				if myRoot then
+					myRoot.Velocity = Vector3.new(0,0,0)
+				end
+			end
+			return
+		end
+		
+		local myChar = LocalPlayer.Character
+		if not myChar then return end
+		local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+		if not myRoot then return end
+		
+		local v = myRoot.Velocity
+		myRoot.Velocity = Vector3.new(0,0,0)
+		myRoot.AssemblyLinearVelocity = flingVelocity
+		
+		for _, targetName in ipairs(targets) do
+			local targetPlr = Players:FindFirstChild(targetName)
+			if targetPlr and targetPlr.Character then
+				local tPart = GetTargetPart(targetPlr.Character)
+				if tPart then
+					local dest = tPart.Position
+					if Config.prediction.enabled then
+						dest = dest + (tPart.Velocity * Config.prediction.lead_dist * (1/60))
+					end
+					
+					local offset = Vector3.new(math.random()-0.5, math.random()-0.5, math.random()-0.5)
+					myRoot.CFrame = CFrame.new(dest + offset)
+					
+					if Config.dz7_ai.enabled then
+						myRoot.RotVelocity = Vector3.new(99999,99999,99999)
+					end
+				end
+			end
+		end
+		
+		if #targets > 0 then
+			local targetName = targets[1]
+			local targetPlr = Players:FindFirstChild(targetName)
+			if targetPlr and targetPlr.Character then
+				local displayName = targetPlr.DisplayName or targetName
+				TargetNameLabel.Text = "Target: " .. displayName .. " (" .. targetName .. ")"
+				
+				local tPart = GetTargetPart(targetPlr.Character)
+				if tPart and myRoot then
+					local dist = (tPart.Position - myRoot.Position).Magnitude
+					DistanceLabel.Text = string.format("Distance: %.1f studs", dist)
+				else
+					DistanceLabel.Text = "Distance: ?"
+				end
+			else
+				TargetNameLabel.Text = "Target: " .. targetName .. " (invalid)"
+				DistanceLabel.Text = "Distance: --"
+			end
+		else
+			TargetNameLabel.Text = "Target: None"
+			DistanceLabel.Text = "Distance: --"
+		end
+	end)
+end
+PhysicsLoop()
