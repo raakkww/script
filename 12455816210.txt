@@ -1,0 +1,144 @@
+-- Auto Spam (Single Message) with GUI
+-- Compatible with both new (TextChatService) and old chat systems
+
+local player = game.Players.LocalPlayer
+local TextChatService = game:GetService("TextChatService")
+
+-- Create GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SpamGUI"
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 250, 0, 150)
+frame.Position = UDim2.new(0.5, -125, 0.5, -75)
+frame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "Auto Spam (1 Message)"
+title.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 20
+title.Parent = frame
+
+local messageBox = Instance.new("TextBox")
+messageBox.Size = UDim2.new(1, -20, 0, 40)
+messageBox.Position = UDim2.new(0, 10, 0, 35)
+messageBox.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+messageBox.TextColor3 = Color3.new(1, 1, 1)
+messageBox.Text = "Your message here"
+messageBox.Font = Enum.Font.SourceSans
+messageBox.TextSize = 16
+messageBox.ClearTextOnFocus = false
+messageBox.Parent = frame
+
+local intervalBox = Instance.new("TextBox")
+intervalBox.Size = UDim2.new(0.5, -15, 0, 30)
+intervalBox.Position = UDim2.new(0, 10, 0, 85)
+intervalBox.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+intervalBox.TextColor3 = Color3.new(1, 1, 1)
+intervalBox.Text = "5"
+intervalBox.Font = Enum.Font.SourceSans
+intervalBox.TextSize = 16
+intervalBox.ClearTextOnFocus = false
+intervalBox.Parent = frame
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0.5, -15, 0, 30)
+toggleBtn.Position = UDim2.new(0.5, 5, 0, 85)
+toggleBtn.BackgroundColor3 = Color3.new(0, 0.6, 0)
+toggleBtn.Text = "Start"
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.SourceSansBold
+toggleBtn.TextSize = 18
+toggleBtn.Parent = frame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 25)
+statusLabel.Position = UDim2.new(0, 10, 0, 120)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Stopped"
+statusLabel.TextColor3 = Color3.new(1, 0, 0)
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.TextSize = 16
+statusLabel.Parent = frame
+
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- State
+local isRunning = false
+local loopCoroutine
+
+-- Function to send a message (supports both new and old chat)
+local function sendMessage(msg)
+	if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+		-- New chat system
+		local channels = TextChatService:WaitForChild("TextChannels")
+		local general = channels:FindFirstChild("RBXGeneral")
+		if general then
+			general:SendAsync(msg)
+		else
+			local first = channels:FindFirstChildOfClass("TextChannel")
+			if first then first:SendAsync(msg) end
+		end
+	else
+		-- Legacy chat
+		local chat = game:GetService("Chat")
+		local head = player.Character and player.Character:FindFirstChild("Head")
+		if head then
+			chat:Chat(head, msg, Enum.ChatColor.White)
+		else
+			chat:Chat(player, msg, Enum.ChatColor.White)
+		end
+	end
+end
+
+-- Start spamming
+local function start()
+	if isRunning then return end
+	local msg = messageBox.Text
+	local interval = tonumber(intervalBox.Text) or 5
+	if interval < 0.5 then interval = 0.5 end  -- avoid excessive spam
+	if msg == "" then msg = "spam" end
+
+	isRunning = true
+	statusLabel.Text = "Running"
+	statusLabel.TextColor3 = Color3.new(0, 1, 0)
+	toggleBtn.Text = "Stop"
+	toggleBtn.BackgroundColor3 = Color3.new(0.8, 0, 0)
+
+	loopCoroutine = coroutine.wrap(function()
+		while isRunning do
+			sendMessage(msg)
+			wait(interval)
+		end
+	end)
+	loopCoroutine()
+end
+
+-- Stop spamming
+local function stop()
+	isRunning = false
+	statusLabel.Text = "Stopped"
+	statusLabel.TextColor3 = Color3.new(1, 0, 0)
+	toggleBtn.Text = "Start"
+	toggleBtn.BackgroundColor3 = Color3.new(0, 0.6, 0)
+end
+
+-- Button click
+toggleBtn.MouseButton1Click:Connect(function()
+	if isRunning then stop() else start() end
+end)
+
+-- Cleanup on player leave
+player:AncestryChanged:Connect(function()
+	if not player.Parent then
+		screenGui:Destroy()
+		script:Destroy()
+	end
+end)
