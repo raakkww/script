@@ -1,0 +1,106 @@
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("ReplicatedStorage")
+
+
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local MainFrame = Instance.new("Frame", ScreenGui)
+local TitleBar = Instance.new("Frame", MainFrame)
+local MoneyBtn = Instance.new("TextButton", MainFrame)
+local ESPBtn = Instance.new("TextButton", MainFrame)
+local CarpetBtn = Instance.new("TextButton", MainFrame)
+local NukeBtn = Instance.new("TextButton", MainFrame)
+
+
+local OpenCloseBtn = Instance.new("TextButton", ScreenGui)
+Instance.new("UICorner", OpenCloseBtn).CornerRadius = UDim.new(0, 8)
+OpenCloseBtn.Size = UDim2.new(0, 50, 0, 50)
+OpenCloseBtn.Position = UDim2.new(0, 10, 0.5, 0)
+OpenCloseBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+OpenCloseBtn.Text = "HUB"
+OpenCloseBtn.TextColor3 = Color3.new(1,1,1)
+OpenCloseBtn.Font = "GothamBold"
+OpenCloseBtn.TextSize = 14
+OpenCloseBtn.Draggable = true -- Simple drag for the small button
+
+
+MainFrame.Size = UDim2.new(0, 180, 0, 210)
+MainFrame.Position = UDim2.new(0.5, -90, 0.4, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.Visible = true
+Instance.new("UICorner", MainFrame)
+
+TitleBar.Size = UDim2.new(1, 0, 0, 30); TitleBar.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+local t = Instance.new("TextLabel", TitleBar); t.Size = UDim2.new(1,0,1,0); t.Text = "BILLIONAIRE HUB V2"; t.TextColor3 = Color3.new(1,1,1); t.BackgroundTransparency = 1; t.Font = "GothamBold"
+Instance.new("UICorner", TitleBar)
+
+local function style(b, txt, y)
+    b.Size = UDim2.new(0.9, 0, 0, 35); b.Position = UDim2.new(0.05, 0, 0, y)
+    b.BackgroundColor3 = Color3.fromRGB(40, 40, 40); b.Text = txt; b.TextColor3 = Color3.new(1,1,1); b.Font = "GothamBold"; b.TextSize = 11
+    Instance.new("UICorner", b)
+end
+
+style(MoneyBtn, "INF MONEY PRINTER: OFF", 40)
+style(ESPBtn, "BRIDGE ESP: OFF", 80)
+style(CarpetBtn, "GET RAINBOW CARPET", 120)
+style(NukeBtn, "SERVER NUKE", 160)
+
+
+local dS, sP, dG
+TitleBar.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dG = true; dS = i.Position; sP = MainFrame.Position end end)
+UIS.InputChanged:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseMovement and dG then
+    local delta = i.Position - dS
+    MainFrame.Position = UDim2.new(sP.X.Scale, sP.X.Offset + delta.X, sP.Y.Scale, sP.Y.Offset + delta.Y)
+end end)
+UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dG = false end end)
+
+
+OpenCloseBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+
+_G.Printing = false
+MoneyBtn.MouseButton1Click:Connect(function()
+    _G.Printing = not _G.Printing
+    MoneyBtn.Text = _G.Printing and "PRINTER: ON" or "INF MONEY PRINTER: OFF"
+    MoneyBtn.TextColor3 = _G.Printing and Color3.new(0, 1, 0) or Color3.new(1, 1, 1)
+    task.spawn(function()
+        while _G.Printing do
+            RS.CratesUtilities.Remotes.GiveReward:FireServer("1000000")
+            task.wait(0.03)
+        end
+    end)
+end)
+
+local espOn = false
+ESPBtn.MouseButton1Click:Connect(function()
+    espOn = not espOn
+    ESPBtn.Text = espOn and "ESP: ON" or "BRIDGE ESP: OFF"
+    local g = workspace:FindFirstChild("Glasses")
+    if g then
+        for _, f in pairs({g:FindFirstChild("Correct"), g:FindFirstChild("Wrong")}) do
+            for _, v in pairs(f:GetChildren()) do
+                if v:IsA("BasePart") then
+                    v.Color = espOn and (f.Name == "Correct" and Color3.new(0,1,0) or Color3.new(1,0,0)) or Color3.fromRGB(163, 162, 165)
+                    v.Material = espOn and Enum.Material.Neon or Enum.Material.Glass
+                end
+            end
+        end
+    end
+end)
+
+CarpetBtn.MouseButton1Click:Connect(function()
+    RS.CratesUtilities.Remotes.GiveReward:FireServer("Carpet")
+end)
+
+NukeBtn.MouseButton1Click:Connect(function()
+    local Daily = RS:WaitForChild("DailyRewardsRemotes")
+    Daily.VerifyFront:FireServer()
+    task.wait(0.2)
+    Daily.OriginFrontman:FireServer()
+    task.wait(0.1)
+    Daily.red:FireServer()
+    NukeBtn.Text = "NUKE SENT!"
+    task.wait(2)
+    NukeBtn.Text = "SERVER NUKE"
+end)
