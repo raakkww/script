@@ -1,0 +1,72 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+getgenv().CustomPointsAmount = -10000  -- Default starting value
+
+local Window = Rayfield:CreateWindow({
+   Name = "Sandman's Legacy Of Krypton | Stat Points â ï¸",
+   LoadingTitle = "Loading Custom Stat Points...",
+   LoadingSubtitle = "by Mr.Sandman - ALT ONLY",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "SandManHub",
+      FileName = "Krypton_StatPoints"
+   },
+   KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Stat Points", 4483362458)
+
+-- Slider: Negative values only (-1 to -1,000,000)
+MainTab:CreateSlider({
+   Name = "Inf Stat Points (-1m is higher than -1)",
+   Range = {-1000000, -1},          -- From -1,000,000 to -1
+   Increment = 1000,                -- Step by 1,000 for easier sliding
+   Suffix = " Points",
+   CurrentValue = -10000,           -- Starts at a moderate negative
+   Flag = "StatPointsAmount",
+   Callback = function(Value)
+      getgenv().CustomPointsAmount = Value
+      Rayfield:Notify({
+         Title = "Amount Updated",
+         Content = "Set to: " .. Value .. " (more negative = bigger overflow)",
+         Duration = 3
+      })
+   end,
+})
+
+-- Apply button
+MainTab:CreateButton({
+   Name = "Apply to combatDamage",
+   Callback = function()
+      pcall(function()
+         local args = {
+            "Add",
+            "combatDamage",
+            getgenv().CustomPointsAmount
+         }
+         game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("ChangeValue"):FireServer(unpack(args))
+      end)
+      Rayfield:Notify({
+         Title = "Fired!",
+         Content = "Sent " .. getgenv().CustomPointsAmount .. " to combatDamage",
+         Duration = 4,
+         Image = 4483362458
+      })
+   end,
+})
+
+-- Quick exit
+MainTab:CreateButton({
+   Name = "Destroy GUI",
+   Callback = function()
+      task.wait(1)
+      Rayfield:Destroy()
+   end,
+})
+
+Rayfield:Notify({
+   Title = "Loaded - Negative Stat Points",
+   Content = "Slide (more negative = stronger) â Apply â¢ ALT account recommended",
+   Duration = 5,
+   Image = 4483362458
+})
