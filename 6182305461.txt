@@ -1,0 +1,16 @@
+local LocalPlayer = game:GetService("Players").LocalPlayer
+while true do
+    pcall(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        for _, v in pairs(char:GetChildren()) do
+            if string.find(v.Name, "Cellphone") then
+                local event = v:FindFirstChild("Remotes", true)
+                if event and event:FindFirstChild("npcAssistance") then
+                    event.npcAssistance:FireServer("MouseBtn1", 8)
+                end
+            end
+        end
+    end)
+    task.wait()
+end
