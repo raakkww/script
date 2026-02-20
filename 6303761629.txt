@@ -1,0 +1,151 @@
+--[[ 
+    CASH INJECTOR V3 (Clean Edition)
+    Developer: MADE BY NHTEPHET
+    Optimized for Delta / Mobile
+--]]
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Configuration
+local Config = {
+    UIName = "NHTEPHET_Utility",
+    AutoRefresh = false,
+    CurrentTarget = 0,
+    MenuVisible = true
+}
+
+-- Cleanup old UI
+if LocalPlayer.PlayerGui:FindFirstChild(Config.UIName) then
+    LocalPlayer.PlayerGui[Config.UIName]:Destroy()
+end
+
+-- UI Setup
+local sg = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+sg.Name = Config.UIName
+sg.ResetOnSpawn = false
+
+-- INTRO TEXT: MADE BY NHTEPHET
+local introLabel = Instance.new("TextLabel", sg)
+introLabel.Size = UDim2.new(1, 0, 1, 0)
+introLabel.BackgroundTransparency = 1
+introLabel.Text = "MADE BY NHTEPHET"
+introLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+introLabel.Font = Enum.Font.SourceSansBold
+introLabel.TextSize = 60
+introLabel.TextTransparency = 1
+
+-- Intro Animation (2 seconds)
+task.spawn(function()
+    TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
+    task.wait(2)
+    TweenService:Create(introLabel, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+    task.wait(0.5)
+    introLabel:Destroy()
+end)
+
+-- Main Frame
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 220, 0, 180)
+main.Position = UDim2.new(0.1, 0, 0.4, 0)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+
+local corner = Instance.new("UICorner", main)
+corner.CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Text = "CASH INJECTOR"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+
+local titleCorner = Instance.new("UICorner", title)
+titleCorner.CornerRadius = UDim.new(0, 10)
+
+-- Minimize Button
+local toggleBtn = Instance.new("TextButton", sg)
+toggleBtn.Size = UDim2.new(0, 40, 0, 40)
+toggleBtn.Position = UDim2.new(0.1, -45, 0.4, 0)
+toggleBtn.Text = "M"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
+toggleBtn.TextColor3 = Color3.new(0, 0, 0)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 20
+
+local tCorner = Instance.new("UICorner", toggleBtn)
+tCorner.CornerRadius = UDim.new(1, 0)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    Config.MenuVisible = not Config.MenuVisible
+    main.Visible = Config.MenuVisible
+    toggleBtn.Text = Config.MenuVisible and "M" or "S"
+end)
+
+-- Input Box
+local amountInput = Instance.new("TextBox", main)
+amountInput.Size = UDim2.new(0, 200, 0, 35)
+amountInput.Position = UDim2.new(0, 10, 0, 50)
+amountInput.PlaceholderText = "Enter Cash Amount"
+amountInput.Text = ""
+amountInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+amountInput.TextColor3 = Color3.new(1, 1, 1)
+amountInput.Font = Enum.Font.Gotham
+amountInput.TextSize = 14
+
+local iCorner = Instance.new("UICorner", amountInput)
+
+-- Apply Button
+local applyBtn = Instance.new("TextButton", main)
+applyBtn.Size = UDim2.new(0, 200, 0, 40)
+applyBtn.Position = UDim2.new(0, 10, 0, 95)
+applyBtn.Text = "INJECT CASH"
+applyBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+applyBtn.TextColor3 = Color3.new(1, 1, 1)
+applyBtn.Font = Enum.Font.GothamBold
+
+local bCorner = Instance.new("UICorner", applyBtn)
+
+-- Destroy UI
+local destroyBtn = Instance.new("TextButton", main)
+destroyBtn.Size = UDim2.new(0, 200, 0, 25)
+destroyBtn.Position = UDim2.new(0, 10, 0, 145)
+destroyBtn.Text = "REMOVE ALL"
+destroyBtn.BackgroundTransparency = 1
+destroyBtn.TextColor3 = Color3.fromRGB(200, 50, 50)
+destroyBtn.Font = Enum.Font.Gotham
+
+-- Main Logic
+applyBtn.MouseButton1Click:Connect(function()
+    local val = tonumber(amountInput.Text:match("%d+"))
+    local cashValue = LocalPlayer.leaderstats:FindFirstChild("Cash")
+    
+    if val and cashValue then
+        Config.CurrentTarget = val
+        Config.AutoRefresh = true
+        cashValue.Value = Config.CurrentTarget
+        
+        task.spawn(function()
+            while Config.AutoRefresh do
+                if cashValue.Value ~= Config.CurrentTarget then
+                    cashValue.Value = Config.CurrentTarget
+                end
+                task.wait(0.5)
+            end
+        end)
+        
+        applyBtn.Text = "SUCCESSFUL"
+        task.wait(1)
+        applyBtn.Text = "INJECT CASH"
+    end
+end)
+
+destroyBtn.MouseButton1Click:Connect(function()
+    Config.AutoRefresh = false
+    sg:Destroy()
+end)
