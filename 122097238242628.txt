@@ -1,0 +1,200 @@
+local player = game.Players.LocalPlayer
+
+local BLOCK = { "reset","new","currently","teleport","travel","map" }
+
+local function isBlocked(name)
+	name = string.lower(name)
+	for _,w in pairs(BLOCK) do
+		if string.find(name,w) then
+			return true
+		end
+	end
+	return false
+end
+
+local function clickSafe(folder)
+	for _,v in pairs(folder:GetDescendants()) do
+		if v:IsA("ClickDetector") then
+			if v.Parent and not isBlocked(v.Parent.Name) then
+				fireclickdetector(v)
+			end
+		end
+	end
+end
+
+local function autoAsteroidUpgrade(moon)
+	if moon:FindFirstChild("AsterBoard") 
+	and moon.AsterBoard:FindFirstChild("Main") then
+		
+		for _,v in pairs(moon.AsterBoard.Main:GetDescendants()) do
+			if v:IsA("ClickDetector") then
+				if string.find(string.lower(v.Parent.Name),"max") then
+					fireclickdetector(v)
+				end
+			end
+		end
+	end
+end
+
+local function touchAsteroid(planet)
+	local char = player.Character
+	if not char then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	for _,obj in pairs(planet:GetDescendants()) do
+		if obj:IsA("BasePart") and string.find(string.lower(obj.Name),"aster") then
+			firetouchinterest(hrp,obj,0)
+			firetouchinterest(hrp,obj,1)
+		end
+	end
+end
+
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.ResetOnSpawn = false
+gui.Name = "Universe_Siqisiwi"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,180,0,200)
+frame.Position = UDim2.new(0.05,0,0.35,0)
+frame.Active = true
+frame.Draggable = true
+frame.BackgroundColor3 = Color3.fromRGB(20,20,35)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,16)
+
+local grad = Instance.new("UIGradient", frame)
+grad.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(25,25,50)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(15,15,30))
+}
+
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(100,180,255)
+stroke.Thickness = 2
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,-30,0,28)
+title.Position = UDim2.new(0,6,0,6)
+title.BackgroundTransparency = 1
+title.Text = "Free Universe"
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.fromRGB(170,220,255)
+
+local credit = Instance.new("TextLabel", frame)
+credit.Size = UDim2.new(1,0,0,18)
+credit.Position = UDim2.new(0,0,1,-18)
+credit.BackgroundTransparency = 1
+credit.Text = " by Siqisiwi"
+credit.TextScaled = true
+credit.Font = Enum.Font.Gotham
+credit.TextColor3 = Color3.fromRGB(120,180,255)
+
+local toggleUI = Instance.new("TextButton", frame)
+toggleUI.Size = UDim2.new(0,22,0,22)
+toggleUI.Position = UDim2.new(1,-26,0,8)
+toggleUI.Text = "-"
+toggleUI.TextScaled = true
+toggleUI.BackgroundColor3 = Color3.fromRGB(40,40,70)
+toggleUI.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", toggleUI).CornerRadius = UDim.new(1,0)
+
+local container = Instance.new("Frame", frame)
+container.Position = UDim2.new(0,0,0,38)
+container.Size = UDim2.new(1,0,1,-60)
+container.BackgroundTransparency = 1
+
+local minimized = false
+toggleUI.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	container.Visible = not minimized
+	credit.Visible = not minimized
+	toggleUI.Text = minimized and "+" or "-"
+	frame.Size = minimized and UDim2.new(0,180,0,40) or UDim2.new(0,180,0,200)
+end)
+
+local function createToggle(text,y)
+	local b = Instance.new("TextButton", container)
+	b.Size = UDim2.new(0.85,0,0,26)
+	b.Position = UDim2.new(0.075,0,0,y)
+	b.BackgroundColor3 = Color3.fromRGB(35,35,60)
+	b.TextColor3 = Color3.fromRGB(220,240,255)
+	b.TextScaled = true
+	b.Text = text.." : OFF"
+	b.Font = Enum.Font.Gotham
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0,8)
+	return b
+end
+
+local earthBtn = createToggle("Earth",0)
+local moonBtn = createToggle("Moon",35)
+local jupiterBtn = createToggle("Jupiter",70)
+local saturnBtn = createToggle("Saturn",105)
+
+local earthAuto, moonAuto, jupiterAuto, saturnAuto = false,false,false,false
+
+earthBtn.MouseButton1Click:Connect(function()
+	earthAuto = not earthAuto
+	earthBtn.Text = "Earth : "..(earthAuto and "ON" or "OFF")
+end)
+
+moonBtn.MouseButton1Click:Connect(function()
+	moonAuto = not moonAuto
+	moonBtn.Text = "Moon : "..(moonAuto and "ON" or "OFF")
+end)
+
+jupiterBtn.MouseButton1Click:Connect(function()
+	jupiterAuto = not jupiterAuto
+	jupiterBtn.Text = "Jupiter : "..(jupiterAuto and "ON" or "OFF")
+end)
+
+saturnBtn.MouseButton1Click:Connect(function()
+	saturnAuto = not saturnAuto
+	saturnBtn.Text = "Saturn : "..(saturnAuto and "ON" or "OFF")
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(0.25)
+
+		local areas = workspace:FindFirstChild("Areas")
+
+		if earthAuto then
+			local upgrades = workspace:FindFirstChild("Upgrades")
+			if upgrades then
+				clickSafe(upgrades)
+			end
+		end
+
+		if moonAuto and areas and areas:FindFirstChild("Moon") then
+			local moon = areas.Moon
+			
+			if moon:FindFirstChild("UpgradeBoard") then
+				clickSafe(moon.UpgradeBoard)
+			end
+			
+			autoAsteroidUpgrade(moon)
+			touchAsteroid(moon)
+		end
+
+		if jupiterAuto and areas and areas:FindFirstChild("Jupiter") then
+			local jupiter = areas.Jupiter
+			
+			if jupiter:FindFirstChild("EssenceBoard") then
+				clickSafe(jupiter.EssenceBoard)
+			end
+			
+			if jupiter:FindFirstChild("EssenceLevel") then
+				clickSafe(jupiter.EssenceLevel)
+			end
+		end
+
+		if saturnAuto and areas and areas:FindFirstChild("Saturn") then
+			local saturn = areas.Saturn
+			
+			if saturn:FindFirstChild("Rings") then
+				clickSafe(saturn.Rings)
+			end
+		end
+	end
+end)
