@@ -1,0 +1,54 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local upgradeEvent = ReplicatedStorage:WaitForChild("UpgradeSpawnTime")
+
+local player = game.Players.LocalPlayer
+
+local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+screenGui.Name = "AutoUpgradeGui"
+
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 250, 0, 150)
+frame.Position = UDim2.new(0.5, -125, 0.5, -75)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "Auto Upgrade"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+title.Text
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local upgradeEvent = ReplicatedStorage:WaitForChild("UpgradeSpawnTime")
+
+local playerData = {}
+
+local BASE_SPAWN_TIME = 5
+local MIN_SPAWN_TIME = 1
+local UPGRADE_AMOUNT = 0.5
+local UPGRADE_COST = 100
+
+game.Players.PlayerAdded:Connect(function(player)
+	playerData[player] = {
+		Coins = 1000,
+		SpawnTime = BASE_SPAWN_TIME
+	}
+end)
+
+game.Players.PlayerRemoving:Connect(function(player)
+	playerData[player] = nil
+end)
+
+upgradeEvent.OnServerEvent:Connect(function(player)
+	local data = playerData[player]
+	if not data then return end
+	
+	if data.Coins >= UPGRADE_COST then
+		if data.SpawnTime > MIN_SPAWN_TIME then
+			data.Coins -= UPGRADE_COST
+			data.SpawnTime -= UPGRADE_AMOUNT
+			
+			print(player.Name .. " upgraded spawn time to: " .. data.SpawnTime)
+		end
+	end
+end)
