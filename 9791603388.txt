@@ -1,0 +1,233 @@
+-- HITBOX GUI ONLY (VERSÃO ESTÁVEL)
+
+local active = true
+local trueActive = true
+local reachType = "Sphere"
+local dmgEnabled = true
+local visualizerEnabled = true
+
+-- Criar visualizador globalmente para evitar duplicatas
+local visualizer = Instance.new("Part")
+visualizer.Name = "HitboxVisualizer"
+visualizer.BrickColor = BrickColor.Blue()
+visualizer.Transparency = 0.6
+visualizer.Anchored = true
+visualizer.CanCollide = false
+visualizer.Size = Vector3.new(0.5,0.5,0.5)
+visualizer.BottomSurface = Enum.SurfaceType.Smooth
+visualizer.TopSurface = Enum.SurfaceType.Smooth
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HitboxGuiSystem"
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999999999
+ScreenGui.ResetOnSpawn = false
+
+-- Proteção contra múltiplos scripts rodando
+local oldGui = game:GetService("CoreGui"):FindFirstChild("HitboxGuiSystem")
+if oldGui then oldGui:Destroy() end
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local Frame = Instance.new("Frame")
+local TextLabel = Instance.new("TextLabel")
+local TextBox = Instance.new("TextBox")
+local TextLabel_2 = Instance.new("TextLabel")
+local TextLabel_3 = Instance.new("TextLabel")
+local TextLabel_4 = Instance.new("TextLabel")
+local TextButton = Instance.new("TextButton")
+local TextButton_2 = Instance.new("TextButton")
+
+Frame.Parent = ScreenGui
+Frame.AnchorPoint = Vector2.new(0, 0.5)
+Frame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Frame.BackgroundTransparency = 0.3
+Frame.BorderSizePixel = 4
+Frame.Position = UDim2.new(0.1, 0, 0.5, 0)
+Frame.Size = UDim2.new(0.15, 0, 0.3, 0)
+Frame.Visible = true
+
+local OpenButton = Instance.new("TextButton")
+OpenButton.Parent = ScreenGui
+OpenButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+OpenButton.BackgroundTransparency = 0.2
+OpenButton.BorderSizePixel = 2
+OpenButton.Position = UDim2.new(0.02, 0, 0.5, 0)
+OpenButton.Size = UDim2.new(0.04, 0, 0.08, 0)
+OpenButton.Text = "H"
+OpenButton.TextColor3 = Color3.new(1, 1, 1)
+OpenButton.TextScaled = true
+OpenButton.Visible = false
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0.5, 0)
+UICorner.Parent = OpenButton
+
+-- Criar labels e inputs (Mesma estrutura sua)
+TextLabel.Parent = Frame
+TextLabel.BackgroundTransparency = 1
+TextLabel.Size = UDim2.new(0.6, 0, 0.2, 0)
+TextLabel.Text = "Alcance:"
+TextLabel.TextColor3 = Color3.new(1,1,1)
+TextLabel.TextScaled = true
+
+TextBox.Parent = Frame
+TextBox.BackgroundTransparency = 1
+TextBox.Position = UDim2.new(0.6, 0, 0, 0)
+TextBox.Size = UDim2.new(0.4, 0, 0.2, 0)
+TextBox.Text = "3.5"
+TextBox.TextColor3 = Color3.fromRGB(255,76,76)
+TextBox.TextScaled = true
+
+TextLabel_2.Parent = Frame
+TextLabel_2.BackgroundTransparency = 1
+TextLabel_2.Position = UDim2.new(0, 0, 0.2, 0)
+TextLabel_2.Size = UDim2.new(0.6, 0, 0.2, 0)
+TextLabel_2.Text = "Tipo:"
+TextLabel_2.TextColor3 = Color3.new(1,1,1)
+TextLabel_2.TextScaled = true
+
+TextLabel_3.Parent = Frame
+TextLabel_3.BackgroundTransparency = 1
+TextLabel_3.Position = UDim2.new(0, 0, 0.4, 0)
+TextLabel_3.Size = UDim2.new(0.6, 0, 0.2, 0)
+TextLabel_3.Text = "Danos:"
+TextLabel_3.TextColor3 = Color3.new(1,1,1)
+TextLabel_3.TextScaled = true
+
+TextLabel_4.Parent = Frame
+TextLabel_4.BackgroundTransparency = 1
+TextLabel_4.Position = UDim2.new(0, 0, 0.6, 0)
+TextLabel_4.Size = UDim2.new(0.6, 0, 0.2, 0)
+TextLabel_4.Text = "Visualizar:"
+TextLabel_4.TextColor3 = Color3.new(1,1,1)
+TextLabel_4.TextScaled = true
+
+TextButton.Parent = Frame
+TextButton.AnchorPoint = Vector2.new(0,1)
+TextButton.BackgroundTransparency = 1
+TextButton.Position = UDim2.new(0,0,1,0)
+TextButton.Size = UDim2.new(1,0,0.15,0)
+TextButton.Text = "Fechar"
+TextButton.TextColor3 = Color3.fromRGB(222,0,0)
+TextButton.TextScaled = true
+
+TextButton_2.Parent = Frame
+TextButton_2.BackgroundTransparency = 1
+TextButton_2.Position = UDim2.new(0.6, 0, 0.2, 0)
+TextButton_2.Size = UDim2.new(0.4, 0, 0.2, 0)
+TextButton_2.Text = "Sphere"
+TextButton_2.TextColor3 = Color3.fromRGB(255,76,76)
+TextButton_2.TextScaled = true
+
+-- Função de Arrastar
+local function MakeDraggable(gui)
+	local UserInputService = game:GetService("UserInputService")
+	local dragging, dragInput, dragStart, startPos
+
+	gui.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = gui.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+
+	gui.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+MakeDraggable(Frame)
+MakeDraggable(OpenButton)
+
+-- Eventos de clique
+TextButton.MouseButton1Click:Connect(function()
+	Frame.Visible = false
+	OpenButton.Visible = true
+end)
+
+OpenButton.MouseButton1Click:Connect(function()
+	OpenButton.Visible = false
+	Frame.Visible = true
+end)
+
+TextButton_2.MouseButton1Click:Connect(function()
+	reachType = (reachType == "Sphere") and "Line" or "Sphere"
+	TextButton_2.Text = reachType
+end)
+
+-- Loop Principal corrigido
+local plr = game.Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+RunService.RenderStepped:Connect(function()
+	if not active or not trueActive then 
+		visualizer.Parent = nil
+		return 
+	end
+
+	local character = plr.Character
+	if not character then 
+		visualizer.Parent = nil 
+		return 
+	end
+
+	local tool = character:FindFirstChildOfClass("Tool")
+	local handle = tool and tool:FindFirstChild("Handle")
+
+	if not handle then
+		visualizer.Parent = nil
+		return
+	end
+
+	local reach = tonumber(TextBox.Text) or 0
+	
+	-- Atualizar Visualizador
+	if visualizerEnabled then
+		visualizer.Parent = workspace
+		visualizer.Shape = Enum.PartType.Ball
+		visualizer.Size = Vector3.new(reach, reach, reach)
+		visualizer.CFrame = handle.CFrame
+	else
+		visualizer.Parent = nil
+	end
+
+	-- Lógica de Hit
+	for _, p in pairs(game.Players:GetPlayers()) do
+		if p ~= plr and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = p.Character.HumanoidRootPart
+			local distance = (hrp.Position - handle.Position).Magnitude
+			if distance <= reach then
+				firetouchinterest(hrp, handle, 0)
+				firetouchinterest(hrp, handle, 1)
+			end
+		end
+	end
+end)
+
+-- Atalho de teclado
+game:GetService("UserInputService").InputBegan:Connect(function(i, gp)
+	if gp then return end
+	if i.KeyCode == Enum.KeyCode.H then
+		if Frame.Visible or OpenButton.Visible then
+			Frame.Visible = false
+			OpenButton.Visible = false
+		else
+			Frame.Visible = true
+		end
+	end
+end)
