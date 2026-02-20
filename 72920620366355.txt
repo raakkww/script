@@ -1,0 +1,231 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local ESP = {}
+
+-- SETTINGS
+local TEAM_CHECK = true
+local MAX_STUCK_TIME = 1.5
+local TOGGLE_KEY = Enum.KeyCode.RightAlt
+
+local ESP_ENABLED = true
+
+----------------------------------------------------
+-- Drawing Helper
+----------------------------------------------------
+
+local function newDrawing(type, props)
+	local obj = Drawing.new(type)
+	for k,v in pairs(props) do
+		obj[k] = v
+	end
+	return obj
+end
+
+local function hide(ui)
+	ui.Box.Visible = false
+	ui.Tracer.Visible = false
+	ui.Health.Visible = false
+	ui.Name.Visible = false
+end
+
+local function hideAll()
+	for _,ui in pairs(ESP) do
+		hide(ui)
+	end
+end
+
+----------------------------------------------------
+-- Toggle Keybind
+----------------------------------------------------
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	
+	if input.KeyCode == TOGGLE_KEY then
+		ESP_ENABLED = not ESP_ENABLED
+		
+		if not ESP_ENABLED then
+			hideAll()
+			print("ESP Disabled")
+		else
+			print("ESP Enabled")
+		end
+	end
+end)
+
+----------------------------------------------------
+-- Create ESP
+----------------------------------------------------
+
+local function createESP(player)
+	if player == LocalPlayer then return end
+	if ESP[player] then return end
+	
+	ESP[player] = {
+		Player = player,
+		
+		Box = newDrawing("Square", {
+			Thickness = 1,
+			Filled = false,
+			Color = Color3.new(1,1,1),
+			Visible = false
+		}),
+		
+		Tracer = newDrawing("Line", {
+			Thickness = 1,
+			Color = Color3.new(1,1,1),
+			Visible = false
+		}),
+		
+		Health = newDrawing("Line", {
+			Thickness = 3,
+			Visible = false
+		}),
+		
+		Name = newDrawing("Text", {
+			Size = 13,
+			Center = true,
+			Outline = true,
+			Font = 2,
+			Visible = false
+		}),
+		
+		LastPosition = nil,
+		StuckTime = 0
+	}
+end
+
+for _,player in ipairs(Players:GetPlayers()) do
+	createESP(player)
+end
+
+Players.PlayerAdded:Connect(createESP)
+
+----------------------------------------------------
+-- Workspace Finder
+----------------------------------------------------
+
+local function findCharacter(player)
+	for _,model in ipairs(workspace:GetChildren()) do
+		if model:IsA("Model") and model.Name == player.Name then
+			local hum = model:FindFirstChildOfClass("Humanoid")
+			local root = model:FindFirstChild("HumanoidRootPart")
+			if hum and root then
+				return model, hum, root
+			end
+		end
+	end
+	return nil
+end
+
+----------------------------------------------------
+-- Bounding Box
+----------------------------------------------------
+
+local function getBox(character)
+	local cf, size = character:GetBoundingBox()
+	local top = cf.Position + Vector3.new(0, size.Y/2, 0)
+	local bottom = cf.Position - Vector3.new(0, size.Y/2, 0)
+
+	local topPos, vis1 = Camera:WorldToViewportPoint(top)
+	local bottomPos, vis2 = Camera:WorldToViewportPoint(bottom)
+
+	if not vis1 or not vis2 then
+		return nil
+	end
+
+	local height = math.abs(topPos.Y - bottomPos.Y)
+	local width = height / 2
+	
+	return Vector2.new(topPos.X - width/2, topPos.Y), width, height
+end
+
+----------------------------------------------------
+-- Main Loop
+----------------------------------------------------
+
+RunService.RenderStepped:Connect(function(dt)
+	if not ESP_ENABLED then return end
+	
+	for player,ui in pairs(ESP) do
+		
+		if TEAM_CHECK and player.Team == LocalPlayer.Team then
+			hide(ui)
+			continue
+		end
+		
+		local character, humanoid, root = findCharacter(player)
+		
+		if not character or not humanoid or humanoid.Health <= 0 then
+			hide(ui)
+			ui.LastPosition = nil
+			ui.StuckTime = 0
+			continue
+		end
+		
+		local pos, width, height = getBox(character)
+		if not pos then
+			hide(ui)
+			ui.LastPosition = nil
+			ui.StuckTime = 0
+			continue
+		end
+		
+		-- Anti-stuck
+		if ui.LastPosition then
+			if (ui.LastPosition - pos).Magnitude < 1 then
+				ui.StuckTime += dt
+			else
+				ui.StuckTime = 0
+			end
+			
+			if ui.StuckTime >= MAX_STUCK_TIME then
+				hide(ui)
+				ui.LastPosition = nil
+				ui.StuckTime = 0
+				continue
+			end
+		end
+		
+		ui.LastPosition = pos
+		
+		-- BOX
+		ui.Box.Size = Vector2.new(width, height)
+		ui.Box.Position = pos
+		ui.Box.Visible = true
+		
+		-- HEALTH
+		local hp = humanoid.Health / humanoid.MaxHealth
+		local healthHeight = height * hp
+		
+		ui.Health.From = Vector2.new(pos.X - 5, pos.Y + height)
+		ui.Health.To = Vector2.new(pos.X - 5, pos.Y + height - healthHeight)
+		ui.Health.Color = Color3.fromRGB(
+			255 - (255*hp),
+			255*hp,
+			0
+		)
+		ui.Health.Visible = true
+		
+		-- TRACER
+		ui.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+		ui.Tracer.To = Vector2.new(pos.X + width/2, pos.Y)
+		ui.Tracer.Visible = true
+		
+		-- NAME + DISTANCE
+		local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if myRoot then
+			local dist = (myRoot.Position - root.Position).Magnitude
+			ui.Name.Text = player.Name .. " [" .. math.floor(dist) .. "m]"
+		else
+			ui.Name.Text = player.Name
+		end
+		
+		ui.Name.Position = Vector2.new(pos.X + width/2, pos.Y - 15)
+		ui.Name.Visible = true
+	end
+end)
