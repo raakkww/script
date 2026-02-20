@@ -1,0 +1,31 @@
+local ITEMS_FOLDER = workspace:WaitForChild("ScavengerHunt")
+
+local function applyHighlight(obj)
+    if obj:IsA("Model") then
+        if not obj:FindFirstChild("ScavengerHighlight") then
+            local h = Instance.new("Highlight")
+            h.Name = "ScavengerHighlight"
+            h.FillColor = Color3.fromRGB(255, 0, 0) -- change the fill colour
+            h.OutlineColor = Color3.fromRGB(255, 0, 0) -- change the outline of it here (which doesnt really matter tbh)
+            h.FillTransparency = 0.5 -- (change this if you want it more or less visible)
+            h.OutlineTransparency = 0
+            h.Parent = obj
+        end
+    elseif obj:IsA("MeshPart") or obj:IsA("BasePart") then
+        if not obj:FindFirstChild("ScavengerHighlight") then
+            local h = Instance.new("Highlight")
+            h.Name = "ScavengerHighlight"
+            h.FillColor = Color3.fromRGB(255, 0, 0) -- change the fill colour
+            h.OutlineColor = Color3.fromRGB(255, 0, 0) -- change the outline of it here (which doesnt really matter tbh)
+            h.FillTransparency = 0.5 -- (change this if you want it more or less visible)
+            h.OutlineTransparency = 0
+            h.Parent = obj
+        end
+    end
+end
+
+for _, item in ipairs(ITEMS_FOLDER:GetChildren()) do
+    applyHighlight(item)
+end
+
+ITEMS_FOLDER.ChildAdded:Connect(applyHighlight)
