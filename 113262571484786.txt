@@ -1,0 +1,143 @@
+local player = game.Players.LocalPlayer
+local AUTO = false
+local busy = false
+
+
+local BLOCK = {"reset","currently","new"}
+
+local function isBlocked(obj)
+    local n = obj:GetFullName():lower()
+    for _, w in ipairs(BLOCK) do
+        if string.find(n, w) then
+            return true
+        end
+    end
+    return false
+end
+
+
+local UPGRADES = {}
+local BUYABLES = {}
+
+local function collect()
+    UPGRADES = {}
+    BUYABLES = {}
+
+    local upg = workspace:FindFirstChild("Upgrades")
+    local buy = workspace:FindFirstChild("Buyables")
+
+    if upg then
+        for _,d in ipairs(upg:GetDescendants()) do
+            if d:IsA("ClickDetector") and not isBlocked(d) then
+                table.insert(UPGRADES, d)
+            end
+        end
+    end
+
+    if buy then
+        for _,d in ipairs(buy:GetDescendants()) do
+            if d:IsA("ClickDetector") and not isBlocked(d) then
+                table.insert(BUYABLES, d)
+            end
+        end
+    end
+end
+
+collect()
+
+-- refresh Upgrade 
+task.spawn(function()
+    while true do
+        task.wait(4)
+        collect()
+    end
+end)
+
+
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.Name = "CocoGocaGui"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromScale(0.26, 0.18)
+frame.Position = UDim2.fromScale(0.37, 0.4)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0,14)
+
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(120, 200, 255)
+stroke.Thickness = 2
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.fromScale(1,0.3)
+title.BackgroundTransparency = 1
+title.Text = "Coco Goca"
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.fromRGB(220,220,220)
+
+local credit = Instance.new("TextLabel", frame)
+credit.Position = UDim2.fromScale(0,0.28)
+credit.Size = UDim2.fromScale(1,0.15)
+credit.BackgroundTransparency = 1
+credit.Text = " by Siqisiwi"
+credit.TextSize = 14
+credit.Font = Enum.Font.Gotham
+credit.TextColor3 = Color3.fromRGB(160,160,160)
+
+local button = Instance.new("TextButton", frame)
+button.Position = UDim2.fromScale(0.07,0.6)
+button.Size = UDim2.fromScale(0.86,0.32)
+button.BackgroundColor3 = Color3.fromRGB(55,55,55)
+button.Text = "off"
+button.TextScaled = true
+button.Font = Enum.Font.GothamBold
+button.TextColor3 = Color3.fromRGB(240,240,240)
+Instance.new("UICorner", button).CornerRadius = UDim.new(0,10)
+
+button.MouseButton1Click:Connect(function()
+    AUTO = not AUTO
+    button.Text = AUTO and "on" or "off"
+    button.BackgroundColor3 = AUTO and Color3.fromRGB(70,120,70) or Color3.fromRGB(55,55,55)
+end)
+
+
+task.spawn(function()
+    while true do
+        task.wait(0.25)
+
+        if AUTO and not busy then
+            busy = true
+
+            -- Nếu reset
+            if not player.Character 
+            or not player.Character:FindFirstChild("HumanoidRootPart") then
+
+                repeat task.wait()
+                until player.Character 
+                and player.Character:FindFirstChild("HumanoidRootPart")
+
+                task.wait(0.7) -- delay ổn định
+                collect()
+            end
+
+            -- Upgrade before
+            for i = 1,#UPGRADES do
+                if not AUTO then break end
+                fireclickdetector(UPGRADES[i])
+                task.wait(0.03)
+            end
+
+            -- buyable After
+            for i = 1,#BUYABLES do
+                if not AUTO then break end
+                fireclickdetector(BUYABLES[i])
+                task.wait(0.03)
+            end
+
+            busy = false
+        end
+    end
+end)
