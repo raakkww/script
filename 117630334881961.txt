@@ -1,0 +1,242 @@
+-- Fake FPS Stats Script v2
+-- Полностью заменяет оригинальный скрипт отправки статистики
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Настройки
+local settings = {
+    FPS = 240,
+    Ping = 5,
+    Device = "Windows",
+    Resolution = "3840x2160 (4K)",
+    Graphics = "10",
+    Memory = "Ram: 512 MB",
+    Friends = 9999,
+    Badges = 9999,
+    Enabled = true
+}
+
+-- Создаём GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FakeFPSStatsGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 400, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 10)
+Corner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Title.BorderSizePixel = 0
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Fake FPS Stats v2"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -35, 0, 5)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseButton.BorderSizePixel = 0
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 16
+CloseButton.Parent = Title
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 5)
+CloseCorner.Parent = CloseButton
+
+local Container = Instance.new("ScrollingFrame")
+Container.Name = "Container"
+Container.Size = UDim2.new(1, -20, 1, -60)
+Container.Position = UDim2.new(0, 10, 0, 50)
+Container.BackgroundTransparency = 1
+Container.BorderSizePixel = 0
+Container.ScrollBarThickness = 6
+Container.CanvasSize = UDim2.new(0, 0, 0, 500)
+Container.Parent = MainFrame
+
+local function createInput(name, yPos, defaultValue)
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0, 100, 0, 30)
+    Label.Position = UDim2.new(0, 10, 0, yPos)
+    Label.BackgroundTransparency = 1
+    Label.Font = Enum.Font.Gotham
+    Label.Text = name .. ":"
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextSize = 14
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Container
+    
+    local Input = Instance.new("TextBox")
+    Input.Name = name .. "Input"
+    Input.Size = UDim2.new(0, 240, 0, 30)
+    Input.Position = UDim2.new(0, 120, 0, yPos)
+    Input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Input.BorderSizePixel = 0
+    Input.Font = Enum.Font.Gotham
+    Input.Text = tostring(defaultValue)
+    Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Input.TextSize = 14
+    Input.ClearTextOnFocus = false
+    Input.Parent = Container
+    
+    local InputCorner = Instance.new("UICorner")
+    InputCorner.CornerRadius = UDim.new(0, 5)
+    InputCorner.Parent = Input
+    
+    return Input
+end
+
+local FPSInput = createInput("FPS", 10, settings.FPS)
+local PingInput = createInput("Ping", 50, settings.Ping)
+local DeviceInput = createInput("Device", 90, settings.Device)
+local ResolutionInput = createInput("Resolution", 130, settings.Resolution)
+local GraphicsInput = createInput("Graphics", 170, settings.Graphics)
+local MemoryInput = createInput("Memory", 210, settings.Memory)
+local FriendsInput = createInput("Friends", 250, settings.Friends)
+local BadgesInput = createInput("Badges", 290, settings.Badges)
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Size = UDim2.new(0, 360, 0, 40)
+ToggleButton.Position = UDim2.new(0, 10, 0, 340)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+ToggleButton.BorderSizePixel = 0
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Text = "ENABLED"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 16
+ToggleButton.Parent = Container
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 8)
+ToggleCorner.Parent = ToggleButton
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Name = "StatusLabel"
+StatusLabel.Size = UDim2.new(1, -20, 0, 30)
+StatusLabel.Position = UDim2.new(0, 10, 0, 390)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Text = "Status: Active | Sent: 0"
+StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+StatusLabel.TextSize = 12
+StatusLabel.Parent = Container
+
+local function updateSettings()
+    settings.FPS = tonumber(FPSInput.Text) or 240
+    settings.Ping = tonumber(PingInput.Text) or 5
+    settings.Device = DeviceInput.Text
+    settings.Resolution = ResolutionInput.Text
+    settings.Graphics = GraphicsInput.Text
+    settings.Memory = MemoryInput.Text
+    settings.Friends = tonumber(FriendsInput.Text) or 9999
+    settings.Badges = tonumber(BadgesInput.Text) or 9999
+end
+
+ToggleButton.MouseButton1Click:Connect(function()
+    settings.Enabled = not settings.Enabled
+    if settings.Enabled then
+        ToggleButton.Text = "ENABLED"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        ToggleButton.Text = "DISABLED"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+for _, input in pairs({FPSInput, PingInput, DeviceInput, ResolutionInput, GraphicsInput, MemoryInput, FriendsInput, BadgesInput}) do
+    input.FocusLost:Connect(updateSettings)
+end
+
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Останавливаем оригинальный скрипт
+local originalScript = LocalPlayer.PlayerScripts:FindFirstChild("CilentStatsSender")
+if originalScript then
+    originalScript.Disabled = true
+    print("Оригинальный скрипт отключен")
+end
+
+-- Ждём RemoteEvent
+local PlayerStatsUpdate = ReplicatedStorage:WaitForChild("PlayerStatsUpdate")
+local PlayerPingReply = ReplicatedStorage:WaitForChild("PlayerPingReply")
+
+local pingRequest = nil
+local sentCount = 0
+
+-- Обработчик ответа пинга
+PlayerPingReply.OnClientEvent:Connect(function(timestamp)
+    if pingRequest and timestamp == pingRequest then
+        local ping = (tick() - timestamp) * 1000
+        if not settings.Enabled then
+            settings.Ping = math.floor(ping)
+            PingInput.Text = tostring(settings.Ping)
+        end
+        pingRequest = nil
+    end
+end)
+
+-- Отправляем фейковые данные
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        
+        if settings.Enabled then
+            updateSettings()
+            
+            pingRequest = tick()
+            
+            local fakeData = {
+                ["Device"] = settings.Device,
+                ["FPS"] = settings.FPS,
+                ["Ping"] = settings.Ping,
+                ["PingRequest"] = pingRequest,
+                ["Friends"] = settings.Friends,
+                ["Badges"] = settings.Badges,
+                ["GraphicsQuality"] = settings.Graphics,
+                ["Resolution"] = settings.Resolution,
+                ["Memory"] = settings.Memory
+            }
+            
+            PlayerStatsUpdate:FireServer(fakeData)
+            sentCount = sentCount + 1
+            StatusLabel.Text = string.format("Status: Active | Sent: %d", sentCount)
+        else
+            StatusLabel.Text = string.format("Status: Inactive | Sent: %d", sentCount)
+        end
+    end
+end)
+
+print("=== Fake FPS Stats v2 активирован! ===")
+print("Оригинальный скрипт заменён")
