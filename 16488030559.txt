@@ -1,0 +1,28 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local rp = char:WaitForChild("HumanoidRootPart")
+
+local damageRemote = ReplicatedStorage:WaitForChild("Src"):WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_knit@1.4.7"):WaitForChild("knit"):WaitForChild("Services"):WaitForChild("DamageService"):WaitForChild("RF"):WaitForChild("HandleHit")
+ while wait() do
+for _, v in pairs(workspace.Game.Enemies:GetChildren()) do
+    if v:IsA("Model") then
+        local root = v:FindFirstChild("HumanoidRootPart")
+        if root then
+            local args = {
+                {
+                    TargetModel = v,
+                    ClientHitPos = root.Position,
+                    SourceModel = char,
+                    IsBlocked = false,
+                    IsHeavyAttack = true
+                }
+            }
+
+            damageRemote:InvokeServer(unpack(args))
+        end
+    end
+end
+end
