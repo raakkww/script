@@ -1,0 +1,5 @@
+while true do task.wait()
+for i,v in pairs(game.Players:GetPlayers()) do
+game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("CashEvent"):FireServer(20000)
+end
+end
