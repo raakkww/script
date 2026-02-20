@@ -1,0 +1,102 @@
+--[[
+ join in https://discord.gg/eTHyrcqXcA to more
+]]
+
+
+local Repository = "https://raw.githubusercontent.com/dementiaenjoyer/homohack/refs/heads/main/storage"
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dementiaenjoyer/UI-LIBRARIES/refs/heads/main/ud_linoria/new_font.lua"))()
+local ThemeManager = loadstring(game:HttpGet(Repository .. "/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(Repository .. "/SaveManager.lua"))()
+
+local Window = Library:CreateWindow({
+    Title   = 'Custom Menu',
+    Center  = true,
+    AutoShow = true,
+    Size    = UDim2.fromOffset(550, 480),
+})
+
+local Tabs = {
+    Main = Window:AddTab('Main'),
+    ['UI Settings'] = Window:AddTab('UI Settings'),
+}
+
+local function EatFruit(fruitName, fruitId)
+    local args = {"Eat", fruitName, fruitId}
+    game:GetService("ReplicatedStorage"):WaitForChild("SystemFruitEatV1"):WaitForChild("SecureEated"):FireServer(unpack(args))
+end
+
+local function GrabFruit(fruitName)
+    local args = {fruitName}
+    game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("NoDelayStatsGui"):WaitForChild("codeframe"):WaitForChild("Enter"):WaitForChild("CodeLists"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
+end
+
+local FruitsTab = Tabs.Main:AddLeftGroupbox("Fruit Actions")
+
+local FruitList = { -- gemini make this part for me.
+    {Name = "Christmas Mech",  Value = "ChristmasMechFruit", ID = "ChristmasMech"},
+    {Name = "Squid Fruit",     Value = "SquidFruit",         ID = "Squid"},
+    {Name = "Tiger Fruit",     Value = "TigerFruit",         ID = "Tiger"},
+    {Name = "Yeti Fruit",      Value = "YetiFruit",          ID = "Yeti"},
+    {Name = "GoroV2 Fruit",    Value = "GoroV2Fruit",        ID = "GoroV2"},
+    {Name = "Arise Fruit",     Value = "AriseFruit",         ID = "Arise"},
+    {Name = "Kaisel Fruit",    Value = "KaiselFruit",        ID = "Kaisel"}
+}
+
+for _, fruit in pairs(FruitList) do
+    FruitsTab:AddButton(fruit.Name, function() EatFruit(fruit.Value, fruit.ID) end)
+end
+
+FruitsTab:AddDivider()
+
+local GrabTab = Tabs.Main:AddRightGroupbox("Grab Fruits")
+
+local GrabList = {"AriseFruit", "ChristmasMechFruit", "BeruFruit", "KaiselFruit"}
+for _, name in pairs(GrabList) do
+    GrabTab:AddButton('Grab ' .. name:gsub("Fruit", ""), function() GrabFruit(name) end)
+end
+
+local Helpers = Tabs.Main:AddLeftGroupbox("Helpers")
+
+Helpers:AddButton('Reset Status', function()
+    game:GetService("ReplicatedStorage"):WaitForChild("BonusFolderFX"):WaitForChild("SHANKSSECRETREVEALEDGG"):FireServer(game.Players.LocalPlayer)
+end)
+
+Helpers:AddButton('Inf Diamonds', function()
+    game:GetService("ReplicatedStorage"):WaitForChild("BonusFolderFX"):WaitForChild("DiamondCodes"):FireServer(1e18, "Code68")
+end)
+
+Helpers:AddToggle('ServerLag', {
+    Text = 'Lag Server',
+    Default = false,
+    Tooltip = '.',
+    Callback = function(Value)
+        getgenv().KillValentinesBoss = Value
+    end
+})
+
+task.spawn(function()
+    while task.wait() do
+        if getgenv().KillValentinesBoss then
+            local args = {"go", Vector3.new(1759.50, 52.25, 224.59)}
+            pcall(function()
+                game:GetService("Players").LocalPlayer.Character.Kaisel.M12.RemoteEvent:FireServer(unpack(args))
+            end)
+        end
+    end
+end)
+
+Library:SetWatermark('exemple')
+Library:OnUnload(function() Library.Unloaded = true end)
+
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+MenuGroup:AddButton('Unload', function() Library:Unload() end)
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'End', NoUI = true })
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+ThemeManager:SetFolder('MyScriptHub')
+SaveManager:SetFolder('MyScriptHub/game-1')
+SaveManager:BuildConfigSection(Tabs['UI Settings'])
+ThemeManager:ApplyToTab(Tabs['UI Settings'])
