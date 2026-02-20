@@ -1,0 +1,77 @@
+local p = game:GetService("Players")
+local rs = game:GetService("RunService")
+local lp = p.LocalPlayer
+
+local active = true
+local last = 0
+local roam = Vector3.new(0,0,0)
+
+local function checkWall(s, t)
+    local d = (t - s).Unit * 6
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {lp.Character}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    return workspace:Raycast(s, d, params)
+end
+
+rs.Heartbeat:Connect(function()
+    local now = tick()
+    if not active or now - last < 0.18 then return end
+    last = now
+
+    local char = lp.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if not hum or not root or hum.Health <= 0 then return end
+
+    local myTool = char:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
+    local target = nil
+    local dist = 200
+
+    for _, v in pairs(p:GetPlayers()) do
+        if v ~= lp and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local h = v.Character:FindFirstChildOfClass("Humanoid")
+            if h and h.Health > 0 then
+                local d = (root.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    target = v.Character
+                end
+            end
+        end
+    end
+
+    local goal = roam
+
+    if target then
+        local tRoot = target.HumanoidRootPart
+        local tP = p:GetPlayerFromCharacter(target)
+        local hasT = target:FindFirstChildOfClass("Tool") or (tP and tP.Backpack:FindFirstChildOfClass("Tool"))
+
+        if hasT then
+            local dir = (root.Position - tRoot.Position).Unit
+            goal = root.Position + (dir * 35) + Vector3.new(math.random(-12,12), 0, math.random(-12,12))
+        elseif myTool then
+            goal = tRoot.Position
+        else
+            if dist > 12 then
+                goal = tRoot.Position
+            else
+                goal = tRoot.Position + Vector3.new(math.sin(now)*15, 0, math.cos(now)*15)
+            end
+        end
+    else
+        if (root.Position - roam).Magnitude < 8 then
+            roam = root.Position + Vector3.new(math.random(-45, 45), 0, math.random(-45, 45))
+        end
+        goal = roam
+    end
+
+    if checkWall(root.Position, goal) then
+        goal = root.Position + Vector3.new(math.random(-25, 25), 0, math.random(-25, 25))
+        hum.Jump = true
+    end
+
+    hum:MoveTo(goal)
+end)
