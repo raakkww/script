@@ -1,0 +1,18 @@
+local rs = game:GetService("RunService")
+local plrs = game:GetService("Players")
+local lp = plrs.LocalPlayer
+
+rs.RenderStepped:Connect(function()
+	for _, v in pairs(plrs:GetPlayers()) do
+		if v ~= lp and v.Character then
+			local hrp = v.Character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				hrp.Size = Vector3.new(13, 13, 13) -- change the size
+				hrp.Transparency = 0.6
+				hrp.Color = Color3.new(1, 0, 0)
+				hrp.Material = Enum.Material.Neon
+				hrp.CanCollide = false
+			end
+		end
+	end
+end)
