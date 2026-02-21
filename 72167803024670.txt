@@ -1,0 +1,7 @@
+while task.wait() do
+local args = {
+	0.9669066071510315
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("Hit"):FireServer(unpack(args))
+
+end
