@@ -1,0 +1,122 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+
+local Storage = workspace:WaitForChild("Storage")
+local Map = Storage:WaitForChild("Map")
+local Scraps = Map:WaitForChild("Scraps")
+
+local function notify(t, x)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = t,
+            Text = x,
+            Duration = 4
+        })
+    end)
+end
+
+local function tp(cf)
+    local c = player.Character or player.CharacterAdded:Wait()
+    local r = c:FindFirstChild("HumanoidRootPart")
+    if r then r.CFrame = cf end
+end
+
+local LatestGift = nil
+
+local function detectGift(o)
+    if o.Name == "Exotic Gift" then
+        LatestGift = o
+        notify("exotic gift", "one spawned")
+    end
+end
+
+for _, v in ipairs(Scraps:GetChildren()) do
+    detectGift(v)
+end
+
+Scraps.ChildAdded:Connect(detectGift)
+
+local function detectOrb(o)
+    if string.find(string.lower(o.Name), "orb") then
+        notify("orb", o.Name .. " showed up")
+    end
+end
+
+for _, v in ipairs(Scraps:GetChildren()) do
+    detectOrb(v)
+end
+
+Scraps.ChildAdded:Connect(detectOrb)
+
+UserInputService.InputBegan:Connect(function(i, gp)
+    if gp then return end
+
+    if i.KeyCode == Enum.KeyCode.F1 then
+        if LatestGift and LatestGift:IsDescendantOf(workspace) then
+            if LatestGift:IsA("Model") then
+                tp(LatestGift:GetPivot())
+            elseif LatestGift:IsA("BasePart") then
+                tp(LatestGift.CFrame)
+            end
+        else
+            notify("nothing", "no exotic gift")
+        end
+    end
+
+    if i.KeyCode == Enum.KeyCode.F2 then
+        local items = Scraps:GetChildren()
+        if #items == 0 then
+            notify("empty", "scraps has nothing")
+            return
+        end
+        local t = items[math.random(1, #items)]
+        if t:IsA("Model") then
+            tp(t:GetPivot())
+        elseif t:IsA("BasePart") then
+            tp(t.CFrame)
+        end
+        notify("teleported", t.Name)
+    end
+
+    if i.KeyCode == Enum.KeyCode.F3 then
+        local c = player.Character or player.CharacterAdded:Wait()
+        local r = c:FindFirstChild("HumanoidRootPart")
+        if not r then return end
+        local original = r.CFrame
+        for _, item in ipairs(Scraps:GetChildren()) do
+            if string.lower(item.Name) == "wood" then
+                if item:IsA("Model") then
+                    tp(item:GetPivot())
+                elseif item:IsA("BasePart") then
+                    tp(item.CFrame)
+                end
+                task.wait(0.15)
+            end
+        end
+        tp(original)
+        notify("done", "wood collected")
+    end
+
+    if i.KeyCode == Enum.KeyCode.F4 then
+        local orbs = {}
+        for _, item in ipairs(Scraps:GetChildren()) do
+            if string.find(string.lower(item.Name), "orb") then
+                table.insert(orbs, item)
+            end
+        end
+        if #orbs == 0 then
+            notify("none", "no orbs in scraps")
+            return
+        end
+        local t = orbs[math.random(1, #orbs)]
+        if t:IsA("Model") then
+            tp(t:GetPivot())
+        elseif t:IsA("BasePart") then
+            tp(t.CFrame)
+        end
+        notify("teleported", t.Name)
+    end
+end)
