@@ -1,0 +1,272 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+--      AIMBOT + ESP + TRIGGERBOT SUITE (STABLE)
+--              by GreenVR512
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    Camera = workspace.CurrentCamera
+end)
+
+-- SETTINGS
+local Settings = {
+    Aimbot = false,
+    Triggerbot = false,
+    ESP = false,
+    TeamCheck = false,
+    ShowFOV = true,
+    FOV = 150,
+    Smoothness = 0.15,
+    TriggerDelay = 0.05,
+    AimKey = Enum.KeyCode.E
+}
+
+local Holding = false
+
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+--                        UI
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+local Window = Rayfield:CreateWindow({
+    Name = "ð¯ GreenVR512 Combat Suite",
+    LoadingTitle = "Loading",
+    LoadingSubtitle = "by GreenVR512",
+})
+
+local Main = Window:CreateTab("ð¯ Main")
+local Visuals = Window:CreateTab("ð Visuals")
+
+local TargetLabel = Main:CreateLabel("Target: None")
+
+Main:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Callback = function(v) Settings.Aimbot = v end
+})
+
+Main:CreateToggle({
+    Name = "Triggerbot",
+    CurrentValue = false,
+    Callback = function(v) Settings.Triggerbot = v end
+})
+
+Main:CreateKeybind({
+    Name = "Aim Hold Key",
+    CurrentKeybind = "E",
+    Callback = function(k) Settings.AimKey = k end
+})
+
+Visuals:CreateToggle({
+    Name = "ESP (Wallhack)",
+    CurrentValue = false,
+    Callback = function(v)
+        Settings.ESP = v
+        if v then EnableESP() else DisableESP() end
+    end
+})
+
+Visuals:CreateToggle({
+    Name = "Show FOV",
+    CurrentValue = true,
+    Callback = function(v) Settings.ShowFOV = v end
+})
+
+Visuals:CreateSlider({
+    Name = "FOV Radius",
+    Range = {50,500},
+    Increment = 5,
+    CurrentValue = 150,
+    Callback = function(v) Settings.FOV = v end
+})
+
+Main:CreateSlider({
+    Name = "Smoothness",
+    Range = {0.05,1},
+    Increment = 0.05,
+    CurrentValue = 0.15,
+    Callback = function(v) Settings.Smoothness = v end
+})
+
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+--                        ESP
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+local ESPObjects = {}
+local ESPEnabled = false
+
+local function ClearESP()
+    for _,v in pairs(ESPObjects) do
+        if v then v:Destroy() end
+    end
+    table.clear(ESPObjects)
+end
+
+local function CreateESP(Player)
+    if Player == LocalPlayer then return end
+
+    local function Apply(Char)
+        if ESPObjects[Player] then ESPObjects[Player]:Destroy() end
+
+        local H = Instance.new("Highlight")
+        H.Adornee = Char
+        H.FillTransparency = 0.45
+        H.OutlineTransparency = 0
+        H.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        H.FillColor = Color3.fromRGB(0,255,120)
+        H.Parent = game:GetService("CoreGui")
+
+        ESPObjects[Player] = H
+    end
+
+    if Player.Character then
+        Apply(Player.Character)
+    end
+
+    Player.CharacterAdded:Connect(function(Char)
+        task.wait(1)
+        if ESPEnabled then Apply(Char) end
+    end)
+end
+
+function EnableESP()
+    ESPEnabled = true
+    ClearESP()
+    for _,p in ipairs(Players:GetPlayers()) do
+        CreateESP(p)
+    end
+end
+
+function DisableESP()
+    ESPEnabled = false
+    ClearESP()
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if ESPEnabled then CreateESP(p) end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    if ESPObjects[p] then ESPObjects[p]:Destroy() end
+    ESPObjects[p] = nil
+end)
+
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+--                        AIMBOT
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+local function GetTarget()
+    local best, dist = nil, Settings.FOV
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            if not Settings.TeamCheck or p.Team ~= LocalPlayer.Team then
+                local pos, vis = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+                if vis then
+                    local mag = (Vector2.new(pos.X,pos.Y)-center).Magnitude
+                    if mag < dist then
+                        dist = mag
+                        best = p
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+--                        FOV
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1
+FOVCircle.NumSides = 100
+FOVCircle.Filled = false
+FOVCircle.Color = Color3.fromRGB(0,255,120)
+
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+--                      MAIN LOOP
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+local Debounce = false
+
+RunService.RenderStepped:Connect(function()
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    FOVCircle.Visible = Settings.ShowFOV and Settings.Aimbot
+    FOVCircle.Radius = Settings.FOV
+    FOVCircle.Position = center
+
+    -- AIMBOT
+    if Settings.Aimbot and Holding then
+        local Target = GetTarget()
+
+        if Target and Target.Character then
+            local part = Target.Character:FindFirstChild("Head")
+            if part then
+                TargetLabel:Set("Target: "..Target.Name)
+                local cf = CFrame.new(Camera.CFrame.Position, part.Position)
+                Camera.CFrame = Camera.CFrame:Lerp(cf, Settings.Smoothness)
+            end
+        else
+            TargetLabel:Set("Target: None")
+        end
+    end
+
+    -- TRIGGERBOT
+    if Settings.Triggerbot and not Debounce then
+        local ray = Camera:ViewportPointToRay(center.X, center.Y)
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+
+        local hit = workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
+        if hit and hit.Instance and hit.Instance.Parent:FindFirstChild("Humanoid") then
+            local plr = Players:GetPlayerFromCharacter(hit.Instance.Parent)
+            if plr and (not Settings.TeamCheck or plr.Team ~= LocalPlayer.Team) then
+                Debounce = true
+                VirtualInputManager:SendMouseButtonEvent(center.X, center.Y, 0, true, game, 1)
+                task.wait(0.02)
+                VirtualInputManager:SendMouseButtonEvent(center.X, center.Y, 0, false, game, 1)
+                task.wait(Settings.TriggerDelay)
+                Debounce = false
+            end
+        end
+    end
+end)
+
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+--                      KEY HOLD
+-- âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+UserInputService.InputBegan:Connect(function(i,gp)
+    if not gp and i.KeyCode == Settings.AimKey then
+        Holding = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(i)
+    if i.KeyCode == Settings.AimKey then
+        Holding = false
+    end
+end)
+
+Rayfield:Notify({
+    Title = "GreenVR512 Loaded",
+    Content = "Aimbot + ESP + Triggerbot Ready",
+    Duration = 4
+})
