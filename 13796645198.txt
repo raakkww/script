@@ -1,0 +1,78 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+getgenv().InfHealthEnabled = false
+local InfHealthConnection = nil
+
+local Window = Rayfield:CreateWindow({
+   Name = "Flashpoint God Mode â¡",
+   LoadingTitle = "Loading SandMan...",
+   LoadingSubtitle = "by Mr.Sandman - ALT ONLY",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "SandManHub",
+      FileName = "InfHealth"
+   },
+   KeySystem = false
+})
+
+local Tab = Window:CreateTab("Inf Health", 4483362458) -- health/heart icon
+
+Tab:CreateToggle({
+   Name = "God Mode",
+   CurrentValue = false,
+   Flag = "InfHealthToggle",
+   Callback = function(Value)
+      getgenv().InfHealthEnabled = Value
+      
+      if Value then
+         Rayfield:Notify({
+            Title = "God Mode ON",
+            Content = "Spamming TakeDamage(-15000000) â you should be unkillable now",
+            Duration = 4,
+            Image = 4483362458
+         })
+         
+         InfHealthConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            if getgenv().InfHealthEnabled then
+               pcall(function()
+                  local args = {
+                     -15000000
+                  }
+                  game:GetService("ReplicatedStorage")
+                     :WaitForChild("Events")
+                     :WaitForChild("TakeDamage")
+                     :FireServer(unpack(args))
+               end)
+               task.wait(0.07)  -- delay to avoid rate-limit kicks; change to 0.03-0.1 if needed
+            end
+         end)
+      else
+         if InfHealthConnection then
+            InfHealthConnection:Disconnect()
+            InfHealthConnection = nil
+         end
+         Rayfield:Notify({
+            Title = "Inf Health OFF",
+            Content = "Spam stopped - health back to normal",
+            Duration = 3
+         })
+      end
+   end,
+})
+
+-- Quick destroy button
+Tab:CreateButton({
+   Name = "Destroy GUI",
+   Callback = function()
+      Rayfield:Notify({Title = "Closing...", Content = "GUI destroyed", Duration = 2})
+      task.wait(1.2)
+      Rayfield:Destroy()
+   end,
+})
+
+Rayfield:Notify({
+   Title = "Sandman's FlashPoint Gui",
+   Content = "Toggle ON to spam negative damage â godmode in Flashpoint",
+   Duration = 5,
+   Image = 4483362458
+})
