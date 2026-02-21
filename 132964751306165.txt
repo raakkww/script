@@ -1,0 +1,174 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("MS | The Origins Of Supernaturals", "GrapeTheme")
+
+local Tab = Window:NewTab("Buy Skins")
+local Section = Tab:NewSection("BUY EVERYTHING FOR 1 COIN!!")
+
+local Section = Tab:NewSection("Davina Claire")
+
+Section:NewButton("Davina", "Buy", function()
+    local args = {"Davina Claire", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+Section:NewButton("Davina Outfit: Iconic", "Buy", function()
+    local args = {"Davina Claire_Skin2", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+local Section = Tab:NewSection("Bonnie Bennett")
+
+Section:NewButton("Bonnie", "Buy", function()
+    local args = {"Bonnie Bennett", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+Section:NewButton("Bonnie Outfit: Casual", "Buy", function()
+    local args = {"Bonnie Bennett_Skin2", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+Section:NewButton("Bonnie Outfit: Prom", "Buy", function()
+    local args = {"Bonnie Bennett_Skin3", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+Section:NewButton("Bonnie Outfit: Kelly Beach", "Buy", function()
+    local args = {"Bonnie Bennett_Skin4", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+Section:NewButton("Bonnie Outfit: HellFire", "Buy", function()
+    local args = {"Bonnie Bennett_Skin5", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+local Section = Tab:NewSection("Madison Montgomery")
+
+Section:NewButton("Madison Montgomery", "Buy", function()
+    local args = {"Madison Montgomery", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+local Section = Tab:NewSection("Phoenix Force")
+
+Section:NewButton("Phoenix Force", "Buy", function()
+    local args = {"Phoenix Force", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+local Section = Tab:NewSection("Jean Grey")
+
+Section:NewButton("Jean Grey", "Buy", function()
+    local args = {"Jean Grey", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+local Section = Tab:NewSection("Sabrina Spellman")
+
+Section:NewButton("Sabrina Spellman", "Buy", function()
+    local args = {"Sabrina Spellman", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+Section:NewButton("Sabrina Spellman Outfit: CheerLeader", "Buy", function()
+    local args = {"Sabrina Spellman_Skin2", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+local Section = Tab:NewSection("Freya Mikaelson")
+
+Section:NewButton("Freya Mikaelson", "Buy", function()
+    local args = {"Freya Mikaelson", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+local Section = Tab:NewSection("Qetsiyah")
+
+Section:NewButton("Qetsiyah", "Buy", function()
+    local args = {"Qetsiyah", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+local Section = Tab:NewSection("Dark Josie")
+
+Section:NewButton("Dark Josie", "Buy", function()
+    local args = {"Dark Josie", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+Section:NewButton("Dark Josie Outfit: Pink", "Buy", function()
+    local args = {"Dark Josie_Skin2", 1}
+    game:GetService("ReplicatedStorage"):WaitForChild("CoinsChecknRemove"):FireServer(unpack(args))
+end)
+
+local CoinsTab = Window:NewTab("Get 50M Coins")
+local CoinSection = CoinsTab:NewSection("Instant Coins")
+
+CoinSection:NewButton("Get 50,000,000 Coins", "Gives you coins", function()
+    local args = {"Sabrina Spellman", -50000000}
+    game:GetService("ReplicatedStorage").CoinsChecknRemove:FireServer(unpack(args))
+end)
+local CustomsTab = Window:NewTab("Customs")
+
+local customNames = {
+    "Rowena Labonair",
+    "Wednesday",
+    "Wednesday Addams",
+    "Esther",
+    "Alanna",
+    "Corell",
+    "HECATE GODDESS OF WITCHCRAFT",
+    "M3GAN",
+    "Jennifer Check",
+    "Inadu Labonair",
+    "Sire",
+    "Seris"
+} 
+local AntiSection = CustomsTab:NewSection("Custom Anticheat")
+AntiSection:NewButton("Disable Custom Anticheat (Perm)", "Disables all anticheats at once", function()
+    for _, name in ipairs(customNames) do
+        local args = {name, 0}
+        game:GetService("ReplicatedStorage").CoinsChecknRemove:FireServer(unpack(args))
+    end
+end)
+
+local MorphSection = CustomsTab:NewSection("Custom Morpher")
+
+for _, name in ipairs(customNames) do
+    local buttonName = (name == "HECATE GODDESS OF WITCHCRAFT" and "Hecate") or name
+    MorphSection:NewButton(buttonName, "Morph into " .. name, function()
+        local args = {"Outfit1", name}
+        game:GetService("ReplicatedStorage").System_Remotes.CharacterChoose:FireServer(unpack(args))
+    end)
+end
+MorphSection:NewButton("Seris - Outfit 2", "Morph", function()
+    local args = {"Outfit2", "Seris"}
+    game:GetService("ReplicatedStorage").System_Remotes.CharacterChoose:FireServer(unpack(args))
+end)
+
+MorphSection:NewButton("Seris - Outfit 3", "Morph", function()
+    local args = {"Outfit3", "Seris"}
+    game:GetService("ReplicatedStorage").System_Remotes.CharacterChoose:FireServer(unpack(args))
+end)
+
+MorphSection:NewButton("Seris - Outfit 4", "Morph", function()
+    local args = {"Outfit4", "Seris"}
+    game:GetService("ReplicatedStorage").System_Remotes.CharacterChoose:FireServer(unpack(args))
+end)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+local button = Instance.new("TextButton")
+button.Name = "PurpleButton"
+button.Text = "Toggle UI"
+button.AnchorPoint = Vector2.new(1, 0)
+button.Position = UDim2.new(1, -10, 0, 10)
+button.Size = UDim2.new(0, 100, 0, 50)
+button.BackgroundColor3 = Color3.fromRGB(107, 98, 155)
+button.TextColor3 = Color3.new(1, 1, 1)
+button.Parent = screenGui
+
+button.MouseButton1Click:Connect(function()
+    Library:ToggleUI()
+end)
