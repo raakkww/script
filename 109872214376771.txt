@@ -1,0 +1,512 @@
+-- // Anti-Teleport System
+local players = game:GetService('Players')
+local runService = game:GetService('RunService')
+local tweenService = game:GetService('TweenService')
+local lplr = players.LocalPlayer
+local lastCF, stop, heartbeatConnection, cfConnection
+local enabled = false
+
+local function cleanup()
+    if heartbeatConnection then heartbeatConnection:Disconnect() heartbeatConnection = nil end
+    if cfConnection then cfConnection:Disconnect() cfConnection = nil end
+end
+
+local function start()
+    if not lplr.Character or not lplr.Character:FindFirstChildOfClass('Humanoid') or not lplr.Character:FindFirstChildOfClass('Humanoid').RootPart then return end
+    cleanup()
+    heartbeatConnection = runService.Heartbeat:Connect(function()
+        if stop or not enabled then return end
+        lastCF = lplr.Character:FindFirstChildOfClass('Humanoid').RootPart.CFrame
+    end)
+    cfConnection = lplr.Character:FindFirstChildOfClass('Humanoid').RootPart:GetPropertyChangedSignal('CFrame'):Connect(function()
+        if not enabled then return end
+        stop = true
+        lplr.Character:FindFirstChildOfClass('Humanoid').RootPart.CFrame = lastCF
+        runService.Heartbeat:Wait()
+        stop = false
+    end)
+    lplr.Character:FindFirstChildOfClass('Humanoid').Died:Connect(function()
+        cleanup()
+    end)
+end
+
+local function enableAntiTeleport()
+    enabled = true
+end
+
+local function disableAntiTeleport()
+    enabled = false
+    stop = false
+end
+
+lplr.CharacterAdded:Connect(function(character)
+    repeat runService.Heartbeat:Wait() until character:FindFirstChildOfClass('Humanoid')
+    repeat runService.Heartbeat:Wait() until character:FindFirstChildOfClass('Humanoid').RootPart
+    start()
+end)
+
+lplr.CharacterRemoving:Connect(function()
+    cleanup()
+end)
+
+enableAntiTeleport()
+start()
+
+local function teleportTo(position)
+    disableAntiTeleport()
+    runService.Heartbeat:Wait()
+    lplr.Character:FindFirstChildOfClass('Humanoid').RootPart.CFrame = CFrame.new(position)
+    runService.Heartbeat:Wait()
+    enableAntiTeleport()
+end
+
+-- // Inventory Helpers
+local function countInBackpack(itemName)
+    local count = 0
+    for _, item in ipairs(lplr.Backpack:GetChildren()) do
+        if item.Name == itemName then
+            count += 1
+        end
+    end
+    if lplr.Character then
+        for _, item in ipairs(lplr.Character:GetChildren()) do
+            if item:IsA('Tool') and item.Name == itemName then
+                count += 1
+            end
+        end
+    end
+    return count
+end
+
+local function hasInBackpack(itemName)
+    return countInBackpack(itemName) > 0
+end
+
+-- // Main Script Loop
+local looping = false
+local loopThread = nil
+
+local function mainScript()
+    local watch = workspace.Smuggling.Items["Fake Watch"].Main.PromptAtt.BasePurchasePrompt
+    local sar = workspace.Smuggling.Items.Sarsaparilla.Main.PromptAtt.BasePurchasePrompt
+    local bag = workspace.Smuggling.Items["Fake Designer Bag"].Main.PromptAtt.BasePurchasePrompt
+    local wash = workspace.Smuggling.Laundering:GetChildren()[4].LaundryPrompt
+
+    local function totalItems()
+        return countInBackpack("Fake Watch") + countInBackpack("Sarsaparilla") + countInBackpack("Fake Designer Bag")
+    end
+
+    --1 teleport once, re-teleport if stuck 7s, until 3 Fake Watch or total = 10
+    local function runPart1()
+        teleportTo(Vector3.new(-1845, 3, 0))
+        local t = tick()
+        repeat
+            if tick() - t >= 7 then
+                teleportTo(Vector3.new(-1845, 3, 0))
+                t = tick()
+            end
+            fireproximityprompt(watch) task.wait(0.1)
+            fireproximityprompt(watch) task.wait(0.1)
+            fireproximityprompt(watch) task.wait(0.1)
+            runService.Heartbeat:Wait()
+        until countInBackpack("Fake Watch") >= 3 or totalItems() >= 10
+    end
+    runPart1()
+
+    --3 teleport once, re-teleport if stuck 7s, until 3 Fake Designer Bag or total = 10
+    if totalItems() < 10 then
+        local function runPart3()
+            teleportTo(Vector3.new(-1831, 3, -2))
+            local t = tick()
+            repeat
+                if tick() - t >= 7 then
+                    teleportTo(Vector3.new(-1831, 3, -2))
+                    t = tick()
+                end
+                fireproximityprompt(bag) task.wait(0.1)
+                fireproximityprompt(bag) task.wait(0.1)
+                fireproximityprompt(bag) task.wait(0.1)
+                runService.Heartbeat:Wait()
+            until countInBackpack("Fake Designer Bag") >= 3 or totalItems() >= 10
+        end
+        runPart3()
+    end
+
+    --2 teleport once, re-teleport if stuck 7s, until 4 Sarsaparilla or total = 10
+    if totalItems() < 10 then
+        local function runPart2()
+            teleportTo(Vector3.new(-1840, 3, 1))
+            local t = tick()
+            repeat
+                if tick() - t >= 7 then
+                    teleportTo(Vector3.new(-1840, 3, 1))
+                    t = tick()
+                end
+                fireproximityprompt(sar) task.wait(0.1)
+                fireproximityprompt(sar) task.wait(0.1)
+                fireproximityprompt(sar) task.wait(0.1)
+                fireproximityprompt(sar) task.wait(0.1)
+                runService.Heartbeat:Wait()
+            until countInBackpack("Sarsaparilla") >= 4 or totalItems() >= 10
+        end
+        runPart2()
+    end
+
+    -- if total is still not 10, keep cycling parts 1-3-2 until it is
+    while totalItems() < 10 do
+        if countInBackpack("Fake Watch") < 3 then
+            teleportTo(Vector3.new(-1845, 3, 0))
+            local t = tick()
+            repeat
+                if tick() - t >= 7 then
+                    teleportTo(Vector3.new(-1845, 3, 0))
+                    t = tick()
+                end
+                fireproximityprompt(watch) task.wait(0.1)
+                runService.Heartbeat:Wait()
+            until countInBackpack("Fake Watch") >= 3 or totalItems() >= 10
+        end
+        if totalItems() >= 10 then break end
+
+        if countInBackpack("Fake Designer Bag") < 3 then
+            teleportTo(Vector3.new(-1831, 3, -2))
+            local t = tick()
+            repeat
+                if tick() - t >= 7 then
+                    teleportTo(Vector3.new(-1831, 3, -2))
+                    t = tick()
+                end
+                fireproximityprompt(bag) task.wait(0.1)
+                runService.Heartbeat:Wait()
+            until countInBackpack("Fake Designer Bag") >= 3 or totalItems() >= 10
+        end
+        if totalItems() >= 10 then break end
+
+        if countInBackpack("Sarsaparilla") < 4 then
+            teleportTo(Vector3.new(-1840, 3, 1))
+            local t = tick()
+            repeat
+                if tick() - t >= 7 then
+                    teleportTo(Vector3.new(-1840, 3, 1))
+                    t = tick()
+                end
+                fireproximityprompt(sar) task.wait(0.1)
+                runService.Heartbeat:Wait()
+            until countInBackpack("Sarsaparilla") >= 4 or totalItems() >= 10
+        end
+    end
+
+    --4 re-teleport if stuck 7s, until Briefcase appears
+    teleportTo(Vector3.new(3147, 0, -184))
+    task.wait(1.75)
+    local t4 = tick()
+    repeat
+        if tick() - t4 >= 7 then
+            teleportTo(Vector3.new(3147, 0, -184))
+            task.wait(1.75)
+            t4 = tick()
+        end
+        local sell = workspace.Smuggling.Sell.Prompt.SellSmugglePrompt
+        fireproximityprompt(sell) task.wait(0.1)
+        runService.Heartbeat:Wait()
+    until hasInBackpack("Briefcase")
+
+    --5 re-teleport if stuck 7s, until Briefcase is gone
+    teleportTo(Vector3.new(-1834, 3, -8))
+    local t5 = tick()
+    repeat
+        if tick() - t5 >= 7 then
+            teleportTo(Vector3.new(-1834, 3, -8))
+            t5 = tick()
+        end
+        fireproximityprompt(wash) task.wait(0.1)
+        runService.Heartbeat:Wait()
+    until not hasInBackpack("Briefcase")
+
+    -- always ensure anti-teleport is re-enabled after each cycle
+    enableAntiTeleport()
+end
+
+-- // UI
+local screenGui = Instance.new('ScreenGui')
+screenGui.Name = 'SmugglingUI'
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = lplr.PlayerGui
+
+-- Main Frame
+local mainFrame = Instance.new('Frame')
+mainFrame.Name = 'MainFrame'
+mainFrame.Size = UDim2.new(0, 220, 0, 185)
+mainFrame.Position = UDim2.new(0.5, -110, 0.05, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new('UICorner')
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = mainFrame
+
+local mainStroke = Instance.new('UIStroke')
+mainStroke.Color = Color3.fromRGB(80, 80, 120)
+mainStroke.Thickness = 1.2
+mainStroke.Parent = mainFrame
+
+-- Top Bar (drag handle)
+local topBar = Instance.new('Frame')
+topBar.Name = 'TopBar'
+topBar.Size = UDim2.new(1, 0, 0, 36)
+topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+topBar.BorderSizePixel = 0
+topBar.Parent = mainFrame
+
+local topCorner = Instance.new('UICorner')
+topCorner.CornerRadius = UDim.new(0, 10)
+topCorner.Parent = topBar
+
+-- fix bottom corners of topbar
+local topBarFix = Instance.new('Frame')
+topBarFix.Size = UDim2.new(1, 0, 0.5, 0)
+topBarFix.Position = UDim2.new(0, 0, 0.5, 0)
+topBarFix.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+topBarFix.BorderSizePixel = 0
+topBarFix.Parent = topBar
+
+-- Title
+local title = Instance.new('TextLabel')
+title.Size = UDim2.new(1, -70, 1, 0)
+title.Position = UDim2.new(0, 12, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = 'El Paso'
+title.TextColor3 = Color3.fromRGB(200, 200, 255)
+title.TextSize = 15
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = topBar
+
+-- Minimize Button
+local minimizeBtn = Instance.new('TextButton')
+minimizeBtn.Size = UDim2.new(0, 28, 0, 28)
+minimizeBtn.Position = UDim2.new(1, -62, 0.5, -14)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 75)
+minimizeBtn.BorderSizePixel = 0
+minimizeBtn.Text = '-'
+minimizeBtn.TextColor3 = Color3.fromRGB(180, 180, 220)
+minimizeBtn.TextSize = 14
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.Parent = topBar
+
+local minCorner = Instance.new('UICorner')
+minCorner.CornerRadius = UDim.new(0, 6)
+minCorner.Parent = minimizeBtn
+
+-- Close Button
+local closeBtn = Instance.new('TextButton')
+closeBtn.Size = UDim2.new(0, 28, 0, 28)
+closeBtn.Position = UDim2.new(1, -30, 0.5, -14)
+closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 60)
+closeBtn.BorderSizePixel = 0
+closeBtn.Text = 'X'
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 13
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = topBar
+
+local closeCorner = Instance.new('UICorner')
+closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.Parent = closeBtn
+
+-- Content Frame
+local content = Instance.new('Frame')
+content.Name = 'Content'
+content.Size = UDim2.new(1, 0, 1, -36)
+content.Position = UDim2.new(0, 0, 0, 36)
+content.BackgroundTransparency = 1
+content.Parent = mainFrame
+
+-- Status Label
+local statusLabel = Instance.new('TextLabel')
+statusLabel.Size = UDim2.new(1, -20, 0, 22)
+statusLabel.Position = UDim2.new(0, 10, 0, 10)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = 'Status: Idle'
+statusLabel.TextColor3 = Color3.fromRGB(130, 130, 160)
+statusLabel.TextSize = 13
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = content
+
+-- Start/Stop Button
+local toggleBtn = Instance.new('TextButton')
+toggleBtn.Size = UDim2.new(1, -20, 0, 40)
+toggleBtn.Position = UDim2.new(0, 10, 0, 40)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 90)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Text = 'START'
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.TextSize = 15
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.Parent = content
+
+local toggleCorner = Instance.new('UICorner')
+toggleCorner.CornerRadius = UDim.new(0, 8)
+toggleCorner.Parent = toggleBtn
+
+-- Loop counter
+local loopCount = 0
+local loopCountLabel = Instance.new('TextLabel')
+loopCountLabel.Size = UDim2.new(1, -20, 0, 18)
+loopCountLabel.Position = UDim2.new(0, 10, 0, 95)
+loopCountLabel.BackgroundTransparency = 1
+loopCountLabel.Text = 'Loops: 0'
+loopCountLabel.TextColor3 = Color3.fromRGB(90, 90, 120)
+loopCountLabel.TextSize = 12
+loopCountLabel.Font = Enum.Font.Gotham
+loopCountLabel.TextXAlignment = Enum.TextXAlignment.Left
+loopCountLabel.Parent = content
+
+-- Money earned label
+local moneyLabel = Instance.new('TextLabel')
+moneyLabel.Size = UDim2.new(1, -20, 0, 18)
+moneyLabel.Position = UDim2.new(0, 10, 0, 114)
+moneyLabel.BackgroundTransparency = 1
+moneyLabel.Text = 'Earned: $0'
+moneyLabel.TextColor3 = Color3.fromRGB(80, 200, 100)
+moneyLabel.TextSize = 12
+moneyLabel.Font = Enum.Font.Gotham
+moneyLabel.TextXAlignment = Enum.TextXAlignment.Left
+moneyLabel.Parent = content
+
+-- Time elapsed label
+local timeLabel = Instance.new('TextLabel')
+timeLabel.Size = UDim2.new(1, -20, 0, 18)
+timeLabel.Position = UDim2.new(0, 10, 0, 133)
+timeLabel.BackgroundTransparency = 1
+timeLabel.Text = 'Time: 00:00:00'
+timeLabel.TextColor3 = Color3.fromRGB(130, 130, 200)
+timeLabel.TextSize = 12
+timeLabel.Font = Enum.Font.Gotham
+timeLabel.TextXAlignment = Enum.TextXAlignment.Left
+timeLabel.Parent = content
+
+-- // Timer logic
+local elapsedTime = 0
+local timerConnection = nil
+
+local function formatTime(seconds)
+    local h = math.floor(seconds / 3600)
+    local m = math.floor((seconds % 3600) / 60)
+    local s = math.floor(seconds % 60)
+    return string.format('%02d:%02d:%02d', h, m, s)
+end
+
+local function startTimer()
+    if timerConnection then timerConnection:Disconnect() end
+    timerConnection = runService.Heartbeat:Connect(function(dt)
+        elapsedTime += dt
+        timeLabel.Text = 'Time: ' .. formatTime(elapsedTime)
+    end)
+end
+
+local function stopTimer()
+    if timerConnection then
+        timerConnection:Disconnect()
+        timerConnection = nil
+    end
+end
+
+-- // Toggle Logic
+local function setRunning(state)
+    looping = state
+    if state then
+        statusLabel.Text = 'Status: Running...'
+        statusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
+        toggleBtn.Text = 'STOP'
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 60)
+        startTimer()
+        loopThread = task.spawn(function()
+            while looping do
+                mainScript()
+                if looping then
+                    loopCount += 1
+                    loopCountLabel.Text = 'Loops: ' .. loopCount
+                    moneyLabel.Text = 'Earned: $' .. (loopCount * 3250)
+                end
+            end
+            enableAntiTeleport()
+        end)
+    else
+        statusLabel.Text = 'Status: Stopped'
+        statusLabel.TextColor3 = Color3.fromRGB(220, 80, 80)
+        toggleBtn.Text = 'â¶  START'
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 90)
+        stopTimer()
+        loopThread = nil
+    end
+end
+
+toggleBtn.MouseButton1Click:Connect(function()
+    setRunning(not looping)
+end)
+
+-- // Minimize Logic
+local minimized = false
+local fullSize = UDim2.new(0, 220, 0, 185)
+local miniSize = UDim2.new(0, 220, 0, 36)
+
+minimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    local tween = tweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Size = minimized and miniSize or fullSize
+    })
+    tween:Play()
+    content.Visible = not minimized
+    minimizeBtn.Text = minimized and 'â¡' or 'â'
+end)
+
+-- // Close Logic
+closeBtn.MouseButton1Click:Connect(function()
+    setRunning(false)
+    screenGui:Destroy()
+end)
+
+-- // Drag Logic (PC & Mobile)
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+topBar.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateDrag(input)
+    end
+end)
+
+game:GetService('UserInputService').InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateDrag(input)
+    end
+end)
