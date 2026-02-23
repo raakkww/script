@@ -1,0 +1,93 @@
+-- made by Phemonaz
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local lp = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local target = { enabled = true, position = nil }
+local validTargets = {}
+local lastCacheUpdate = 0
+
+local function refreshCache()
+    validTargets = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == lp then continue end
+        local char = p.Character
+        if not char then continue end
+        if char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
+            table.insert(validTargets, p)
+        end
+    end
+end
+
+local function getAimPart(char)
+    local morphModel = char:FindFirstChild("MorphModel")
+    if not morphModel then return nil end
+    local rootPart = morphModel:FindFirstChild("RootPart")
+    if rootPart and rootPart:IsA("BasePart") then return rootPart end
+    return nil
+end
+
+local function getClosestTarget()
+    local mouse = lp:GetMouse()
+    local mp = Vector2.new(mouse.X, mouse.Y)
+    local best, bestDist = nil, math.huge
+    for _, p in ipairs(validTargets) do
+        local char = p.Character
+        if not char then continue end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
+        local aimPart = getAimPart(char)
+        if not aimPart then continue end
+        local sp, vis = camera:WorldToScreenPoint(aimPart.Position)
+        if not vis then continue end
+        local d = (Vector2.new(sp.X, sp.Y) - mp).Magnitude
+        if d < bestDist then
+        bestDist = d
+        local offset = Vector3.new(0, aimPart.Size.Y * 0.35, 0)
+        best = aimPart.Position + offset
+        end
+    end
+    return best
+end
+
+RunService.Heartbeat:Connect(function()
+    if not target.enabled then return end
+    local now = tick()
+    if now - lastCacheUpdate > 2 then
+        lastCacheUpdate = now
+        refreshCache()
+    end
+    target.position = getClosestTarget()
+end)
+
+local shootRemote = game.ReplicatedStorage:WaitForChild("Network"):WaitForChild("blaster"):WaitForChild("Shoot")
+
+local Hooks = {}
+Hooks.namecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+
+    if method == "FireServer" and self == shootRemote and target.enabled and target.position then
+        local args = {...}
+        local camCFrame = args[3]
+        if typeof(camCFrame) == "CFrame" then
+            local origin = camCFrame.Position
+            local dir = (target.position - origin).Unit
+            args[3] = CFrame.lookAt(origin, origin + dir)
+        end
+        return Hooks.namecall(self, table.unpack(args))
+    end
+
+    if method == "Spherecast" and self == workspace and target.enabled and target.position then
+        local args = {...}
+        local origin = args[1]
+        local originalLen = typeof(args[3]) == "Vector3" and args[3].Magnitude or 100
+        if origin and target.position then
+            local dir = (target.position - origin).Unit * originalLen
+            args[3] = dir
+        end
+        return Hooks.namecall(self, table.unpack(args))
+    end
+
+    return Hooks.namecall(self, ...)
+end))
