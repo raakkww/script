@@ -1,0 +1,72 @@
+-- made by Phemonaz
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function getTarget()
+    local camera = workspace.Camera
+    local mouse = LocalPlayer:GetMouse()
+    local mousePos = Vector2.new(mouse.X, mouse.Y)
+    local bestDist = math.huge
+    local bestPos = nil
+
+    local function checkChar(char)
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum or hum.Health <= 0 then return end
+        local screenPos, onScreen = camera:WorldToScreenPoint(hrp.Position)
+        if not onScreen then return end
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+        if dist < bestDist then
+            bestDist = dist
+            bestPos = hrp.Position
+        end
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            checkChar(player.Character)
+        end
+    end
+
+    local playerChars = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character then
+            playerChars[player.Character] = true
+        end
+    end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and not playerChars[obj] then
+            checkChar(obj)
+        end
+    end
+
+    return bestPos
+end
+
+local RS = game:GetService("ReplicatedStorage")
+
+--[[ Visual Hook ]]--
+local AsyncRaycast = require(RS.Common.AsyncService.AsyncRaycast)
+local originalRaycast = AsyncRaycast.Raycast
+AsyncRaycast.Raycast = function(origin, direction, params)
+    local target = getTarget()
+    if target then
+        direction = (target - origin).Unit * direction.Magnitude
+    end
+    return originalRaycast(origin, direction, params)
+end
+
+--[[ Server Hook ]]--
+local ClientShootable = require(RS.Client.CombatController.ClientComponent.ClientShootableComponent)
+local originalLocalShoot = ClientShootable.LocalShoot
+ClientShootable.LocalShoot = function(self, extra)
+    local target = getTarget()
+    if target then
+        local origin = workspace.Camera.CFrame.Position
+        local direction = (target - origin).Unit
+        return self:Shoot(origin, direction, extra)
+    end
+    return originalLocalShoot(self, extra)
+end
