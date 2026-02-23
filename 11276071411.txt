@@ -1,0 +1,81 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local target = {
+    enabled = true,
+    position = nil,
+}
+local Hooks = {}
+
+local validModels = {}
+local lastCacheUpdate = 0
+local CACHE_INTERVAL = 2
+
+local function hasNameTag(model)
+    return model:FindFirstChild("NameTag", true) ~= nil
+        and model:FindFirstChild("NameTag", true):IsA("BillboardGui")
+end
+
+local function refreshCache()
+    validModels = {}
+    for _, model in ipairs(workspace:GetDescendants()) do
+        if model:IsA("Model") and model ~= LocalPlayer.Character and hasNameTag(model) then
+            local hrp = model:FindFirstChild("HumanoidRootPart")
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            if hrp and hum then
+                table.insert(validModels, model)
+            end
+        end
+    end
+end
+
+local function getClosestTarget()
+    local camera = workspace.Camera
+    local mouse = LocalPlayer:GetMouse()
+    local mousePos = Vector2.new(mouse.X, mouse.Y)
+    local closestDist = math.huge
+    local closestPos = nil
+
+    for _, model in ipairs(validModels) do
+        local hum = model:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
+        local aimPart = model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart")
+        if not aimPart then continue end
+        local screenPos, onScreen = camera:WorldToScreenPoint(aimPart.Position)
+        if not onScreen then continue end
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+        if dist < closestDist then
+            closestDist = dist
+            closestPos = aimPart.Position
+        end
+    end
+
+    return closestPos
+end
+
+RunService.Heartbeat:Connect(function()
+    if not target.enabled then return end
+
+    local now = tick()
+    if now - lastCacheUpdate > CACHE_INTERVAL then
+        lastCacheUpdate = now
+        refreshCache()
+    end
+
+    local pos = getClosestTarget()
+    if pos then
+        target.position = pos
+    end
+end)
+
+Hooks.Raycast = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local args = { ... }
+    local method = getnamecallmethod():lower()
+    local cam = workspace.Camera
+    if target.enabled and target.position and method == "raycast" and self.Name == "Workspace" then
+        local direction = (target.position - cam.CFrame.Position).Unit * 200
+        args[2] = direction
+        return Hooks.Raycast(self, table.unpack(args))
+    end
+    return Hooks.Raycast(self, ...)
+end))
