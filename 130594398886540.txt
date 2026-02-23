@@ -1,0 +1,154 @@
+-- ZAPORIUM GUI -
+
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Zap-Zaporium/Zap-is-Me/refs/heads/main/Zaporium.lua"))()
+
+-- Create main window
+local Window = library:CreateWindow("Garden Horizons")
+
+-- ââââââââââââââââââââââââââââââââââââââââââââââââ
+-- 1. Farm Tab (first)
+-- ââââââââââââââââââââââââââââââââââââââââââââââââ
+local Farm = Window:AddFolder("Farm Tab")
+
+local sellRemote = game:GetService("ReplicatedStorage")
+    :WaitForChild("RemoteEvents")
+    :WaitForChild("SellItems")
+
+local sellingState = false
+
+Farm:AddToggle({
+    text = "Sell All",
+    state = false,
+    flag = "sellall",
+    callback = function(v)
+        if v then
+            if not sellingState then
+                sellingState = true
+                print("ð Started auto-selling ALL (every 2s)")
+                task.spawn(function()
+                    while sellingState do
+                        pcall(function()
+                            sellRemote:InvokeServer("SellAll")
+                        end)
+                        task.wait(2)
+                    end
+                end)
+            end
+        else
+            sellingState = false
+            print("â¹ï¸ Stopped auto-selling")
+        end
+    end
+})
+
+-- ââââââââââââââââââââââââââââââââââââââââââââââââ
+-- 2. Seed Shop
+-- ââââââââââââââââââââââââââââââââââââââââââââââââ
+local Main = Window:AddFolder("Seed Shop")
+
+-- Seed buying logic
+local shopName = "SeedShop"
+local remote = game:GetService("ReplicatedStorage")
+    :WaitForChild("RemoteEvents")
+    :WaitForChild("PurchaseShopItem")
+
+local seedsByRarity = {
+    Common    = {"Carrot Seed", "Corn Seed"},
+    Uncommon  = {"Onion Seed", "Strawberry Seed", "Mushroom Seed"},
+    Rare      = {"Beetroot Seed", "Tomato Seed", "Apple Seed", "Rose Seed"},
+    Epic      = {"Wheat Seed", "Banana Seed", "Plum Seed", "Potato Seed"},
+    Legendary = {"Cabbage Seed", "Cherry Seed"},
+}
+
+local buyingStates = {
+    Common = false, Uncommon = false, Rare = false, Epic = false, Legendary = false,
+}
+
+local function startBuyLoop(rarity)
+    task.spawn(function()
+        local seeds = seedsByRarity[rarity]
+        while buyingStates[rarity] do
+            for _, seedName in ipairs(seeds) do
+                if not buyingStates[rarity] then break end
+                pcall(function()
+                    remote:InvokeServer(shopName, seedName)
+                end)
+                task.wait(0.4)
+            end
+        end
+    end)
+end
+
+-- Seed toggles â added in the exact order you wanted
+local rarityOrder = {"Common", "Uncommon", "Rare", "Epic", "Legendary"}
+
+for _, rarity in ipairs(rarityOrder) do
+    Main:AddToggle({
+        text = "Buy " .. rarity,
+        state = false,
+        flag = "buy" .. rarity:lower(),
+        callback = function(v)
+            if v then
+                if not buyingStates[rarity] then
+                    buyingStates[rarity] = true
+                    print("ð Started auto-buying " .. rarity .. " seeds")
+                    startBuyLoop(rarity)
+                end
+            else
+                buyingStates[rarity] = false
+                print("â¹ï¸ Stopped auto-buying " .. rarity .. " seeds")
+            end
+        end
+    })
+end
+
+-- ââââââââââââââââââââââââââââââââââââââââââââââââ
+-- 3. Gear Shop
+-- ââââââââââââââââââââââââââââââââââââââââââââââââ
+local Gear = Window:AddFolder("Gear Shop")
+
+local gearList = {
+    "Watering Can",
+    "Basic Sprinkler",
+    "Harvest Bell",
+    "Turbo Sprinkler",
+    "Favorite Tool",
+    "Super Sprinklers",
+}
+
+local gearBuyingStates = {}
+
+for _, gearName in ipairs(gearList) do
+    gearBuyingStates[gearName] = false
+
+    Gear:AddToggle({
+        text = "Buy " .. gearName,
+        state = false,
+        flag = "buy" .. gearName:gsub("%s+", ""),
+        callback = function(v)
+            local item = gearName
+            if v then
+                if not gearBuyingStates[item] then
+                    gearBuyingStates[item] = true
+                    print("ð Started auto-buying " .. item)
+                    task.spawn(function()
+                        while gearBuyingStates[item] do
+                            pcall(function()
+                                remote:InvokeServer("GearShop", item)
+                            end)
+                            task.wait(0.6)
+                        end
+                    end)
+                end
+            else
+                gearBuyingStates[item] = false
+                print("â¹ï¸ Stopped auto-buying " .. item)
+            end
+        end
+    })
+end
+
+-- Init GUI
+library:Init()
+
+print("Garden Horizons GUI Loaded!")
