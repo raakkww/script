@@ -1,0 +1,53 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function getTarget()
+    local camera = workspace.Camera
+    local mouse = LocalPlayer:GetMouse()
+    local mousePos = Vector2.new(mouse.X, mouse.Y)
+    local bestDist = math.huge
+    local bestPos = nil
+
+    local function check(model)
+        if not model then return end
+        local hrp = model:FindFirstChild("HumanoidRootPart")
+        local hum = model:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum or hum.Health <= 0 then return end
+        local screenPos, onScreen = camera:WorldToScreenPoint(hrp.Position)
+        if not onScreen then return end
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+        if dist < bestDist then
+            bestDist = dist
+            bestPos = hrp.Position
+        end
+    end
+
+    local playerChars = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            check(player.Character)
+        end
+        if player.Character then
+            playerChars[player.Character] = true
+        end
+    end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and not playerChars[obj] then
+            check(obj)
+        end
+    end
+
+    return bestPos
+end
+
+local BulletWeapon = require(game:GetService("ReplicatedStorage").WeaponsSystem.WeaponTypes.BulletWeapon)
+local originalDoLocalFire = BulletWeapon.doLocalFire
+
+BulletWeapon.doLocalFire = function(self)
+    local target = getTarget()
+    if target and self.tipAttach then
+        self.aimPoint = target
+    end
+    return originalDoLocalFire(self)
+end
