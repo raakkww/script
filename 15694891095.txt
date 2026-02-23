@@ -1,0 +1,106 @@
+-- made by Phemonaz
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local target = {
+    enabled = true,
+    position = nil,
+}
+
+local Hooks = {}
+
+local function getHeadPosition(model)
+    local head = model:FindFirstChild("Head")
+    if head and (head:IsA("MeshPart") or head:IsA("Part")) then
+        return head.Position
+    end
+    return nil
+end
+
+local function getClosestTarget()
+    local camera = workspace.Camera
+    local closestDist = math.huge
+    local closestPos = nil
+    local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
+
+        local char = player.Character
+        if not char then continue end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum or hum.Health <= 0 then continue end
+
+        local worldPos = getHeadPosition(char) or hrp.Position
+
+        local screenPos, onScreen = camera:WorldToScreenPoint(worldPos)
+        if not onScreen then continue end
+
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+
+        if dist < closestDist then
+            closestDist = dist
+            closestPos = worldPos
+        end
+    end
+
+    local playerChars = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character then
+            playerChars[player.Character] = true
+        end
+    end
+
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") and not playerChars[obj] then
+            local headPos = getHeadPosition(obj)
+            if not headPos then continue end
+
+            local screenPos, onScreen = camera:WorldToScreenPoint(headPos)
+            if not onScreen then continue end
+
+            local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+
+            if dist < closestDist then
+                closestDist = dist
+                closestPos = headPos
+            end
+        end
+    end
+
+    return closestPos
+end
+
+workspace.ChildAdded:Connect(function(child)
+end)
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(char)
+    end)
+end)
+
+RunService.Heartbeat:Connect(function()
+    if target.enabled then
+        local pos = getClosestTarget()
+        if pos then
+            target.position = pos
+        end
+    end
+end)
+
+Hooks.Raycast = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    local args = { ... }
+    local method = getnamecallmethod():lower()
+    local cam = workspace.Camera
+
+    if target.enabled and target.position and method == "raycast" and self.Name == "Workspace" then
+        local direction = (target.position - cam.CFrame.Position).Unit * 200
+        args[2] = direction
+        return Hooks.Raycast(self, table.unpack(args))
+    end
+
+    return Hooks.Raycast(self, ...)
+end))
