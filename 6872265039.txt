@@ -1,0 +1,264 @@
+-- made by Phemonaz
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = Workspace.CurrentCamera
+
+local targetingFolder = Workspace:WaitForChild("ProjectileTargeting")
+
+local WORKSPACE_GRAVITY = Workspace.Gravity
+
+local WEAPON_PROFILES = {
+    WOOD_BOW            = { speed = 160, effectiveGravity = WORKSPACE_GRAVITY * 0.45 },
+    FALCONER_BOW        = { speed = 185, effectiveGravity = WORKSPACE_GRAVITY * 0.38 },
+    FEATHER_BOW         = { speed = 150, effectiveGravity = WORKSPACE_GRAVITY * 0.50 },
+    GOLDEN_BOW          = { speed = 200, effectiveGravity = WORKSPACE_GRAVITY * 0.35 },
+    WOOD_CROSSBOW       = { speed = 175, effectiveGravity = WORKSPACE_GRAVITY * 0.42 },
+    OG_WOOD_CROSSBOW    = { speed = 175, effectiveGravity = WORKSPACE_GRAVITY * 0.42 },
+    FLOWER_CROSSBOW     = { speed = 170, effectiveGravity = WORKSPACE_GRAVITY * 0.44 },
+    FALCONER_CROSSBOW   = { speed = 190, effectiveGravity = WORKSPACE_GRAVITY * 0.37 },
+    TACTICAL_CROSSBOW   = { speed = 205, effectiveGravity = WORKSPACE_GRAVITY * 0.33 },
+    HEADHUNTER          = { speed = 215, effectiveGravity = WORKSPACE_GRAVITY * 0.30 },
+    FLOWER_HEADHUNTER   = { speed = 210, effectiveGravity = WORKSPACE_GRAVITY * 0.32 },
+    TACTICAL_HEADHUNTER = { speed = 225, effectiveGravity = WORKSPACE_GRAVITY * 0.28 },
+    FALCONER_HEADHUNTER = { speed = 220, effectiveGravity = WORKSPACE_GRAVITY * 0.29 },
+}
+
+local DEFAULT_PROFILE = { speed = 185, effectiveGravity = WORKSPACE_GRAVITY * 0.40 }
+
+local function getCurrentWeaponProfile()
+    local inventories = ReplicatedStorage:FindFirstChild("Inventories")
+    if not inventories then return DEFAULT_PROFILE end
+
+    local playerInventory = inventories:FindFirstChild(LocalPlayer.Name)
+    if not playerInventory then return DEFAULT_PROFILE end
+
+    for _, item in ipairs(playerInventory:GetChildren()) do
+        local itemName = item.Name:upper()
+            :gsub("%s+", "_")
+            :gsub("%-", "_")
+            :gsub("[^%w_]", "")
+
+        for weaponName, profile in pairs(WEAPON_PROFILES) do
+            if itemName:find(weaponName, 1, true) then
+                return profile
+            end
+        end
+    end
+
+    return DEFAULT_PROFILE
+end
+
+local targetedYLevel = nil
+
+local function getFurthestPart()
+    local myChar = LocalPlayer.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
+    local myHRP = myChar.HumanoidRootPart
+
+    local furthest, furthestDist = nil, -math.huge
+    for _, p in ipairs(targetingFolder:GetChildren()) do
+        if p:IsA("BasePart") then
+            local d = (p.Position - myHRP.Position).Magnitude
+            if d > furthestDist then
+                furthestDist = d
+                furthest = p
+            end
+        end
+    end
+    return furthest
+end
+
+targetingFolder.ChildAdded:Connect(function(child)
+    if not child:IsA("BasePart") then return end
+
+    task.defer(function()
+        local furthest = getFurthestPart()
+        if not furthest then return end
+
+        local target = getTarget and getTarget() or nil
+        if target and target.hrp then
+            targetedYLevel = target.hrp.Position.Y
+        end
+    end)
+end)
+
+local function getDummyTarget(mousePos)
+    local best, bestDist = nil, math.huge
+
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if not obj.Name:lower():find("dummy") then continue end
+
+        local hrp = obj:FindFirstChild("HumanoidRootPart")
+        local hum = obj:FindFirstChild("Humanoid")
+
+        if not hrp then continue end
+        if hum and hum.Health <= 0 then continue end
+
+        local ok, screenPos, onScreen =
+            pcall(Camera.WorldToViewportPoint, Camera, hrp.Position)
+
+        if ok and onScreen then
+            local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+            if dist < bestDist then
+                bestDist = dist
+                best = { hrp = hrp }
+            end
+        end
+    end
+
+    return best
+end
+
+local function getPlayerTarget(mousePos)
+    local best, bestDist = nil, math.huge
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LocalPlayer then continue end
+        if plr.Team == LocalPlayer.Team then continue end
+
+        local char = plr.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+        if not hum or hum.Health <= 0 or not hrp then continue end
+
+        local ok, screenPos, onScreen =
+            pcall(Camera.WorldToViewportPoint, Camera, hrp.Position)
+
+        if ok and onScreen then
+            local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+            if dist < bestDist then
+                bestDist = dist
+                best = { hrp = hrp }
+            end
+        end
+    end
+
+    return best
+end
+
+function getTarget()
+    local ok, mousePos = pcall(UserInputService.GetMouseLocation, UserInputService)
+    if not ok then return nil end
+
+    local playerTarget = getPlayerTarget(mousePos)
+    local dummyTarget = getDummyTarget(mousePos)
+
+    if playerTarget and dummyTarget then
+        local ok1, ps1 = pcall(Camera.WorldToViewportPoint, Camera, playerTarget.hrp.Position)
+        local ok2, ps2 = pcall(Camera.WorldToViewportPoint, Camera, dummyTarget.hrp.Position)
+
+        if ok1 and ok2 then
+            local d1 = (Vector2.new(ps1.X, ps1.Y) - mousePos).Magnitude
+            local d2 = (Vector2.new(ps2.X, ps2.Y) - mousePos).Magnitude
+            return d1 < d2 and playerTarget or dummyTarget
+        end
+    end
+
+    return playerTarget or dummyTarget
+end
+
+local function getShootOrigin()
+    local myChar = LocalPlayer.Character
+    if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+        local myHRP = myChar.HumanoidRootPart
+        local closest, closestDist = nil, math.huge
+        for _, p in ipairs(targetingFolder:GetChildren()) do
+            if p:IsA("BasePart") then
+                local d = (p.Position - myHRP.Position).Magnitude
+                if d < closestDist then
+                    closestDist = d
+                    closest = p
+                end
+            end
+        end
+        if closest then
+            return closest.Position
+        end
+    end
+    return Camera.CFrame.Position
+end
+
+local function predictPosition(hrp, shootPos, profile)
+    local vel = hrp.AssemblyLinearVelocity
+    local targetPos = hrp.Position
+    local hrpCenterY = hrp.Position.Y
+
+    local horizDist = Vector3.new(
+        targetPos.X - shootPos.X,
+        0,
+        targetPos.Z - shootPos.Z
+    ).Magnitude
+
+    local flightTime = horizDist / profile.speed
+
+    local arcHeight = 0.5 * profile.effectiveGravity * (flightTime ^ 2)
+    local vertDiff = math.abs(targetPos.Y - shootPos.Y)
+    local totalVertical = vertDiff + arcHeight
+    local refinedTime = math.sqrt((2 * totalVertical) / math.max(profile.effectiveGravity, 0.1))
+    flightTime = (flightTime + refinedTime) / 2
+
+    local horizVel = Vector3.new(vel.X, 0, vel.Z)
+    local predictedPos = targetPos + horizVel * flightTime
+
+    local gravityDrop = 0.5 * profile.effectiveGravity * (flightTime ^ 2)
+    local requiredAimY = hrpCenterY + gravityDrop + 0.6
+
+    local vertLead = 0
+    if math.abs(vel.Y) > 1 then
+        vertLead = vel.Y * flightTime
+    end
+
+    predictedPos = Vector3.new(
+        predictedPos.X,
+        requiredAimY + vertLead,
+        predictedPos.Z
+    )
+
+    return predictedPos
+end
+
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+setreadonly(mt, false)
+
+mt.__index = newcclosure(function(self, key)
+    if self ~= Mouse then
+        return oldIndex(self, key)
+    end
+
+    local target = getTarget()
+    if not target then
+        return oldIndex(self, key)
+    end
+
+    local hrp = target.hrp
+    if not hrp then
+        return oldIndex(self, key)
+    end
+
+    targetedYLevel = hrp.Position.Y
+
+    local shootPos = getShootOrigin()
+    local profile = getCurrentWeaponProfile()
+    local predictedPos = predictPosition(hrp, shootPos, profile)
+
+    local ok, screenPos = pcall(Camera.WorldToViewportPoint, Camera, predictedPos)
+    if not ok then
+        return oldIndex(self, key)
+    end
+
+    if key == "Hit" then return CFrame.new(predictedPos) end
+    if key == "Target" then return hrp end
+    if key == "X" then return screenPos.X end
+    if key == "Y" then return screenPos.Y end
+
+    return oldIndex(self, key)
+end)
+
+setreadonly(mt, true)
