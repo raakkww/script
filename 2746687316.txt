@@ -1,0 +1,158 @@
+-- ts file was generated at discord.gg/25ms
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+getgenv().ESPEnabled = false
+local _Workspace = game:GetService('Workspace')
+local _Players = game:GetService('Players')
+local _UserInputService = game:GetService('UserInputService')
+local _CurrentCamera = workspace.CurrentCamera
+
+local Window = Rayfield:CreateWindow({
+   Name = "Fart Hub: Fixed",
+   LoadingTitle = "Loading script...",
+   LoadingSubtitle = "Discord: shutka1",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "FartHubAlone",
+      FileName = "Config"
+   },
+   KeySystem = false
+})
+
+local function silentaim()
+    local v3 = next
+    local v4, v5 = getgc(true)
+    local u6 = {}
+
+    while true do
+        local v7
+        v5, v7 = v3(v4, v5)
+        if v5 == nil then break end
+        if type(v7) == 'table' then
+            if rawget(v7, 'Fire') and (type(rawget(v7, 'Fire')) == 'function' and not u6.Bullet) then
+                u6.Bullet = v7
+            elseif rawget(v7, 'HiddenUpdate') then
+                u6.Players = debug.getupvalue(rawget(v7, 'new'), 9)
+            end
+        end
+    end
+
+    function u6.GetPlayerHitbox(_, p8, p9)
+        local v10 = next
+        local _Hitboxes = p8.Hitboxes
+        local v12 = nil
+        while true do
+            local v13
+            v12, v13 = v10(_Hitboxes, v12)
+            if v12 == nil then break end
+            if v13._name == p9 then return v13 end
+        end
+    end
+
+    function u6.GetClosestPlayerFromCursor(_)
+        local _huge = math.huge
+        local v15 = next
+        local _PlayersList = u6.Players
+        local v17 = nil
+        local u18 = nil
+        while true do
+            local u19
+            v17, u19 = v15(_PlayersList, v17)
+            if v17 == nil then break end
+            pcall(function()
+                if not u19.Dead and (u19.PlayerModel and u19.PlayerModel.Model.Head.Transparency == 0) then
+                    local v20, v21 = _CurrentCamera:WorldToViewportPoint(u19.Position)
+                    if v21 then
+                        local _Magnitude = (_UserInputService:GetMouseLocation() - Vector2.new(v20.X, v20.Y)).Magnitude
+                        if _Magnitude < _huge then
+                            _huge = _Magnitude
+                            u18 = u19
+                        end
+                    end
+                end
+            end)
+        end
+        return u18
+    end
+
+    local OldFire
+    OldFire = hookfunction(u6.Bullet.Fire, function(p23, ...)
+        local v24 = {...}
+        local v25 = u6:GetClosestPlayerFromCursor()
+        if v25 and u6:GetPlayerHitbox(v25, 'Head') then
+            v24[2] = CFrame.new(_CurrentCamera.CFrame.Position, u6:GetPlayerHitbox(v25, 'Head').CFrame.Position).LookVector
+        end
+        return OldFire(p23, unpack(v24))
+    end)
+end
+
+function createESP(p28)
+    if p28:FindFirstChild("ESP") then return end
+    local _Highlight = Instance.new('Highlight')
+    _Highlight.Name = 'ESP'
+    _Highlight.Adornee = p28
+    _Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    _Highlight.FillColor = Color3.new(1, 0, 0)
+    _Highlight.FillTransparency = 0.5
+    _Highlight.Parent = p28
+end
+
+function updateESP()
+    for _, v in pairs(_Workspace:GetDescendants()) do
+        if v.Name == 'ESP' then v:Destroy() end
+    end
+    if getgenv().ESPEnabled then
+        local models = _Workspace:FindFirstChild("Playermodels")
+        if models then
+            for _, v in pairs(models:GetChildren()) do
+                createESP(v)
+            end
+        end
+    end
+end
+
+local AimTab = Window:CreateTab("Aiming", 4483362458)
+AimTab:CreateButton({
+   Name = "Enable Silent Aim",
+   Callback = function()
+      silentaim()
+      Rayfield:Notify({Title = "Silent Aim", Content = "Activated!", Duration = 2})
+   end,
+})
+
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+VisualsTab:CreateToggle({
+   Name = "Enable ESP",
+   CurrentValue = false,
+   Flag = "ESP_Toggle",
+   Callback = function(Value)
+      getgenv().ESPEnabled = Value
+      task.spawn(function()
+          while getgenv().ESPEnabled do
+              updateESP()
+              task.wait(1)
+          end
+          updateESP()
+      end)
+   end,
+})
+
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+MiscTab:CreateSlider({
+   Name = "FOV (Field of View)",
+   Range = {0, 120},
+   Increment = 1,
+   Suffix = "Â°",
+   CurrentValue = 70,
+   Flag = "FOV_Slider",
+   Callback = function(Value)
+      _CurrentCamera.FieldOfView = Value
+   end,
+})
+
+Rayfield:Notify({
+   Title = "Success!",
+   Content = "Rayfield Menu Loaded",
+   Duration = 3,
+})
