@@ -1,0 +1,442 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+-- // CONFIGURATION //
+local CONFIG = {
+    ProfitMargin = 4000,
+    WaitTime = 0.5,
+    Running = false,
+    SearchDelay = 0.05 -- Speed of scanning slots
+}
+
+-- // GUI CREATION //
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local MinimizeBtn = Instance.new("TextButton")
+local ToggleBtn = Instance.new("TextButton")
+local StatusLabel = Instance.new("TextLabel")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Name = "DealerSniperV2"
+if game.CoreGui:FindFirstChild("DealerSniperV2") then game.CoreGui.DealerSniperV2:Destroy() end
+ScreenGui.Parent = game.CoreGui
+
+-- Main Frame Styling
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.Size = UDim2.new(0, 320, 0, 190)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
+
+UICorner.Parent = MainFrame
+UICorner.CornerRadius = UDim.new(0, 8)
+
+-- Title
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 15, 0, 10)
+Title.Size = UDim2.new(0, 200, 0, 30)
+Title.Font = Enum.Font.GothamBold
+Title.Text = ""
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 20
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Minimize Button
+MinimizeBtn.Parent = MainFrame
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+MinimizeBtn.Position = UDim2.new(0.85, 0, 0, 10)
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.TextSize = 18
+Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
+
+-- Toggle Button
+ToggleBtn.Parent = MainFrame
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0.3, 0)
+ToggleBtn.Size = UDim2.new(0.9, 0, 0, 45)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Text = "START BOT"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.TextSize = 22
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
+
+-- Status
+StatusLabel.Parent = MainFrame
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Position = UDim2.new(0.05, 0, 0.65, 0)
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 40)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Text = "Status: Idle"
+StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusLabel.TextSize = 14
+StatusLabel.TextWrapped = true
+
+-- // GUI LOGIC //
+local minimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        MainFrame:TweenSize(UDim2.new(0, 320, 0, 50), "Out", "Quad", 0.3)
+        MinimizeBtn.Text = "+"
+        ToggleBtn.Visible = false
+        StatusLabel.Visible = false
+    else
+        MainFrame:TweenSize(UDim2.new(0, 320, 0, 190), "Out", "Quad", 0.3)
+        MinimizeBtn.Text = "-"
+        ToggleBtn.Visible = true
+        StatusLabel.Visible = true
+    end
+end)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    CONFIG.Running = not CONFIG.Running
+    if CONFIG.Running then
+        ToggleBtn.Text = "STOP BOT"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+        task.spawn(MainLoop)
+    else
+        ToggleBtn.Text = "START BOT"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+        StatusLabel.Text = "Status: Stopped"
+    end
+end)
+
+-- // HELPER FUNCTIONS //
+
+local function SetStatus(msg)
+    StatusLabel.Text = "Status: " .. msg
+end
+
+local function DebugPrint(msg)
+    -- Prints to F9 Console for debugging
+    print("[BOT DEBUG]: " .. msg)
+end
+
+local function Teleport(target)
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local targetCFrame
+    if typeof(target) == "Vector3" then
+        targetCFrame = CFrame.new(target)
+    elseif typeof(target) == "Instance" then
+        if target:IsA("Model") then
+            targetCFrame = target:GetPrimaryPartCFrame()
+        elseif target:IsA("BasePart") then
+            targetCFrame = target.CFrame
+        end
+    elseif typeof(target) == "CFrame" then
+        targetCFrame = target
+    end
+
+    if targetCFrame then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = targetCFrame + Vector3.new(0, 3, 0)
+    end
+end
+
+local function PressKey(key, duration)
+    VirtualInputManager:SendKeyEvent(true, key, false, game)
+    task.wait(duration)
+    VirtualInputManager:SendKeyEvent(false, key, false, game)
+end
+
+local function GetPlayerMoney()
+    if LocalPlayer:FindFirstChild("leaderstats") and LocalPlayer.leaderstats:FindFirstChild("Money") then
+        return LocalPlayer.leaderstats.Money.Value
+    end
+    return 0
+end
+
+local function FindBestSlot()
+    local bestSlot = nil
+    local bestScore = -99999
+    local playerMoney = GetPlayerMoney()
+    
+    DebugPrint("Starting Scan. Player Money: " .. playerMoney)
+    
+    for i = 1, 55 do
+        if not CONFIG.Running then break end
+        
+        local slotName = "Slot" .. i
+        local slot = Workspace:WaitForChild("Slots"):FindFirstChild(slotName)
+        
+        if slot then
+            SetStatus("Scanning " .. slotName .. "...")
+            
+            -- DATA FINDING
+            local priceVal = slot:FindFirstChild("CheckPrice") or slot:FindFirstChild("Price")
+            local scammerVal = slot:FindFirstChild("IsScammer")
+            local currentUserVal = slot:FindFirstChild("CurrentUser")
+            local brokenPartsFolder = slot:FindFirstChild("BrokenParts")
+            
+            -- DATA EXTRACTION (SAFE MODE)
+            local price = priceVal and priceVal.Value or 999999999
+            local isScam = false
+            
+            if scammerVal then
+                -- Some games use BoolValue, some use IntValue (0/1). Handling both.
+                if scammerVal:IsA("BoolValue") then isScam = scammerVal.Value end
+                if scammerVal:IsA("IntValue") and scammerVal.Value == 1 then isScam = true end
+            end
+            
+            -- Check if someone is already talking to dealer
+            local isBusy = false
+            if currentUserVal and currentUserVal.Value ~= "" and currentUserVal.Value ~= nil then
+                isBusy = true
+            end
+
+            -- LOGIC
+            if not isScam and not isBusy then
+                if price <= playerMoney then
+                    -- Scoring Logic
+                    local score = 1000
+                    
+                    -- Check Broken Status
+                    local isBroken = false
+                    if brokenPartsFolder and #brokenPartsFolder:GetChildren() > 0 then
+                        isBroken = true
+                    end
+                    
+                    if not isBroken then
+                        score = score + 500 -- Prefer Functional
+                    else
+                        score = score + 200 -- Still buy broken if it's all we have
+                    end
+                    
+                    -- Prefer cheaper cars (higher profit margin)
+                    score = score - (price / 1000)
+                    
+                    DebugPrint(slotName .. " is VALID. Price: " .. price .. " Score: " .. score)
+                    
+                    if score > bestScore then
+                        bestScore = score
+                        bestSlot = slot
+                    end
+                else
+                    -- DebugPrint(slotName .. " Too Expensive: " .. price)
+                end
+            else
+                -- DebugPrint(slotName .. " Invalid (Busy or Scam)")
+            end
+        end
+        if i % 10 == 0 then task.wait() end -- Anti-crash yield
+    end
+    
+    return bestSlot
+end
+
+local function FindMyPlot()
+    for i = 1, 13 do
+        local plot = Workspace.Plots:FindFirstChild("Plot" .. i)
+        if plot and plot:FindFirstChild("CurrentOwner") then
+            -- Check if owner matches LocalPlayer
+            if plot.CurrentOwner.Value == LocalPlayer then
+                return plot
+            end
+            -- Fallback: Check checking the name string just in case object value fails
+            if tostring(plot.CurrentOwner.Value) == LocalPlayer.Name then
+                return plot
+            end
+        end
+    end
+    return nil
+end
+
+local function GetCarSerialFromSlot(slot)
+    -- Finds the folder named {GUID} inside the slot
+    for _, child in pairs(slot:GetChildren()) do
+        if child.Name:match("^{.*}$") then
+            return child.Name
+        end
+    end
+    return nil
+end
+
+-- // MAIN LOGIC //
+
+function MainLoop()
+    while CONFIG.Running do
+        SetStatus("Teleporting to Dealership...")
+        Teleport(Vector3.new(-80, 7, -27))
+        task.wait(1.5)
+        
+        local targetSlot = FindBestSlot()
+        
+        if targetSlot then
+            SetStatus("Target Found: " .. targetSlot.Name)
+            DebugPrint("Proceeding with " .. targetSlot.Name)
+            
+            local dealer = targetSlot:FindFirstChild("Dealer")
+            local checkPrice = targetSlot:FindFirstChild("CheckPrice")
+            local buyPrice = checkPrice and checkPrice.Value or 0
+            
+            -- 1. Grab Serial BEFORE buying (Reliable tracking)
+            local carSerial = GetCarSerialFromSlot(targetSlot)
+            DebugPrint("Car Serial Detected: " .. tostring(carSerial))
+
+            if dealer then
+                -- TP to Dealer
+                Teleport(dealer.PrimaryPart.CFrame * CFrame.new(0, 0, 3))
+                task.wait(0.5)
+                
+                -- Double Check Busy
+                if targetSlot.CurrentUser.Value ~= "" and targetSlot.CurrentUser.Value ~= LocalPlayer.Name then
+                    SetStatus("Slot stolen! Retrying...")
+                    task.wait(1)
+                    continue
+                end
+                
+                -- Interact
+                SetStatus("Buying Car...")
+                PressKey(Enum.KeyCode.E, 2.5) -- Hold E longer
+                
+                local args = {
+                    "Auth",
+                    targetSlot
+                }
+                Remotes.PromptSale:FireServer(unpack(args))
+                
+                SetStatus("Waiting for purchase...")
+                task.wait(3) -- Give server time to process
+                
+                -- FIND THE CAR
+                local myCar = nil
+                local attempts = 0
+                
+                while not myCar and attempts < 15 do
+                    SetStatus("Locating Car... (" .. attempts .. ")")
+                    
+                    -- Method A: Look for Serial in PlayersCars
+                    if carSerial then
+                        myCar = Workspace.PlayersCars:FindFirstChild(carSerial)
+                    end
+                    
+                    -- Method B: Look for any car owned by us (Fallback)
+                    if not myCar then
+                        for _, car in pairs(Workspace.PlayersCars:GetChildren()) do
+                             -- Check if car has an Owner value pointing to us
+                             local ownerVal = car:FindFirstChild("Owner")
+                             if ownerVal and (ownerVal.Value == LocalPlayer or ownerVal.Value == LocalPlayer.Name) then
+                                 myCar = car
+                                 carSerial = car.Name -- Update serial if we found it via owner
+                                 break
+                             end
+                        end
+                    end
+                    
+                    if not myCar then
+                        -- If not found, try to spawn it via Plot Teleport
+                        local argsTp = {"PlayerPlot"}
+                        Remotes:WaitForChild("RequestTeleport"):FireServer(unpack(argsTp))
+                        task.wait(1.5)
+                    end
+                    
+                    attempts = attempts + 1
+                    task.wait(1)
+                end
+                
+                if myCar then
+                    SetStatus("Car Found! Driving to Plot...")
+                    -- Teleport to car, enter, then TP car
+                    Teleport(myCar.PrimaryPart.CFrame + Vector3.new(0, 3, 0))
+                    task.wait(0.5)
+                    PressKey(Enum.KeyCode.E, 2)
+                    task.wait(1)
+                    
+                    local myPlot = FindMyPlot()
+                    if myPlot then
+                        local dropOffPoint = myPlot.Objects.Variant5
+                        
+                        -- TP Vehicle
+                        if LocalPlayer.Character.Humanoid.SeatPart then
+                             local carModel = LocalPlayer.Character.Humanoid.SeatPart.Parent
+                             carModel:SetPrimaryPartCFrame(dropOffPoint.CFrame + Vector3.new(0, 5, 0))
+                        else
+                             -- Failed to sit, force TP car body
+                             myCar:SetPrimaryPartCFrame(dropOffPoint.CFrame + Vector3.new(0, 5, 0))
+                             Teleport(dropOffPoint.CFrame)
+                        end
+                        task.wait(1)
+                        
+                        -- Exit Car
+                        PressKey(Enum.KeyCode.E, 1)
+                        task.wait(1)
+                        
+                        -- Sell Sequence
+                        SetStatus("Listing on PC...")
+                        local pcSeat = myPlot.Objects.BigDesk.MainSeat
+                        Teleport(pcSeat.CFrame)
+                        task.wait(0.5)
+                        PressKey(Enum.KeyCode.E, 1)
+                        task.wait(1.5)
+                        
+                        local listArgs = {
+                            "ListVehicle",
+                            myCar,
+                            buyPrice + CONFIG.ProfitMargin,
+                            false
+                        }
+                        Remotes.PromptSell:InvokeServer(unpack(listArgs))
+                        task.wait(1)
+                        
+                        Remotes.PcStartup:FireServer("Shutdown")
+                        task.wait(1)
+                        
+                        -- Jump out
+                        LocalPlayer.Character.Humanoid.Jump = true
+                        
+                        -- Wait for NPC
+                        SetStatus("Waiting for Buyer NPC...")
+                        local sold = false
+                        local waittime = 0
+                        
+                        while not sold and waittime < 40 do
+                            for _, npc in pairs(Workspace.Characters:GetChildren()) do
+                                -- Match NPC Name to Car Serial
+                                if carSerial and npc.Name:find(carSerial) then
+                                    SetStatus("Buyer Found! Selling...")
+                                    local sellArgs = {
+                                        "RespondToBot",
+                                        npc,
+                                        myCar,
+                                        buyPrice + CONFIG.ProfitMargin,
+                                        "ConfirmSell"
+                                    }
+                                    Remotes.PromptSell:InvokeServer(unpack(sellArgs))
+                                    sold = true
+                                    SetStatus("SOLD! +$" .. CONFIG.ProfitMargin)
+                                    task.wait(2)
+                                    break
+                                end
+                            end
+                            task.wait(1)
+                            waittime = waittime + 1
+                        end
+                        
+                    else
+                        SetStatus("Error: Can't find Plot!")
+                    end
+                else
+                    SetStatus("Error: Car failed to spawn!")
+                end
+            end
+        else
+            SetStatus("No valid cars found. Retrying...")
+            task.wait(2)
+        end
+    end
+end
