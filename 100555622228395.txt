@@ -1,0 +1,51 @@
+local Workspace = game:GetService("Workspace")
+
+-- Configuration
+local REFRESH_RATE = 1 
+local ESP_NAME = "MineESP_Solid"
+
+while true do
+    -- 1. Locate the TripMines folder
+    local tripMinesFolder = Workspace:FindFirstChild("TripMines", true)
+
+    if tripMinesFolder and tripMinesFolder:IsA("Folder") then
+        for _, mineModel in ipairs(tripMinesFolder:GetChildren()) do
+            
+            -- 2. Target the "Main" part
+            local mainPart = mineModel:FindFirstChild("Main")
+
+            if mainPart and mainPart:IsA("BasePart") then
+                -- 3. Check for existing ESP
+                if not mainPart:FindFirstChild(ESP_NAME) then
+                    
+                    -- Create the Solid Box
+                    local box = Instance.new("BoxHandleAdornment")
+                    box.Name = ESP_NAME
+                    box.Adornee = mainPart
+                    box.AlwaysOnTop = true
+                    box.ZIndex = 10
+                    box.Size = mainPart.Size
+                    
+                    -- Visuals: Solid Red
+                    box.Color3 = Color3.fromRGB(255, 0, 0)
+                    box.Transparency = 0 -- Fully solid
+                    
+                    -- Optional: Add a white outline for extra visibility
+                    local outline = Instance.new("SelectionBox")
+                    outline.Name = "Outline"
+                    outline.Adornee = mainPart
+                    outline.LineThickness = 0.05
+                    outline.SurfaceColor3 = Color3.fromRGB(255, 255, 255)
+                    outline.Parent = box
+                    
+                    box.Parent = mainPart
+                else
+                    -- Ensure size stays correct if the part changes
+                    mainPart[ESP_NAME].Size = mainPart.Size
+                end
+            end
+        end
+    end
+
+    task.wait(REFRESH_RATE)
+end
