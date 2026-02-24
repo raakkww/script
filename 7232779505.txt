@@ -1,0 +1,20 @@
+local vim = game:GetService("VirtualInputManager")
+
+while true do
+    local target = workspace.SelectionBox.Adornee
+    if target and target ~= workspace.Baseplate then
+        local surfaceGui = target:FindFirstChild("SurfaceGui")
+        if surfaceGui then
+            local textBox = surfaceGui:FindFirstChild("TextLabel")
+            if textBox then
+                local letter = textBox.Text == " " and "Space" or textBox.Text:upper()
+                local keyEnum = Enum.KeyCode[letter]
+                vim:SendKeyEvent(true, keyEnum, false, nil)
+                task.wait(0.1) -- ?
+                vim:SendKeyEvent(false, keyEnum, false, nil)
+            end
+        end
+    else
+        break
+    end
+end
