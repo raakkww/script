@@ -1,0 +1,7 @@
+while true do
+local args = {
+	"Slap"
+}
+game:GetService("Players").LocalPlayer.Character:WaitForChild("Fight"):WaitForChild("FightEvent"):FireServer(unpack(args))
+wait(0)
+end
