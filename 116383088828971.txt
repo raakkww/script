@@ -1,0 +1,6 @@
+local args = {
+	999999999999999999,
+	true,
+	1/0
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RewardClaim"):FireServer(unpack(args))
