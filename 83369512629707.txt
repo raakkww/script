@@ -1,0 +1,6 @@
+local args = {
+    "SELL",
+    "Padi",
+    0/0
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("TutorialRemotes"):WaitForChild("RequestSell"):InvokeServer(unpack(args))
