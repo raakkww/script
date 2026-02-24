@@ -1,0 +1,62 @@
+local player = game.Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+-- CONFIGURAÃÃO DA UI (Estilo Dark Minimalista)
+local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+screenGui.Name = "ComboSpammer_V35"
+screenGui.ResetOnSpawn = false
+
+local main = Instance.new("Frame", screenGui)
+main.Size = UDim2.new(0, 250, 0, 150)
+main.Position = UDim2.new(0.5, -125, 0.4, 0)
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+main.Active = true
+main.Draggable = true
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", main).Color = Color3.fromRGB(255, 200, 0) -- Cor Dourada (Combo)
+
+local title = Instance.new("TextLabel", main)
+title.Text = ""
+title.Size = UDim2.new(1, 0, 0, 40)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.BackgroundTransparency = 1
+
+local active = false
+local btn = Instance.new("TextButton", main)
+btn.Text = "SPAM COMBO (OFF)"
+btn.Size = UDim2.new(0.9, 0, 0, 50)
+btn.Position = UDim2.new(0.05, 0, 0.4, 0)
+btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", btn)
+
+-- LÃGICA DO BOTÃO
+btn.MouseButton1Click:Connect(function()
+    active = not active
+    btn.Text = active and "SPAMMING... (ON)" or "SPAM COMBO (OFF)"
+    btn.BackgroundColor3 = active and Color3.fromRGB(255, 150, 0) or Color3.fromRGB(30, 30, 30)
+end)
+
+-- LOOP DE ALTA FREQUÃNCIA (OVERDRIVE)
+task.spawn(function()
+    while true do
+        if active then
+            -- Dispara o seu cÃ³digo 10 vezes por ciclo para mÃ¡xima velocidade
+            for i = 1, 10 do
+                pcall(function()
+                    ReplicatedStorage.TappingRemote.ComboBonus:FireServer(9e190)
+                end)
+            end
+        end
+        -- O wait() vazio permite que o jogo processe o clique de desligar
+        task.wait() 
+    end
+end)
+
+-- ANTI-AFK (Para nÃ£o ser kickado enquanto o combo sobe)
+player.Idled:Connect(function()
+    game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+end)
