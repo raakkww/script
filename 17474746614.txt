@@ -1,0 +1,455 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+local scrapObjects = {}
+local collectedScrap = {}
+local isMinimized = false
+local autoFarmEnabled = false
+
+-- || GUI SETUP ||
+local gui = Instance.new("ScreenGui")
+gui.Name = "ScrapGui"
+gui.ResetOnSpawn = false
+gui.Parent = game.CoreGui
+
+-- Main Container
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 220, 0, 340)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -170)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = gui
+local mainCorner = Instance.new("UICorner", mainFrame)
+mainCorner.CornerRadius = UDim.new(0, 6)
+
+-- Title Bar
+local titleBar = Instance.new("TextButton")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+titleBar.BorderSizePixel = 0
+titleBar.Text = ""
+titleBar.Parent = mainFrame
+local titleCorner = Instance.new("UICorner", titleBar)
+
+-- Title Text
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -70, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Scrapinator 3000" -- Changed Title
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+-- Minimize Button
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 25, 0, 25)
+minBtn.Position = UDim2.new(1, -30, 0.5, -12)
+minBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+minBtn.Text = "-"
+minBtn.TextColor3 = Color3.new(1, 1, 1)
+minBtn.Font = Enum.Font.GothamBold
+minBtn.TextSize = 18
+minBtn.Parent = titleBar
+local minCorner = Instance.new("UICorner", minBtn)
+minCorner.CornerRadius = UDim.new(0, 4)
+
+-- Body Frame
+local bodyFrame = Instance.new("Frame")
+bodyFrame.Name = "Body"
+bodyFrame.Size = UDim2.new(1, 0, 1, -40)
+bodyFrame.Position = UDim2.new(0, 0, 0, 40)
+bodyFrame.BackgroundTransparency = 1
+bodyFrame.Parent = mainFrame
+
+-- Scrolling List
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, -10, 1, -95)
+scroll.Position = UDim2.new(0, 5, 0, 5)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 4
+scroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+scroll.Parent = bodyFrame
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 4)
+layout.Parent = scroll
+
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 5)
+end)
+
+-- Auto Farm Button
+local autoFarmBtn = Instance.new("TextButton")
+autoFarmBtn.Size = UDim2.new(1, -10, 0, 25)
+autoFarmBtn.Position = UDim2.new(0, 5, 1, -60)
+autoFarmBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 50)
+autoFarmBtn.Text = "AUTO FARM: OFF"
+autoFarmBtn.TextColor3 = Color3.new(1, 1, 1)
+autoFarmBtn.Font = Enum.Font.GothamBold
+autoFarmBtn.TextSize = 12
+autoFarmBtn.Parent = bodyFrame
+local autoCorner = Instance.new("UICorner", autoFarmBtn)
+autoCorner.CornerRadius = UDim.new(0, 4)
+
+-- Reset Button (Teleport Up & Click Return)
+local resetBtn = Instance.new("TextButton")
+resetBtn.Size = UDim2.new(1, -10, 0, 25)
+resetBtn.Position = UDim2.new(0, 5, 1, -30)
+resetBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+resetBtn.Text = "RESET (kills you)"
+resetBtn.TextColor3 = Color3.new(1, 1, 1)
+resetBtn.Font = Enum.Font.GothamBold
+resetBtn.TextSize = 12
+resetBtn.Parent = bodyFrame
+local refCorner = Instance.new("UICorner", resetBtn)
+refCorner.CornerRadius = UDim.new(0, 4)
+
+-- || DRAG LOGIC ||
+local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- || MINIMIZE LOGIC ||
+minBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local goalSize = isMinimized and UDim2.new(0, 220, 0, 35) or UDim2.new(0, 220, 0, 340)
+    TweenService:Create(mainFrame, TweenInfo.new(0.2), {Size = goalSize}):Play()
+    bodyFrame.Visible = not isMinimized
+    minBtn.Text = isMinimized and "+" or "-"
+end)
+
+-- || SCRAP LOGIC ||
+local function isScrap(obj)
+    if not obj or not obj.Parent then return false end
+    local name = obj.Name:lower()
+    if not name:find("scrap") then return false end
+    
+    local parent = obj.Parent
+    while parent do
+        if parent:FindFirstChild("Humanoid") then return false end
+        parent = parent.Parent
+    end
+    return true
+end
+
+local function getPos(obj)
+    if obj:IsA("BasePart") then return obj.Position end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj.PrimaryPart.Position end
+        local p = obj:FindFirstChildWhichIsA("BasePart")
+        if p then return p.Position end
+    end
+    return nil
+end
+
+local function getPart(obj)
+    if obj:IsA("BasePart") then return obj end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj.PrimaryPart end
+        return obj:FindFirstChildWhichIsA("BasePart")
+    end
+    return nil
+end
+
+local function getScrapHeight(obj)
+    if obj:IsA("BasePart") then
+        return obj.Size.Y
+    elseif obj:IsA("Model") then
+        local success, size = pcall(function() return obj:GetExtentsSize() end)
+        if success then return size.Y end
+    end
+    return 4
+end
+
+local function clearList()
+    for id, data in pairs(scrapObjects) do
+        if data.btn then data.btn:Destroy() end
+    end
+    scrapObjects = {}
+end
+
+local function addScrap(obj)
+    local id = tostring(obj:GetDebugId())
+    if collectedScrap[id] then return end
+    local pos = getPos(obj)
+    if not pos then return end
+    if scrapObjects[id] then return end
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 28)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 12
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Text = " " .. obj.Name .. " [?m]"
+    btn.Parent = scroll
+    local btnCorner = Instance.new("UICorner", btn)
+    btnCorner.CornerRadius = UDim.new(0, 4)
+    
+    scrapObjects[id] = { obj = obj, btn = btn, id = id }
+    
+    btn.MouseButton1Click:Connect(function()
+        local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        local head = player.Character and player.Character:FindFirstChild("Head")
+        local currentObj = scrapObjects[id] and scrapObjects[id].obj
+        local currentPos = currentObj and getPos(currentObj)
+        
+        if not currentPos then
+            btn.Text = " GONE"
+            btn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+            return
+        end
+        
+        if root and head then
+            btn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+            btn.Text = " TELEPORTING..."
+            
+            local objectHeight = getScrapHeight(currentObj)
+            local tpPos = currentPos + Vector3.new(0, (objectHeight / 2) + 3, 0)
+            root.CFrame = CFrame.new(tpPos)
+            
+            local cameraConnection
+            cameraConnection = RunService.RenderStepped:Connect(function()
+                if not root or not root.Parent then 
+                    cameraConnection:Disconnect()
+                    return 
+                end
+                
+                local currentHeadPos = head.Position
+                local lookVector = (currentPos - currentHeadPos).Unit
+                local goalCFrame = CFrame.new(currentHeadPos, currentHeadPos + lookVector)
+                
+                workspace.CurrentCamera.CFrame = goalCFrame
+            end)
+            
+            task.delay(2, function()
+                if cameraConnection then cameraConnection:Disconnect() end
+            end)
+            
+            task.wait(2)
+            if not currentObj or not currentObj.Parent then
+                collectedScrap[id] = true
+                if scrapObjects[id] then 
+                    if scrapObjects[id].btn then scrapObjects[id].btn:Destroy() end
+                    scrapObjects[id] = nil
+                end
+            else
+                btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            end
+        end
+    end)
+end
+
+-- || SCANNING FUNCTIONS ||
+local function fullScan()
+    clearList()
+    local descendants = Workspace:GetDescendants()
+    for _, obj in pairs(descendants) do
+        if isScrap(obj) then
+            addScrap(obj)
+        end
+    end
+end
+
+Workspace.DescendantAdded:Connect(function(obj)
+    task.wait(0.1)
+    if isScrap(obj) then
+        addScrap(obj)
+    end
+end)
+
+Workspace.DescendantRemoving:Connect(function(obj)
+    local id = tostring(obj:GetDebugId())
+    if scrapObjects[id] then
+        if scrapObjects[id].btn then scrapObjects[id].btn:Destroy() end
+        scrapObjects[id] = nil
+    end
+end)
+
+-- Distance Loop
+RunService.RenderStepped:Connect(function()
+    if isMinimized then return end
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    for id, data in pairs(scrapObjects) do
+        if data.obj and data.obj.Parent and data.btn and data.btn.Parent then
+            local pos = getPos(data.obj)
+            if pos and root then
+                local dist = math.floor((pos - root.Position).Magnitude)
+                data.btn.Text = " " .. data.obj.Name .. " [" .. dist .. "m]"
+            end
+        elseif data.btn then
+            data.btn:Destroy()
+            scrapObjects[id] = nil
+        end
+    end
+end)
+
+-- Reset Button Logic
+resetBtn.MouseButton1Click:Connect(function()
+    local character = player.Character
+    if character then
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            rootPart.CFrame = rootPart.CFrame + Vector3.new(0, 500, 0)
+        end
+    end
+
+    -- Listen and Click "return" button logic
+    task.spawn(function()
+        local found = false
+        local startTime = tick()
+        local timeout = 10 -- Search for 10 seconds
+        
+        while tick() - startTime < timeout and not found do
+            -- Function to check a table of descendants
+            local function searchGui(guiObj)
+                for _, obj in pairs(guiObj:GetDescendants()) do
+                    if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and not found then
+                        -- Check Name or Text property
+                        if obj.Name:lower() == "return" or (obj:IsA("TextButton") and obj.Text:lower() == "return") then
+                            task.wait(0.2) -- Small buffer for UI to properly appear
+                            -- Try firing signal or activating
+                            if firesignal then
+                                firesignal(obj.MouseButton1Click)
+                            else
+                                obj:Activate()
+                            end
+                            found = true
+                            return
+                        end
+                    end
+                end
+            end
+            
+            -- Check PlayerGui
+            if player.PlayerGui then searchGui(player.PlayerGui) end
+            -- Check CoreGui
+            searchGui(game.CoreGui)
+            
+            task.wait(0.1)
+        end
+    end)
+end)
+
+-- || AUTO FARM LOGIC ||
+local function getNearestScrap()
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local nearest = nil
+    local shortestDist = math.huge
+    
+    for id, data in pairs(scrapObjects) do
+        if data.obj and data.obj.Parent then
+            local pos = getPos(data.obj)
+            if pos then
+                local dist = (pos - root.Position).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    nearest = data.obj
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function stopAutoFarm()
+    autoFarmEnabled = false
+    autoFarmBtn.Text = "AUTO FARM: OFF"
+    autoFarmBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 50)
+end
+
+local function startAutoFarm()
+    autoFarmEnabled = true
+    autoFarmBtn.Text = "AUTO FARM: ON"
+    autoFarmBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+    
+    task.spawn(function()
+        while autoFarmEnabled do
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            local head = player.Character and player.Character:FindFirstChild("Head")
+            local target = getNearestScrap()
+            
+            if target and root and head then
+                local pos = getPos(target)
+                local part = getPart(target)
+                
+                if pos and part then
+                    local objectHeight = getScrapHeight(target)
+                    local tpPos = pos + Vector3.new(0, (objectHeight / 2) + 3, 0)
+                    root.CFrame = CFrame.new(tpPos)
+                    
+                    local lookVector = (pos - head.Position).Unit
+                    workspace.CurrentCamera.CFrame = CFrame.new(head.Position, head.Position + lookVector)
+                    
+                    local prompt = part:FindFirstChild("ProximityPrompt") or target:FindFirstChild("ProximityPrompt", true)
+                    
+                    if prompt then
+                        if fireproximityprompt then
+                            fireproximityprompt(prompt)
+                        else
+                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                            task.wait(0.1)
+                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        end
+                    else
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                    end
+                    
+                    task.wait(0.4)
+                end
+            else
+                task.wait(1)
+            end
+            task.wait()
+        end
+    end)
+end
+
+autoFarmBtn.MouseButton1Click:Connect(function()
+    if autoFarmEnabled then
+        stopAutoFarm()
+    else
+        startAutoFarm()
+    end
+end)
+
+-- Initial Load
+task.wait(1)
+fullScan()
