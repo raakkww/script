@@ -1,0 +1,8 @@
+local repeticoes = 30
+
+for i = 1, repeticoes do
+
+    game.ReplicatedStorage.Click.Click:FireServer()
+    
+    game.ReplicatedStorage.CurrencyTransaction:FireServer("add", 9e9)
+end
