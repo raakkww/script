@@ -1,0 +1,4 @@
+while true do
+	game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(0, 2064, -101)
+	wait(3)
+end
