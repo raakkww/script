@@ -1,0 +1,795 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- ========== AREA WHITELIST ==========
+local validAreaNumbers = {
+1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,
+61,62,63,64,65,66,67,68,69,70,71,72,73,74,75
+}
+
+-- ========== STATES ==========
+local State = {
+    autoAttack = false,
+    autoCollect = false,
+    autoHatch = false,
+    autoPedestals = false,
+    autoBossParts = false,
+    autoRace = false
+}
+local selectedEgg = nil
+local hatchAmount = 1
+
+-- ========== DYNAMIC REMOTE FINDER ==========
+local Knit = ReplicatedStorage:FindFirstChild("Knit")
+local Services = Knit and Knit:FindFirstChild("Services")
+local HatchRemote = nil
+local NodeRemote = nil
+local REMOTE_CHECK_INTERVAL = 30
+
+local function findRemotes()
+    if Services then
+        local clamSvc = Services:FindFirstChild("ClamService")
+        if clamSvc then
+            local rf = clamSvc:FindFirstChild("RF")
+            if rf then
+                HatchRemote = rf:FindFirstChild("Purchase") or rf:FindFirstChild("Hatch")
+            end
+        end
+        local nodeSvc = Services:FindFirstChild("NodeService")
+        if nodeSvc then
+            local re = nodeSvc:FindFirstChild("RE")
+            if re then
+                NodeRemote = re:FindFirstChild("NodeClicked")
+            end
+        end
+    end
+    if not HatchRemote then
+        for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+            if obj:IsA("RemoteFunction") and (obj.Name == "Purchase" or obj.Name == "Hatch") then
+                HatchRemote = obj
+                break
+            end
+        end
+    end
+    if not NodeRemote then
+        for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+            if obj:IsA("RemoteEvent") and obj.Name == "NodeClicked" then
+                NodeRemote = obj
+                break
+            end
+        end
+    end
+end
+findRemotes()
+
+task.spawn(function()
+    while true do
+        task.wait(REMOTE_CHECK_INTERVAL)
+        findRemotes()
+    end
+end)
+
+-- ========== EGG LIST ==========
+local function generateEggs()
+    local eggs = {}
+    local added = {}
+    for _, i in ipairs(validAreaNumbers) do
+        local basic = "area" .. i .. " basic"
+        if not added[basic] then
+            added[basic] = true
+            table.insert(eggs, basic)
+        end
+        local golden = "area" .. i .. " golden"
+        if not added[golden] then
+            added[golden] = true
+            table.insert(eggs, golden)
+        end
+    end
+    table.insert(eggs, "meme buddies")
+    table.sort(eggs)
+    return eggs
+end
+local availableEggs = generateEggs()
+
+-- ========== AUTO ATTACK ==========
+task.spawn(function()
+    while true do
+        if State.autoAttack and NodeRemote then
+            pcall(function()
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                local nodes = Workspace:FindFirstChild("Nodes")
+                if nodes then
+                    local closest, minDist = nil, 150
+                    for _, node in pairs(nodes:GetChildren()) do
+                        if node:IsA("BasePart") then
+                            local dist = (node.Position - hrp.Position).Magnitude
+                            if dist < minDist then
+                                minDist = dist
+                                closest = node
+                            end
+                        end
+                    end
+                    if closest then
+                        NodeRemote:FireServer(closest, true, false)
+                    end
+                end
+            end)
+        end
+        task.wait(0.2)
+    end
+end)
+
+-- ========== AUTO COLLECT ==========
+task.spawn(function()
+    local cache = {}
+    while true do
+        if State.autoCollect then
+            pcall(function()
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                local terrain = Workspace:FindFirstChild("Terrain")
+                if terrain then
+                    for _, att in pairs(terrain:GetChildren()) do
+                        if att:IsA("Attachment") and att.Name:match("^Currency") and not cache[att] then
+                            cache[att] = true
+                            att.WorldPosition = hrp.Position
+                            task.delay(0.2, function() cache[att] = nil end)
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait(0.01)
+    end
+end)
+
+-- ========== AUTO BOSS PARTS ==========
+local bossSpawnPositions = {}
+local function initBossSpawnPositions()
+    local prog = Workspace:FindFirstChild("Programmables")
+    if not prog then return end
+    local spawners = prog:FindFirstChild("BossPartSpawners")
+    if not spawners then return end
+    for _, worldName in ipairs({"GooLagoon", "Mermalair", "VacationWorld"}) do
+        local folder = spawners:FindFirstChild(worldName)
+        if folder then
+            for _, obj in ipairs(folder:GetDescendants()) do
+                if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+                    table.insert(bossSpawnPositions, obj.Position)
+                    break
+                end
+            end
+        end
+    end
+end
+initBossSpawnPositions()
+
+task.spawn(function()
+    local collected = {}
+    local lastPosition = nil
+    local teleporting = false
+    while true do
+        if State.autoBossParts and not teleporting then
+            pcall(function()
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                local terrain = Workspace:FindFirstChild("Terrain")
+                if terrain then
+                    for _, obj in pairs(terrain:GetChildren()) do
+                        if obj:IsA("Attachment") and obj.Name:match("^Item") and not collected[obj] then
+                            local itemPos = obj.WorldPosition
+                            local isBossPart = false
+                            for _, spawnPos in ipairs(bossSpawnPositions) do
+                                if (itemPos - spawnPos).Magnitude < 120 then
+                                    isBossPart = true
+                                    break
+                                end
+                            end
+                            if isBossPart then
+                                collected[obj] = true
+                                teleporting = true
+                                lastPosition = hrp.CFrame
+                                hrp.CFrame = CFrame.new(itemPos + Vector3.new(0, 3, 0))
+                                task.wait(0.3)
+                                if lastPosition then
+                                    hrp.CFrame = lastPosition
+                                end
+                                teleporting = false
+                                task.delay(15, function() collected[obj] = nil end)
+                                break
+                            else
+                                collected[obj] = true
+                                task.delay(5, function() collected[obj] = nil end)
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- ========== AUTO PEDESTALS ==========
+local function findPedestals()
+    local items = {}
+    local prog = Workspace:FindFirstChild("Programmables")
+    if prog then
+        local pedestalsFolder = prog:FindFirstChild("CollectiblePedestals") or prog
+        for _, obj in pairs(pedestalsFolder:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "CollectiblePedestal" or (obj.Parent and obj.Parent.Name == "CollectiblePedestal")) then
+                table.insert(items, obj)
+            end
+        end
+    end
+    return items
+end
+
+local pedestalCache = {}
+local function startPedestals()
+    task.spawn(function()
+        while State.autoPedestals do
+            local pedestals = findPedestals()
+            local found = false
+            for _, ped in ipairs(pedestals) do
+                if not State.autoPedestals then break end
+                if ped and ped.Parent and not pedestalCache[ped] then
+                    pedestalCache[ped] = true
+                    found = true
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.CFrame = CFrame.new(ped.Position + Vector3.new(0, 5, 0))
+                        local cd = ped:FindFirstChildOfClass("ClickDetector")
+                        if cd then fireclickdetector(cd) end
+                        local pp = ped:FindFirstChildOfClass("ProximityPrompt")
+                        if pp then fireproximityprompt(pp) end
+                        task.wait(0.3)
+                        task.delay(10, function() pedestalCache[ped] = nil end)
+                    end
+                end
+            end
+            if found then
+                task.wait(0.5)
+            else
+                task.wait(2)
+            end
+        end
+    end)
+end
+
+-- ========== AUTO RACE WITH FAST TWEEN ==========
+local function getCheckpointsOrdered()
+    local checkpoints = Workspace:FindFirstChild("Checkpoints")
+    if not checkpoints then
+        local prog = Workspace:FindFirstChild("Programmables")
+        if prog then
+            local races = prog:FindFirstChild("Races")
+            if races then
+                local boatSchool = races:FindFirstChild("boat school")
+                if boatSchool then
+                    checkpoints = boatSchool:FindFirstChild("Checkpoints")
+                end
+            end
+        end
+    end
+    if not checkpoints then return {} end
+
+    local cpMap = {}
+    for _, child in ipairs(checkpoints:GetChildren()) do
+        if child:IsA("BasePart") then
+            local num = tonumber(child.Name)
+            if num then
+                cpMap[num] = child
+            end
+        end
+    end
+    local ordered = {}
+    for i = 1, #cpMap do
+        if cpMap[i] then
+            table.insert(ordered, cpMap[i])
+        else
+            break
+        end
+    end
+    return ordered
+end
+
+local function getPlayerVehicle()
+    local char = player.Character
+    if not char then return nil end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return nil end
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if v:IsA("VehicleSeat") and v.Occupant == humanoid then
+            return v.Parent
+        end
+    end
+    return nil
+end
+
+local function smoothMoveTo(targetCF, vehicle)
+    local char = player.Character
+    if not char then return end
+    local part = vehicle and vehicle.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
+    if not part then return end
+    -- Very fast tween (0.1s) to trigger the checkpoint
+    local tween = TweenService:Create(part, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = targetCF})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+local function triggerTouch(part, checkpoint)
+    if not part or not checkpoint then return end
+    firetouchinterest(part, checkpoint, 0)
+    task.wait(0.05)
+    firetouchinterest(part, checkpoint, 1)
+end
+
+local function startRace()
+    task.spawn(function()
+        while State.autoRace do
+            local checkpoints = getCheckpointsOrdered()
+            if #checkpoints > 0 then
+                for _, cp in ipairs(checkpoints) do
+                    if not State.autoRace then break end
+
+                    local vehicle = getPlayerVehicle()
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if not hrp then continue end
+
+                    local targetCF = cp.CFrame + Vector3.new(0, 3, 0)
+
+                    -- Smooth fast movement
+                    smoothMoveTo(targetCF, vehicle)
+
+                    -- Trigger touch
+                    if vehicle then
+                        local touchPart = vehicle.PrimaryPart or vehicle:FindFirstChildWhichIsA("BasePart")
+                        if touchPart then
+                            triggerTouch(touchPart, cp)
+                        end
+                    else
+                        triggerTouch(hrp, cp)
+                    end
+
+                    task.wait(0.1)
+                end
+                task.wait(0.5)
+            else
+                task.wait(2)
+            end
+        end
+    end)
+end
+
+-- ========== AUTO HATCH WITH ANIMATION SKIP (destroys GUI) ==========
+local hatchSession = 0
+local HATCH_COOLDOWN = 3 -- seconds between hatches
+
+local function findIncubator()
+    local incubatorFolder = Workspace:FindFirstChild("Incubators") or Workspace:FindFirstChild("EggMachines")
+    if incubatorFolder then
+        for _, obj in ipairs(incubatorFolder:GetChildren()) do
+            if obj:IsA("BasePart") then
+                return obj
+            end
+        end
+    end
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("ClickDetector") or obj:IsA("ProximityPrompt") then
+            local parent = obj.Parent
+            if parent and parent:IsA("BasePart") and parent.Name:lower():find("hatch") then
+                return parent
+            end
+        end
+    end
+    return nil
+end
+
+local function startHatch()
+    if not selectedEgg or not HatchRemote then
+        warn("Hatch not available: egg not selected or remote missing")
+        return
+    end
+    hatchSession = hatchSession + 1
+    local currentSession = hatchSession
+
+    task.spawn(function()
+        while State.autoHatch and currentSession == hatchSession do
+            -- Move near an incubator
+            local incubator = findIncubator()
+            if incubator then
+                local char = player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.CFrame = incubator.CFrame * CFrame.new(0, 3, 0)
+                    task.wait(0.2)
+                end
+            else
+                warn("No incubator found, proceeding without moving")
+            end
+
+            -- Invoke remote
+            local success = pcall(function()
+                HatchRemote:InvokeServer(selectedEgg, hatchAmount)
+            end)
+
+            if success then
+                -- DESTROY ANIMATION IMMEDIATELY (if present)
+                local gui = player:FindFirstChildOfClass("PlayerGui")
+                if gui then
+                    local anim = gui:FindFirstChild("HatchAnimation")
+                    if anim then
+                        anim:Destroy()
+                    end
+                end
+                -- Short pause for safety (server already got the request)
+                task.wait(0.1)
+            else
+                warn("Hatch call failed, retrying soon")
+                task.wait(1)
+            end
+
+            -- Cooldown before next hatch
+            task.wait(HATCH_COOLDOWN)
+        end
+    end)
+end
+
+local function stopHatch()
+    State.autoHatch = false
+    hatchSession = hatchSession + 1
+end
+
+-- ========== GUI (IDENTICAL TO v20.2) ==========
+local PlayerGui = player:WaitForChild("PlayerGui")
+for _, g in pairs(PlayerGui:GetChildren()) do
+    if g:IsA("ScreenGui") and g.Name == "SpongeMobile" then
+        g:Destroy()
+    end
+end
+
+local Colors = {
+    Background = Color3.fromRGB(25, 25, 30),
+    Glass = Color3.fromRGB(40, 40, 48),
+    Accent = Color3.fromRGB(138, 43, 226),
+    AccentLight = Color3.fromRGB(168, 85, 255),
+    Text = Color3.fromRGB(255, 255, 255),
+    ToggleOff = Color3.fromRGB(60, 60, 70),
+    ToggleOn = Color3.fromRGB(138, 43, 226)
+}
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "SpongeMobile"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = PlayerGui
+
+-- Main frame
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 220, 0, 320)
+main.Position = UDim2.new(0, 10, 0.5, -160)
+main.BackgroundColor3 = Colors.Background
+main.BackgroundTransparency = 0.1
+main.BorderSizePixel = 0
+main.Active = true
+main.ClipsDescendants = true
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", main).Color = Colors.Accent; main.UIStroke.Transparency = 0.6; main.UIStroke.Thickness = 1
+
+-- Header
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 32)
+header.BackgroundColor3 = Colors.Accent
+header.BackgroundTransparency = 0.15
+header.BorderSizePixel = 0
+header.Parent = main
+Instance.new("UICorner", header).CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -70, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.Text = "SPONGEBOB SIMULATOR"
+title.TextColor3 = Colors.Text
+title.Font = Enum.Font.GothamBold
+title.TextSize = 10
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.BackgroundTransparency = 1
+title.Parent = header
+
+-- Header buttons
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 26, 0, 26)
+minBtn.Position = UDim2.new(1, -60, 0, 3)
+minBtn.Text = "â"
+minBtn.TextColor3 = Colors.Text
+minBtn.TextSize = 18
+minBtn.BackgroundColor3 = Colors.Glass
+minBtn.BackgroundTransparency = 0.3
+minBtn.Font = Enum.Font.GothamBold
+minBtn.Parent = header
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 26, 0, 26)
+closeBtn.Position = UDim2.new(1, -30, 0, 3)
+closeBtn.Text = "Ã"
+closeBtn.TextColor3 = Colors.Text
+closeBtn.TextSize = 18
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+closeBtn.BackgroundTransparency = 0.3
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = header
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+-- Minimize variables
+local isMinimized = false
+local fullSize = UDim2.new(0, 220, 0, 320)
+local miniSize = UDim2.new(0, 220, 0, 32)
+
+minBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        TweenService:Create(main, TweenInfo.new(0.2), {Size = miniSize}):Play()
+        minBtn.Text = "+"
+    else
+        TweenService:Create(main, TweenInfo.new(0.2), {Size = fullSize}):Play()
+        minBtn.Text = "â"
+    end
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    stopHatch()
+    gui:Destroy()
+end)
+
+-- Drag
+local dragging = false
+local dragStart, startPos
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Scroll frame
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, -12, 1, -42)
+scroll.Position = UDim2.new(0, 6, 0, 36)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 3
+scroll.ScrollBarImageColor3 = Colors.Accent
+scroll.ScrollBarImageTransparency = 0.5
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.Parent = main
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 6)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.Parent = scroll
+
+-- Toggle function
+local function createToggle(text, key)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 30)
+    container.BackgroundTransparency = 1
+    container.Parent = scroll
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Colors.Glass
+    bg.BackgroundTransparency = 0.6
+    bg.BorderSizePixel = 0
+    bg.Parent = container
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 6)
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -60, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.Text = text
+    label.TextColor3 = Colors.Text
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 10
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.BackgroundTransparency = 1
+    label.Parent = container
+
+    local switchContainer = Instance.new("TextButton")
+    switchContainer.Size = UDim2.new(0, 38, 0, 20)
+    switchContainer.Position = UDim2.new(1, -48, 0.5, -10)
+    switchContainer.BackgroundColor3 = Colors.ToggleOff
+    switchContainer.Text = ""
+    switchContainer.AutoButtonColor = false
+    switchContainer.Parent = container
+    Instance.new("UICorner", switchContainer).CornerRadius = UDim.new(1, 0)
+
+    local circle = Instance.new("Frame")
+    circle.Size = UDim2.new(0, 14, 0, 14)
+    circle.Position = UDim2.new(0, 3, 0.5, -7)
+    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    circle.Parent = switchContainer
+    Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+
+    local function updateToggle()
+        State[key] = not State[key]
+        local isOn = State[key]
+        local targetColor = isOn and Colors.ToggleOn or Colors.ToggleOff
+        local targetPos = isOn and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+
+        TweenService:Create(switchContainer, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+        TweenService:Create(circle, TweenInfo.new(0.2), {Position = targetPos}):Play()
+
+        if key == "autoHatch" then
+            if isOn then startHatch() else stopHatch() end
+        elseif key == "autoPedestals" then
+            if isOn then startPedestals() end
+        elseif key == "autoRace" then
+            if isOn then startRace() end
+        end
+    end
+    switchContainer.MouseButton1Click:Connect(updateToggle)
+end
+
+createToggle("Auto Attack", "autoAttack")
+createToggle("Auto Collect", "autoCollect")
+createToggle("Auto Boss Parts", "autoBossParts")
+createToggle("Auto Pedestals", "autoPedestals")
+createToggle("Auto Hatch", "autoHatch")
+createToggle("Auto Race", "autoRace")
+
+-- Egg dropdown
+local dropContainer = Instance.new("Frame")
+dropContainer.Size = UDim2.new(1, 0, 0, 28)
+dropContainer.BackgroundTransparency = 1
+dropContainer.Parent = scroll
+
+local dropHeader = Instance.new("TextButton")
+dropHeader.Size = UDim2.new(1, 0, 0, 28)
+dropHeader.Text = "Select Egg"
+dropHeader.BackgroundColor3 = Colors.Glass
+dropHeader.BackgroundTransparency = 0.4
+dropHeader.TextColor3 = Colors.Text
+dropHeader.Font = Enum.Font.GothamSemibold
+dropHeader.TextSize = 10
+dropHeader.Parent = dropContainer
+Instance.new("UICorner", dropHeader).CornerRadius = UDim.new(0, 6)
+
+local dropArrow = Instance.new("TextLabel")
+dropArrow.Size = UDim2.new(0, 20, 1, 0)
+dropArrow.Position = UDim2.new(1, -25, 0, 0)
+dropArrow.Text = "â¼"
+dropArrow.TextColor3 = Colors.Accent
+dropArrow.Font = Enum.Font.GothamBold
+dropArrow.TextSize = 9
+dropArrow.BackgroundTransparency = 1
+dropArrow.Parent = dropHeader
+
+local dropList = Instance.new("ScrollingFrame")
+dropList.Size = UDim2.new(1, 0, 0, 0)
+dropList.Position = UDim2.new(0, 0, 0, 30)
+dropList.BackgroundColor3 = Colors.Background
+dropList.BackgroundTransparency = 0.05
+dropList.BorderSizePixel = 0
+dropList.ScrollBarThickness = 3
+dropList.ScrollBarImageColor3 = Colors.Accent
+dropList.CanvasSize = UDim2.new(0, 0, 0, 0)
+dropList.Parent = dropContainer
+Instance.new("UICorner", dropList).CornerRadius = UDim.new(0, 6)
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 2)
+listLayout.Parent = dropList
+
+for _, egg in ipairs(availableEggs) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -8, 0, 24)
+    btn.Position = UDim2.new(0, 4, 0, 0)
+    btn.Text = egg
+    btn.BackgroundColor3 = Colors.Glass
+    btn.BackgroundTransparency = 0.8
+    btn.TextColor3 = Colors.Text
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 9
+    btn.Parent = dropList
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+    btn.MouseButton1Click:Connect(function()
+        selectedEgg = egg
+        dropHeader.Text = #egg > 22 and egg:sub(1, 22) .. "..." or egg
+        toggleDropdown(false)
+    end)
+end
+
+dropList.CanvasSize = UDim2.new(0, 0, 0, #availableEggs * 26)
+local listHeight = math.min(#availableEggs * 26, 140)
+
+-- Hatch amount
+local amtFrame = Instance.new("Frame")
+amtFrame.Size = UDim2.new(1, 0, 0, 26)
+amtFrame.BackgroundTransparency = 1
+amtFrame.Parent = scroll
+
+local elementsToMove = {amtFrame}
+
+for i, amt in ipairs({1, 3, 8}) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.32, -4, 1, 0)
+    btn.Position = UDim2.new((i-1)*0.34, 0, 0, 0)
+    btn.Text = "x" .. amt
+    btn.BackgroundColor3 = amt == 1 and Colors.Accent or Colors.Glass
+    btn.BackgroundTransparency = amt == 1 and 0.3 or 0.6
+    btn.TextColor3 = Colors.Text
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 10
+    btn.Parent = amtFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+
+    btn.MouseButton1Click:Connect(function()
+        hatchAmount = amt
+        for _, b in ipairs(amtFrame:GetChildren()) do
+            if b:IsA("TextButton") then
+                TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = Colors.Glass, BackgroundTransparency = 0.6}):Play()
+            end
+        end
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.Accent, BackgroundTransparency = 0.3}):Play()
+    end)
+end
+
+-- Dropdown logic
+local dropOpen = false
+function toggleDropdown(open)
+    dropOpen = open
+    if open then
+        dropArrow.Text = "â²"
+        TweenService:Create(dropContainer, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 28 + listHeight + 4)}):Play()
+        TweenService:Create(dropList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, listHeight)}):Play()
+        for _, el in ipairs(elementsToMove) do
+            el.Position = el.Position + UDim2.new(0, 0, 0, listHeight + 4)
+        end
+    else
+        dropArrow.Text = "â¼"
+        TweenService:Create(dropContainer, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 28)}):Play()
+        TweenService:Create(dropList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0)}):Play()
+        for _, el in ipairs(elementsToMove) do
+            el.Position = el.Position - UDim2.new(0, 0, 0, listHeight + 4)
+        end
+    end
+    task.delay(0.3, function()
+        scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    end)
+end
+
+dropHeader.MouseButton1Click:Connect(function()
+    toggleDropdown(not dropOpen)
+end)
+
+task.delay(0.5, function()
+    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+end)
+
+print("â SpongeMobile v20.6 loaded - Hatch: destroys animation, cooldown 3s, improved race")
