@@ -1,0 +1,8 @@
+local RS = game:GetService("ReplicatedStorage")
+
+while true do
+	for i = 1, 50 do
+		pcall(function() RS.Remotes.DistanceWalked:FireServer(49, 160, 0) end)
+	end
+	task.wait()
+end
