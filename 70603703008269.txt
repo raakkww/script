@@ -1,0 +1,56 @@
+local player = game.Players.LocalPlayer
+local TeleportService = game:GetService("TeleportService")
+
+local Badge1 = Vector3.new(-1940, 168, -91)
+local Badge3 = Vector3.new(-284, 193, -800)
+
+local Secrets = {
+    Vector3.new(396, -327, -10),
+    Vector3.new(-117, 308, 7),
+    Vector3.new(76, 423, -30),
+    Vector3.new(-10, 1158, -21),
+    Vector3.new(135, 248, -35)
+}
+
+local rejoinScript = [[
+task.wait(0.3)
+local player = game.Players.LocalPlayer
+local pos = Vector3.new(-1940, 168, -91)
+if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+    player.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
+end
+]]
+
+if queue_on_teleport then
+    queue_on_teleport(rejoinScript)
+elseif syn and syn.queue_on_teleport then
+    syn.queue_on_teleport(rejoinScript)
+end
+
+game:GetService("RunService").Stepped:Connect(function()
+    if player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    end
+end)
+
+local function tp(pos)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
+    end
+end
+
+tp(Badge3)
+task.wait(1)
+
+for _, pos in ipairs(Secrets) do
+    tp(pos)
+    task.wait(0.6)
+end
+
+task.wait(0.3)
+
+TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
