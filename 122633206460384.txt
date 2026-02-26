@@ -1,0 +1,335 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+local KillAuraEnabled = false
+local Range = 8
+local AttackSpeed = 10
+local LastHitTime = 0
+local originalSizes = {}  -- to restore sizes when off
+local collectConnection
+
+-- Remote path (exact as you gave)
+local HitRemote = game:GetService("ReplicatedStorage")
+    :WaitForChild("Packages")
+    :WaitForChild("Knit")
+    :WaitForChild("Services")
+    :WaitForChild("CombatService")
+    :WaitForChild("RF")
+    :WaitForChild("Hit")
+
+-- ==================== Value Box Creator ====================
+local function CreateValueBox(parent, name, default, callback, minVal, maxVal)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.85, 0, 0, 50)
+    frame.BackgroundTransparency = 1
+    frame.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 0.5, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name .. ":"
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 16
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local textbox = Instance.new("TextBox")
+    textbox.Size = UDim2.new(0.35, 0, 0.5, 0)
+    textbox.Position = UDim2.new(0.65, 0, 0, 0)
+    textbox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    textbox.Text = tostring(default)
+    textbox.TextColor3 = Color3.new(1, 1, 1)
+    textbox.Font = Enum.Font.Gotham
+    textbox.TextSize = 16
+    textbox.TextXAlignment = Enum.TextXAlignment.Center
+    textbox.Parent = frame
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = textbox
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(70, 70, 70)
+    stroke.Thickness = 1.5
+    stroke.Parent = textbox
+    
+    textbox.FocusLost:Connect(function(enterPressed)
+        local val = tonumber(textbox.Text) or default
+        val = math.clamp(val, minVal or 0, maxVal or math.huge)
+        textbox.Text = tostring(math.floor(val))
+        callback(val)
+    end)
+    
+    callback(default)
+    return frame
+end
+
+-- ==================== Main Frame Creator ====================
+local function CreateMainFrame(titleText, sizeX, sizeY)
+    sizeX = sizeX or 260
+    sizeY = sizeY or 200
+    
+    local ScreenGui = player.PlayerGui:FindFirstChild("MainFrames") 
+        or Instance.new("ScreenGui")
+    ScreenGui.Name = "MainFrames"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = player.PlayerGui
+    
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, sizeX, 0, sizeY)
+    Frame.Position = UDim2.new(0.5, -sizeX/2, 0.5, -sizeY/2)
+    Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    Frame.BorderSizePixel = 0
+    Frame.ClipsDescendants = true
+    Frame.Parent = ScreenGui
+    
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 12)
+    UICorner.Parent = Frame
+    
+    local UIGradient = Instance.new("UIGradient")
+    UIGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30,30,30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(10,10,10))
+    }
+    UIGradient.Rotation = 90
+    UIGradient.Parent = Frame
+    
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Color = Color3.fromRGB(255,255,255)
+    UIStroke.Transparency = 0.4
+    UIStroke.Thickness = 1.5
+    UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    UIStroke.Parent = Frame
+    
+    -- Title Bar
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Size = UDim2.new(1, 0, 0, 40)
+    TitleBar.BackgroundTransparency = 1
+    TitleBar.Parent = Frame
+    
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(0.7, 0, 1, 0)
+    Title.Position = UDim2.new(0, 12, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = titleText or "Kill Aura"
+    Title.TextColor3 = Color3.fromRGB(255,255,255)
+    Title.TextSize = 20
+    Title.Font = Enum.Font.GothamBold
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = TitleBar
+    
+    -- Minimize Button
+    local MinimizeButton = Instance.new("TextButton")
+    MinimizeButton.Size = UDim2.new(0, 34, 0, 34)
+    MinimizeButton.Position = UDim2.new(1, -80, 0, 3)
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    MinimizeButton.Text = "-"
+    MinimizeButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    MinimizeButton.Font = Enum.Font.GothamBold
+    MinimizeButton.TextSize = 24
+    MinimizeButton.Parent = TitleBar
+    
+    local MinCorner = Instance.new("UICorner")
+    MinCorner.CornerRadius = UDim.new(0, 8)
+    MinCorner.Parent = MinimizeButton
+    
+    -- Delete All Button
+    local DeleteButton = Instance.new("TextButton")
+    DeleteButton.Size = UDim2.new(0, 34, 0, 34)
+    DeleteButton.Position = UDim2.new(1, -42, 0, 3)
+    DeleteButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    DeleteButton.Text = "X"
+    DeleteButton.TextColor3 = Color3.fromRGB(255, 220, 220)
+    DeleteButton.Font = Enum.Font.GothamBold
+    DeleteButton.TextSize = 22
+    DeleteButton.Parent = TitleBar
+    
+    local DelCorner = Instance.new("UICorner")
+    DelCorner.CornerRadius = UDim.new(0, 8)
+    DelCorner.Parent = DeleteButton
+    
+    -- Content Area
+    local Content = Instance.new("Frame")
+    Content.Name = "Content"
+    Content.Size = UDim2.new(1, 0, 1, -40)
+    Content.Position = UDim2.new(0, 0, 0, 40)
+    Content.BackgroundTransparency = 1
+    Content.Parent = Frame
+    
+    -- Minimize
+    local minimized = false
+    local originalSizeY = sizeY
+    
+    MinimizeButton.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        if minimized then
+            Frame.Size = UDim2.new(0, sizeX, 0, 40)
+            MinimizeButton.Text = "+"
+            MinimizeButton.TextColor3 = Color3.fromRGB(100, 255, 100)
+            Content.Visible = false
+        else
+            Frame.Size = UDim2.new(0, sizeX, 0, originalSizeY)
+            MinimizeButton.Text = "-"
+            MinimizeButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+            Content.Visible = true
+        end
+    end)
+    
+    -- Delete All Settings
+    DeleteButton.MouseButton1Click:Connect(function()
+        if collectConnection then collectConnection:Disconnect() end
+        -- Restore all hitboxes before closing
+        for _, p in pairs(Players:GetPlayers()) do
+            if p \~= player and p.Character then
+                local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                if hrp and originalSizes[hrp] then
+                    hrp.Size = originalSizes[hrp]
+                end
+            end
+        end
+        Frame:Destroy()
+    end)
+    
+    --// To Make Frame Draggable
+    local dragging, dragInput, dragStart, startPos
+    TitleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = Frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    
+    TitleBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    
+    return Content
+end
+
+--// Fio GUI MainFrame
+local content = CreateMainFrame("Fio Kill Aura", 260, 320)
+
+--// Kill Aura Toggle Button
+local auraBtn = Instance.new("TextButton")
+auraBtn.Size = UDim2.new(0.85, 0, 0, 55)
+auraBtn.Position = UDim2.new(0.075, 0, 0.05, 0)
+auraBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+auraBtn.Text = "Kill Aura: OFF"
+auraBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+auraBtn.Font = Enum.Font.GothamBold
+auraBtn.TextSize = 18
+auraBtn.Parent = content
+
+local auraCorner = Instance.new("UICorner")
+auraCorner.CornerRadius = UDim.new(0, 10)
+auraCorner.Parent = auraBtn
+
+local auraStroke = Instance.new("UIStroke")
+auraStroke.Color = Color3.fromRGB(60, 60, 60)
+auraStroke.Thickness = 1.5
+auraStroke.Parent = auraBtn
+
+-- Range Value Box
+local rangeFrame = CreateValueBox(content, "Range", Range, function(v) Range = v end, 1, 500)
+rangeFrame.Position = UDim2.new(0.075, 0, 0.35, 0)
+
+-- Attack Speed Value Box
+local speedFrame = CreateValueBox(content, "Attack Speed", AttackSpeed, function(v) AttackSpeed = v end, 1, 500)
+speedFrame.Position = UDim2.new(0.075, 0, 0.65, 0)
+
+--// Kill Aura Logic
+auraBtn.MouseButton1Click:Connect(function()
+    KillAuraEnabled = not KillAuraEnabled
+    
+    if KillAuraEnabled then
+        auraBtn.Text = "Kill Aura: ON"
+        auraBtn.TextColor3 = Color3.fromRGB(80, 255, 80)
+        auraBtn.BackgroundColor3 = Color3.fromRGB(40, 70, 40)
+        auraStroke.Color = Color3.fromRGB(80, 150, 80)
+        
+        -- Make all other players' hitbox huge (local only)
+        for _, p in pairs(Players:GetPlayers()) do
+            if p \~= player and p.Character then
+                local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    originalSizes[hrp] = hrp.Size
+                    hrp.Size = Vector3.new(40, 40, 40)
+                end
+            end
+        end
+        
+        --// Kill Aura Loop
+        collectConnection = RunService.Heartbeat:Connect(function()
+            if not KillAuraEnabled then return end
+            if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+            
+            local myHRP = player.Character.HumanoidRootPart
+            local closest, closestDist = nil, Range  -- Use adjustable Range
+            
+            for _, p in pairs(Players:GetPlayers()) do
+                if p \~= player and p.Character and p.Character:FindFirstChild("Humanoid") then
+                    local hum = p.Character.Humanoid
+                    local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                    if hum.Health > 0 and hrp then
+                        local dist = (hrp.Position - myHRP.Position).Magnitude
+                        if dist <= closestDist then
+                            closestDist = dist
+                            closest = p
+                        end
+                    end
+                end
+            end
+            
+            if closest and closest.Character and closest.Character:FindFirstChild("Humanoid") then
+                local cooldown = 1 / AttackSpeed
+                if tick() - LastHitTime >= cooldown then
+                    local args = {
+                        closest.Character.Humanoid,
+                        Vector3.new(myHRP.Position.X, myHRP.Position.Y, myHRP.Position.Z)
+                    }
+                    pcall(function()
+                        HitRemote:InvokeServer(unpack(args))
+                    end)
+                    LastHitTime = tick()
+                end
+            end
+        end)
+    else
+        auraBtn.Text = "Kill Aura: OFF"
+        auraBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+        auraBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        auraStroke.Color = Color3.fromRGB(60, 60, 60)
+        
+        if collectConnection then
+            collectConnection:Disconnect()
+            collectConnection = nil
+        end
+        
+        -- Restore hitboxes
+        for hrp, oldSize in pairs(originalSizes) do
+            if hrp and hrp.Parent then
+                hrp.Size = oldSize
+            end
+        end
+        originalSizes = {}
+    end
+end)
+
+print("Fio Kill Aura Loaded - Toggle ON & adjust Range/Attack Speed!")
