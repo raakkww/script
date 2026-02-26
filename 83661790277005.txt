@@ -1,0 +1,5 @@
+local args = {
+	"Minigun",
+	0
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ButtonClickEvent"):FireServer(unpack(args))
