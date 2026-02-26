@@ -1,0 +1,8 @@
+local args = {
+	"CoinTwo",
+	{
+		cooldown = 1,
+		amount = math.huge
+	}
+}
+game:GetService("ReplicatedStorage"):WaitForChild("JoinReward_Claim"):FireServer(unpack(args))
