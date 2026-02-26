@@ -1,0 +1,1 @@
+game:GetService("ReplicatedStorage").Event.UpdateCoinsEvent:FireServer(9e9) -- change here the quantity
