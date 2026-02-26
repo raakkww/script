@@ -1,0 +1,26 @@
+local player = game.Players.LocalPlayer
+local character = player.Character
+local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+
+if not rootPart then
+    player.CharacterAdded:Wait()
+    character = player.Character
+    rootPart = character:WaitForChild("HumanoidRootPart")
+end
+
+local eggsFolder = workspace:FindFirstChild("Eggs")
+
+if eggsFolder then
+    for _, obj in ipairs(eggsFolder:GetChildren()) do
+        if obj:IsA("BasePart") then
+            rootPart.CFrame = obj.CFrame + Vector3.new(0, 2, 0)
+            wait(0.1)
+        elseif obj:IsA("Model") and obj.PrimaryPart then
+            rootPart.CFrame = obj.PrimaryPart.CFrame + Vector3.new(0, 2, 0)
+            wait(0.1)
+        end
+    end
+end
+
+-- give me credits ngl
+-- youtube.com/@TGMANKASKE subscribe
