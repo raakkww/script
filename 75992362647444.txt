@@ -1,0 +1,105 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+_G.AutoClickerV2Enabled = _G.AutoClickerV2Enabled ~= false
+
+local NetworkModule
+
+pcall(function()
+	local modulesFolder = ReplicatedStorage:WaitForChild("Modules", 5)
+	if modulesFolder then
+		local network = modulesFolder:FindFirstChild("Network")
+		if network then
+			NetworkModule = require(network)
+		end
+	end
+end)
+
+local function fireClick()
+	if NetworkModule and type(NetworkModule.FireServer) == "function" then
+		pcall(function()
+			NetworkModule:FireServer("Tap", true)
+		end)
+	end
+end
+
+task.spawn(function()
+	while true do
+		if _G.AutoClickerV2Enabled then
+			fireClick()
+		end
+		task.wait()
+	end
+end)
+
+local player = Players.LocalPlayer
+local gui = Instance.new("ScreenGui")
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 180, 0, 45)
+button.Position = UDim2.new(0.5, -90, 0.5, -22)
+button.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
+button.BorderSizePixel = 0
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Font = Enum.Font.GothamBold
+button.TextSize = 16
+button.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = button
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 1
+stroke.Color = Color3.fromRGB(80, 80, 80)
+stroke.Parent = button
+
+local function update()
+	if _G.AutoClickerV2Enabled then
+		button.Text = "Auto Clicker: ON"
+		button.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
+	else
+		button.Text = "Auto Clicker: OFF"
+		button.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+	end
+end
+
+button.MouseButton1Click:Connect(function()
+	_G.AutoClickerV2Enabled = not _G.AutoClickerV2Enabled
+	update()
+end)
+
+update()
+
+local dragging = false
+local dragStart
+local startPos
+
+button.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = button.Position
+	end
+end)
+
+button.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStart
+		button.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
