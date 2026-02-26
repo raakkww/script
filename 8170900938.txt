@@ -1,0 +1,74 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+local styleToChange = "Beast" --Brawler = fisticuffs, Rush = frenzy, Beast = brute. you MUST use one of these 3 or else you cannot use the custom style.
+
+local styleToChangeTo = "à¤¨à¤¾à¤à¤°à¤¾à¤" --å å³¶ã®é¾ is dragon style. you can find the styles at game.ReplicatedStorage.Styles
+
+for i, v in pairs(game.ReplicatedStorage.Styles:FindFirstChild(styleToChange):GetChildren()) do
+
+v:Destroy()
+
+end
+
+for i, v in pairs(game.ReplicatedStorage.Styles:FindFirstChild(styleToChangeTo):GetChildren()) do
+
+v = v:Clone()
+
+v.Parent = game.ReplicatedStorage.Styles[styleToChange]
+
+end
+
+game.StarterGui:SetCore("SendNotification",{
+
+Title = styleToChangeTo.." style loaded!";
+
+Text = styleToChangeTo.." style has replaced "..styleToChange..".";
+
+Button1 = "OK!";
+
+})
+
+
+
+
+
+local Dragon = game.ReplicatedStorage.Styles.Brawler
+Dragon.VisualName.Value = "Dragon"
+Dragon.Color.Value = Color3.fromRGB(255, 0, 0)
+
+Dragon.Rush1.Value = "é¾Attack1"
+Dragon.Rush2.Value = "é¾Attack2"
+Dragon.Rush3.Value = "é¾Attack3"
+Dragon.Rush4.Value = "é¾Attack4"
+
+Dragon.Strike1.Value = "TigerDrop"
+Dragon.Strike2.Value = "BStrike2"
+Dragon.Strike3.Value = "BStrike3"
+Dragon.Strike4.Value = "BStrike5"
+Dragon.Strike5.Value = "RDashAttack"
+
+Dragon.Grab.Value = "GGrab"
+Dragon.Taunt.Value = "DragonTaunt"
+Dragon.DashAttack.Value = "DashAttack"
+Dragon.GrabStrike.Value = "T_é¾GParry"
+
+
+
+
+
+
+local Player = game.Players.LocalPlayer
+local Rep = game.ReplicatedStorage
+local Char = Player.Character
+local Main = Player.PlayerGui.Interface.Battle.Main
+
+Main.HeatMove.TextLabel:GetPropertyChangedSignal("Text"):Connect(function()
+    if Main.HeatMove.TextLabel.Text == "Ultimate Essence" then
+        Main.HeatMove.TextLabel.Text = Rep.Moves.H_UltimateEssence.MoveName.Value
+        local Anim = Char.Humanoid:LoadAnimation(Rep.Moves.H_UltimateEssence.Anim)
+        Anim.Priority = Enum.AnimationPriority.Action4
+        Anim:Play()
+        Anim:Destroy()
+    end
+end)
