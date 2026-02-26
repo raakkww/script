@@ -1,0 +1,4 @@
+while true do
+	game:GetService("ReplicatedStorage").GiveCash:FireServer(workspace.Players.YOURNAMEHERE.YOURDRILLNAME)
+	wait(0)
+end
