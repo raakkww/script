@@ -1,0 +1,6 @@
+local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("Pao"):WaitForChild("[C-S]TryFire")
+
+for i = 1, 10 do -- change the number 10 to get more money, but lag lol
+    remote:FireServer()
+    wait(0.1)
+end
