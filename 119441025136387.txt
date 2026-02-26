@@ -1,0 +1,18 @@
+local NPCContainer = workspace["NPC Engine"].NPCContainer
+local scale = 6
+
+local function enlargeHead(npc)
+    local head = npc:FindFirstChild("Head")
+    if head and head:IsA("BasePart") then
+        head.Size = head.Size * scale
+    end
+end
+
+for _, npc in ipairs(NPCContainer:GetChildren()) do
+    enlargeHead(npc)
+end
+
+NPCContainer.ChildAdded:Connect(function(npc)
+    task.wait(0.1)
+    enlargeHead(npc)
+end)
