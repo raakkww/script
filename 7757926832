@@ -1,36 +1,36 @@
 -- ╔══════════════════════════════════════════════════╗
 -- ║  RoHub Assistant                                  ║
--- ║  Generated : 2026-03-01 05:01:18             ║
+-- ║  Generated : 2026-03-01 05:08:02             ║
 -- ║  Mode      : modify                               ║
 -- ╚══════════════════════════════════════════════════╝
 
--- Membuat ScreenGui
+-- Buat ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RoHub TouchSpammer"
+ScreenGui.Name = "RoHub_TouchPartSpammer"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Membuat MainFrame
+-- Buat MainFrame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 250, 0, 150)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
+MainFrame.Size = UDim2.new(0, 250, 0, 200)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -100)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
 
--- Membuat RainbowStroke
+-- Tambahkan RainbowStroke
 local RainbowStroke = Instance.new("UIStroke")
 RainbowStroke.Thickness = 3
 RainbowStroke.Color = Color3.fromRGB(255, 0, 0)
 RainbowStroke.Parent = MainFrame
 
--- Membuat UICorner
+-- Tambahkan UICorner
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 20)
 UICorner.Parent = MainFrame
 
--- Membuat Title
+-- Buat Title
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
 Title.Size = UDim2.new(1, 0, 0, 40)
@@ -42,61 +42,65 @@ Title.TextSize = 18
 Title.Font = Enum.Font.GothamBold
 Title.Parent = MainFrame
 
--- Membuat TitleStroke
+-- Tambahkan TitleStroke
 local TitleStroke = Instance.new("UIStroke")
 TitleStroke.Thickness = 2
 TitleStroke.Color = Color3.fromRGB(255, 0, 0)
 TitleStroke.Parent = Title
 
--- Membuat SpamButton
+-- Buat SpamButton
 local SpamButton = Instance.new("TextButton")
 SpamButton.Name = "SpamButton"
 SpamButton.Size = UDim2.new(0, 200, 0, 50)
 SpamButton.Position = UDim2.new(0.5, -100, 0.5, 0)
-SpamButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-SpamButton.Text = "Mulai Spam"
+SpamButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+SpamButton.Text = "Start Spamming"
 SpamButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 SpamButton.TextSize = 16
 SpamButton.Font = Enum.Font.GothamBold
 SpamButton.Parent = MainFrame
 
--- Membuat ButtonStroke
+-- Tambahkan ButtonStroke
 local ButtonStroke = Instance.new("UIStroke")
 ButtonStroke.Thickness = 2
 ButtonStroke.Color = Color3.fromRGB(255, 0, 0)
 ButtonStroke.Parent = SpamButton
 
--- Membuat ButtonBorderStroke
+-- Tambahkan ButtonBorderStroke
 local ButtonBorderStroke = Instance.new("UIStroke")
 ButtonBorderStroke.Thickness = 3
 ButtonBorderStroke.Color = Color3.fromRGB(255, 0, 0)
 ButtonBorderStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 ButtonBorderStroke.Parent = SpamButton
 
--- Membuat ButtonCorner
+-- Tambahkan ButtonCorner
 local ButtonCorner = Instance.new("UICorner")
 ButtonCorner.CornerRadius = UDim.new(0, 15)
 ButtonCorner.Parent = SpamButton
 
--- Variabel untuk mengontrol spam
+-- Buat HideButton
+local HideButton = Instance.new("TextButton")
+HideButton.Name = "HideButton"
+HideButton.Size = UDim2.new(0, 100, 0, 30)
+HideButton.Position = UDim2.new(0, 0, 0, 150)
+HideButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+HideButton.Text = "Hide"
+HideButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+HideButton.TextSize = 14
+HideButton.Font = Enum.Font.Gotham
+HideButton.Parent = MainFrame
+
+-- Tambahkan HideButtonStroke
+local HideButtonStroke = Instance.new("UIStroke")
+HideButtonStroke.Thickness = 2
+HideButtonStroke.Color = Color3.fromRGB(255, 0, 0)
+HideButtonStroke.Parent = HideButton
+
+-- Variabel untuk menyimpan status spamming
 local isSpamming = false
 local spamConnection
 
--- Fungsi untuk membuat warna rainbow
-spawn(function()
-    local hue = 0
-    while true do
-        hue = (hue + 3) % 360
-        local rainbowColor = Color3.fromHSV(hue / 360, 1, 1)
-        RainbowStroke.Color = rainbowColor
-        TitleStroke.Color = rainbowColor
-        ButtonStroke.Color = rainbowColor
-        ButtonBorderStroke.Color = rainbowColor
-        wait(0.01)
-    end
-end)
-
--- Fungsi untuk menjalankan skrip touch
+-- Fungsi untuk menjalankan touch script
 local function runTouchScript()
     local r = (game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()):WaitForChild("HumanoidRootPart")
     for _, p in pairs(workspace:GetDescendants()) do
@@ -107,51 +111,81 @@ local function runTouchScript()
     end
 end
 
--- Menghubungkan fungsi ke tombol spam
+-- Koneksi untuk tombol spam
 SpamButton.MouseButton1Click:Connect(function()
     isSpamming = not isSpamming
     if isSpamming then
-        SpamButton.Text = "Berhenti Spam"
+        SpamButton.Text = "Stop Spamming"
         SpamButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
         spamConnection = game:GetService("RunService").Heartbeat:Connect(function()
             pcall(runTouchScript)
         end)
     else
-        SpamButton.Text = "Mulai Spam"
-        SpamButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        SpamButton.Text = "Start Spamming"
+        SpamButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         if spamConnection then
             spamConnection:Disconnect()
         end
     end
 end)
 
--- Mengatur drag untuk MainFrame
-local UserInputService = game:GetService("UserInputService")
+-- Koneksi untuk tombol hide
+HideButton.MouseButton1Click:Connect(function()
+    if MainFrame.Visible then
+        MainFrame.Visible = false
+    else
+        MainFrame.Visible = true
+    end
+end)
+
+-- Fungsi untuk mengupdate warna rainbow
+spawn(function()
+    local hue = 0
+    while true do
+        hue = (hue + 3) % 360
+        local rainbowColor = Color3.fromHSV(hue / 360, 1, 1)
+        RainbowStroke.Color = rainbowColor
+        TitleStroke.Color = rainbowColor
+        ButtonStroke.Color = rainbowColor
+        ButtonBorderStroke.Color = rainbowColor
+        HideButtonStroke.Color = rainbowColor
+        wait(0.01)
+    end
+end)
+
+-- Variabel untuk menyimpan status dragging
 local dragging
 local dragInput
 local dragStart
 local startPos
 
+-- Fungsi untuk mengupdate posisi MainFrame
 local function update(input)
     local delta = input.Position - dragStart
     MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
+-- Koneksi untuk event input began
 MainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
     end
 end)
 
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        update(input)
+-- Koneksi untuk event input changed
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if dragging then
+            update(input)
+        end
+    end
+end)
+
+-- Koneksi untuk event input ended
+MainFrame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
     end
 end)
