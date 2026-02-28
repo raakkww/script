@@ -1,20 +1,24 @@
 task.spawn(function()
-    local ok, err = pcall(function()
-        local id = tostring(game.GameId)
-        local url = "https://raw.githubusercontent.com/raakkww/script/RoHub/" .. id
-
+    local function tryLoad(id)
+        local url = "https://raw.githubusercontent.com/raakkww/script/RoHub/" .. tostring(id)
         local src = game:HttpGet(url, true)
         assert(src and #src > 10 and not src:find("<!DOCTYPE"), "Not found")
-
         loadstring(src)()
-        print("Loaded: " .. id)
-    end)
+        return true
+    end
+
+    local ok, err = pcall(tryLoad, game.GameId)
+
+    if not ok then
+        -- fallback ke PlaceId
+        ok, err = pcall(tryLoad, game.PlaceId)
+    end
 
     if not ok then
         warn("Error: " .. tostring(err))
 
         local universeId = tostring(game.GameId)
-        warn("Buat file:" .. universeId)
+        warn("Buat file: " .. universeId)
 
         pcall(function()
             setclipboard(universeId)
