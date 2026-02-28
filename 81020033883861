@@ -1,61 +1,135 @@
+-- [[ RoHub - Rocta ]]
+-- Modified by RoHub Developer Team
+-- Key System: REMOVED/NONE
+-- UI Theme: Modern Dark (Cyan Accent)
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- Wait for Remote safely
 local SpawnRemote = ReplicatedStorage:WaitForChild("SpawnCar")
 
-
+-- [[ GUI SETUP ]]
 local ScreenGui = Instance.new("ScreenGui", PlayerGui)
-ScreenGui.Name = "CarSpawner"
+ScreenGui.Name = "RoHub_Rocta_GUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 260, 0, 180)
-MainFrame.Position = UDim2.new(0.5, -130, 0.5, -90)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Size = UDim2.new(0, 280, 0, 200)
+MainFrame.Position = UDim2.new(0.5, -140, 0.5, -100)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25) -- Darker Background
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 
+-- Modern Corners
+local MainCorner = Instance.new("UICorner", MainFrame)
+MainCorner.CornerRadius = UDim.new(0, 8)
+
+-- Subtle Border
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Color = Color3.fromRGB(40, 40, 40)
+MainStroke.Thickness = 1
+
+-- [[ TITLE BAR ]]
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-Title.Text = "CAR SPAWNER V2"
-Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Text = "RoHub - Rocta" -- Rebranded Title
+Title.TextColor3 = Color3.fromRGB(0, 255, 255) -- Cyan Accent Text
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
+Title.TextSize = 18
+Title.BorderSizePixel = 0
 
+local TitleCorner = Instance.new("UICorner", Title)
+TitleCorner.CornerRadius = UDim.new(0, 8)
+-- Only round top corners for title if desired, but keeping full round for simplicity matches frame
+TitleCorner.CornerRadius = UDim.new(0, 8) 
 
+local TitleStroke = Instance.new("UIStroke", Title)
+TitleStroke.Color = Color3.fromRGB(50, 50, 50)
+TitleStroke.Thickness = 1
+TitleStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- [[ VARIABLES ]]
 local SelectedCar = ""
+
+-- [[ DROPDOWN BUTTON ]]
 local DropdownBtn = Instance.new("TextButton", MainFrame)
 DropdownBtn.Size = UDim2.new(1, -20, 0, 40)
 DropdownBtn.Position = UDim2.new(0, 10, 0, 55)
-DropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+DropdownBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 DropdownBtn.Text = "Select a Car..."
-DropdownBtn.TextColor3 = Color3.new(1, 1, 1)
+DropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 DropdownBtn.Font = Enum.Font.GothamMedium
+DropdownBtn.TextSize = 14
 
+local DropdownCorner = Instance.new("UICorner", DropdownBtn)
+DropdownCorner.CornerRadius = UDim.new(0, 6)
+
+local DropdownStroke = Instance.new("UIStroke", DropdownBtn)
+DropdownStroke.Color = Color3.fromRGB(60, 60, 60)
+DropdownStroke.Thickness = 1
+
+-- Hover Effect
+DropdownBtn.MouseEnter:Connect(function()
+    DropdownBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+end)
+DropdownBtn.MouseLeave:Connect(function()
+    DropdownBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+end)
+
+-- [[ SCROLL FRAME (DROPDOWN LIST) ]]
 local ScrollFrame = Instance.new("ScrollingFrame", MainFrame)
 ScrollFrame.Size = UDim2.new(1, -20, 0, 200)
-ScrollFrame.Position = UDim2.new(0, 10, 0, 95)
-ScrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ScrollFrame.Position = UDim2.new(0, 10, 0, 100)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 ScrollFrame.Visible = false
-ScrollFrame.ZIndex = 5
-ScrollFrame.ScrollBarThickness = 4
+ScrollFrame.ZIndex = 10 -- Higher ZIndex to appear on top
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local ScrollCorner = Instance.new("UICorner", ScrollFrame)
+ScrollCorner.CornerRadius = UDim.new(0, 6)
+
+local ScrollStroke = Instance.new("UIStroke", ScrollFrame)
+ScrollStroke.Color = Color3.fromRGB(0, 255, 255) -- Accent Border when open
+ScrollStroke.Thickness = 1
 
 local UIList = Instance.new("UIListLayout", ScrollFrame)
 UIList.Padding = UDim.new(0, 2)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
 
-
+-- [[ SPAWN BUTTON ]]
 local SpawnBtn = Instance.new("TextButton", MainFrame)
 SpawnBtn.Size = UDim2.new(1, -20, 0, 45)
-SpawnBtn.Position = UDim2.new(0, 10, 0, 115)
-SpawnBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-SpawnBtn.Text = "SPAWN"
-SpawnBtn.TextColor3 = Color3.new(1, 1, 1)
+SpawnBtn.Position = UDim2.new(0, 10, 0, 145)
+SpawnBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255) -- Modern Blue Accent
+SpawnBtn.Text = "SPAWN CAR"
+SpawnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SpawnBtn.Font = Enum.Font.GothamBold
-SpawnBtn.TextSize = 18
+SpawnBtn.TextSize = 16
 
+local SpawnCorner = Instance.new("UICorner", SpawnBtn)
+SpawnCorner.CornerRadius = UDim.new(0, 6)
 
+local SpawnStroke = Instance.new("UIStroke", SpawnBtn)
+SpawnStroke.Color = Color3.fromRGB(0, 200, 255)
+SpawnStroke.Thickness = 1
+
+-- Hover Effect
+SpawnBtn.MouseEnter:Connect(function()
+    SpawnBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
+end)
+SpawnBtn.MouseLeave:Connect(function()
+    SpawnBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+end)
+
+-- [[ CAR LIST DATA ]]
 local cars = {
 	{n = "Yuzu 125", p = 1500}, {n = "Ladybug Riva", p = 3000}, {n = "Cobra Simvy", p = 3200},
 	{n = "BRW e30 M3", p = 5000}, {n = "Tyrota AE86", p = 6200}, {n = "BWM e36 M3", p = 6500},
@@ -86,40 +160,81 @@ local cars = {
 	{n = "Butaro Bowler", p = 14500000}, {n = "Evil Sixteen", p = 21000000}
 }
 
-
+-- Sort cars by price
 table.sort(cars, function(a, b) return a.p < b.p end)
 
-
+-- [[ DROPDOWN LOGIC ]]
 DropdownBtn.MouseButton1Click:Connect(function()
 	ScrollFrame.Visible = not ScrollFrame.Visible
+    -- Bring to front when opened
+    if ScrollFrame.Visible then
+        ScrollFrame.ZIndex = 10
+        MainFrame.ZIndex = 5
+    else
+        ScrollFrame.ZIndex = 5
+        MainFrame.ZIndex = 1
+    end
 end)
 
+-- Generate Car List
 for _, car in ipairs(cars) do
 	local b = Instance.new("TextButton", ScrollFrame)
-	b.Size = UDim2.new(1, 0, 0, 30)
+	b.Size = UDim2.new(1, -10, 0, 35)
+	b.Position = UDim2.new(0, 5, 0, 0) -- Padding inside scroll
 	b.Text = car.n .. " ($" .. tostring(car.p) .. ")"
-	b.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-	b.TextColor3 = Color3.new(1, 1, 1)
-	b.ZIndex = 6
+	b.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	b.TextColor3 = Color3.fromRGB(255, 255, 255)
+	b.Font = Enum.Font.GothamMedium
+	b.TextSize = 12
+	b.ZIndex = 11
+	
+    local BtnCorner = Instance.new("UICorner", b)
+    BtnCorner.CornerRadius = UDim.new(0, 4)
 	
 	b.MouseButton1Click:Connect(function()
 		SelectedCar = car.n
 		DropdownBtn.Text = car.n
+        DropdownBtn.TextColor3 = Color3.fromRGB(0, 255, 255) -- Highlight selected
 		ScrollFrame.Visible = false
 	end)
+    
+    -- Hover Effect for List Items
+    b.MouseEnter:Connect(function()
+        b.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end)
+    b.MouseLeave:Connect(function()
+        b.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    end)
 end
 
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y)
+-- Update Canvas Size dynamically
+UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIList.AbsoluteContentSize.Y + 10)
+end)
 
-
+-- [[ SPAWN LOGIC ]]
 SpawnBtn.MouseButton1Click:Connect(function()
 	if SelectedCar ~= "" then
 		local fullName = SelectedCar .. " - Stock"
 		SpawnRemote:FireServer(fullName)
-		print("Attempting to spawn: " .. fullName)
+		print("[RoHub - Rocta] Attempting to spawn: " .. fullName)
+        
+        -- Visual Feedback on Button
+        local originalText = SpawnBtn.Text
+        SpawnBtn.Text = "SPAWNED!"
+        SpawnBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(0.5)
+        SpawnBtn.Text = originalText
+        SpawnBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 	else
-		DropdownBtn.Text = "PICK A CAR FIRST!"
+		DropdownBtn.Text = "RoHub: PICK A CAR!"
+        DropdownBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
 		task.wait(1)
 		DropdownBtn.Text = "Select a Car..."
+        DropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 	end
 end)
+
+-- [[ LOAD NOTIFICATION ]]
+print("[RoHub - Rocta] Script Loaded Successfully.")
+print("[RoHub - Rocta] No Key System Required.")
