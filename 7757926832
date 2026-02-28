@@ -1,322 +1,157 @@
---// RoHub - Rocta | TouchPart Spammer (Modern Edition)
--- Credits: RoHub - Rocta
+-- ╔══════════════════════════════════════════════════╗
+-- ║  RoHub Assistant                                  ║
+-- ║  Generated : 2026-03-01 05:01:18             ║
+-- ║  Mode      : modify                               ║
+-- ╚══════════════════════════════════════════════════╝
 
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-
-local LocalPlayer = Players.LocalPlayer
-
--- Cleanup existing GUI
-if game.CoreGui:FindFirstChild("RoHubRocta_TouchSpammer") then
-    game.CoreGui.RoHubRocta_TouchSpammer:Destroy()
-end
-
--- Create main ScreenGui
+-- Membuat ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RoHubRocta_TouchSpammer"
+ScreenGui.Name = "RoHub TouchSpammer"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game.CoreGui
-ScreenGui.DisplayOrder = 100
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Main Frame with modern styling
+-- Membuat MainFrame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 280, 0, 180)
-MainFrame.Position = UDim2.new(0.5, -140, 0.5, -90)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+MainFrame.Size = UDim2.new(0, 250, 0, 150)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
-MainFrame.ClipsDescendants = true
-MainFrame.Active = true
-MainFrame.Selectable = true
 
--- Rounded corners
+-- Membuat RainbowStroke
+local RainbowStroke = Instance.new("UIStroke")
+RainbowStroke.Thickness = 3
+RainbowStroke.Color = Color3.fromRGB(255, 0, 0)
+RainbowStroke.Parent = MainFrame
+
+-- Membuat UICorner
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 22)
+UICorner.CornerRadius = UDim.new(0, 20)
 UICorner.Parent = MainFrame
 
--- Modern gradient background
-local UIGradient = Instance.new("UIGradient")
-UIGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 50)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(25, 25, 40)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 25, 45))
-}
-UIGradient.Rotation = 135
-UIGradient.Parent = MainFrame
-
--- Subtle animated border glow
-local BorderGlow = Instance.new("Frame")
-BorderGlow.Size = UDim2.new(1, 6, 1, 6)
-BorderGlow.Position = UDim2.new(0, -3, 0, -3)
-BorderGlow.BackgroundTransparency = 1
-BorderGlow.BorderSizePixel = 0
-BorderGlow.Parent = MainFrame
-
-local GlowCorner = Instance.new("UICorner")
-GlowCorner.CornerRadius = UDim.new(0, 24)
-GlowCorner.Parent = BorderGlow
-
-local GlowGradient = Instance.new("UIGradient")
-GlowGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(138, 43, 226)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 212, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(138, 43, 226))
-}
-GlowGradient.Rotation = 90
-GlowGradient.Transparency = NumberSequence.new{
-    NumberSequenceKeypoint.new(0, 0.8),
-    NumberSequenceKeypoint.new(0.5, 0.4),
-    NumberSequenceKeypoint.new(1, 0.8)
-}
-GlowGradient.Parent = BorderGlow
-
--- Title with branding (fixed text color for readability)
+-- Membuat Title
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
-Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Size = UDim2.new(1, 0, 0, 40)
 Title.Position = UDim2.new(0, 0, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "RoHub - Rocta"
+Title.Text = "RoHub TouchPart Spammer"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 20
-Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
 Title.Parent = MainFrame
 
--- Animated rainbow stroke for title (kept but refined)
+-- Membuat TitleStroke
 local TitleStroke = Instance.new("UIStroke")
 TitleStroke.Thickness = 2
-TitleStroke.Color = Color3.fromRGB(255, 100, 100)
-TitleStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+TitleStroke.Color = Color3.fromRGB(255, 0, 0)
 TitleStroke.Parent = Title
 
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 22)
-TitleCorner.Parent = Title
-
--- Status indicator
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -20, 0, 20)
-StatusLabel.Position = UDim2.new(0, 10, 0, 42)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "● Ready"
-StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 140)
-StatusLabel.TextSize = 13
-StatusLabel.Font = Enum.Font.GothamMedium
-StatusLabel.Parent = MainFrame
-
--- Action Button (modern styling, fixed text color)
+-- Membuat SpamButton
 local SpamButton = Instance.new("TextButton")
 SpamButton.Name = "SpamButton"
-SpamButton.Size = UDim2.new(0, 220, 0, 50)
-SpamButton.Position = UDim2.new(0.5, -110, 0.5, 10)
-SpamButton.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-SpamButton.Text = "Start Spamming"
+SpamButton.Size = UDim2.new(0, 200, 0, 50)
+SpamButton.Position = UDim2.new(0.5, -100, 0.5, 0)
+SpamButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+SpamButton.Text = "Mulai Spam"
 SpamButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 SpamButton.TextSize = 16
-SpamButton.Font = Enum.Font.GothamSemibold
+SpamButton.Font = Enum.Font.GothamBold
 SpamButton.Parent = MainFrame
-SpamButton.AutoButtonColor = false
 
-local ButtonCorner = Instance.new("UICorner")
-ButtonCorner.CornerRadius = UDim.new(0, 16)
-ButtonCorner.Parent = SpamButton
-
-local ButtonGradient = Instance.new("UIGradient")
-ButtonGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(88, 45, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(138, 43, 226))
-}
-ButtonGradient.Parent = SpamButton
-
--- Rainbow stroke effect for button (kept but optimized)
+-- Membuat ButtonStroke
 local ButtonStroke = Instance.new("UIStroke")
 ButtonStroke.Thickness = 2
-ButtonStroke.Color = Color3.fromRGB(255, 100, 100)
-ButtonStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+ButtonStroke.Color = Color3.fromRGB(255, 0, 0)
 ButtonStroke.Parent = SpamButton
 
--- Close button (top right)
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -38, 0, 8)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = "✕"
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-CloseBtn.TextSize = 18
-CloseBtn.Parent = MainFrame
+-- Membuat ButtonBorderStroke
+local ButtonBorderStroke = Instance.new("UIStroke")
+ButtonBorderStroke.Thickness = 3
+ButtonBorderStroke.Color = Color3.fromRGB(255, 0, 0)
+ButtonBorderStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+ButtonBorderStroke.Parent = SpamButton
 
-CloseBtn.MouseButton1Click:Connect(function()
-    -- Fade out animation
-    local TweenService = game:GetService("TweenService")
-    TweenService:Create(MainFrame, TweenInfo.new(0.25), {
-        Size = UDim2.new(0, 0, 0, 0),
-        Position = UDim2.new(0.5, 0, 0.5, 0)
-    }):Play()
-    task.wait(0.25)
-    ScreenGui:Destroy()
-end)
+-- Membuat ButtonCorner
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 15)
+ButtonCorner.Parent = SpamButton
 
--- Hover/press effects for button
-SpamButton.MouseEnter:Connect(function()
-    local TweenService = game:GetService("TweenService")
-    TweenService:Create(SpamButton, TweenInfo.new(0.15), {
-        BackgroundColor3 = Color3.fromRGB(60, 60, 85)
-    }):Play()
-end)
-
-SpamButton.MouseLeave:Connect(function()
-    local TweenService = game:GetService("TweenService")
-    TweenService:Create(SpamButton, TweenInfo.new(0.15), {
-        BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-    }):Play()
-end)
-
--- Rainbow animation loop (optimized)
-spawn(function()
-    local hue = 0
-    local TweenService = game:GetService("TweenService")
-    while ScreenGui.Parent do
-        hue = (hue + 4) % 360
-        local rainbowColor = Color3.fromHSV(hue / 360, 0.9, 1)
-        
-        -- Smooth color transition using TweenService
-        TweenService:Create(TitleStroke, TweenInfo.new(0.1), {Color = rainbowColor}):Play()
-        TweenService:Create(ButtonStroke, TweenInfo.new(0.1), {Color = rainbowColor}):Play()
-        
-        task.wait(0.016) -- ~60 FPS
-    end
-end)
-
--- Core spamming functionality
+-- Variabel untuk mengontrol spam
 local isSpamming = false
 local spamConnection
 
+-- Fungsi untuk membuat warna rainbow
+spawn(function()
+    local hue = 0
+    while true do
+        hue = (hue + 3) % 360
+        local rainbowColor = Color3.fromHSV(hue / 360, 1, 1)
+        RainbowStroke.Color = rainbowColor
+        TitleStroke.Color = rainbowColor
+        ButtonStroke.Color = rainbowColor
+        ButtonBorderStroke.Color = rainbowColor
+        wait(0.01)
+    end
+end)
+
+-- Fungsi untuk menjalankan skrip touch
 local function runTouchScript()
-    local character = LocalPlayer.Character
-    if not character then return end
-    
-    local r = character:FindFirstChild("HumanoidRootPart")
-    if not r then return end
-    
+    local r = (game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()):WaitForChild("HumanoidRootPart")
     for _, p in pairs(workspace:GetDescendants()) do
         if p.Name == "TouchPart" and p:IsA("BasePart") then
-            pcall(function()
-                firetouchinterest(r, p, 0)
-                firetouchinterest(r, p, 1)
-            end)
+            firetouchinterest(r, p, 0)
+            firetouchinterest(r, p, 1)
         end
     end
 end
 
--- Button click handler
+-- Menghubungkan fungsi ke tombol spam
 SpamButton.MouseButton1Click:Connect(function()
     isSpamming = not isSpamming
-    
-    local TweenService = game:GetService("TweenService")
-    
     if isSpamming then
-        SpamButton.Text = "Stop Spamming"
-        StatusLabel.Text = "● Active"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        
-        -- Visual feedback animation
-        TweenService:Create(SpamButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        }):Play()
-        
-        spamConnection = RunService.Heartbeat:Connect(function()
+        SpamButton.Text = "Berhenti Spam"
+        SpamButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        spamConnection = game:GetService("RunService").Heartbeat:Connect(function()
             pcall(runTouchScript)
         end)
     else
-        SpamButton.Text = "Start Spamming"
-        StatusLabel.Text = "● Ready"
-        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 140)
-        
-        TweenService:Create(SpamButton, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-        }):Play()
-        
+        SpamButton.Text = "Mulai Spam"
+        SpamButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
         if spamConnection then
             spamConnection:Disconnect()
-            spamConnection = nil
         end
     end
 end)
 
--- Draggable functionality (mobile + PC optimized)
-local dragging = false
-local dragStart = nil
-local startPos = nil
+-- Mengatur drag untuk MainFrame
+local UserInputService = game:GetService("UserInputService")
+local dragging
+local dragInput
+local dragStart
+local startPos
 
-local function updateDrag(input)
-    if not dragging or not dragStart or not startPos then return end
+local function update(input)
     local delta = input.Position - dragStart
-    MainFrame.Position = UDim2.new(
-        startPos.X.Scale, startPos.X.Offset + delta.X,
-        startPos.Y.Scale, startPos.Y.Offset + delta.Y
-    )
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
 MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-       input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = MainFrame.Position
-    end
-end)
-
-MainFrame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-       input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-        dragStart = nil
-        startPos = nil
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
-                     input.UserInputType == Enum.UserInputType.Touch) then
-        updateDrag(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        update(input)
     end
 end)
-
--- Mobile optimization: ensure proper touch target sizes
-if UserInputService.TouchEnabled then
-    SpamButton.Size = UDim2.new(0, 240, 0, 55)
-    SpamButton.Position = UDim2.new(0.5, -120, 0.5, 10)
-    SpamButton.TextSize = 17
-end
-
--- Fade in animation on load
-task.spawn(function()
-    local TweenService = game:GetService("TweenService")
-    MainFrame.BackgroundTransparency = 1
-    Title.TextTransparency = 1
-    SpamButton.BackgroundTransparency = 1
-    SpamButton.TextTransparency = 1
-    
-    task.wait(0.1)
-    
-    TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency = 0}):Play()
-    TweenService:Create(Title, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {TextTransparency = 0}):Play()
-    TweenService:Create(SpamButton, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency = 0, TextTransparency = 0}):Play()
-end)
-
--- Return module table for external integration (optional)
-return {
-    GUI = ScreenGui,
-    ToggleSpam = function(state)
-        if state ~= isSpamming then
-            SpamButton:FireClick()
-        end
-    end,
-    IsSpamming = function()
-        return isSpamming
-    end
-}
