@@ -1,8 +1,9 @@
 task.spawn(function()
     local ok, err = pcall(function()
         local placeId = tostring(game.PlaceId)
-        local url = "https://raw.githubusercontent.com/raakkww/script/refs/heads/RoHub/" .. placeId ..
-
+        -- Perbaiki: hapus spasi, hapus 'refs/heads/', hapus .. di akhir
+        local url = "https://raw.githubusercontent.com/raakkww/script/RoHub/" .. placeId
+        
         local source = game:HttpGet(url)
         assert(source and #source > 5, "Game script not found")
         assert(not source:find("<!DOCTYPE"), "Invalid response")
