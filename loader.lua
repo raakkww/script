@@ -1,17 +1,18 @@
 task.spawn(function()
     local ok, err = pcall(function()
-        local placeId = tostring(game.PlaceId)
-        -- PERBAIKAN: Hapus spasi, hapus .. di akhir
-        local url = "https://raw.githubusercontent.com/raakkww/script/RoHub/" .. placeId
+        -- PAKAI GAMEID (Universe ID), BUKAN PLACEID
+        local id = tostring(game.GameId)
+        local url = "https://raw.githubusercontent.com/raakkww/script/RoHub/universe_" .. id
         
-        local source = game:HttpGet(url)
-        assert(source and #source > 5, "Game script not found")
-        assert(not source:find("<!DOCTYPE"), "Invalid response")
-
-        loadstring(source)()
+        local src = game:HttpGet(url, true)
+        assert(src and #src > 10 and not src:find("<!DOCTYPE"), "Not found")
+        
+        loadstring(src)()
+        print("Loaded: universe_" .. id)
     end)
-
-    if not ok then
-        warn("[LOADER ERROR]: " .. tostring(err))
+    
+    if not ok then 
+        warn("Error: " .. tostring(err))
+        warn("Buat file: universe_" .. tostring(game.GameId))
     end
 end)
