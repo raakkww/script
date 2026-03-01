@@ -1,0 +1,56 @@
+local function getswordremote()
+    local LocalPlayer = game:GetService("Players").LocalPlayer
+    
+    local character = LocalPlayer.Character
+    if not character then return nil end
+
+    local sword = character:FindFirstChildOfClass("Tool")
+    if not sword then return nil end
+
+    local Remote = sword:FindFirstChild("Remote")
+    if not Remote then return nil end
+
+    return Remote
+end
+
+local function attack(user)
+    local remote = getswordremote()
+    if not remote then return end
+
+    local character = user.Character
+    if not character then return end
+
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+
+    local args = {
+        "Hit",
+        humanoid
+    }
+    remote:FireServer(unpack(args))
+end
+
+while true do
+    wait()
+    local LocalPlayer = game:GetService("Players").LocalPlayer
+    local mychar = LocalPlayer.Character
+    if not mychar then continue end
+
+    local myhrp = mychar:FindFirstChild("HumanoidRootPart")
+    if not myhrp then continue end
+
+    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+        if player == LocalPlayer then continue end
+
+        local character = player.Character
+        if not character then continue end
+
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+
+        local distance = (myhrp.Position - hrp.Position).Magnitude
+        if distance < 20 then
+            attack(player)
+        end
+    end
+end
