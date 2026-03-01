@@ -1,0 +1,151 @@
+-- LocalScript dentro de StarterPlayer â†’ StarterPlayerScripts
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- FunÃ§Ã£o para cor arco-Ã­ris
+local function getRainbowColor()
+	local time = tick() * 2
+	local r = math.sin(time) * 0.5 + 0.5
+	local g = math.sin(time + 2) * 0.5 + 0.5
+	local b = math.sin(time + 4) * 0.5 + 0.5
+	return Color3.new(r, g, b)
+end
+
+-- Criar GUI
+local hubGui = Instance.new("ScreenGui")
+hubGui.Name = "ScriptHub"
+hubGui.ResetOnSpawn = false
+hubGui.Parent = playerGui
+
+local mainButton = Instance.new("TextButton")
+mainButton.Size = UDim2.new(0, 150, 0, 50)
+mainButton.Position = UDim2.new(0.5, -75, 0, 10) -- topo da tela
+mainButton.Text = "Script Hub"
+mainButton.BackgroundColor3 = Color3.new(0,0,0)
+mainButton.TextColor3 = Color3.new(1,1,1)
+mainButton.Parent = hubGui
+
+local innerGui = Instance.new("Frame")
+innerGui.Size = UDim2.new(0, 400, 0, 300)
+innerGui.Position = UDim2.new(0.5, -200, 0.5, -150)
+innerGui.BackgroundColor3 = Color3.fromRGB(40,40,40)
+innerGui.Visible = false
+innerGui.Parent = hubGui
+
+-- BotÃ£o arrastÃ¡vel
+local dragButton = Instance.new("TextButton")
+dragButton.Size = UDim2.new(0, 100, 0, 50)
+dragButton.Position = UDim2.new(0, 20, 0, 20)
+dragButton.Text = "Arraste-me"
+dragButton.BackgroundColor3 = Color3.new(0,0,0)
+dragButton.TextColor3 = Color3.new(1,1,1)
+dragButton.Parent = innerGui
+
+local dragging = false
+local dragOffset = Vector2.new(0,0)
+dragButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		local mousePos = input.Position
+		local buttonPos = dragButton.Position
+		dragOffset = Vector2.new(mousePos.X - buttonPos.X.Offset, mousePos.Y - buttonPos.Y.Offset)
+	end
+end)
+dragButton.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+dragButton.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+		local mousePos = input.Position
+		dragButton.Position = UDim2.new(0, mousePos.X - dragOffset.X, 0, mousePos.Y - dragOffset.Y)
+	end
+end)
+
+-- BotÃ£o Arco-Ã­ris infinito
+local rainbowButton = Instance.new("TextButton")
+rainbowButton.Size = UDim2.new(0, 150, 0, 50)
+rainbowButton.Position = UDim2.new(0, 20, 0, 100)
+rainbowButton.Text = "ChÃ£o Arco-Ã­ris"
+rainbowButton.TextColor3 = Color3.new(1,1,1)
+rainbowButton.Parent = innerGui
+
+RunService.RenderStepped:Connect(function()
+	if rainbowButton then
+		rainbowButton.BackgroundColor3 = getRainbowColor()
+	end
+end)
+
+-- Tapete infinito que acompanha o jogador
+local activeFloor = false
+local rainbowBlocks = {}
+local lastPos = nil
+local floorHeight = nil
+local distanceThreshold = 3 -- distancia entre blocos
+
+local function createBlock(position)
+	local block = Instance.new("Part")
+	block.Anchored = true
+	block.CanCollide = true
+	block.Size = Vector3.new(6,1,6)
+	block.Position = position
+	block.Color = getRainbowColor()
+	block.Parent = workspace
+	table.insert(rainbowBlocks, block)
+end
+
+local function updateRainbowFloor()
+	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+	local hrp = player.Character.HumanoidRootPart
+	local currentPos = Vector3.new(hrp.Position.X, floorHeight, hrp.Position.Z)
+
+	if not lastPos then
+		createBlock(currentPos)
+		lastPos = currentPos
+	else
+		if (Vector3.new(currentPos.X,0,currentPos.Z) - Vector3.new(lastPos.X,0,lastPos.Z)).Magnitude >= distanceThreshold then
+			createBlock(currentPos)
+			lastPos = currentPos
+		end
+	end
+
+	-- Atualiza a cor de todos os blocos existentes
+	for _, b in pairs(rainbowBlocks) do
+		b.Color = getRainbowColor()
+	end
+end
+
+rainbowButton.MouseButton1Click:Connect(function()
+	activeFloor = not activeFloor
+	if activeFloor then
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			floorHeight = player.Character.HumanoidRootPart.Position.Y - 3 -- altura inicial fixa
+			lastPos = nil
+			rainbowBlocks = {}
+		end
+	else
+		-- Remove todos os blocos ao desativar
+		for _, b in pairs(rainbowBlocks) do
+			if b then b:Destroy() end
+		end
+		rainbowBlocks = {}
+		lastPos = nil
+		floorHeight = nil
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if activeFloor then
+		updateRainbowFloor()
+	end
+end)
+
+-- Mostrar GUI interna
+mainButton.MouseButton1Click:Connect(function()
+	innerGui.Visible = not innerGui.Visible
+end)
