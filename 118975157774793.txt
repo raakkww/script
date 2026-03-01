@@ -1,0 +1,6 @@
+while wait(0.1) do
+local args = {
+	"DailyWarp"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("DailyRewardEvent"):FireServer(unpack(args))
+end
