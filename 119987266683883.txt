@@ -1,0 +1,38 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+-- Define the names of the folders you want to remove
+local targetNames = {
+    "Lavas",
+    "ObbyLavas",
+    "UnusedLavas"
+}
+
+-- Function to check if a name is in our target list
+local function isTarget(name)
+    for _, target in ipairs(targetNames) do
+        if name == target then
+            return true
+        end
+    end
+    return false
+end
+
+-- Counter to track how many folders were deleted
+local deletedCount = 0
+
+-- Scan the entire Workspace
+-- We use GetDescendants() to find folders even if they are inside other models/folders
+for _, object in pairs(workspace:GetDescendants()) do
+    if object:IsA("Folder") and isTarget(object.Name) then
+        -- Print to output so you know what is being removed
+        print("Deleting folder: " .. object:GetFullName())
+        
+        object:Destroy()
+        deletedCount = deletedCount + 1
+    end
+end
+
+print("------------------------------------------------")
+print("Operation Complete. Total folders deleted: " .. deletedCount)
+print("------------------------------------------------")
