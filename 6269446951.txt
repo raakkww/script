@@ -1,0 +1,342 @@
+-- Resty Hub Lite. Enjoy!!
+-- Made by Wonder
+-- Game: Smooth Slicing (PlaceId: 6269446951)
+
+-- ===== PlaceId Check =====
+if game.PlaceId ~= 6269446951 then
+    warn("This script is designed for Smooth Slicing only")
+    return
+end
+
+-- =========================
+-- Services & Setup
+-- =========================
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local lp = Players.LocalPlayer
+
+-- =========================
+-- UI
+-- =========================
+local function create(class, props)
+    local obj = Instance.new(class)
+    for k, v in pairs(props) do
+        if k ~= "Corner" then obj[k] = v end
+    end
+    if props.Corner then
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = props.Corner
+        corner.Parent = obj
+    end
+    return obj
+end
+
+local gui = create("ScreenGui", {
+    Name = "RestyHubLite",
+    Parent = game.CoreGui
+})
+
+local mainFrame = create("Frame", {
+    Parent = gui,
+    Size = UDim2.new(0, 280, 0, 320),
+    Position = UDim2.new(0.5, -140, 0.5, -160),
+    BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+    BorderSizePixel = 0,
+    Active = true,
+    Draggable = true,
+    Corner = UDim.new(0, 8)
+})
+
+-- Header
+local header = create("Frame", {
+    Parent = mainFrame,
+    Size = UDim2.new(1, 0, 0, 45),
+    BackgroundColor3 = Color3.fromRGB(35, 35, 35),
+    BorderSizePixel = 0,
+    Corner = UDim.new(0, 8)
+})
+
+create("TextLabel", {
+    Parent = header,
+    Size = UDim2.new(1, -20, 1, 0),
+    Position = UDim2.new(0, 10, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Font = Enum.Font.GothamBold,
+    TextSize = 18,
+    TextXAlignment = Enum.TextXAlignment.Left
+})
+
+create("TextLabel", {
+    Parent = header,
+    Size = UDim2.new(0, 100, 0, 16),
+    Position = UDim2.new(1, -110, 1, -20),
+    BackgroundTransparency = 1,
+    Text = "",
+    TextColor3 = Color3.fromRGB(0, 255, 128),
+    Font = Enum.Font.Gotham,
+    TextSize = 10,
+    TextXAlignment = Enum.TextXAlignment.Right
+})
+
+local closeBtn = create("TextButton", {
+    Parent = header,
+    Size = UDim2.new(0, 25, 0, 25),
+    Position = UDim2.new(1, -30, 0, 10),
+    BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+    Text = "×",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    Corner = UDim.new(0, 4)
+})
+
+-- Content
+local content = create("Frame", {
+    Parent = mainFrame,
+    Size = UDim2.new(1, -20, 1, -65),
+    Position = UDim2.new(0, 10, 0, 55),
+    BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+    BorderSizePixel = 0,
+    Corner = UDim.new(0, 6)
+})
+
+local scroll = create("ScrollingFrame", {
+    Parent = content,
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 3,
+    CanvasSize = UDim2.new(0, 0, 0, 0)
+})
+
+local list = Instance.new("UIListLayout")
+list.Parent = scroll
+list.Padding = UDim.new(0, 6)
+list.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- =========================
+-- Features Helps
+-- =========================
+local activeLoops = {}
+
+local function createButton(text, callback)
+    local btn = create("TextButton", {
+        Parent = scroll,
+        Size = UDim2.new(1, -12, 0, 35),
+        Position = UDim2.new(0, 6, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+        Text = text,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Font = Enum.Font.Gotham,
+        TextSize = 12,
+        Corner = UDim.new(0, 4)
+    })
+    btn.MouseButton1Click:Connect(callback)
+    scroll.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y + 10)
+    return btn
+end
+
+local function createToggle(text, callback)
+    local frame = create("Frame", {
+        Parent = scroll,
+        Size = UDim2.new(1, -12, 0, 35),
+        Position = UDim2.new(0, 6, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+        Corner = UDim.new(0, 4)
+    })
+    
+    create("TextLabel", {
+        Parent = frame,
+        Size = UDim2.new(0.6, 0, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Font = Enum.Font.Gotham,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    
+    local toggle = create("Frame", {
+        Parent = frame,
+        Size = UDim2.new(0, 36, 0, 18),
+        Position = UDim2.new(1, -46, 0.5, -9),
+        BackgroundColor3 = Color3.fromRGB(60, 60, 60),
+        Corner = UDim.new(0, 9)
+    })
+    
+    local circle = create("Frame", {
+        Parent = toggle,
+        Size = UDim2.new(0, 14, 0, 14),
+        Position = UDim2.new(0, 2, 0.5, -7),
+        BackgroundColor3 = Color3.fromRGB(150, 150, 150),
+        Corner = UDim.new(0.5, 0)
+    })
+    
+    local enabled = false
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            enabled = not enabled
+            if enabled then
+                toggle.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+                circle:TweenPosition(UDim2.new(1, -16, 0.5, -7), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+                circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            else
+                toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                circle:TweenPosition(UDim2.new(0, 2, 0.5, -7), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+                circle.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+            end
+            callback(enabled)
+        end
+    end)
+    
+    scroll.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y + 10)
+    return frame
+end
+
+-- =========================
+-- FEATURES
+-- =========================
+
+-- Visuals
+createToggle("Player ESP", function(enabled)
+    if enabled then
+        local function addEsp(player)
+            if player == lp then return end
+            local char = player.Character
+            if not char then return end
+            
+            if char:FindFirstChild("RestyESPHighlight") then return end
+            
+            local hl = Instance.new("Highlight")
+            hl.Name = "RestyESPHighlight"
+            hl.Adornee = char
+            hl.FillColor = Color3.fromRGB(255, 0, 0)
+            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+            hl.FillTransparency = 0.6
+            hl.OutlineTransparency = 0.3
+            hl.Parent = char
+        end
+        
+        for _, p in ipairs(Players:GetPlayers()) do addEsp(p) end
+        
+        activeLoops.espAdded = Players.PlayerAdded:Connect(function(p)
+            task.wait(1)
+            addEsp(p)
+        end)
+        
+        activeLoops.espChar = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            activeLoops.espChar[p] = p.CharacterAdded:Connect(function()
+                task.wait(0.5)
+                addEsp(p)
+            end)
+        end
+    else
+        if activeLoops.espAdded then activeLoops.espAdded:Disconnect() end
+        if activeLoops.espChar then
+            for _, conn in pairs(activeLoops.espChar) do conn:Disconnect() end
+        end
+        
+        for _, p in ipairs(Players:GetPlayers()) do
+            local char = p.Character
+            if char then
+                local hl = char:FindFirstChild("RestyESPHighlight")
+                if hl then hl:Destroy() end
+            end
+        end
+    end
+end)
+
+createToggle("Full Bright", function(enabled)
+    if enabled then
+        Lighting.Brightness = 8
+        Lighting.GlobalShadows = false
+    else
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = true
+    end
+end)
+
+-- Movement
+local speedValue = 16
+createButton("Speed Boost (Toggle)", function()
+    speedValue = (speedValue == 16) and 40 or 16
+    local char = lp.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = speedValue end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if speedValue > 16 then
+        local char = lp.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum and hum.WalkSpeed < speedValue then
+                hum.WalkSpeed = speedValue
+            end
+        end
+    end
+end)
+
+-- Utility
+createButton("Server Hop", function()
+    local Http = game:GetService("HttpService")
+    local success, result = pcall(function()
+        local Api = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=50"
+        local Raw = game:HttpGet(Api)
+        local Servers = Http:JSONDecode(Raw)
+        if Servers.data and #Servers.data > 0 then
+            local Server = Servers.data[math.random(1, math.min(#Servers.data, 5))]
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, Server.id, lp)
+        end
+    end)
+    if not success then
+        warn("Server hop failed: " .. tostring(result))
+    end
+end)
+
+createButton("Rejoin Server", function()
+    game:GetService("TeleportService"):Teleport(game.PlaceId, lp)
+end)
+
+createToggle("Anti-AFK", function(enabled)
+    if enabled then
+        local vu = game:GetService("VirtualUser")
+        activeLoops.afk = lp.Idled:Connect(function()
+            vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+        end)
+    else
+        if activeLoops.afk then activeLoops.afk:Disconnect() activeLoops.afk = nil end
+    end
+end)
+
+-- =========================
+-- Cleanup
+-- =========================
+closeBtn.MouseButton1Click:Connect(function()
+    for _, loop in pairs(activeLoops) do
+        if typeof(loop) == "RBXScriptConnection" then
+            loop:Disconnect()
+        end
+    end
+    gui:Destroy()
+end)
+
+-- Character respawn handler
+lp.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = speedValue
+    end
+end)
