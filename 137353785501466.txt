@@ -1,0 +1,30 @@
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local pGui = player:WaitForChild("PlayerGui")
+
+RunService.RenderStepped:Connect(function()
+    local gui = pGui:FindFirstChild("TimingBarGui")
+    if not gui or not gui.Enabled then return end
+
+    local bar = gui:FindFirstChild("Container") and gui.Container:FindFirstChild("Bar") and gui.Container.Bar:FindFirstChild("BarInner")
+    if not bar then return end
+
+    local cursor = bar:FindFirstChild("Cursor")
+    local zone = bar:FindFirstChild("SweetSpotZone")
+
+    if cursor and zone and cursor.Visible and zone.Visible then
+        local cursorCenter = cursor.AbsolutePosition.X + (cursor.AbsoluteSize.X / 2)
+        local zoneLeft = zone.AbsolutePosition.X
+        local zoneRight = zoneLeft + zone.AbsoluteSize.X
+
+        if cursorCenter >= zoneLeft and cursorCenter <= zoneRight then
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            task.wait(0.01)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            task.wait(0.5)
+        end
+    end
+end)
