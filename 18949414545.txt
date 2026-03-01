@@ -1,0 +1,132 @@
+- SERVICES
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local player = Players.LocalPlayer
+
+-- BLUR
+local blur = Instance.new("BlurEffect")
+blur.Size = 0
+blur.Parent = Lighting
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "FoodBandageGui"
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- FONCTION ANIMATION
+local function tween(obj, info, props)
+	TweenService:Create(obj, info, props):Play()
+end
+
+-- ===== FRAME PRINCIPAL =====
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.fromScale(0.32, 0.42)
+main.Position = UDim2.fromScale(0.34, 0.29)
+main.BackgroundColor3 = Color3.fromRGB(18,18,18)
+main.BackgroundTransparency = 1
+main.BorderSizePixel = 0
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0,16)
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(120,120,120)
+stroke.Thickness = 2
+
+-- TITRE
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.fromScale(1, 0.2)
+title.BackgroundTransparency = 1
+title.Text = "Food Bandage Teleport"
+title.Font = Enum.Font.GothamBlack
+title.TextScaled = true
+title.TextColor3 = Color3.fromRGB(255,255,255)
+
+-- FADE IN
+tween(blur, TweenInfo.new(.4), {Size = 18})
+tween(main, TweenInfo.new(.4), {BackgroundTransparency = 0})
+
+-- ===== POPUP =====
+local popup = Instance.new("Frame", gui)
+popup.Size = UDim2.fromScale(0.36, 0.26)
+popup.Position = UDim2.fromScale(0.32, 0.37)
+popup.BackgroundColor3 = Color3.fromRGB(20,20,20)
+popup.Visible = false
+popup.BackgroundTransparency = 1
+popup.BorderSizePixel = 0
+Instance.new("UICorner", popup).CornerRadius = UDim.new(0,16)
+Instance.new("UIStroke", popup).Color = Color3.fromRGB(150,150,150)
+
+-- TITRE POPUP
+local pTitle = title:Clone()
+pTitle.Parent = popup
+pTitle.Text = "Copy Link"
+
+-- LIEN
+local linkLabel = Instance.new("TextLabel", popup)
+linkLabel.Position = UDim2.fromScale(0.05, 0.22)
+linkLabel.Size = UDim2.fromScale(0.9, 0.35)
+linkLabel.BackgroundTransparency = 1
+linkLabel.TextWrapped = true
+linkLabel.TextScaled = true
+linkLabel.Font = Enum.Font.Gotham
+linkLabel.TextColor3 = Color3.fromRGB(220,220,220)
+
+-- BOUTON COPIE
+local copy = Instance.new("TextButton", popup)
+copy.Size = UDim2.fromScale(0.7, 0.25)
+copy.Position = UDim2.fromScale(0.15, 0.62)
+copy.Text = "Copier le lien"
+copy.Font = Enum.Font.GothamBold
+copy.TextScaled = true
+copy.BackgroundColor3 = Color3.fromRGB(35,35,35)
+copy.TextColor3 = Color3.fromRGB(255,255,255)
+Instance.new("UICorner", copy).CornerRadius = UDim.new(0,12)
+
+-- ===== LOGIQUE =====
+local currentLink = ""
+
+local function openPopup(link)
+	currentLink = link
+	main.Visible = false
+	popup.Visible = true
+	linkLabel.Text = link
+	tween(popup, TweenInfo.new(.3), {BackgroundTransparency = 0})
+end
+
+copy.MouseButton1Click:Connect(function()
+	if setclipboard then 
+		setclipboard(currentLink) 
+	end
+	tween(blur, TweenInfo.new(.3), {Size = 0})
+	task.wait(.25)
+	gui:Destroy()
+end)
+
+-- ===== BOUTONS =====
+local function createButton(txt, y, link)
+	local b = Instance.new("TextButton", main)
+	b.Size = UDim2.fromScale(0.8, 0.18)
+	b.Position = UDim2.fromScale(0.1, y)
+	b.Text = txt
+	b.Font = Enum.Font.GothamBold
+	b.TextScaled = true
+	b.BackgroundColor3 = Color3.fromRGB(30,30,30)
+	b.TextColor3 = Color3.fromRGB(255,255,255)
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 14)
+
+	b.MouseEnter:Connect(function()
+		tween(b, TweenInfo.new(.15), {BackgroundColor3 = Color3.fromRGB(45,45,45)})
+	end)
+	b.MouseLeave:Connect(function()
+		tween(b, TweenInfo.new(.15), {BackgroundColor3 = Color3.fromRGB(30,30,30)})
+	end)
+
+	b.MouseButton1Click:Connect(function()
+		openPopup(link)
+	end)
+end
+
+-- Updated Buttons and Links
+createButton("Lootlabs", 0.25, "https://lootdest.org/s?pFSDwHsg")
+createButton("Linkvertise", 0.48, "https://direct-link.net/3185914/j5WwYSXv7RaT")
+createButton("Work.ink", 0.71, "https://work.ink/2cps/food-bandage-teleport")
