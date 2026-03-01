@@ -1,0 +1,80 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local itemsFolder = workspace:WaitForChild("Items")
+
+local activeESPs = {}
+
+local function getModelColor(model)
+	local part = model:IsA("BasePart") and model or model:FindFirstChildWhichIsA("BasePart", true)
+	return part and part.Color or Color3.fromRGB(255, 255, 255)
+end
+
+local function createESP(item)
+	if not item:IsA("Model") and not item:IsA("BasePart") then return end
+	if item:FindFirstChild("ItemESP") then return end
+
+	local itemColor = getModelColor(item)
+	local primaryPart = item:IsA("Model") and (item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")) or item
+	
+	if not primaryPart then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ItemESP"
+	highlight.Adornee = item
+	highlight.FillColor = itemColor
+	highlight.OutlineColor = itemColor
+	highlight.FillTransparency = 0.6
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = item
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ItemNametag"
+	billboard.Adornee = primaryPart
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 600
+	billboard.Size = UDim2.new(0, 100, 0, 25)
+	billboard.StudsOffset = Vector3.new(0, 2, 0)
+	
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = item.Name
+	label.TextColor3 = itemColor
+	label.TextStrokeTransparency = 0
+	label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.Parent = billboard
+
+	billboard.Parent = item
+	activeESPs[item] = {gui = billboard, part = primaryPart}
+end
+
+local function updateSizes()
+	local camPos = camera.CFrame.Position
+	for item, data in pairs(activeESPs) do
+		if not item.Parent then
+			activeESPs[item] = nil
+			continue
+		end
+		
+		local distance = (camPos - data.part.Position).Magnitude
+		local scale = math.clamp(distance / 50, 0.5, 3)
+		data.gui.Size = UDim2.new(scale * 2, 0, scale * 0.5, 0)
+	end
+end
+
+local function setup()
+	for _, item in ipairs(itemsFolder:GetChildren()) do
+		createESP(item)
+	end
+	
+	itemsFolder.ChildAdded:Connect(createESP)
+	RunService.Heartbeat:Connect(updateSizes)
+end
+
+setup()
