@@ -1,0 +1,87 @@
+-- Locate the BodyParts folder in the Workspace
+local bodyPartsFolder = workspace:WaitForChild("BodyParts")
+
+-- Configuration
+local ESP_FILL_COLOR = Color3.fromRGB(255, 0, 0)
+local ESP_OUTLINE_COLOR = Color3.fromRGB(255, 255, 255)
+local TEXT_COLOR = Color3.fromRGB(255, 255, 255)
+local TEXT_SIZE = 16 -- Fixed size in pixels
+
+local function applyESP(object)
+	if object:IsA("Model") or object:IsA("BasePart") then
+		
+		if object:FindFirstChild("ESPHighlight") then return end
+
+		-- 1. Create the Highlight
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "ESPHighlight"
+		highlight.Adornee = object
+		highlight.FillColor = ESP_FILL_COLOR
+		highlight.OutlineColor = ESP_OUTLINE_COLOR
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.Parent = object
+
+		-- 2. Create the BillboardGui (Fixed Size)
+		local billboard = Instance.new("BillboardGui")
+		billboard.Name = "ESPText"
+		billboard.Adornee = object
+		
+		-- Setting Scale to 0 and Offset to specific pixels (200x50) 
+		-- keeps it the same size on your screen no matter the distance.
+		billboard.Size = UDim2.new(0, 200, 0, 50) 
+		
+		billboard.ExtentsOffset = Vector3.new(0, 2, 0)
+		billboard.AlwaysOnTop = true
+		
+		local textLabel = Instance.new("TextLabel")
+		textLabel.Size = UDim2.new(1, 0, 1, 0)
+		textLabel.BackgroundTransparency = 1
+		textLabel.TextColor3 = TEXT_COLOR
+		textLabel.TextStrokeTransparency = 0
+		textLabel.Font = Enum.Font.GothamBold
+		
+		-- FIX: Disable TextScaled and set a fixed TextSize
+		textLabel.TextScaled = false
+		textLabel.TextSize = TEXT_SIZE
+		
+		textLabel.Text = "Searching..."
+		textLabel.Parent = billboard
+		billboard.Parent = object
+
+print("if someone skidded this, the og script is by IMP_ or rfalconn on rblx")
+
+		-- 3. Update the value every 1 second
+		task.spawn(function()
+			while object and object.Parent do
+				local foundValue = nil
+				for _, child in ipairs(object:GetChildren()) do
+					if child:IsA("ValueBase") then
+						foundValue = child
+						break
+					end
+				end
+
+				if foundValue then
+					-- Displays the Name of the value and its actual Value (data)
+					textLabel.Text = foundValue.Name .. ": " .. tostring(foundValue.Value)
+					textLabel.Visible = true
+				else
+					textLabel.Visible = false
+				end
+				task.wait(1)
+			end
+		end)
+	end
+end
+
+-- Initialization
+for _, item in ipairs(bodyPartsFolder:GetChildren()) do
+	applyESP(item)
+end
+
+bodyPartsFolder.ChildAdded:Connect(function(newItem)
+	task.wait() 
+	applyESP(newItem)
+end)
+
+print("Thanks for using my script - IMP_ on scriptblox - rfalconnn on roblox")
