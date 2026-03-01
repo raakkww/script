@@ -1,0 +1,496 @@
+local OldGui = game.CoreGui:FindFirstChild("LuvHub X")
+if OldGui then OldGui:Destroy() end
+
+local IslandList = {
+    {Name = "Lobby", Pos = Vector3.new(381, 8, -871)},
+    {Name = "Lab Totem", Pos = Vector3.new(341, 10, 81)},
+    {Name = "Holo Vortex", Pos = Vector3.new(-870, 7, -290)},
+    {Name = "Arctic Island", Pos = Vector3.new(1201, 5, -651)},
+    {Name = "Fairy Island", Pos = Vector3.new(567, 7, 1098)},
+    {Name = "Kraken Island", Pos = Vector3.new(-581, 11, 893)},
+    {Name = "Shark Island", Pos = Vector3.new(-552, 9, -1157)},
+    {Name = "Hades Island", Pos = Vector3.new(1316.3, 6.8, 639.8)},
+}
+
+-- [[ Global Variables ]] --
+getgenv().FarmActive = false
+getgenv().FishDelay = 0.5 
+getgenv().CustomWeight = 480 
+getgenv().WeightActive = false 
+getgenv().CustomLuck = 25500 
+getgenv().LuckActive = false 
+getgenv().SavedPosition = nil
+getgenv().SpectateIndex = 1
+getgenv().TargetMapPos = nil
+getgenv().TargetPlayer = nil
+getgenv().WSActive = false
+getgenv().WSValue = 16
+getgenv().JPActive = false
+getgenv().JPValue = 50
+getgenv().AntiAFK = false
+
+local CurrentSelectBtn = nil 
+local IsSpectatingTarget = false
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- [[ Metatable Hooking ]] --
+local mt = getrawmetatable(game)
+local old_namecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+
+    if method == "InvokeServer" and self.Name == "ChooseFishRF" and getgenv().LuckActive then
+        if args[1] and type(args[1]) == "table" then args[1]["baseLuck"] = getgenv().CustomLuck end
+        return old_namecall(self, unpack(args))
+    end
+
+    if method == "FireServer" and self.Name == "GiveFish" and getgenv().WeightActive then
+        if getgenv().CustomWeight then
+            args[2] = getgenv().CustomWeight
+            args[3] = getgenv().CustomWeight * 1.5 
+        end
+        return old_namecall(self, unpack(args))
+    end
+
+    return old_namecall(self, ...)
+end)
+setreadonly(mt, true)
+
+local Remotes = ReplicatedStorage:WaitForChild("RemoteEvents")
+local GiveFishRemote = ReplicatedStorage:WaitForChild("GiveFish")
+local FishingSync = Remotes:WaitForChild("FishingSync")
+local ChooseFishRF = ReplicatedStorage:WaitForChild("RemoteFunction"):WaitForChild("ChooseFishRF")
+
+-- [[ UI Framework ]] --
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "LuvHub X"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.ResetOnSpawn = false
+
+local function AddGradient(Parent)
+    local UIGradient = Instance.new("UIGradient")
+    UIGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(10, 10, 20)), 
+        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 60, 110))
+    }
+    UIGradient.Rotation = 45
+    UIGradient.Parent = Parent
+end
+
+local Colors = {
+    Sidebar = Color3.fromRGB(12, 12, 18),
+    Accent = Color3.fromRGB(0, 200, 255),
+    Text = Color3.fromRGB(240, 240, 240),
+    SubText = Color3.fromRGB(130, 130, 150),
+    ItemBg = Color3.fromRGB(25, 30, 40)
+}
+
+local ToggleBtn = Instance.new("ImageButton")
+ToggleBtn.Parent = ScreenGui
+ToggleBtn.BackgroundColor3 = Colors.Sidebar
+ToggleBtn.Position = UDim2.new(0.02, 0, 0.4, 0)
+ToggleBtn.Size = UDim2.new(0, 40, 0, 40)
+ToggleBtn.Image = "rbxassetid://81111630423385"
+ToggleBtn.Visible = false
+ToggleBtn.Active = true
+ToggleBtn.Draggable = true
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", ToggleBtn).Color = Colors.Accent
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+local TargetSize = UDim2.new(0, 380, 0, 240)
+MainFrame.Size = UDim2.new(0, 0, 0, 0)
+MainFrame.ClipsDescendants = false 
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+AddGradient(MainFrame)
+
+-- [[ List Handler ]] --
+local ListFrame = Instance.new("Frame")
+ListFrame.Parent = MainFrame 
+ListFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ListFrame.Position = UDim2.new(1, 5, 0, 0) 
+ListFrame.Size = UDim2.new(0, 110, 1, 0) 
+ListFrame.BorderSizePixel = 0
+ListFrame.Visible = false
+Instance.new("UICorner", ListFrame).CornerRadius = UDim.new(0, 10)
+AddGradient(ListFrame)
+
+local ListTitle = Instance.new("TextLabel", ListFrame)
+ListTitle.Text = "SELECT"
+ListTitle.Size = UDim2.new(0.6, 0, 0, 25)
+ListTitle.Position = UDim2.new(0.05, 0, 0, 0)
+ListTitle.BackgroundTransparency = 1
+ListTitle.TextColor3 = Colors.Accent
+ListTitle.Font = Enum.Font.GothamBlack
+ListTitle.TextSize = 10
+ListTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local ListClose = Instance.new("TextButton", ListFrame)
+ListClose.Text = "X"
+ListClose.TextColor3 = Color3.fromRGB(255, 80, 80)
+ListClose.BackgroundTransparency = 1
+ListClose.Font = Enum.Font.GothamBold
+ListClose.TextSize = 10
+ListClose.Size = UDim2.new(0, 20, 0, 25)
+ListClose.Position = UDim2.new(0.82, 0, 0, 0)
+
+local ListRefresh = Instance.new("TextButton", ListFrame)
+ListRefresh.BackgroundTransparency = 1
+ListRefresh.Text = "🔄"
+ListRefresh.TextColor3 = Colors.Text
+ListRefresh.Font = Enum.Font.Gotham
+ListRefresh.TextSize = 14
+ListRefresh.Size = UDim2.new(0, 20, 0, 25)
+ListRefresh.Position = UDim2.new(0.65, 0, 0, 0)
+ListRefresh.Visible = false
+
+local ListScroll = Instance.new("ScrollingFrame", ListFrame)
+ListScroll.Size = UDim2.new(1, -6, 1, -30)
+ListScroll.Position = UDim2.new(0, 3, 0, 25)
+ListScroll.BackgroundTransparency = 1
+ListScroll.ScrollBarThickness = 3
+ListScroll.AutomaticCanvasSize = Enum.AutomaticSize.None 
+ListScroll.CanvasSize = UDim2.new(0,0,0,0)
+local ListLayout = Instance.new("UIListLayout", ListScroll)
+ListLayout.Padding = UDim.new(0, 3)
+
+ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ListScroll.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 20)
+end)
+
+local function UpdateList(Type, ButtonToUpdate)
+    CurrentSelectBtn = ButtonToUpdate
+    for _, child in pairs(ListScroll:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
+    ListFrame.Visible = true
+    ListTitle.Text = (Type == "Map") and "MAPS" or "PLAYERS"
+    ListRefresh.Visible = (Type == "Player")
+    
+    local DataList = (Type == "Map") and IslandList or Players:GetPlayers()
+    for _, Item in pairs(DataList) do
+        if Type == "Player" and Item == LocalPlayer then continue end
+        local Name = (Type == "Map") and Item.Name or Item.Name
+        local Btn = Instance.new("TextButton", ListScroll)
+        Btn.Size = UDim2.new(1, 0, 0, 20)
+        Btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        Btn.BackgroundTransparency = 0.6
+        Btn.Text = string.sub(Name, 1, 12)
+        Btn.TextColor3 = Colors.Text
+        Btn.Font = Enum.Font.GothamBold
+        Btn.TextSize = 8
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+        Btn.MouseButton1Click:Connect(function()
+            if Type == "Map" then
+                getgenv().TargetMapPos = Item.Pos
+                ButtonToUpdate.Text = "Map: "..Item.Name
+            else
+                getgenv().TargetPlayer = Item
+                IsSpectatingTarget = false 
+                ButtonToUpdate.Text = "Plr: "..string.sub(Item.Name, 1, 6)
+            end
+            ListFrame.Visible = false
+        end)
+    end
+end
+
+ListClose.MouseButton1Click:Connect(function() ListFrame.Visible = false end)
+ListRefresh.MouseButton1Click:Connect(function() if CurrentSelectBtn then UpdateList("Player", CurrentSelectBtn) end end)
+
+-- [[ Header Elements ]] --
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(0.92, 0, 0, 0)
+
+local MinBtn = Instance.new("TextButton", MainFrame)
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Colors.SubText
+MinBtn.BackgroundTransparency = 1
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.Size = UDim2.new(0, 25, 0, 25)
+MinBtn.Position = UDim2.new(0.84, 0, 0, 0)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Text = ""
+Title.TextColor3 = Colors.Accent
+Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 11
+Title.Position = UDim2.new(0.05, 0, 0, 8)
+Title.Size = UDim2.new(0.4, 0, 0, 15)
+Title.BackgroundTransparency = 1
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local Body = Instance.new("Frame", MainFrame)
+Body.Size = UDim2.new(1, 0, 1, 0)
+Body.BackgroundTransparency = 1
+Body.ClipsDescendants = true 
+Instance.new("UICorner", Body).CornerRadius = UDim.new(0, 10)
+
+local Sidebar = Instance.new("Frame", Body)
+Sidebar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Sidebar.BackgroundTransparency = 0.5
+Sidebar.Position = UDim2.new(0, 0, 0, 30)
+Sidebar.Size = UDim2.new(0.28, 0, 1, -30)
+Sidebar.BorderSizePixel = 0
+local SideList = Instance.new("UIListLayout", Sidebar)
+SideList.Padding = UDim.new(0, 0)
+
+local Content = Instance.new("Frame", Body)
+Content.BackgroundTransparency = 1
+Content.Position = UDim2.new(0.28, 0, 0, 30)
+Content.Size = UDim2.new(0.72, 0, 1, -30)
+
+local Tabs = {}
+local PageCounters = {}
+
+-- [[ Tab & Section Creator ]] --
+local function CreateTab(Name, EmojiIcon, PageName)
+    local Btn = Instance.new("TextButton", Sidebar)
+    Btn.BackgroundTransparency = 1
+    Btn.Size = UDim2.new(1, 0, 0, 35)
+    Btn.Text = ""
+    
+    local Icon = Instance.new("TextLabel", Btn)
+    Icon.Text = EmojiIcon
+    Icon.BackgroundTransparency = 1
+    Icon.Size = UDim2.new(0, 30, 1, 0)
+    Icon.TextColor3 = Colors.SubText
+    Icon.TextSize = 14
+    
+    local Title = Instance.new("TextLabel", Btn)
+    Title.Text = Name
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 9
+    Title.TextColor3 = Colors.SubText
+    Title.BackgroundTransparency = 1
+    Title.Size = UDim2.new(0.6, 0, 1, 0)
+    Title.Position = UDim2.new(0, 32, 0, 0)
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local Page = Instance.new("ScrollingFrame", Content)
+    Page.Name = PageName
+    Page.Size = UDim2.new(1, 0, 1, 0)
+    Page.BackgroundTransparency = 1
+    Page.Visible = false
+    Page.ScrollBarThickness = 4
+    Page.CanvasSize = UDim2.new(0, 0, 0, 0) 
+    
+    local PList = Instance.new("UIListLayout", Page)
+    PList.Padding = UDim.new(0, 4)
+    PList.SortOrder = Enum.SortOrder.LayoutOrder
+    Instance.new("UIPadding", Page).PaddingLeft = UDim.new(0, 5)
+    
+    PList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Page.CanvasSize = UDim2.new(0, 0, 0, PList.AbsoluteContentSize.Y + 50)
+    end)
+    
+    PageCounters[Page] = 0
+    Btn.MouseButton1Click:Connect(function()
+        for _, t in pairs(Tabs) do t.Icon.TextColor3=Colors.SubText; t.Title.TextColor3=Colors.SubText; t.Page.Visible=false end
+        Icon.TextColor3 = Colors.Accent; Title.TextColor3 = Colors.Text; Page.Visible = true
+    end)
+    table.insert(Tabs, {Icon = Icon, Title = Title, Page = Page})
+    return Page
+end
+
+local function CreateSection(Page, LabelText, Type, Callback)
+    PageCounters[Page] = PageCounters[Page] + 1
+    local CurrentOrder = PageCounters[Page]
+
+    if Type == "Label" then
+        local Lbl = Instance.new("TextLabel", Page)
+        Lbl.Size = UDim2.new(0.96, 0, 0, 15); Lbl.BackgroundTransparency = 1; Lbl.Text = LabelText; Lbl.TextColor3 = Color3.fromRGB(180, 180, 180); Lbl.Font = Enum.Font.GothamBold; Lbl.TextSize = 8; Lbl.TextXAlignment = Enum.TextXAlignment.Left
+        Lbl.LayoutOrder = CurrentOrder; return
+    end
+
+    local Section = Instance.new("Frame", Page)
+    Section.LayoutOrder = CurrentOrder; Section.BackgroundColor3 = Color3.fromRGB(0, 0, 0); Section.BackgroundTransparency = 0.6; Section.Size = UDim2.new(0.96, 0, 0, 28)
+    Instance.new("UICorner", Section).CornerRadius = UDim.new(0, 4)
+    local Title = Instance.new("TextLabel", Section)
+    Title.Text = LabelText; Title.Font = Enum.Font.GothamBold; Title.TextSize = 9; Title.TextColor3 = Colors.Text; Title.Size = UDim2.new(0.55, 0, 1, 0); Title.Position = UDim2.new(0.05, 0, 0, 0); Title.BackgroundTransparency = 1; Title.TextXAlignment = Enum.TextXAlignment.Left
+    
+    if Type == "Toggle" then
+        local TogBtn = Instance.new("TextButton", Section)
+        TogBtn.Size = UDim2.new(0, 28, 0, 14); TogBtn.Position = UDim2.new(1, -35, 0.5, -7); TogBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); TogBtn.Text = ""
+        Instance.new("UICorner", TogBtn).CornerRadius = UDim.new(1, 0)
+        local On = false
+        TogBtn.MouseButton1Click:Connect(function() On = not On; TogBtn.BackgroundColor3 = On and Colors.Accent or Color3.fromRGB(60, 60, 60); Callback(On) end)
+    elseif Type == "Input" then
+        local Box = Instance.new("TextBox", Section)
+        Box.Size = UDim2.new(0, 50, 0, 16); Box.Position = UDim2.new(1, -58, 0.5, -8); Box.BackgroundColor3 = Color3.fromRGB(20, 20, 20); Box.Text = ""; Box.PlaceholderText = "Set"; Box.TextColor3 = Colors.Accent; Box.Font = Enum.Font.Gotham; Box.TextSize = 8
+        Instance.new("UICorner", Box).CornerRadius = UDim.new(0, 4)
+        Box.FocusLost:Connect(function() Callback(Box.Text) end)
+    elseif Type == "Button" then
+        local Btn = Instance.new("TextButton", Section)
+        Btn.Size = UDim2.new(0, 50, 0, 16); Btn.Position = UDim2.new(1, -58, 0.5, -8); Btn.BackgroundColor3 = Colors.Accent; Btn.Text = "Click"; Btn.Font = Enum.Font.GothamBold; Btn.TextSize = 8; Btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+        Btn.MouseButton1Click:Connect(function() Callback(Btn) end)
+    elseif Type == "Selector" then
+        local SelBtn = Instance.new("TextButton", Section)
+        SelBtn.Size = UDim2.new(0, 80, 0, 16); SelBtn.Position = UDim2.new(1, -90, 0.5, -8); SelBtn.BackgroundColor3 = Color3.fromRGB(40, 45, 55); SelBtn.Text = "Select >"; SelBtn.TextColor3 = Colors.Accent; SelBtn.Font = Enum.Font.GothamBold; SelBtn.TextSize = 8
+        Instance.new("UICorner", SelBtn).CornerRadius = UDim.new(0, 4)
+        SelBtn.MouseButton1Click:Connect(function() Callback(SelBtn) end)
+    end
+end
+
+-- [[ TABS INITIALIZATION ]] --
+
+-- 1. Info Tab
+local PageInfo = CreateTab("Info", "❗", "Info") 
+CreateSection(PageInfo, "ANNOUNCEMENT:", "Label")
+CreateSection(PageInfo, "Jangan gunakan Auto Farm saat God Luck aktif! Resiko banned tinggi.", "Label")
+
+-- 2. Fishing Tab
+local PageFish = CreateTab("Fishing", "🎣", "Fish")
+CreateSection(PageFish, "--- MAIN FEATURES ---", "Label")
+CreateSection(PageFish, "Auto Farm", "Toggle", function(Val) getgenv().FarmActive = Val; if Val then StartFarming() end end)
+CreateSection(PageFish, "Delay Speed", "Input", function(Val) local n = tonumber(Val); if n then getgenv().FishDelay = n end end)
+CreateSection(PageFish, "--- LUCK MODIFIER ---", "Label")
+CreateSection(PageFish, "God Luck", "Toggle", function(Val) getgenv().LuckActive = Val end)
+CreateSection(PageFish, "Luck Amount", "Input", function(Val) local n=tonumber(Val); if n then getgenv().CustomLuck=n end end)
+CreateSection(PageFish, "--- WEIGHT MODIFIER ---", "Label")
+CreateSection(PageFish, "God Weight", "Toggle", function(Val) getgenv().WeightActive = Val end)
+CreateSection(PageFish, "Weight (KG)", "Input", function(Val) local n=tonumber(Val); if n then getgenv().CustomWeight=n end end)
+local StatusLbl = Instance.new("TextLabel", PageFish); StatusLbl.LayoutOrder=100; StatusLbl.Size = UDim2.new(1, 0, 0, 20); StatusLbl.BackgroundTransparency = 1; StatusLbl.Text = "Idle"; StatusLbl.TextColor3 = Colors.SubText; StatusLbl.Font = Enum.Font.Gotham; StatusLbl.TextSize = 9
+
+-- 3. Automatically Tab (New Feature Included)
+local PageAuto = CreateTab("Automatically", "⚙️", "Auto")
+CreateSection(PageAuto, "--- POSITION MANAGER ---", "Label")
+CreateSection(PageAuto, "Save Position", "Button", function(Btn) if LocalPlayer.Character then getgenv().SavedPosition = LocalPlayer.Character.HumanoidRootPart.CFrame; Btn.Text="Saved!"; task.wait(1); Btn.Text="Click" end end)
+CreateSection(PageAuto, "Load Position", "Button", function(Btn) if getgenv().SavedPosition then LocalPlayer.Character.HumanoidRootPart.CFrame = getgenv().SavedPosition else Btn.Text="No Data"; task.wait(1); Btn.Text="Click" end end)
+CreateSection(PageAuto, "Reset Saved", "Button", function(Btn) getgenv().SavedPosition = nil; Btn.Text="Reset!"; task.wait(1); Btn.Text="Click" end)
+
+-- INTEGRATED: Sell All Fish Feature
+CreateSection(PageAuto, "--- MERCHANT ---", "Label")
+CreateSection(PageAuto, "Sell All Fish", "Button", function(Btn)
+    local args = {[1] = true, [2] = ""}
+    local SellRemote = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):FindFirstChild("FishSellAll")
+    if SellRemote then
+        SellRemote:FireServer(unpack(args))
+        Btn.Text = "Sold! ✅"
+        task.wait(1)
+        Btn.Text = "Click"
+    else
+        Btn.Text = "Error!"
+        task.wait(1); Btn.Text = "Click"
+    end
+end)
+
+-- 4. Teleport Tab
+local PageTp = CreateTab("Teleport", "🏝️", "Tp")
+CreateSection(PageTp, "--- MAP TELEPORT ---", "Label")
+CreateSection(PageTp, "Map List", "Selector", function(Btn) UpdateList("Map", Btn) end)
+CreateSection(PageTp, "Teleport to Map", "Button", function(Btn) if getgenv().TargetMapPos and LocalPlayer.Character then LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(getgenv().TargetMapPos + Vector3.new(0, 5, 0)) else Btn.Text="Select 1st"; task.wait(1); Btn.Text="Click" end end)
+CreateSection(PageTp, "--- PLAYER TELEPORT ---", "Label")
+CreateSection(PageTp, "Player List", "Selector", function(Btn) UpdateList("Player", Btn) end)
+CreateSection(PageTp, "Action Button", "Button", function(Btn)
+    local Target = getgenv().TargetPlayer
+    if not Target then Btn.Text = "Select 1st"; task.wait(1); Btn.Text = "Click"; return end
+    if not IsSpectatingTarget then
+        Camera.CameraType = Enum.CameraType.Custom
+        local CamSub = Target.Character and (Target.Character:FindFirstChild("Humanoid") or Target.Character:FindFirstChild("Head"))
+        if CamSub then Camera.CameraSubject = CamSub; IsSpectatingTarget = true; Btn.Text = "Teleport Now" else Btn.Text = "Far Away" end
+    else
+        if LocalPlayer.Character and Target.Character then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = Target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+            Btn.Text = "Success!"; task.wait(1); Btn.Text = "Teleport Now"
+        end
+    end
+end)
+
+-- 5. Misc Tab
+local PageMisc = CreateTab("Misc", "🧩", "Misc")
+CreateSection(PageMisc, "Enable WalkSpeed", "Toggle", function(Val) getgenv().WSActive = Val end)
+CreateSection(PageMisc, "Speed Amount", "Input", function(Val) local n = tonumber(Val); if n then getgenv().WSValue = n end end)
+CreateSection(PageMisc, "Enable JumpPower", "Toggle", function(Val) getgenv().JPActive = Val end)
+CreateSection(PageMisc, "Jump Amount", "Input", function(Val) local n = tonumber(Val); if n then getgenv().JPValue = n end end)
+CreateSection(PageMisc, "Anti AFK", "Toggle", function(Val) getgenv().AntiAFK = Val end)
+
+-- 6. Settings Tab
+local PageSet = CreateTab("Settings", "🔧", "Set")
+CreateSection(PageSet, "Unload GUI", "Button", function() ScreenGui:Destroy() end)
+CreateSection(PageSet, "Anti Lag", "Button", function(Btn)
+    for _,v in pairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") and not v.Parent:IsA("Model") then v.Material = Enum.Material.SmoothPlastic end
+        if v:IsA("Texture") or v:IsA("Decal") then v:Destroy() end
+    end
+    Btn.Text="Done!"; task.wait(1); Btn.Text="Click"
+end)
+
+-- [[ System Loops ]] --
+LocalPlayer.Idled:Connect(function() 
+    if getgenv().AntiAFK then 
+        game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame) 
+    end 
+end)
+
+RunService.Stepped:Connect(function()
+    if getgenv().WSActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.WalkSpeed = getgenv().WSValue end
+    if getgenv().JPActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid.JumpPower = getgenv().JPValue end
+end)
+
+-- [[ Farming Logic ]] --
+function StartFarming()
+    task.spawn(function()
+        while getgenv().FarmActive do
+            local Char = LocalPlayer.Character
+            if not Char then task.wait(1) continue end
+            local Rod = LocalPlayer.Backpack:FindFirstChildWhichIsA("Tool") or Char:FindFirstChildWhichIsA("Tool")
+            if Rod and Rod.Parent ~= Char then Char.Humanoid:EquipTool(Rod) end
+            
+            local Root = Char:FindFirstChild("HumanoidRootPart")
+            if not Root then task.wait(1) continue end
+            
+            local CastPos = Root.Position + (Root.CFrame.LookVector * 10) + Vector3.new(0, -2, 0)
+            StatusLbl.Text = "Casting.."
+            FishingSync:FireServer("StartFishing", CastPos, 3)
+            task.wait(0.3)
+            
+            local LuckVal = getgenv().LuckActive and getgenv().CustomLuck or 25500
+            local Success, Result = pcall(function() return ChooseFishRF:InvokeServer({["baseLuck"] = LuckVal, ["targetPos"] = CastPos}) end)
+            
+            local RealToken = nil
+            if Success then
+                if type(Result) == "string" then RealToken = Result
+                elseif type(Result) == "table" then
+                    for k, v in pairs(Result) do if type(v) == "string" and #v > 20 then RealToken = v; break end end
+                end
+            end
+            
+            if RealToken then
+                StatusLbl.Text = "Catching.."
+                local FinalWeight = getgenv().WeightActive and getgenv().CustomWeight or math.random(50, 500)
+                GiveFishRemote:FireServer(RealToken, FinalWeight, FinalWeight, "Ocean")
+            end
+            
+            task.wait(0.2); FishingSync:FireServer("EndFishing"); task.wait(getgenv().FishDelay)
+        end
+        StatusLbl.Text = "Idle"
+    end)
+end
+
+-- [[ UI Control ]] --
+MainFrame:TweenSize(TargetSize, "Out", "Back", 0.5, true)
+CloseBtn.MouseButton1Click:Connect(function() getgenv().FarmActive=false; ScreenGui:Destroy() end)
+MinBtn.MouseButton1Click:Connect(function() MainFrame:TweenSize(UDim2.new(0,0,0,0), "In", "Back", 0.3, true, function() MainFrame.Visible=false; ToggleBtn.Visible=true end) end)
+ToggleBtn.MouseButton1Click:Connect(function() ToggleBtn.Visible=false; MainFrame.Visible=true; MainFrame:TweenSize(TargetSize, "Out", "Back", 0.4, true) end)
+Tabs[1].Icon.TextColor3 = Colors.Accent; Tabs[1].Title.TextColor3 = Colors.Text; Tabs[1].Page.Visible = true
