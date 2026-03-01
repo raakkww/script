@@ -1,0 +1,11 @@
+local ents = game.Workspace:FindFirstChild("Entities") or game:WaitForChild("Workspace"):WaitForChild("Entities")
+
+while true do
+    wait()
+    ent = ents:GetChildren()
+    for i=1,#ent do
+        if ent[i].Name ~= "Studio" and not ent[i]:FindFirstChild("Highlight") then
+            Instance.new("Highlight").Parent = ent[i]
+        end
+    end
+end
