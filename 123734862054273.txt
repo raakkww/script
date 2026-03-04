@@ -1,0 +1,166 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/theneutral0ne/wally-modified/refs/heads/main/wally-modified.lua"))()
+
+local PlayersService = game:GetService("Players")
+local ReplicatedStorageService = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = PlayersService.LocalPlayer
+local RemoteFolder = ReplicatedStorageService:WaitForChild("Remotes")
+
+local RequestRockDamageRemote = RemoteFolder:WaitForChild("RequestRockDamage")
+local BonkClickRemote = RemoteFolder:FindFirstChild("BonkClick")
+local MineOreRemote = RemoteFolder:FindFirstChild("MineOre")
+local PrestigeRemote = RemoteFolder:FindFirstChild("PrestigeRemote")
+local RequestReforgeRemote = RemoteFolder:FindFirstChild("RequestReforge")
+
+while LocalPlayer:GetAttribute("DataLoaded") ~= true do
+	task.wait()
+end
+
+local CurrentGeneration = LocalPlayer:GetAttribute("ServerResetTick") or 0
+local LastResetClock = 0
+
+LocalPlayer:GetAttributeChangedSignal("ServerResetTick"):Connect(function()
+	CurrentGeneration = LocalPlayer:GetAttribute("ServerResetTick") or CurrentGeneration
+	LastResetClock = os.clock()
+end)
+
+local Settings = {
+	AutoFarmEnabled = false,
+	SendInterval = 0.10,
+	UseResetGuard = true,
+	AutoBonk = true,
+	AutoOre = true,
+	AutoPrestige = true,
+	AutoReforge = true,
+}
+
+local function CreatePositionValue(PositionVector)
+	if vector and vector.create then
+		return vector.create(PositionVector.X, PositionVector.Y, PositionVector.Z)
+	end
+	return PositionVector
+end
+
+local function FireRemoteIfEnabled(RemoteInstance, IsEnabled)
+	if IsEnabled and RemoteInstance then
+		RemoteInstance:FireServer()
+	end
+end
+
+local function RunFarmTick()
+	if Settings.UseResetGuard and (os.clock() - LastResetClock < 0.5) then
+		return
+	end
+
+	FireRemoteIfEnabled(BonkClickRemote, Settings.AutoBonk)
+	FireRemoteIfEnabled(MineOreRemote, Settings.AutoOre)
+	FireRemoteIfEnabled(PrestigeRemote, Settings.AutoPrestige)
+	FireRemoteIfEnabled(RequestReforgeRemote, Settings.AutoReforge)
+
+	for _, Object in ipairs(workspace:GetChildren()) do
+		if Object:IsA("BasePart") and string.find(Object.Name, "Rock", 1, true) then
+			local RockIdentifier = Object:GetAttribute("RockId")
+			if RockIdentifier ~= nil then
+				RequestRockDamageRemote:FireServer({
+					Gen = CurrentGeneration,
+					Pos = CreatePositionValue(Object.Position),
+					Rocks = { RockIdentifier }
+				})
+			end
+		end
+	end
+end
+
+local Window = Library:CreateWindow("Rock Farm", {
+	topcolor = Color3.fromRGB(28, 28, 28),
+	bgcolor = Color3.fromRGB(35, 35, 35),
+	btncolor = Color3.fromRGB(24, 24, 24),
+	dropcolor = Color3.fromRGB(24, 24, 24),
+	sectncolor = Color3.fromRGB(22, 22, 22),
+	bordercolor = Color3.fromRGB(60, 60, 60),
+	underlinecolor = Color3.fromRGB(0, 170, 255),
+	font = Enum.Font.SourceSans,
+	titlefont = Enum.Font.SourceSansSemibold,
+	fontsize = 16,
+	titlesize = 17,
+})
+
+Window:Section("Main")
+
+local AutoFarmToggle = Window:Toggle("Auto Farm", { flag = "AutoFarm", default = false }, function(IsEnabled)
+	Settings.AutoFarmEnabled = IsEnabled
+end)
+
+local IntervalSlider
+local IsUpdatingIntervalSlider = false
+
+IntervalSlider = Window:Slider("Interval", {
+	flag = "SendInterval",
+	min = 0.05,
+	max = 1,
+	default = Settings.SendInterval,
+	precise = true
+}, function(NewInterval)
+	local RoundedInterval = tonumber(string.format("%.2f", NewInterval))
+
+	if IsUpdatingIntervalSlider then
+		Settings.SendInterval = RoundedInterval
+		return
+	end
+
+	Settings.SendInterval = RoundedInterval
+	IsUpdatingIntervalSlider = true
+	IntervalSlider:Set(RoundedInterval)
+	IsUpdatingIntervalSlider = false
+end)
+
+Window:Toggle("Reset Guard", { flag = "UseResetGuard", default = true }, function(IsEnabled)
+	Settings.UseResetGuard = IsEnabled
+end)
+
+Window:Button("Run Once", function()
+	RunFarmTick()
+end)
+
+Window:Bind("Toggle Key", {
+	flag = "ToggleAutoKey",
+	default = Enum.KeyCode.RightShift,
+	kbonly = true
+}, function()
+	AutoFarmToggle:Set(not Settings.AutoFarmEnabled)
+end)
+
+Window:Section("Extras")
+
+Window:Toggle("Auto Bonk", { flag = "AutoBonk", default = true }, function(IsEnabled)
+	Settings.AutoBonk = IsEnabled
+end)
+
+Window:Toggle("Auto Ore", { flag = "AutoOre", default = true }, function(IsEnabled)
+	Settings.AutoOre = IsEnabled
+end)
+
+Window:Toggle("Auto Prestige", { flag = "AutoPrestige", default = true }, function(IsEnabled)
+	Settings.AutoPrestige = IsEnabled
+end)
+
+Window:Toggle("Auto Reforge", { flag = "AutoReforge", default = true }, function(IsEnabled)
+	Settings.AutoReforge = IsEnabled
+end)
+
+local LastSendTime = 0
+
+RunService.Heartbeat:Connect(function()
+	if not Settings.AutoFarmEnabled then
+		return
+	end
+
+	local CurrentTime = tick()
+	if CurrentTime - LastSendTime < Settings.SendInterval then
+		return
+	end
+
+	LastSendTime = CurrentTime
+	RunFarmTick()
+end)
