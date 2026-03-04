@@ -1,0 +1,401 @@
+-- KRT Hub for Evade Roblox Delta
+
+-- by @Quil_T_T
+
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+local character = player.Character or player.CharacterAdded:Wait()
+
+local humanoid = character:WaitForChild("Humanoid")
+
+-- Создаем GUI
+
+local ScreenGui = Instance.new("ScreenGui")
+
+ScreenGui.Name = "KRT_Hub"
+
+ScreenGui.Parent = game.CoreGui
+
+-- Основной контейнер с радужной обводкой
+
+local MainContainer = Instance.new("Frame")
+
+MainContainer.Name = "MainContainer"
+
+MainContainer.Size = UDim2.new(0, 370, 0, 270) -- Увеличил размер для обводки
+
+MainContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
+
+MainContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+
+MainContainer.BackgroundTransparency = 1
+
+MainContainer.Parent = ScreenGui
+
+-- Функция для радужной обводки
+
+local function createRainbowBorder()
+
+    local borderThickness = 5
+
+    local borderParts = {}
+
+    
+
+    -- Создаем 4 части обводки (верх, право, низ, лево)
+
+    for i = 1, 4 do
+
+        local part = Instance.new("Frame")
+
+        part.Name = "BorderPart_"..i
+
+        part.BorderSizePixel = 0
+
+        part.ZIndex = 0
+
+        part.Parent = MainContainer
+
+        
+
+        table.insert(borderParts, part)
+
+    end
+
+    
+
+    -- Обновляем цвета обводки
+
+    coroutine.wrap(function()
+
+        while true do
+
+            for hue = 0, 1, 0.01 do
+
+                local color = Color3.fromHSV(hue, 1, 1)
+
+                
+
+                -- Верхняя часть
+
+                borderParts[1].Size = UDim2.new(1, 0, 0, borderThickness)
+
+                borderParts[1].Position = UDim2.new(0, 0, 0, 0)
+
+                borderParts[1].BackgroundColor3 = color
+
+                
+
+                -- Правая часть
+
+                borderParts[2].Size = UDim2.new(0, borderThickness, 1, -borderThickness*2)
+
+                borderParts[2].Position = UDim2.new(1, -borderThickness, 0, borderThickness)
+
+                borderParts[2].BackgroundColor3 = color
+
+                
+
+                -- Нижняя часть
+
+                borderParts[3].Size = UDim2.new(1, 0, 0, borderThickness)
+
+                borderParts[3].Position = UDim2.new(0, 0, 1, -borderThickness)
+
+                borderParts[3].BackgroundColor3 = color
+
+                
+
+                -- Левая часть
+
+                borderParts[4].Size = UDim2.new(0, borderThickness, 1, -borderThickness*2)
+
+                borderParts[4].Position = UDim2.new(0, 0, 0, borderThickness)
+
+                borderParts[4].BackgroundColor3 = color
+
+                
+
+                wait(0.05)
+
+            end
+
+        end
+
+    end)()
+
+end
+
+createRainbowBorder()
+
+local MainFrame = Instance.new("Frame")
+
+MainFrame.Name = "MainFrame"
+
+MainFrame.Size = UDim2.new(1, -10, 1, -10) -- Уменьшаем размер для обводки
+
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+MainFrame.BorderSizePixel = 0
+
+MainFrame.Parent = MainContainer
+
+local UICorner = Instance.new("UICorner")
+
+UICorner.CornerRadius = UDim.new(0, 8)
+
+UICorner.Parent = MainFrame
+
+local TitleLabel = Instance.new("TextLabel")
+
+TitleLabel.Name = "TitleLabel"
+
+TitleLabel.Size = UDim2.new(1, -50, 0, 40)
+
+TitleLabel.Position = UDim2.new(0, 25, 0, 10)
+
+TitleLabel.BackgroundTransparency = 1
+
+TitleLabel.Font = Enum.Font.GothamBold
+
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+TitleLabel.TextSize = 24
+
+TitleLabel.Text = ""
+
+TitleLabel.RichText = true
+
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+TitleLabel.Parent = MainFrame
+
+-- Функция для переливающегося текста
+
+local function rainbowText()
+
+    while true do
+
+        for i = 0, 1, 0.01 do
+
+            local hue = i * 360
+
+            local color = Color3.fromHSV(hue / 360, 1, 1)
+
+            TitleLabel.Text = "", "", ""
+
+            wait(0.05)
+
+        end
+
+    end
+
+end
+
+coroutine.wrap(rainbowText)()
+
+-- Кнопки и функции
+
+local buttons = {
+
+    {Name = "Speed Hack", Function = function()
+
+        humanoid.WalkSpeed = 30
+
+    end},
+
+    {Name = "Jump Hack", Function = function()
+
+        humanoid.JumpPower = 100
+
+    end},
+
+    {Name = "No Clip", Function = function()
+
+        local noclip = false
+
+        game:GetService("RunService").Stepped:Connect(function()
+
+            if noclip then
+
+                for _, part in pairs(character:GetDescendants()) do
+
+                    if part:IsA("BasePart") then
+
+                        part.CanCollide = false
+
+                    end
+
+                end
+
+            end
+
+        end)
+
+        noclip = not noclip
+
+    end},
+
+    {Name = "Anti-Stun", Function = function()
+
+        -- Здесь можно добавить анти-стаун логику
+
+    end}
+
+}
+
+local buttonTemplate = Instance.new("TextButton")
+
+buttonTemplate.Name = "ButtonTemplate"
+
+buttonTemplate.Size = UDim2.new(0, 150, 0, 35)
+
+buttonTemplate.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+
+buttonTemplate.BorderSizePixel = 0
+
+buttonTemplate.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+buttonTemplate.Font = Enum.Font.Gotham
+
+buttonTemplate.TextSize = 14
+
+buttonTemplate.AutoButtonColor = true
+
+buttonTemplate.Parent = MainFrame
+
+buttonTemplate.Visible = false
+
+local UICornerButton = Instance.new("UICorner")
+
+UICornerButton.CornerRadius = UDim.new(0, 6)
+
+UICornerButton.Parent = buttonTemplate
+
+for i, buttonInfo in ipairs(buttons) do
+
+    local newButton = buttonTemplate:Clone()
+
+    newButton.Name = buttonInfo.Name
+
+    newButton.Text = buttonInfo.Name
+
+    newButton.Position = UDim2.new(0.5, -75, 0, 60 + (i - 1) * 45)
+
+    newButton.Visible = true
+
+    newButton.Parent = MainFrame
+
+    
+
+    newButton.MouseButton1Click:Connect(buttonInfo.Function)
+
+end
+
+-- Закрытие GUI
+
+local CloseButton = Instance.new("TextButton")
+
+CloseButton.Name = "CloseButton"
+
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+
+CloseButton.Position = UDim2.new(1, -35, 0, 5)
+
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+
+CloseButton.BorderSizePixel = 0
+
+CloseButton.Text = "X"
+
+CloseButton.Font = Enum.Font.GothamBold
+
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+CloseButton.TextSize = 16
+
+CloseButton.Parent = MainFrame
+
+local UICornerClose = Instance.new("UICorner")
+
+UICornerClose.CornerRadius = UDim.new(0, 15)
+
+UICornerClose.Parent = CloseButton
+
+CloseButton.MouseButton1Click:Connect(function()
+
+    ScreenGui:Destroy()
+
+end)
+
+-- Функционал перемещения окна
+
+local UserInputService = game:GetService("UserInputService")
+
+local dragging
+
+local dragInput
+
+local dragStart
+
+local startPos
+
+local function update(input)
+
+    local delta = input.Position - dragStart
+
+    MainContainer.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+
+end
+
+MainFrame.InputBegan:Connect(function(input)
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+
+        dragStart = input.Position
+
+        startPos = MainContainer.Position
+
+        
+
+        input.Changed:Connect(function()
+
+            if input.UserInputState == Enum.UserInputState.End then
+
+                dragging = false
+
+            end
+
+        end)
+
+    end
+
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragInput = input
+
+    end
+
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+
+    if input == dragInput and dragging then
+
+        update(input)
+
+    end
+
+end)
