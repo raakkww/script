@@ -1,0 +1,11 @@
+while true do
+    local args = {
+	    game:GetService("Players").LocalPlayer.Character,
+	    "rbxassetid://126552350651537",
+	    10000000000000000000000000000,
+	    math.huge
+    }
+    game:GetService("ReplicatedStorage"):WaitForChild("PlayerEvents"):WaitForChild("FootstepEvent"):FireServer(unpack(args))
+
+    task.wait(0.01) 
+end
