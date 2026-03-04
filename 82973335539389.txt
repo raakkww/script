@@ -1,0 +1,34 @@
+--[[
+Doesnt have an afk part attached so game will kick after 20 min inactivity
+--]]
+local player = game.Players.LocalPlayer
+local character = player.Character
+local root = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+local function trigger(prompt)
+    if prompt then
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration)
+        prompt:InputHoldEnd()
+    end
+end
+task.spawn(function()
+    while task.wait() do
+        local box = player.Backpack:FindFirstChild("Box")
+        if box then
+            task.wait(0.2)
+            humanoid:EquipTool(box)
+        end
+    end
+end)
+
+while true do
+    task.wait()
+root.CFrame = CFrame.new(398, 4, -300)
+task.wait(0.2)
+trigger(workspace.DeliveryJob.BoxPickingJob.PickupBox.PickupPrompt)
+task.wait(1)
+root.CFrame = CFrame.new(474, 4, -278)
+task.wait(2)
+trigger(workspace.DeliveryJob.BoxPickingJob.Job.Part.ProximityPrompt)
+end
