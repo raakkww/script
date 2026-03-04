@@ -1,0 +1,52 @@
+local a = game:GetService("RunService")
+local b = nil
+
+local function c()
+    for _, d in pairs(getgc(true)) do
+        if type(d) == "table"
+            and type(d.tick_rate) == "number"
+            and type(d.ticks) == "number"
+            and type(d.Players) == "table"
+            and type(d.Camera) == "table"
+            and type(d.GameObjects) == "table"
+            and type(d.Triggers) == "table"
+            and d.Folder ~= nil then
+            return d
+        end
+    end
+end
+
+local function e()
+    if b then
+        b:Disconnect()
+        b = nil
+    end
+end
+
+workspace.ChildAdded:Connect(function(f)
+    if f.Name == "Level" then
+        local g = c()
+        if not g then return end
+
+        local h = 0
+
+        b = a.Heartbeat:Connect(function()
+            local i, j = pcall(function()
+                if g.attempts ~= h then
+                    h = g.attempts
+                    g:SetTimeScale(0.5)  --- u can change ts based on the speed u want
+                end
+            end)
+
+            if not i then
+                e()
+            end
+        end)
+
+        f.AncestryChanged:Connect(function()
+            if not f.Parent then
+                e()
+            end
+        end)
+    end
+end)
