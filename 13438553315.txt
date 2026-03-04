@@ -1,0 +1,69 @@
+-- variables
+local inter = workspace:FindFirstChild("Interactables")
+local scavs = workspace:FindFirstChild("activeHostiles")
+local uip = game:GetService("UserInputService")
+
+-- functions
+
+local function addEsp(item, clr)
+    if item then
+        local h = Instance.new("Highlight")
+        h.Name = "ESP"
+        h.Parent = item
+        h.FillColor = clr
+        h.OutlineColor = clr
+    end
+end
+
+local function disableEsp(item)
+    if item then
+        local esp = item:FindFirstChild("ESP")
+        if esp then
+            esp.Enabled = false
+        end
+    end
+end
+
+local function refreshEsp()
+    for _, item in inter:GetChildren() do
+        if item then
+            if not item:FindFirstChild("ESP") then
+                if item.Name == "Workbench" then
+                    addEsp(item, Color3.fromRGB(255, 0, 0))
+                elseif item.Name == "Long Ammo" or item.Name == "Medium Ammo" or item.Name == "Small Ammo" or item.Name == "Short Ammo" or     item.Name == "Heavy Ammo" or item.Name == "Shells Ammo" or item.Name == "Light Ammo" then
+                    addEsp(item, Color3.fromRGB(255, 255, 0))
+                elseif item.Name == "Locker" or item.Name == "Double Locker" or item.Name == "Medical Cabinet" then
+                    addEsp(item, Color3.fromRGB(0, 0, 255))
+                elseif item.Name == "Scapper" then
+                    addEsp(item, Color3.fromRGB(0, 255, 0))
+                else
+                    addEsp(item, Color3.fromRGB(255, 255, 255))
+                end
+            else
+                if item.Name == "Locker" or item.Name == "Double Locker" or item.Name == "Medical Cabinet" then
+                    if item:FindFirstChild("stats") then
+                        if item.stats:FindFirstChild("interactable") then
+                            if item.stats:FindFirstChild("interactable").Value == false then
+                                if item:FindFirstChild("ESP") then 
+                                    disableEsp(item)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    for _, scav in scavs:GetChildren() do
+        if scav then
+            if not scav:FindFirstChild("ESP") then
+                addEsp(scav, Color3.fromRGB(255, 0, 0))
+            end
+        end
+    end
+end
+
+-- init
+
+uip.InputBegan:Connect(refreshEsp)
