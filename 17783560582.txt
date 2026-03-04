@@ -1,0 +1,105 @@
+local RS = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local WS = game:GetService("Workspace")
+local Run = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local backpack = player:WaitForChild("Backpack")
+local character = player.Character or player.CharacterAdded:Wait()
+local remotes = RS:WaitForChild("Remotes")
+local placeClone = remotes:WaitForChild("PlaceClone")
+
+local activateAll = true -- set to false if you just wanna place fireworks
+
+local function getPos(offset, height)
+    local root = character:GetPrimaryPartCFrame()
+    local origin = root.Position + Vector3.new(0,5,0) + offset
+    local ray = WS:Raycast(origin, Vector3.new(0,-50,0), RaycastParams.new())
+    if ray and ray.Instance and not ray.Instance:IsDescendantOf(character) then
+        local pos = ray.Position + Vector3.new(0,height,0)
+        local rot = root.Rotation.Y
+        return CFrame.new(pos) * CFrame.Angles(0, math.rad(rot), 0)
+    end
+    return root * CFrame.new(5,-3,0)
+end
+
+local function placeFirework()
+    local tool = character:FindFirstChildOfClass("Tool")
+    if not tool then return false end
+    local handle = tool:FindFirstChild("Handle")
+    if not handle or not handle:IsA("BasePart") then return false end
+    local pos = getPos(Vector3.new(3 + (math.random()-0.5)*0.2,0,0), handle.Size.Y/2)
+    placeClone:FireServer(tool, pos, handle.Size, handle.BrickColor, 0, Vector3.zero)
+    return true
+end
+
+local function holdingTool() return character:FindFirstChildOfClass("Tool") ~= nil end
+
+local function equipNext()
+    for _, item in pairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            item.Parent = character
+            return true
+        end
+    end
+    return false
+end
+
+local function placeAll()
+    character = player.Character or player.CharacterAdded:Wait()
+    while true do
+        if not holdingTool() and not equipNext() then break end
+        if holdingTool() then
+            if placeFirework() then
+                local tool = character:FindFirstChildOfClass("Tool")
+                if tool then tool.Parent = nil end
+            end
+        end
+        task.wait(0.01 + math.random()*0.02)
+    end
+end
+
+local function getPrompts()
+    local list = {}
+    local filter = WS:FindFirstChild("Filter")
+    if not filter then return list end
+    local temp = filter:FindFirstChild("TempFirecrackers")
+    if not temp then return list end
+    for _, fw in pairs(temp:GetChildren()) do
+        local owner = fw:FindFirstChild("Owner")
+        if owner and owner.Value == player then
+            local main = fw:FindFirstChild("MainPart")
+            if main then
+                local prompt = main:FindFirstChildOfClass("ProximityPrompt")
+                if prompt and prompt.Enabled then
+                    table.insert(list, prompt)
+                end
+            end
+        end
+    end
+    return list
+end
+
+local function activateAllFireworks()
+    if not activateAll then return end
+    local prompts = getPrompts()
+    if #prompts == 0 then return end
+    local conn
+    conn = Run.Heartbeat:Connect(function()
+        if #prompts == 0 then conn:Disconnect() return end
+        for _, p in pairs(prompts) do
+            task.spawn(function()
+                p:InputHoldBegin()
+                p:InputHoldEnd()
+            end)
+        end
+        prompts = getPrompts()
+    end)
+end
+
+task.spawn(function()
+    character = player.Character or player.CharacterAdded:Wait()
+    placeAll()
+    task.wait(1)
+    activateAllFireworks()
+end)
