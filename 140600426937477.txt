@@ -1,0 +1,111 @@
+--// CLEAN CUSTOM GUI VERSION
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FreeCharacterGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 350)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -175)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner", MainFrame)
+Corner.CornerRadius = UDim.new(0, 15)
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,0,0,40)
+Title.BackgroundTransparency = 1
+Title.Text = "Free Character"
+Title.TextColor3 = Color3.fromRGB(255,255,255)
+Title.TextScaled = true
+Title.Parent = MainFrame
+
+-- Button Maker Function
+local function CreateButton(text, posY, callback)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0.9,0,0,40)
+    Button.Position = UDim2.new(0.05,0,0,posY)
+    Button.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    Button.TextColor3 = Color3.fromRGB(255,255,255)
+    Button.TextScaled = true
+    Button.Text = text
+    Button.BorderSizePixel = 0
+    Button.Parent = MainFrame
+    
+    local BC = Instance.new("UICorner", Button)
+    BC.CornerRadius = UDim.new(0,10)
+
+    Button.MouseButton1Click:Connect(callback)
+end
+
+-- BUTTONS (SAMA FUNCTION KAMU)
+CreateButton("UTDM", 60, function()
+    local args = {ReplicatedStorage:WaitForChild("UTDMDIGI")}
+    ReplicatedStorage:WaitForChild("CharChange"):FireServer(unpack(args))
+end)
+
+CreateButton("RockStar Speakerman", 110, function()
+    local args = {ReplicatedStorage:WaitForChild("rockstarDIGI")}
+    ReplicatedStorage:WaitForChild("CharChange"):FireServer(unpack(args))
+end)
+
+CreateButton("Titan Drill", 160, function()
+    local args = {ReplicatedStorage:WaitForChild("drilltitanEEE")}
+    ReplicatedStorage:WaitForChild("CharChange"):FireServer(unpack(args))
+end)
+
+CreateButton("Soon 1", 210, function() end)
+CreateButton("Soon 2", 260, function() end)
+CreateButton("Soon 3", 310, function() end)
+
+-- DRAG SUPPORT (MOBILE + PC)
+local UIS = game:GetService("UserInputService")
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or
+       input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or
+       input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
