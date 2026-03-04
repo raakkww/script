@@ -1,0 +1,120 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local remote = ReplicatedStorage:WaitForChild("RE"):WaitForChild("FireMissile")
+
+-- Ð§Ð¸ÑÑÐ¸Ð¼ ÑÑÐ°ÑÐ¾Ðµ
+if CoreGui:FindFirstChild("NukeSystem") then CoreGui.NukeSystem:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "NukeSystem"
+screenGui.Parent = CoreGui
+screenGui.IgnoreGuiInset = true
+
+-- ÐÐ°ÑÑÑÐ¾Ð¹ÐºÐ¸ ÑÐ½Ð°ÑÑÐ´Ð¾Ð²
+local ammoTypes = {"Nuke", "Artillery Barrage", "Light Artillery", "Heavy Artillery"}
+local currentAmmoIndex = 1
+
+-- ÐÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ ÐºÐ¾Ð½ÑÐµÐ¹Ð½ÐµÑ (ÑÑÐ¾Ð±Ñ ÑÐ°ÑÐºÐ°ÑÑ Ð²ÑÑ ÑÑÐ°Ð·Ñ)
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 200, 0, 150)
+mainFrame.Position = UDim2.new(0.5, -100, 0.2, 0)
+mainFrame.BackgroundTransparency = 1
+mainFrame.Parent = screenGui
+
+-- ÐÐ½Ð¾Ð¿ÐºÐ° ÐÐ¢ÐÐÐ
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(1, 0, 0, 60)
+button.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+button.BorderSizePixel = 2
+button.Text = "ÐÐ Ð¢Ð: ÐÐ«ÐÐ"
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Font = Enum.Font.RobotoMono
+button.TextSize = 20
+button.Parent = mainFrame
+
+-- ÐÐ½Ð¾Ð¿ÐºÐ° ÐÐ«ÐÐÐ Ð Ð¡ÐÐÐ Ð¯ÐÐ
+local selectButton = Instance.new("TextButton")
+selectButton.Size = UDim2.new(1, 0, 0, 40)
+selectButton.Position = UDim2.new(0, 0, 0, 65)
+selectButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+selectButton.Text = "Ð¡ÐÐÐÐÐ¢Ð¬ Ð¢ÐÐ"
+selectButton.TextColor3 = Color3.fromRGB(255, 255, 0)
+selectButton.Font = Enum.Font.RobotoMono
+selectButton.TextSize = 16
+selectButton.Parent = mainFrame
+
+-- Ð¢ÐµÐºÑÑ Ñ Ð¢ÐÐÐ£Ð©ÐÐ Ð¡ÐÐÐ Ð¯ÐÐÐ
+local ammoLabel = Instance.new("TextLabel")
+ammoLabel.Size = UDim2.new(1, 0, 0, 30)
+ammoLabel.Position = UDim2.new(0, 0, 0, 110)
+ammoLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ammoLabel.BackgroundTransparency = 0.3
+ammoLabel.Text = "Ð¢ÐÐ: " .. ammoTypes[currentAmmoIndex]
+ammoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+ammoLabel.Font = Enum.Font.RobotoMono
+ammoLabel.TextSize = 14
+ammoLabel.Parent = mainFrame
+
+--- ÐÐ¾Ð³Ð¸ÐºÐ° Ð¿ÐµÑÐµÑÐ°ÑÐºÐ¸Ð²Ð°Ð½Ð¸Ñ (ÑÐµÐ¿ÐµÑÑ Ð·Ð° mainFrame) ---
+local dragging, dragInput, dragStart, startPos
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+end)
+
+--- ÐÐ¾Ð³Ð¸ÐºÐ° Ð²ÑÐ±Ð¾ÑÐ° ÑÐ½Ð°ÑÑÐ´Ð° ---
+selectButton.MouseButton1Click:Connect(function()
+    currentAmmoIndex = currentAmmoIndex + 1
+    if currentAmmoIndex > #ammoTypes then currentAmmoIndex = 1 end
+    ammoLabel.Text = "Ð¢ÐÐ: " .. ammoTypes[currentAmmoIndex]
+end)
+
+--- ÐÐ¾Ð³Ð¸ÐºÐ° Ð°ÑÐ°ÐºÐ¸ ---
+local isNuking = false
+local lp = Players.LocalPlayer
+
+button.MouseButton1Click:Connect(function()
+    isNuking = not isNuking
+    if isNuking then
+        button.Text = "ÐÐ Ð¢Ð: on"
+        button.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        
+        task.spawn(function()
+            while isNuking do
+                local char = lp.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local p = root.Position
+                    for i = 1, 30 do 
+                        if not isNuking then break end
+                        local targetPos = vector.create(
+                            p.X + math.random(-150, 150),
+                            p.Y - 5, 
+                            p.Z + math.random(-150, 150)
+                        )
+                        -- ÐÑÐ¿Ð¾Ð»ÑÐ·ÑÐµÐ¼ Ð²ÑÐ±ÑÐ°Ð½Ð½ÑÐ¹ ÑÐ¸Ð¿ ÑÐ½Ð°ÑÑÐ´Ð°
+                        remote:FireServer(ammoTypes[currentAmmoIndex], targetPos)
+                    end
+                end
+                task.wait(0.05)
+            end
+        end)
+    else
+        button.Text = "ÐÐ Ð¢Ð: off"
+        button.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+    end
+end)
