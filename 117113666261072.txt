@@ -1,0 +1,274 @@
+local RS = game:GetService("ReplicatedStorage")
+local CS = game:GetService("CollectionService")
+local Players = game:GetService("Players")
+local PathfindingService = game:GetService("PathfindingService")
+local TablesRE = RS.Packages.Knit.Services.TablesService.RE
+local TablesRF = RS.Packages.Knit.Services.TablesService.RF
+local LocalPlayer = Players.LocalPlayer
+
+local NumberMap = {}
+local BoardMap = {}
+local FlippedBoards = {}
+local AllBoardIDs = {}
+local TriedBoards = {}
+local CurrentTableID = nil
+local NextNumber = 1
+local IsSubmitting = false
+local LastSubmittedBoardID = nil
+local AutoLobbyEnabled = true
+local IsSeated = false
+
+local function FindOpenTable()
+	local BestTable = nil
+	local BestDistance = math.huge
+	local HumanoidRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not HumanoidRootPart then return nil end
+	for _, T in CS:GetTagged("Table") do
+		local Seats = T:FindFirstChild("Seats")
+		if not Seats then continue end
+		local OccupiedCount = 0
+		local EmptySeat = nil
+		for _, S in Seats:GetChildren() do
+			if S:IsA("Seat") then
+				if S.Occupant then
+					OccupiedCount = OccupiedCount + 1
+				else
+					EmptySeat = S
+				end
+			end
+		end
+		if OccupiedCount == 1 and EmptySeat then
+			local Dist = (EmptySeat.Position - HumanoidRootPart.Position).Magnitude
+			if Dist < BestDistance then
+				BestDistance = Dist
+				BestTable = EmptySeat
+			end
+		end
+	end
+	if not BestTable then
+		for _, T in CS:GetTagged("Table") do
+			local Seats = T:FindFirstChild("Seats")
+			if not Seats then continue end
+			local OccupiedCount = 0
+			local EmptySeat = nil
+			for _, S in Seats:GetChildren() do
+				if S:IsA("Seat") then
+					if S.Occupant then
+						OccupiedCount = OccupiedCount + 1
+					else
+						EmptySeat = S
+					end
+				end
+			end
+			if OccupiedCount == 0 and EmptySeat then
+				local Dist = (EmptySeat.Position - HumanoidRootPart.Position).Magnitude
+				if Dist < BestDistance then
+					BestDistance = Dist
+					BestTable = EmptySeat
+				end
+			end
+		end
+	end
+	return BestTable
+end
+
+local function IsSeatStillValid(Seat)
+	if not Seat or not Seat.Parent then return false end
+	if Seat.Occupant then return false end
+	local PP = Seat:FindFirstChildOfClass("ProximityPrompt")
+	if PP and not PP.Enabled then return false end
+	return true
+end
+
+local function WalkToSeat(Seat)
+	local Character = LocalPlayer.Character
+	if not Character then return false end
+	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+	local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+	if not Humanoid or not HumanoidRootPart then return false end
+	if not IsSeatStillValid(Seat) then return false end
+	local Path = PathfindingService:CreatePath({
+		AgentRadius = 2,
+		AgentHeight = 5,
+		AgentCanJump = true,
+		AgentCanClimb = false,
+	})
+	local Success, Err = nil, nil
+	Success, Err = xpcall(function()
+		Path:ComputeAsync(HumanoidRootPart.Position, Seat.Position)
+	end, function(E) return E end)
+	if not Success then return false end
+	if Path.Status ~= Enum.PathStatus.Success then return false end
+	local Waypoints = Path:GetWaypoints()
+	for _, Waypoint in Waypoints do
+		if not AutoLobbyEnabled or IsSeated then return false end
+		if not IsSeatStillValid(Seat) then
+			Humanoid:MoveTo(HumanoidRootPart.Position)
+			return false
+		end
+		Humanoid:MoveTo(Waypoint.Position)
+		if Waypoint.Action == Enum.PathWaypointAction.Jump then
+			Humanoid.Jump = true
+		end
+		local Reached = Humanoid.MoveToFinished:Wait()
+		if not Reached then return false end
+	end
+	if not IsSeatStillValid(Seat) then return false end
+	return true
+end
+
+local function FireProximityPrompt(Seat)
+	local PP = Seat:FindFirstChildOfClass("ProximityPrompt")
+	if not PP then return false end
+	if not PP.Enabled then return false end
+	PP.HoldDuration = 0
+	if fireproximityprompt then
+		fireproximityprompt(PP)
+	else
+		PP:InputHoldBegin()
+		task.wait(0.1)
+		PP:InputHoldEnd()
+	end
+	return true
+end
+
+local function AutoLobbyLoop()
+	while AutoLobbyEnabled do
+		if not IsSeated then
+			local Seat = FindOpenTable()
+			if Seat then
+				local Arrived = WalkToSeat(Seat)
+				if Arrived and not IsSeated and IsSeatStillValid(Seat) then
+					task.wait(0.3)
+					if IsSeatStillValid(Seat) then
+						local Fired = FireProximityPrompt(Seat)
+						if not Fired and IsSeatStillValid(Seat) then
+							local Character = LocalPlayer.Character
+							local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+							if Humanoid then
+								Humanoid:MoveTo(Seat.Position)
+								Humanoid.MoveToFinished:Wait()
+								task.wait(0.3)
+								if IsSeatStillValid(Seat) then
+									FireProximityPrompt(Seat)
+								end
+							end
+						end
+					end
+					task.wait(2)
+				end
+			end
+		end
+		task.wait(0.5)
+	end
+end
+
+local function GetAllBoardIDs()
+	AllBoardIDs = {}
+	for _, T in CS:GetTagged("Table") do
+		if T:GetAttribute("ID") == CurrentTableID then
+			local Boards = T:FindFirstChild("Boards")
+			if Boards then
+				for _, B in Boards:GetChildren() do
+					if B:IsA("Model") then
+						local BID = B:GetAttribute("ID")
+						if BID then
+							table.insert(AllBoardIDs, BID)
+						end
+					end
+				end
+			end
+			break
+		end
+	end
+end
+
+local function GetUnknownBoard()
+	for _, BID in AllBoardIDs do
+		if not BoardMap[BID] and not FlippedBoards[BID] and not TriedBoards[BID] then
+			return BID
+		end
+	end
+	return nil
+end
+
+TablesRE.OnBoardFlip.OnClientEvent:Connect(function(Data)
+	if not Data or not Data.Model or not Data.Number then return end
+	local BID = Data.Model:GetAttribute("ID")
+	if not BID then return end
+	NumberMap[Data.Number] = BID
+	BoardMap[BID] = Data.Number
+end)
+
+TablesRE.OnBoardsReset.OnClientEvent:Connect(function()
+	NextNumber = 1
+	FlippedBoards = {}
+	TriedBoards = {}
+	IsSubmitting = false
+end)
+
+TablesRE.OnPickedBoard.OnClientEvent:Connect(function(Correct)
+	IsSubmitting = false
+	if Correct then
+		local BID = NumberMap[NextNumber]
+		if not BID and LastSubmittedBoardID then
+			BID = LastSubmittedBoardID
+			NumberMap[NextNumber] = BID
+			BoardMap[BID] = NextNumber
+		end
+		if BID then
+			FlippedBoards[BID] = true
+		end
+		NextNumber = NextNumber + 1
+	end
+end)
+
+TablesRE.OnPickTurn.OnClientEvent:Connect(function(TableID)
+	if TableID and type(TableID) == "string" then
+		CurrentTableID = TableID
+	end
+	if not CurrentTableID then return end
+	if IsSubmitting then return end
+	if #AllBoardIDs == 0 then
+		GetAllBoardIDs()
+	end
+	task.wait(0.2)
+	local BoardID = NumberMap[NextNumber]
+	if not BoardID then
+		BoardID = GetUnknownBoard()
+	end
+	if not BoardID then
+		TriedBoards = {}
+		BoardID = GetUnknownBoard()
+	end
+	if BoardID then
+		IsSubmitting = true
+		LastSubmittedBoardID = BoardID
+		TriedBoards[BoardID] = true
+		task.spawn(function()
+			TablesRF.OnPicked:InvokeServer(CurrentTableID, BoardID)
+		end)
+	end
+end)
+
+TablesRE.OnPickStopped.OnClientEvent:Connect(function()
+	IsSubmitting = false
+end)
+
+TablesRE.OnPlayerSeated.OnClientEvent:Connect(function()
+	IsSeated = true
+end)
+
+TablesRE.OnPlayerUnSeated.OnClientEvent:Connect(function()
+	IsSeated = false
+	CurrentTableID = nil
+	NumberMap = {}
+	BoardMap = {}
+	FlippedBoards = {}
+	AllBoardIDs = {}
+	TriedBoards = {}
+	NextNumber = 1
+	IsSubmitting = false
+end)
+
+task.spawn(AutoLobbyLoop)
