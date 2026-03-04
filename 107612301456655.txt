@@ -1,0 +1,15 @@
+local funny = game:GetService("MaterialService").Admins.AdminGUI
+local clone = funny:Clone()
+clone.Parent = game.Players.LocalPlayer.PlayerGui
+
+task.wait(1)
+
+for _, obj in clone:GetDescendants() do
+	if obj:IsA("GuiObject") then
+		obj.Visible = true
+	end
+end
+
+if clone:IsA("GuiObject") then
+	clone.Visible = true
+end
