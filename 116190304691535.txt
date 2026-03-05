@@ -1,0 +1,208 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "WRESTLE! | Premium Multi-Tool",
+    LoadingTitle = "Loading...",
+    LoadingSubtitle = "made by bren lol",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "WrestleScript",
+        FileName = "Config"
+    },
+    KeySystem = false
+})
+
+-- Global Variables
+_G.HitboxSize = 5
+_G.HitboxEnabled = false
+_G.HitboxColor = Color3.fromRGB(128, 0, 128)
+_G.ESPEnabled = false
+_G.InfJump = false
+_G.Noclip = false
+_G.DamageMultiplierEnabled = false
+_G.DamageMultiplierValue = 1
+_G.AutoClicker = false
+
+local players = game:GetService("Players")
+local runService = game:GetService("RunService")
+local teleportService = game:GetService("TeleportService")
+local userInputService = game:GetService("UserInputService")
+local vim = game:GetService("VirtualInputManager")
+local localPlayer = players.LocalPlayer
+
+--- DAMAGE MULTIPLIER (METATABLE HOOK) ---
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    if method == "FireServer" and _G.DamageMultiplierEnabled then
+        if tostring(self):find("Damage") or tostring(self):find("Hit") then
+            for i = 1, (_G.DamageMultiplierValue - 1) do
+                oldNamecall(self, unpack(args))
+            end
+        end
+    end
+    return oldNamecall(self, ...)
+end)
+
+--- MOBILE/PC SAFE AUTOCLICKER ---
+task.spawn(function()
+    while true do
+        if _G.AutoClicker then
+            -- Click center of screen without locking controls
+            vim:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            task.wait(0.05)
+            vim:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+        end
+        task.wait(0.1) 
+    end
+end)
+
+-- Tabs
+local MainTab = Window:CreateTab("Main")
+local LocalTab = Window:CreateTab("Local")
+local UsefulTab = Window:CreateTab("Useful scripts")
+local SettingsTab = Window:CreateTab("Settings")
+
+--- MAIN TAB ---
+MainTab:CreateSection("Combat")
+
+MainTab:CreateToggle({
+    Name = "Universal Autoclicker",
+    CurrentValue = false,
+    Callback = function(Value) _G.AutoClicker = Value end,
+})
+
+MainTab:CreateToggle({
+    Name = "Damage Multiplier",
+    CurrentValue = false,
+    Callback = function(Value) _G.DamageMultiplierEnabled = Value end,
+})
+
+MainTab:CreateInput({
+    Name = "Multiplier Amount",
+    PlaceholderText = "Enter Multiplier",
+    Callback = function(Text) _G.DamageMultiplierValue = tonumber(Text) or 1 end,
+})
+
+MainTab:CreateSection("Hitbox & ESP")
+
+MainTab:CreateToggle({
+    Name = "Enable Hitbox",
+    CurrentValue = false,
+    Callback = function(Value) _G.HitboxEnabled = Value end,
+})
+
+MainTab:CreateInput({
+    Name = "Hitbox Size",
+    PlaceholderText = "Enter Number",
+    Callback = function(Text) _G.HitboxSize = tonumber(Text) or 5 end,
+})
+
+MainTab:CreateToggle({
+    Name = "Dark Purple ESP",
+    CurrentValue = false,
+    Callback = function(Value) _G.ESPEnabled = Value end,
+})
+
+MainTab:CreateSection("Movement")
+MainTab:CreateToggle({ Name = "Infinite Jump", Callback = function(V) _G.InfJump = V end })
+MainTab:CreateToggle({ Name = "Noclip", Callback = function(V) _G.Noclip = V end })
+
+--- LOCAL TAB ---
+LocalTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 250},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(Value)
+        if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then
+            localPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end,
+})
+
+--- USEFUL SCRIPTS ---
+
+--- SETTINGS TAB ---
+SettingsTab:CreateSection("Customization")
+
+SettingsTab:CreateColorPicker({
+    Name = "Hitbox/ESP Color",
+    Color = Color3.fromRGB(128, 0, 128),
+    Callback = function(Value) _G.HitboxColor = Value end
+})
+
+SettingsTab:CreateSection("Server")
+
+SettingsTab:CreateButton({
+    Name = "Serverhop",
+    Callback = function()
+        local Http = game:GetService("HttpService")
+        local Api = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        local success, _Servers = pcall(function() return Http:JSONDecode(game:HttpGet(Api)) end)
+        if success then
+            for _, s in pairs(_Servers.data) do
+                if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                    teleportService:TeleportToPlaceInstance(game.PlaceId, s.id)
+                    break
+                end
+            end
+        end
+    end,
+})
+
+SettingsTab:CreateButton({
+    Name = "Rejoin Server",
+    Callback = function() teleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId) end,
+})
+
+-- FPS/Uptime (Bottom Right)
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local InfoLabel = Instance.new("TextLabel", ScreenGui)
+InfoLabel.Size, InfoLabel.Position = UDim2.new(0, 200, 0, 50), UDim2.new(1, -210, 1, -60)
+InfoLabel.BackgroundTransparency, InfoLabel.TextColor3, InfoLabel.TextSize = 1, Color3.fromRGB(128, 0, 128), 14
+InfoLabel.TextXAlignment = Enum.TextXAlignment.Right
+InfoLabel.Font = Enum.Font.Code
+
+local startTime = os.time()
+runService.RenderStepped:Connect(function(dt)
+    local fps = math.floor(1/dt)
+    local uptime = os.time() - startTime
+    InfoLabel.Text = string.format("FPS: %d | Uptime: %dm %ds", fps, math.floor(uptime/60), uptime%60)
+end)
+
+-- Hitbox Persistency & ESP Loop
+task.spawn(function()
+    while task.wait(0.5) do
+        for _, v in pairs(players:GetPlayers()) do
+            if v ~= localPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = v.Character.HumanoidRootPart
+                -- Hitbox
+                hrp.Size = _G.HitboxEnabled and Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize) or Vector3.new(2, 2, 1)
+                hrp.Transparency = _G.HitboxEnabled and 0.7 or 1
+                hrp.Color = _G.HitboxColor
+                -- ESP
+                local highlight = v.Character:FindFirstChild("GeminiESP")
+                if _G.ESPEnabled then
+                    if not highlight then
+                        highlight = Instance.new("Highlight", v.Character)
+                        highlight.Name = "GeminiESP"
+                    end
+                    highlight.FillColor = _G.HitboxColor
+                elseif highlight then
+                    highlight:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+userInputService.JumpRequest:Connect(function()
+    if _G.InfJump and localPlayer.Character then
+        localPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
