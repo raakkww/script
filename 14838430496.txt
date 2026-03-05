@@ -1,0 +1,61 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+
+--IF THE SCRIPT DOES NOTHING THEN EXECUTE IT AGAIN OR YOUR EXECUTOR ISNT SUPPORTED!
+
+local pl = game.Players.LocalPlayer
+for _,n in ipairs(workspace.LobbyGloboStart.Portal:GetChildren()) do
+if n:FindFirstChild("TouchInterest") then n.Size = Vector3.new(1,1,1)
+pl.Character:MoveTo(n.Position)
+end
+end
+wait(0.6)
+pl.Backpack:FindFirstChildOfClass("Tool").Parent = pl.Character
+wait(0.1)
+
+
+wait(0.05)
+local players = game:GetService("Players")
+local localplayer = players.LocalPlayer
+
+local function getevent()
+ local char = localplayer.Character or localplayer.CharacterAdded:Wait()
+ return char:FindFirstChildOfClass("Tool"):WaitForChild("Event")
+end
+
+local event = getevent()
+
+local direction = Vector3.new(0,1e29,0)
+
+local function hitcharacter(char)
+ event:FireServer("slash",char,direction
+ )
+end
+
+local function handleplayer(plr)
+ if plr == localplayer then return end
+
+ if plr.Character then
+  hitcharacter(plr.Character)
+ end
+
+ plr.CharacterAdded:Connect(function(char)
+  hitcharacter(char)
+ end)
+end
+
+for _, plr in ipairs(players:GetPlayers()) do
+ handleplayer(plr)
+end
+
+players.PlayerAdded:Connect(handleplayer)
+
+while task.wait(0.08) do
+ for _, plr in ipairs(players:GetPlayers()) do
+  if plr ~= localplayer and plr.Character then
+   hitcharacter(plr.Character)
+  end
+ end
+end
+
