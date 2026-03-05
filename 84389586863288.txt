@@ -1,0 +1,45 @@
+while true do
+    local parkour = workspace:FindFirstChild("Parkour")
+    if not parkour then 
+        task.wait()
+        continue 
+    end
+    
+    local player = game:GetService("Players").LocalPlayer
+    if not (player.Character and player.Character:FindFirstChild("HumanoidRootPart")) then
+        task.wait()
+        continue
+    end
+    
+    local hrp = player.Character.HumanoidRootPart
+    
+    local findTheChicken = parkour:FindFirstChild("FindTheChicken")
+    
+    if findTheChicken then
+        local chickensFolder = findTheChicken:FindFirstChild("Chickens")
+        if chickensFolder then
+            for _, chicken in pairs(chickensFolder:GetChildren()) do
+                local realBool = chicken:FindFirstChild("Real")
+                if realBool and realBool:IsA("BoolValue") and realBool.Value == true then
+                    if chicken:IsA("MeshPart") then
+                        firetouchinterest(chicken, hrp, 0)
+                        task.wait()
+                        firetouchinterest(chicken, hrp, 1)
+                    end
+                end
+            end
+        end
+    else
+        local model = parkour:FindFirstChildOfClass("Model")
+        if model then
+            local chicken = model:FindFirstChild("Chicken")
+            if chicken and chicken:IsA("MeshPart") then
+                firetouchinterest(chicken, hrp, 0)
+                task.wait()
+                firetouchinterest(chicken, hrp, 1)
+            end
+        end
+    end
+    
+    task.wait()
+end
