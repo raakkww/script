@@ -1,0 +1,5 @@
+for i,v in ipairs(game:GetService("Players").LocalPlayer.PlayerGui.TopbarPlus.TopbarContainer.Characters.DropdownContainer.DropdownFrame:GetChildren()) do
+    pcall(function()
+        v.Visible = true
+    end)
+end
