@@ -1,0 +1,645 @@
+--[[
+    SAFE ORE FINDER - Fixed Version with Live Updates
+]]
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local camera = workspace.CurrentCamera
+
+-- UI Setup
+local gui = Instance.new("ScreenGui")
+gui.Name = "SafeOreFinder"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
+gui.IgnoreGuiInset = true
+
+-- Main Container
+local mainContainer = Instance.new("Frame")
+mainContainer.Size = UDim2.fromScale(0.35, 0.55)
+mainContainer.Position = UDim2.fromScale(0.02, 0.2)
+mainContainer.BackgroundTransparency = 1
+mainContainer.BorderSizePixel = 0
+mainContainer.Active = true
+mainContainer.Parent = gui
+mainContainer.Selectable = false
+
+-- Main Frame (Content)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromScale(1, 1)
+frame.Position = UDim2.fromScale(0, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BackgroundTransparency = 0.1
+frame.BorderSizePixel = 0
+frame.ClipsDescendants = true
+frame.Parent = mainContainer
+
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 12)
+frameCorner.Parent = frame
+
+-- Collapse Toggle Button
+local collapseBtn = Instance.new("TextButton")
+collapseBtn.Size = UDim2.fromOffset(35, 35)
+collapseBtn.Position = UDim2.new(1, -40, 0, -40)
+collapseBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+collapseBtn.Text = "<"
+collapseBtn.Font = Enum.Font.GothamBold
+collapseBtn.TextSize = 20
+collapseBtn.TextColor3 = Color3.new(1, 1, 1)
+collapseBtn.ZIndex = 10
+collapseBtn.Parent = mainContainer
+
+local collapseCorner = Instance.new("UICorner")
+collapseCorner.CornerRadius = UDim.new(0.8, 0)
+collapseCorner.Parent = collapseBtn
+
+-- Settings Button
+local settingsBtn = Instance.new("TextButton")
+settingsBtn.Size = UDim2.fromOffset(40, 40)
+settingsBtn.Position = UDim2.new(1, -45, 1, 5)
+settingsBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+settingsBtn.Text = "âï¸"
+settingsBtn.Font = Enum.Font.GothamBold
+settingsBtn.TextSize = 22
+settingsBtn.TextColor3 = Color3.new(1, 1, 1)
+settingsBtn.ZIndex = 10
+settingsBtn.Parent = mainContainer
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.fromScale(1, 0.08)
+title.BackgroundTransparency = 1
+title.Text = "ð ORE FINDER"
+title.Font = Enum.Font.GothamBold
+title.TextScaled = true
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Parent = frame
+
+-- Scanner Toggle Button
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.fromScale(0.9, 0.07)
+toggleBtn.Position = UDim2.fromScale(0.05, 0.1)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+toggleBtn.Text = "SCANNER: ON"
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextScaled = true
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Parent = frame
+
+-- Arrow Frame
+local arrowFrame = Instance.new("Frame")
+arrowFrame.Size = UDim2.fromScale(0.9, 0.1)
+arrowFrame.Position = UDim2.fromScale(0.05, 0.18)
+arrowFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+arrowFrame.BorderSizePixel = 0
+arrowFrame.Parent = frame
+
+local arrowCorner = Instance.new("UICorner")
+arrowCorner.CornerRadius = UDim.new(0, 6)
+arrowCorner.Parent = arrowFrame
+
+local arrowLabel = Instance.new("TextLabel")
+arrowLabel.Size = UDim2.fromScale(0.3, 1)
+arrowLabel.Position = UDim2.fromScale(0, 0)
+arrowLabel.BackgroundTransparency = 1
+arrowLabel.Text = "â¤"
+arrowLabel.Font = Enum.Font.GothamBold
+arrowLabel.TextSize = 35
+arrowLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+arrowLabel.Parent = arrowFrame
+
+local arrowInfo = Instance.new("TextLabel")
+arrowInfo.Size = UDim2.fromScale(0.7, 1)
+arrowInfo.Position = UDim2.fromScale(0.3, 0)
+arrowInfo.BackgroundTransparency = 1
+arrowInfo.Text = "No ore nearby"
+arrowInfo.Font = Enum.Font.GothamBold
+arrowInfo.TextScaled = true
+arrowInfo.TextColor3 = Color3.new(1, 1, 1)
+arrowInfo.TextXAlignment = Enum.TextXAlignment.Left
+arrowInfo.Parent = arrowFrame
+
+-- Radar Frame
+local radarFrame = Instance.new("Frame")
+radarFrame.Size = UDim2.fromScale(0.9, 0.35)
+radarFrame.Position = UDim2.fromScale(0.05, 0.29)
+radarFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+radarFrame.BorderSizePixel = 0
+radarFrame.Parent = frame
+
+local radarCorner = Instance.new("UICorner")
+radarCorner.CornerRadius = UDim.new(0, 6)
+radarCorner.Parent = radarFrame
+
+-- Radar Center (Player)
+local radarCenter = Instance.new("Frame")
+radarCenter.Size = UDim2.fromScale(0, 0)
+radarCenter.Position = UDim2.fromScale(0.5, 0.5)
+radarCenter.BackgroundTransparency = 1
+radarCenter.Parent = radarFrame
+
+local playerDot = Instance.new("Frame")
+playerDot.Size = UDim2.fromOffset(8, 8)
+playerDot.Position = UDim2.fromOffset(-4, -4)
+playerDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+playerDot.BorderSizePixel = 0
+playerDot.Parent = radarCenter
+
+local playerDotCorner = Instance.new("UICorner")
+playerDotCorner.CornerRadius = UDim.new(1, 0)
+playerDotCorner.Parent = playerDot
+
+-- Stats List
+local statsList = Instance.new("TextLabel")
+statsList.Size = UDim2.fromScale(0.9, 0.2)
+statsList.Position = UDim2.fromScale(0.05, 0.66)
+statsList.BackgroundTransparency = 1
+statsList.TextColor3 = Color3.new(1, 1, 1)
+statsList.TextXAlignment = Enum.TextXAlignment.Left
+statsList.TextYAlignment = Enum.TextYAlignment.Top
+statsList.TextWrapped = true
+statsList.TextSize = 14
+statsList.Font = Enum.Font.Gotham
+statsList.Text = "Scanning..."
+statsList.Parent = frame
+
+-- Nearest Ore Info
+local nearestFrame = Instance.new("Frame")
+nearestFrame.Size = UDim2.fromScale(0.9, 0.1)
+nearestFrame.Position = UDim2.fromScale(0.05, 0.87)
+nearestFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+nearestFrame.BorderSizePixel = 0
+nearestFrame.Parent = frame
+
+local nearestCorner = Instance.new("UICorner")
+nearestCorner.CornerRadius = UDim.new(0, 6)
+nearestCorner.Parent = nearestFrame
+
+local nearestLabel = Instance.new("TextLabel")
+nearestLabel.Size = UDim2.fromScale(1, 1)
+nearestLabel.BackgroundTransparency = 1
+nearestLabel.Text = "Nearest: None"
+nearestLabel.Font = Enum.Font.GothamBold
+nearestLabel.TextScaled = true
+nearestLabel.TextColor3 = Color3.new(1, 1, 1)
+nearestLabel.Parent = nearestFrame
+
+-- SETTINGS PANEL
+local settingsFrame = Instance.new("Frame")
+settingsFrame.Size = UDim2.fromScale(1, 1)
+settingsFrame.Position = UDim2.fromScale(0, 0)
+settingsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+settingsFrame.BackgroundTransparency = 0.1
+settingsFrame.BorderSizePixel = 0
+settingsFrame.ClipsDescendants = true
+settingsFrame.Visible = false
+settingsFrame.Parent = mainContainer
+
+local settingsFrameCorner = Instance.new("UICorner")
+settingsFrameCorner.CornerRadius = UDim.new(0, 12)
+settingsFrameCorner.Parent = settingsFrame
+
+-- Settings Title
+local settingsTitle = Instance.new("TextLabel")
+settingsTitle.Size = UDim2.fromScale(1, 0.08)
+settingsTitle.BackgroundTransparency = 1
+settingsTitle.Text = "âï¸ SETTINGS"
+settingsTitle.Font = Enum.Font.GothamBold
+settingsTitle.TextScaled = true
+settingsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+settingsTitle.Parent = settingsFrame
+
+-- Settings Content Frame
+local settingsContent = Instance.new("Frame")
+settingsContent.Size = UDim2.fromScale(0.9, 0.82)
+settingsContent.Position = UDim2.fromScale(0.05, 0.12)
+settingsContent.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+settingsContent.BorderSizePixel = 0
+settingsContent.Parent = settingsFrame
+
+-- Toggle: Show Distance
+local distanceToggleFrame = Instance.new("Frame")
+distanceToggleFrame.Size = UDim2.fromScale(0.9, 0.12)
+distanceToggleFrame.Position = UDim2.fromScale(0.05, 0.05)
+distanceToggleFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+distanceToggleFrame.BorderSizePixel = 0
+distanceToggleFrame.Parent = settingsContent
+
+local distanceLabel = Instance.new("TextLabel")
+distanceLabel.Size = UDim2.fromScale(0.6, 1)
+distanceLabel.Position = UDim2.fromScale(0.05, 0)
+distanceLabel.BackgroundTransparency = 1
+distanceLabel.Text = "Show Distance"
+distanceLabel.Font = Enum.Font.GothamBold
+distanceLabel.TextScaled = true
+distanceLabel.TextColor3 = Color3.new(1, 1, 1)
+distanceLabel.TextXAlignment = Enum.TextXAlignment.Left
+distanceLabel.Parent = distanceToggleFrame
+
+local distanceToggleBtn = Instance.new("TextButton")
+distanceToggleBtn.Size = UDim2.fromScale(0.25, 0.7)
+distanceToggleBtn.Position = UDim2.fromScale(0.7, 0.15)
+distanceToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+distanceToggleBtn.Text = "ON"
+distanceToggleBtn.Font = Enum.Font.GothamBold
+distanceToggleBtn.TextScaled = true
+distanceToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+distanceToggleBtn.Parent = distanceToggleFrame
+
+-- Toggle: Show Rarity Text
+local textToggleFrame = Instance.new("Frame")
+textToggleFrame.Size = UDim2.fromScale(0.9, 0.12)
+textToggleFrame.Position = UDim2.fromScale(0.05, 0.2)
+textToggleFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+textToggleFrame.BorderSizePixel = 0
+textToggleFrame.Parent = settingsContent
+
+local textLabel = Instance.new("TextLabel")
+textLabel.Size = UDim2.fromScale(0.6, 1)
+textLabel.Position = UDim2.fromScale(0.05, 0)
+textLabel.BackgroundTransparency = 1
+textLabel.Text = "Show Rarity Text"
+textLabel.Font = Enum.Font.GothamBold
+textLabel.TextScaled = true
+textLabel.TextColor3 = Color3.new(1, 1, 1)
+textLabel.TextXAlignment = Enum.TextXAlignment.Left
+textLabel.Parent = textToggleFrame
+
+local textToggleBtn = Instance.new("TextButton")
+textToggleBtn.Size = UDim2.fromScale(0.25, 0.7)
+textToggleBtn.Position = UDim2.fromScale(0.7, 0.15)
+textToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+textToggleBtn.Text = "ON"
+textToggleBtn.Font = Enum.Font.GothamBold
+textToggleBtn.TextScaled = true
+textToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+textToggleBtn.Parent = textToggleFrame
+
+-- ORE LIMIT INPUT FRAME
+local limitFrame = Instance.new("Frame")
+limitFrame.Size = UDim2.fromScale(0.9, 0.2)
+limitFrame.Position = UDim2.fromScale(0.05, 0.35)
+limitFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+limitFrame.BorderSizePixel = 0
+limitFrame.Parent = settingsContent
+
+local limitLabel = Instance.new("TextLabel")
+limitLabel.Size = UDim2.fromScale(0.9, 0.35)
+limitLabel.Position = UDim2.fromScale(0.05, 0.05)
+limitLabel.BackgroundTransparency = 1
+limitLabel.Text = "Max Ores to Display"
+limitLabel.Font = Enum.Font.GothamBold
+limitLabel.TextScaled = true
+limitLabel.TextColor3 = Color3.new(1, 1, 1)
+limitLabel.TextXAlignment = Enum.TextXAlignment.Left
+limitLabel.Parent = limitFrame
+
+-- TextBox for ore limit input
+local limitInput = Instance.new("TextBox")
+limitInput.Size = UDim2.fromScale(0.9, 0.5)
+limitInput.Position = UDim2.fromScale(0.05, 0.45)
+limitInput.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+limitInput.Text = "150"
+limitInput.TextColor3 = Color3.new(1, 1, 1)
+limitInput.Font = Enum.Font.GothamBold
+limitInput.TextSize = 20
+limitInput.TextScaled = true
+limitInput.ClearTextOnFocus = false
+limitInput.Parent = limitFrame
+
+-- Current Limit Display
+local currentLimitLabel = Instance.new("TextLabel")
+currentLimitLabel.Size = UDim2.fromScale(0.9, 0.08)
+currentLimitLabel.Position = UDim2.fromScale(0.05, 0.56)
+currentLimitLabel.BackgroundTransparency = 1
+currentLimitLabel.Text = "Current Limit: 150"
+currentLimitLabel.Font = Enum.Font.Gotham
+currentLimitLabel.TextScaled = true
+currentLimitLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+currentLimitLabel.Parent = settingsContent
+
+-- Apply Button
+local applyBtn = Instance.new("TextButton")
+applyBtn.Size = UDim2.fromScale(0.9, 0.08)
+applyBtn.Position = UDim2.fromScale(0.05, 0.66)
+applyBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+applyBtn.Text = "â APPLY CHANGES"
+applyBtn.Font = Enum.Font.GothamBold
+applyBtn.TextScaled = true
+applyBtn.TextColor3 = Color3.new(1, 1, 1)
+applyBtn.Parent = settingsContent
+
+-- Back Button in Settings
+local backBtn = Instance.new("TextButton")
+backBtn.Size = UDim2.fromScale(0.9, 0.08)
+backBtn.Position = UDim2.fromScale(0.05, 0.9)
+backBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+backBtn.Text = "â BACK TO SCANNER"
+backBtn.Font = Enum.Font.GothamBold
+backBtn.TextScaled = true
+backBtn.TextColor3 = Color3.new(1, 1, 1)
+backBtn.Parent = settingsFrame
+
+-- Configuration
+local rarities = {
+	Uncommon = {Color = Color3.fromHex("#00ff00")},
+	Epic = {Color = Color3.fromHex("#8a2be2")},
+	Legendary = {Color = Color3.fromHex("#ffff00")},
+	Mythic = {Color = Color3.fromHex("#ff0000")},
+	Ethereal = {Color = Color3.fromHex("#ff1493")},
+	Celestial = {Color = Color3.fromHex("#00ffff")},
+	Zenith = {Color = Color3.fromHex("#800080")},
+	Divine = {Color = Color3.fromHex("#000000")},
+	Nil = {Color = Color3.fromHex("#635f62")}
+}
+
+-- State variables
+local isScanning = true
+local isCollapsed = false
+local showDistance = true
+local showRarityText = true
+local maxOresLimit = 150
+
+local trackedOres = {} -- Stores all tracked ore data
+local radarDots = {}
+local arrow3D = nil
+local liveUpdateConnection = nil
+
+-- Helper functions
+local function colorMatches(colorSeq, targetColor)
+	local keypoints = colorSeq.Keypoints
+	if #keypoints > 0 then
+		local c = keypoints[1].Value
+		return math.abs(c.R - targetColor.R) < 0.02
+		and math.abs(c.G - targetColor.G) < 0.02
+		and math.abs(c.B - targetColor.B) < 0.02
+	end
+	return false
+end
+
+local function clearAllOres()
+	-- Stop live updates
+	if liveUpdateConnection then
+		liveUpdateConnection:Disconnect()
+		liveUpdateConnection = nil
+	end
+	
+	-- Clear all tracked ores
+	for _, oreData in ipairs(trackedOres) do
+		if oreData.Highlight and oreData.Highlight.Parent then
+			oreData.Highlight:Destroy()
+		end
+		if oreData.Billboard and oreData.Billboard.Parent then
+			oreData.Billboard:Destroy()
+		end
+	end
+	table.clear(trackedOres)
+	
+	-- Clear radar dots
+	for _, dot in ipairs(radarDots) do
+		if dot and dot.Parent then
+			dot:Destroy()
+		end
+	end
+	table.clear(radarDots)
+	
+	-- Clear arrow
+	if arrow3D then
+		arrow3D:Destroy()
+		arrow3D = nil
+	end
+end
+
+local function createArrow3D()
+	if arrow3D then
+		arrow3D:Destroy()
+	end
+	
+	arrow3D = Instance.new("Model")
+	arrow3D.Name = "OreArrow"
+	
+	local shaft = Instance.new("Part")
+	shaft.Name = "Shaft"
+	shaft.Size = Vector3.new(0.5, 2, 0.5)
+	shaft.Color = Color3.fromRGB(255, 255, 0)
+	shaft.Material = Enum.Material.Neon
+	shaft.Anchored = true
+	shaft.CanCollide = false
+	shaft.Parent = arrow3D
+	
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Size = Vector3.new(1, 1, 1)
+	head.Color = Color3.fromRGB(255, 255, 0)
+	head.Material = Enum.Material.Neon
+	head.Anchored = true
+	head.CanCollide = false
+	head.Parent = arrow3D
+	
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Cone
+	mesh.Scale = Vector3.new(1, 2, 1)
+	mesh.Parent = head
+	
+	arrow3D.Parent = workspace
+	
+	return arrow3D
+end
+
+-- MAIN SCAN FUNCTION
+local function scanOres()
+	if not isScanning then return end
+	
+	-- Clear previous
+	clearAllOres()
+	
+	local character = player.Character
+	if not character then return end
+	
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	
+	local playerPos = hrp.Position
+	local counts = {}
+	for name in pairs(rarities) do counts[name] = 0 end
+	
+	local foundOres = {}
+	local totalOres = 0
+	
+	-- Scan all descendants
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if not isScanning then break end
+		if totalOres >= maxOresLimit then break end
+		
+		if obj:IsA("ParticleEmitter") then
+			for rarityName, data in pairs(rarities) do
+				if totalOres >= maxOresLimit then break end
+				
+				if colorMatches(obj.Color, data.Color) then
+					local parent = obj.Parent
+					if not parent or not parent:IsA("BasePart") then continue end
+					
+					-- Check for duplicate
+					local isDuplicate = false
+					for _, existing in ipairs(foundOres) do
+						if existing.Part == parent then
+							isDuplicate = true
+							break
+						end
+					end
+					if isDuplicate then continue end
+					
+					local distance = (parent.Position - playerPos).Magnitude
+					
+					table.insert(foundOres, {
+						Part = parent,
+						Color = data.Color,
+						Rarity = rarityName,
+						Distance = distance
+					})
+					
+					counts[rarityName] = (counts[rarityName] or 0) + 1
+					totalOres = totalOres + 1
+					break -- Only count once per emitter
+				end
+			end
+		end
+	end
+	
+	-- Create visuals for each found ore
+	for _, oreInfo in ipairs(foundOres) do
+		local oreData = {
+			Part = oreInfo.Part,
+			Color = oreInfo.Color,
+			Rarity = oreInfo.Rarity,
+			InitialDistance = oreInfo.Distance
+		}
+		
+		-- Create Highlight (outline)
+		local highlight = Instance.new("Highlight")
+		highlight.Adornee = oreInfo.Part
+		highlight.FillColor = oreInfo.Color
+		highlight.OutlineColor = Color3.new(1, 1, 1)
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.FillTransparency = 0.5
+		highlight.OutlineTransparency = 0
+		highlight.Parent = oreInfo.Part
+		oreData.Highlight = highlight
+		
+		-- Create Billboard
+		local billboard = Instance.new("BillboardGui")
+		billboard.Size = UDim2.new(0, 160, 0, showDistance and 50 or 30)
+		billboard.StudsOffset = Vector3.new(0, showDistance and 4 or 2.5, 0)
+		billboard.AlwaysOnTop = true
+		billboard.Parent = oreInfo.Part
+		
+		-- Rarity label
+		if showRarityText then
+			local rarityLabel = Instance.new("TextLabel")
+			rarityLabel.Name = "RarityLabel"
+			rarityLabel.Size = UDim2.fromScale(1, showDistance and 0.6 or 1)
+			rarityLabel.BackgroundTransparency = 1
+			rarityLabel.TextScaled = true
+			rarityLabel.Font = Enum.Font.GothamBold
+			rarityLabel.Text = oreInfo.Rarity
+			rarityLabel.TextColor3 = oreInfo.Color
+			rarityLabel.Parent = billboard
+			oreData.RarityLabel = rarityLabel
+		end
+		
+		-- Distance label (will be updated)
+		if showDistance then
+			local distLabel = Instance.new("TextLabel")
+			distLabel.Name = "DistanceLabel"
+			distLabel.Size = UDim2.fromScale(1, 0.4)
+			distLabel.Position = UDim2.fromScale(0, 0.6)
+			distLabel.BackgroundTransparency = 1
+			distLabel.TextScaled = true
+			distLabel.Font = Enum.Font.Gotham
+			distLabel.Text = string.format("%.0f studs", oreInfo.Distance)
+			distLabel.TextColor3 = Color3.new(1, 1, 1)
+			distLabel.Parent = billboard
+			oreData.DistanceLabel = distLabel
+		end
+		
+		oreData.Billboard = billboard
+		table.insert(trackedOres, oreData)
+	end
+	
+	-- Update stats display
+	local statsText = ""
+	for name, count in pairs(counts) do
+		if count > 0 then
+			statsText = statsText .. string.format("%s: %d\n", name, count)
+		end
+	end
+	statsList.Text = statsText ~= "" and statsText or "No ores found..."
+	
+	-- Update radar
+	updateRadar(foundOres)
+	
+	-- Start live updates
+	startLiveUpdates()
+end
+
+-- Update radar dots
+function updateRadar(ores)
+	-- Clear old dots
+	for _, dot in ipairs(radarDots) do
+		if dot and dot.Parent then
+			dot:Destroy()
+		end
+	end
+	table.clear(radarDots)
+	
+	local character = player.Character
+	if not character then return end
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	
+	local playerPos = hrp.Position
+	local radarRange = 500
+	
+	for _, oreData in ipairs(ores) do
+		if not oreData.Part or not oreData.Part.Parent then continue end
+		
+		local diff = oreData.Part.Position - playerPos
+		local distance = diff.Magnitude
+		
+		if distance > radarRange then continue end
+		
+		-- Calculate relative position
+		local relativeX = diff.X / radarRange
+		local relativeZ = diff.Z / radarRange
+		
+		-- Clamp to circle
+		local distFromCenter = math.sqrt(relativeX^2 + relativeZ^2)
+		if distFromCenter > 1 then
+			relativeX = relativeX / distFromCenter
+			relativeZ = relativeZ / distFromCenter
+		end
+		
+		-- Create dot
+		local dot = Instance.new("Frame")
+		dot.Name = "RadarDot"
+		dot.Size = UDim2.fromOffset(8, 8)
+		dot.Position = UDim2.fromScale(0.5 + relativeX * 0.45, 0.5 + relativeZ * 0.45)
+		dot.AnchorPoint = Vector2.new(0.5, 0.5)
+		dot.BackgroundColor3 = oreData.Color
+		dot.BorderSizePixel = 0
+		dot.ZIndex = 2
+		
+		local dotCorner = Instance.new("UICorner")
+		dotCorner.CornerRadius = UDim.new(1, 0)
+		dotCorner.Parent = dot
+		
+		dot.Parent = radarFrame
+		table.insert(radarDots, dot)
+	end
+end
+
+-- LIVE UPDATE FUNCT
