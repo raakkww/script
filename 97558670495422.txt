@@ -1,0 +1,267 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local LOCAL_PLAYER = Players.LocalPlayer
+local TARGET_GAME_ID = 97558670495422
+local TARGET_PATH = "workspace.WinClaimers.Stage9.FreeButton.Zone"
+
+if game.PlaceId ~= TARGET_GAME_ID then
+    warn("[AutoTeleportGUI] Wrong game ID. GUI not loaded.")
+    return
+end
+
+local success, gameInfo = pcall(function()
+    return MarketplaceService:GetProductInfo(game.PlaceId)
+end)
+local GAME_NAME = success and gameInfo.Name or "Unknown Game"
+
+local isAutoTeleportEnabled = false
+local teleportConnection: RBXScriptConnection?
+local gui: ScreenGui?
+
+local function getTargetPart(): BasePart?
+    local pathParts = string.split(TARGET_PATH, ".")
+    local current: any = _G
+    
+    for _, part in ipairs(pathParts) do
+        if part == "workspace" then
+            current = workspace
+        elseif current and current:FindFirstChild(part) then
+            current = current[part]
+        else
+            return nil
+        end
+    end
+    
+    return if typeof(current) == "Instance" and current:IsA("BasePart") then current else nil
+end
+
+local function updateTeleport()
+    if not isAutoTeleportEnabled then return end
+    
+    local target = getTargetPart()
+    local character = LOCAL_PLAYER.Character
+    local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if target and humanoidRootPart then
+        humanoidRootPart.CFrame = target.CFrame * CFrame.new(0, 3, 0)
+    end
+end
+
+local function createGUI(): ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AutoTeleportGUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.DisplayOrder = 999
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "Main"
+    mainFrame.Size = UDim2.new(0, 220, 0, 120)
+    mainFrame.Position = UDim2.new(0.5, -110, 0.5, -60)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = mainFrame
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(60, 60, 60)
+    stroke.Thickness = 1
+    stroke.Parent = mainFrame
+    
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name = "Shadow"
+    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+    shadow.BackgroundTransparency = 1
+    shadow.Position = UDim2.new(0.5, 0, 0.5, 4)
+    shadow.Size = UDim2.new(1, 24, 1, 24)
+    shadow.ZIndex = -1
+    shadow.Image = "rbxassetid://1316045217"
+    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.ImageTransparency = 0.6
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+    shadow.Parent = mainFrame
+    
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1, 0, 0, 32)
+    titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.Parent = titleBar
+    
+    local fixFrame = Instance.new("Frame")
+    fixFrame.Size = UDim2.new(1, 0, 0.5, 0)
+    fixFrame.Position = UDim2.new(0, 0, 0.5, 0)
+    fixFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    fixFrame.BorderSizePixel = 0
+    fixFrame.Parent = titleBar
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Size = UDim2.new(1, -60, 1, 0)
+    titleLabel.Position = UDim2.new(0, 12, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Text = GAME_NAME
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize = 14
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    titleLabel.Parent = titleBar
+    
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Name = "Close"
+    closeBtn.Size = UDim2.new(0, 28, 0, 28)
+    closeBtn.Position = UDim2.new(1, -30, 0.5, 0)
+    closeBtn.AnchorPoint = Vector2.new(0, 0.5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Text = "Ã"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextSize = 18
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = titleBar
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 6)
+    closeCorner.Parent = closeBtn
+    
+    local content = Instance.new("Frame")
+    content.Name = "Content"
+    content.Size = UDim2.new(1, -20, 1, -42)
+    content.Position = UDim2.new(0, 10, 0, 37)
+    content.BackgroundTransparency = 1
+    content.Parent = mainFrame
+    
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Name = "Status"
+    statusLabel.Size = UDim2.new(1, 0, 0, 20)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.Text = "Status: Idle"
+    statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    statusLabel.TextSize = 12
+    statusLabel.Parent = content
+    
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Name = "Toggle"
+    toggleBtn.Size = UDim2.new(1, 0, 0, 36)
+    toggleBtn.Position = UDim2.new(0, 0, 0, 28)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    toggleBtn.BorderSizePixel = 0
+    toggleBtn.Text = "Enable Auto-Teleport"
+    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleBtn.TextSize = 13
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.AutoButtonColor = true
+    toggleBtn.Parent = content
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 6)
+    toggleCorner.Parent = toggleBtn
+    
+    local infoLabel = Instance.new("TextLabel")
+    infoLabel.Name = "Info"
+    infoLabel.Size = UDim2.new(1, 0, 0, 16)
+    infoLabel.Position = UDim2.new(0, 0, 1, -16)
+    infoLabel.BackgroundTransparency = 1
+    infoLabel.Font = Enum.Font.Gotham
+    infoLabel.Text = "Target: Stage9.FreeButton"
+    infoLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
+    infoLabel.TextSize = 10
+    infoLabel.Parent = content
+    
+    local dragging = false
+    local dragStart: Vector3
+    local startPos: UDim2
+    
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+        end
+    end)
+    
+    titleBar.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or 
+                        input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(
+                startPos.X.Scale, 
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale, 
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    titleBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    
+    local function updateUI()
+        if isAutoTeleportEnabled then
+            toggleBtn.Text = "Disable Auto-Teleport"
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+            statusLabel.Text = "Status: Active"
+            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            toggleBtn.Text = "Enable Auto-Teleport"
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+            statusLabel.Text = "Status: Idle"
+            statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+        end
+    end
+    
+    toggleBtn.MouseButton1Click:Connect(function()
+        isAutoTeleportEnabled = not isAutoTeleportEnabled
+        
+        if isAutoTeleportEnabled then
+            teleportConnection = RunService.Heartbeat:Connect(updateTeleport)
+            updateTeleport()
+        else
+            if teleportConnection then
+                teleportConnection:Disconnect()
+                teleportConnection = nil
+            end
+        end
+        
+        updateUI()
+    end)
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        isAutoTeleportEnabled = false
+        if teleportConnection then
+            teleportConnection:Disconnect()
+            teleportConnection = nil
+        end
+        
+        if screenGui then
+            screenGui:Destroy()
+        end
+        gui = nil
+    end)
+    
+    return screenGui
+end
+
+gui = createGUI()
+if gui then
+    gui.Parent = LOCAL_PLAYER:WaitForChild("PlayerGui")
+    print("[AutoTeleportGUI] Loaded for:", GAME_NAME)
+end
