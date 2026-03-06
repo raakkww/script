@@ -1,0 +1,57 @@
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local correctKey = "T3CHN0OnT0P"
+
+local Window = Rayfield:CreateWindow({
+    Name = "Find The FNAF TP",
+    LoadingTitle = "Animatronic Teleporter",
+    LoadingSubtitle = "",
+    ConfigurationSaving = {
+        Enabled = false
+    },
+    KeySystem = flase,
+    KeySettings = {
+        Title = "Script Key",
+        Subtitle = "Enter Key",
+        Note = "Key required to use the script",
+        FileName = "FNAFKey",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {correctKey}
+    }
+})
+
+local Tab = Window:CreateTab("Teleport", 4483362458)
+
+local player = game.Players.LocalPlayer
+
+local function teleportToAnimatronics()
+
+    local character = player.Character or player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+
+    local folder = workspace:FindFirstChild("Animatronics")
+    if not folder then return end
+
+    for _, v in ipairs(folder:GetChildren()) do
+        local part
+
+        if v:IsA("Model") then
+            part = v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")
+        elseif v:IsA("BasePart") then
+            part = v
+        end
+
+        if part then
+            hrp.CFrame = part.CFrame + Vector3.new(0,3,0)
+            task.wait(1)
+        end
+    end
+end
+
+Tab:CreateButton({
+    Name = "Teleport All Animatronics",
+    Callback = function()
+        teleportToAnimatronics()
+    end
+})
