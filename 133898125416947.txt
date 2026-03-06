@@ -1,0 +1,575 @@
+local Configuration = {
+    Discord = "",
+    DiscordID = ""
+}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local VirtualUser = game:GetService("VirtualUser")
+local VIM = game:GetService("VirtualInputManager")
+local player = Players.LocalPlayer
+
+-- // 0. SESSION & CLEANUP //
+local SessionID = tostring(math.random(1, 1000000)) .. tostring(tick())
+getgenv().NebuBlox_SessionID = SessionID
+
+local g = getgenv and getgenv() or shared
+if g.NebuState_AnimeCreatures then
+    pcall(function() g.NebuState_AnimeCreatures.Running = false end)
+    task.wait(0.25)
+end
+g.NebuState_AnimeCreatures = { Running = true, Connections = {}, SessionID = SessionID }
+local NebuState = g.NebuState_AnimeCreatures
+
+-- // 0.1 UTILS //
+local function IsValid() return NebuState.Running and NebuState.SessionID == getgenv().NebuBlox_SessionID end
+
+-- // 0.2 HIDDEN VISUAL ENHANCER //
+task.spawn(function()
+    while task.wait(1) do
+        if not IsValid() then break end
+        pcall(function()
+            for _, v in ipairs(Lighting:GetChildren()) do
+                if v:IsA("BlurEffect") or v:IsA("DepthOfFieldEffect") or v:IsA("SunRaysEffect") then v.Enabled = false end
+            end
+        end)
+    end
+end)
+
+-- // 0.3 STATE & FLAGS //
+local Flags = {
+    SmartFarm = false, AutoCapture = false, AutoEquip = false, AutoRebirth = false,
+    AutoFreeGifts = false, AutoDailyRewards = false, AutoSpin = false, 
+    AutoAchievements = false, SelectedMobs = {}, SelectedGachaId = "201", 
+    AutoRollSelected = false, AutoLeafRaid = false, AutoStartRaid = false, AutoResetRaid = false,
+    AntiAfkEnabled = false, Noclip = false, FPSBoost = false
+}
+
+local BossNameMap = {
+    ["MapBoss1001"] = "World Boss 1", ["MapBoss1002"] = "World Boss 2",
+    ["MapBoss1003"] = "World Boss 3", ["MapBoss1004"] = "World Boss 4",
+    ["MapBoss1005"] = "World Boss 5", ["MapBoss1006"] = "World Boss 6",
+    ["MapBoss1007"] = "World Boss 7", ["MapBoss1008"] = "World Boss 8"
+}
+
+-- // 0.4 TARGETING ENGINE //
+local function GetSmartTarget()
+    local char = player.Character; local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil end
+    local bestTarget, shortestDist = nil, 1000
+    
+    local function CheckMob(mob)
+        if mob and mob:FindFirstChild("HumanoidRootPart") and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+            local rawName = mob.Name; local prettyName = BossNameMap[rawName] or rawName
+            if next(Flags.SelectedMobs) ~= nil and not Flags.SelectedMobs[rawName] and not Flags.SelectedMobs[prettyName] then return end
+            local dist = (mob.HumanoidRootPart.Position - myRoot.Position).Magnitude
+            if dist < shortestDist then shortestDist = dist; bestTarget = mob end
+        end
+    end
+
+    pcall(function()
+        if Flags.AutoLeafRaid and workspace:FindFirstChild("enemy") then
+            for _, m in ipairs(workspace.enemy:GetDescendants()) do 
+                if m:IsA("Model") and m.Name == "MapMonster_92" and m:FindFirstChild("Humanoid") and m.Humanoid.Health > 0 then bestTarget = m; return end 
+            end
+        end
+        if workspace:FindFirstChild("enemy") then for _, mob in ipairs(workspace.enemy:GetChildren()) do CheckMob(mob) end end
+        if not bestTarget and workspace:FindFirstChild("common") and workspace.common:FindFirstChild("Up") then
+            for _, island in ipairs(workspace.common.Up:GetChildren()) do
+                local npc = island:FindFirstChild("NPC")
+                if npc then for _, mob in ipairs(npc:GetChildren()) do CheckMob(mob) end end
+            end
+        end
+    end)
+    return bestTarget
+end
+
+-- // 0.5 MOVEMENT & COMBAT ENGINE //
+RunService.Heartbeat:Connect(function()
+    if not IsValid() then return end
+    
+    if Flags.AutoCapture or Flags.SmartFarm or Flags.AutoLeafRaid then
+        pcall(function()
+            VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game); VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            ReplicatedStorage.Events.SetStatEvent:FireServer("AutoCatchFollow", true)
+        end)
+    end
+    if Flags.SmartFarm or Flags.AutoLeafRaid then
+        pcall(function()
+            local char = player.Character; local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+            if myRoot then
+                local target = GetSmartTarget()
+                if target and target:FindFirstChild("HumanoidRootPart") then
+                    myRoot.Velocity = Vector3.zero
+                    myRoot.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 4)
+                    ReplicatedStorage.Events.Battle.AttackEvent:FireServer(target)
+                end
+            end
+        end)
+    end
+    if Flags.Noclip and player.Character then
+        for _, v in ipairs(player.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
+    end
+end)
+
+-- // 0.6 AUTOMATIONS //
+task.spawn(function()
+    while task.wait(0.5) do
+        if not IsValid() then break end
+        if Flags.AutoRollSelected then pcall(function() ReplicatedStorage.Events.NewLotto.RollOne:FireServer(true, tonumber(Flags.SelectedGachaId)) end) end
+        if Flags.AutoAchievements then pcall(function() ReplicatedStorage.Events.Achievement.GetAllEvent:FireServer() end) end
+        if Flags.AutoStartRaid then pcall(function() ReplicatedStorage.Events.Dungeon.LeafRaid.EnterEvent:FireServer(player, true) end) end
+        if Flags.AutoResetRaid then pcall(function() ReplicatedStorage.Events.Dungeon.LeafRaid.ExitEvent:FireServer() end) end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(5) do
+        if not IsValid() then break end
+        if Flags.AutoEquip then pcall(function() ReplicatedStorage.Events.Equip.EquipBestEvent:FireServer(1) end) end
+        if Flags.AutoRebirth then pcall(function() ReplicatedStorage.Events.Rebirth.RebirthEvent:FireServer() end) end
+        if Flags.AutoFreeGifts then for i=1,12 do pcall(function() ReplicatedStorage.Events.Rewards.ClaimeTaskEvent:FireServer(i) end) end end
+    end
+end)
+
+-- ═══════════════════════════════════════
+--  UI INITIALIZATION
+-- ═══════════════════════════════════════
+local function Load()
+    local url = "https://raw.githubusercontent.com/LilNugOfWisdom/NebubloxUI/main/NebubloxUI.lua"
+    local success, content = pcall(game.HttpGet, game, url .. "?t=" .. tick())
+    if not success then return warn("[NEBUBLOX]: HTTP GET Failed") end
+    local fn, err = loadstring(content)
+    if not fn then return warn("[NEBUBLOX]: UI Load Crash (Syntax): " .. tostring(err)) end
+    return fn()
+end
+
+local Nebublox = Load()
+if not Nebublox then return end
+local Window = Nebublox:MakeWindow({
+    Title = "NEBUBLOX", Subtitle = "Anime Creatures 🌌", Size = UDim2.new(0.85, 0, 0.85, 0),
+    Profile = true, CyberBackground = true, TitleGradient = true, Acrylic = true
+})
+
+-- Sidebar Stats
+task.spawn(function()
+    while task.wait(5) do
+        if not IsValid() then break end
+        pcall(function() local ping = tonumber(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString():match("%d+")) or 0; Window._ping.Text = "Stable • " .. ping .. "ms" end)
+    end
+end)
+
+-- ═══════════════════════════════════════
+--  TAB 1: HOME
+-- ═══════════════════════════════════════
+local HomeTab = Window:MakeTab({Name = "Home", Icon = "🏠"})
+local DashTab = HomeTab:MakeSection({Name = "The Core"})
+
+local welcomeRow = DashTab:AddRow({Columns = 1})
+welcomeRow[1]:AddParagraph({
+    Title = "<font size='22' color='#00E6FF'><b>Welcome to the Expanse, " .. player.DisplayName .. "!</b></font>",
+    Content = "<font size='16' color='#AAAAAA'>At Nebublox, we’ve engineered a sanctuary among the stars designed to give you your time back. From gravitational Anti-AFK that keeps you anchored in-game to scripts that handle the heavy lifting while you drift through sleep, we’ve got your orbit covered.\n\nStay stellar, Void Walker 🟣</font>",
+    Center = true
+})
+
+local LogSec = HomeTab:MakeSection({Name = "Information"})
+local InfoTabs = LogSec:AddSubTabs({Tabs = {"API Logs", "OVERLORD"}})
+local DmTab = InfoTabs[1]; local OLTab = InfoTabs[2]
+
+-- Live stats feed
+task.spawn(function()
+    while task.wait(1) do
+        if not IsValid() then break end
+        pcall(function()
+            local ping = tonumber(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString():match("%d+")) or 0
+            Window:SetSidebarStats('<font size="16" color="#00E6FF"><b>STABLE</b></font>', '<font color="#AAAAAA" size="12">' .. ping .. 'ms</font>')
+        end)
+    end
+end)
+
+DmTab:AddParagraph({
+    Title = "NEBUBLOX LOGS", 
+    Content = "v3.0 — Masterpiece Feature Injection\nv2.0 — Big Bang Intro\nv1.0 — Foundation"
+})
+
+OLTab:AddParagraph({
+    Title = "<font color='#00E6FF'>MEET THE OVERLORD, NEBUBLOX</font>", 
+    Content = "<font color='#AA00FF'>You’re looking at the result of way too much caffeine</font> and a <font color='#FF0066'>complete disregard for a normal sleep schedule</font>. " ..
+              "I scripted this chaos so you could <font color='#00E6FF'>skip the grind</font> and get straight to the fun. " ..
+              "I’m the one pulling the strings on the <font color='#FF9900'>gravity</font> and <font color='#FF9900'>time</font> here—and yes, the <font color='#FF0066'>bugs</font> are intentional 'flavor.' " ..
+              "<font color='#00E6FF'>Thanks for being here</font> and supporting the grind behind the scenes. " ..
+              "<font color='#AA00FF'>Join the Discord</font> if you need a hand or just want to see what I’m breaking next!"
+})
+
+local dBtn = OLTab:AddButton({
+    Name = "<font color='#00E6FF'><b>Join the Community today!</b></font>", 
+    Icon = "user", 
+    Primary = true, 
+    Callback = function() 
+        setclipboard(Configuration.Discord) 
+        Window:Notify({Title="Discord", Content="Invite link copied!", Type="info"}) 
+    end
+})
+
+-- Lanyard Status
+pcall(function()
+    if Configuration.DiscordID ~= "" then
+        local lanLbl = Instance.new("TextLabel")
+        lanLbl.Size = UDim2.new(1, -160, 1, 0) 
+        lanLbl.Position = UDim2.new(0, 150, 0, 0)
+        lanLbl.BackgroundTransparency = 1
+        lanLbl.TextColor3 = Color3.fromRGB(240, 240, 240)
+        lanLbl.TextSize = 12
+        lanLbl.Font = Enum.Font.FredokaOne
+        lanLbl.TextXAlignment = Enum.TextXAlignment.Right
+        lanLbl.Parent = dBtn
+
+        task.spawn(function()
+            while task.wait(20) do
+                if not IsValid() or not lanLbl.Parent then break end
+                pcall(function()
+                    local res = game:HttpGet("https://api.lanyard.rest/v1/users/" .. Configuration.DiscordID)
+                    if res then
+                        local data = game:GetService("HttpService"):JSONDecode(res)
+                        if data.success and data.data then
+                            local status = data.data.discord_status or "offline"
+                            local emoji = status == "online" and "🟢" or (status == "idle" and "🌙" or (status == "dnd" and "🔴" or "⚫"))
+                            local activity = "No Activity"
+                            if data.data.activities and #data.data.activities > 0 then
+                                for _, act in ipairs(data.data.activities) do
+                                    if act.type == 0 then activity = "Playing: " .. act.name break end
+                                end
+                            end
+                            lanLbl.Text = emoji .. " " .. data.data.discord_user.username .. " | " .. activity
+                        end
+                    end
+                end)
+            end
+        end)
+    end
+end)
+
+-- ═══════════════════════════════════════
+--  TAB 2: ACTIVITIES
+-- ═══════════════════════════════════════
+local ActivityTab = Window:MakeTab({Name = "Activities", Icon = "✨"})
+local RaidSec = ActivityTab:MakeSection({Name = "Endless Dungeon"})
+RaidSec:AddToggle({Name = "Auto Dungeon Kill", Default = false, Callback = function(s) Flags.AutoLeafRaid = s end})
+RaidSec:AddToggle({Name = "Auto Start Dungeon", Default = false, Callback = function(s) Flags.AutoStartRaid = s end})
+RaidSec:AddToggle({Name = "Auto Reset Dungeon", Default = false, Callback = function(s) Flags.AutoResetRaid = s end})
+
+-- ═══════════════════════════════════════
+--  TAB 3: FARMING
+-- ═══════════════════════════════════════
+local FarmTab = Window:MakeTab({Name = "Farming", Icon = "⚔️"})
+local CombatSec = FarmTab:MakeSection({Name = "Combat Engine"})
+CombatSec:AddToggle({Name = "God-Mode Auto Farm", Default = false, Callback = function(s) Flags.SmartFarm = s end})
+CombatSec:AddToggle({Name = "Auto Capture (Hyper-Spam)", Default = false, Callback = function(s) Flags.AutoCapture = s end})
+
+local PrioritySec = FarmTab:MakeSection({Name = "Target Priority"})
+local TargetDrop = PrioritySec:AddMultiDropdown({Name = "Selected Mobs", Options = {"Refresh List..."}, Callback = function(val)
+    Flags.SelectedMobs = {}
+    for k, v in pairs(val) do if type(k) == "string" and v == true then Flags.SelectedMobs[k] = true elseif type(v) == "string" then Flags.SelectedMobs[v] = true end end
+end})
+PrioritySec:AddButton({Name = "Refresh Nearby Targets", Callback = function()
+    local list = {}; local seen = {}; pcall(function() if workspace:FindFirstChild("enemy") then for _, m in ipairs(workspace.enemy:GetChildren()) do if m:IsA("Model") and m:FindFirstChild("Humanoid") then local n = BossNameMap[m.Name] or m.Name; if not seen[n] then seen[n] = true; table.insert(list, n) end end end end end); TargetDrop:Refresh(list, true)
+end})
+
+-- ═══════════════════════════════════════
+--  TAB 4: AUTOMATION
+-- ═══════════════════════════════════════
+local AutoTab = Window:MakeTab({Name = "Automation", Icon = "🤖"})
+local GachaSec = AutoTab:MakeSection({Name = "Auto Roll"})
+local GachaList = {["Shock Fruit"] = "201", ["Flame Fruit"] = "202", ["Sharingan"] = "203", ["Tessen"] = "204", ["Scouter"] = "221"}
+GachaSec:AddDropdown({Name = "Select Machine", Options = {"Shock Fruit", "Flame Fruit", "Sharingan", "Tessen", "Scouter"}, Callback = function(v) Flags.SelectedGachaId = GachaList[v] end})
+GachaSec:AddToggle({Name = "Start Auto Roll", Default = false, Callback = function(s) Flags.AutoRollSelected = s end})
+
+local RewardSec = AutoTab:MakeSection({Name = "Rewards"})
+RewardSec:AddToggle({Name = "Auto Claim Achievements", Default = false, Callback = function(s) Flags.AutoAchievements = s end})
+RewardSec:AddToggle({Name = "Auto Equip Best", Default = false, Callback = function(s) Flags.AutoEquip = s end})
+RewardSec:AddToggle({Name = "Auto Rebirth", Default = false, Callback = function(s) Flags.AutoRebirth = s end})
+RewardSec:AddToggle({Name = "Auto Free Gifts", Default = false, Callback = function(s) Flags.AutoFreeGifts = s end})
+
+-- ═══════════════════════════════════════
+--  TAB 5: TRAVEL
+-- ═══════════════════════════════════════
+local TravelTab = Window:MakeTab({Name = "Worlds", Icon = "🌎"})
+local TravelSec = TravelTab:MakeSection({Name = "Fast Travel"})
+local Islands = {{Name = "Seaside Town", Id = 0}, {Name = "Pirate Village", Id = 1}, {Name = "Ninja Village", Id = 2}, {Name = "Shirayuki Village", Id = 3}, {Name = "Cursed Arts", Id = 4}}
+for _, isl in ipairs(Islands) do TravelSec:AddButton({Name = isl.Name, Callback = function() ReplicatedStorage.Events.Map.PortalEvent:FireServer(isl.Id) end}) end
+
+-- ═══════════════════════════════════════
+--  TAB 6: SETTINGS
+-- ═══════════════════════════════════════
+local SettingsTab = Window:MakeTab({Name = "Settings", Icon = "⚙️"})
+local LibSec = SettingsTab:MakeSection({Name = "UI Settings"})
+
+LibSec:AddToggle({
+    Name = "Hide Notifications",
+    Default = false,
+    Callback = function(v)
+        Window._hideNotifications = v
+    end
+})
+
+local UtilSec = SettingsTab:MakeSection({Name = "Utility Hacks"})
+
+UtilSec:AddToggle({Name = "Anti-AFK", Default = false, Callback = function(s)
+    if s then
+        NebuState.AntiAfkConnection = player.Idled:Connect(function()
+            local vu = game:GetService("VirtualUser")
+            vu:CaptureController()
+            vu:ClickButton2(Vector2.new())
+        end)
+    else
+        if NebuState.AntiAfkConnection then 
+            NebuState.AntiAfkConnection:Disconnect()
+            NebuState.AntiAfkConnection = nil 
+        end
+    end
+end})
+
+UtilSec:AddToggle({Name = "Noclip", Default = false, Callback = function(s) 
+    NebuState.Noclip = s
+    if s and not NebuState.NoclipLoopConn then
+        NebuState.NoclipLoopConn = RunService.Stepped:Connect(function()
+            if not NebuState.Noclip then 
+                NebuState.NoclipLoopConn:Disconnect()
+                NebuState.NoclipLoopConn = nil 
+                return 
+            end
+            if player.Character then
+                for _, v in ipairs(player.Character:GetDescendants()) do
+                    if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
+                end
+            end
+        end)
+    end
+end})
+
+local VisualSec = SettingsTab:MakeSection({Name = "Aesthetics & UI"})
+
+VisualSec:AddToggle({Name = "Dark Mode", Default = true, Callback = function(s)
+    pcall(function()
+        if s then
+            Lighting.Brightness = 0.5
+            Lighting.GlobalShadows = false
+            Lighting.ClockTime = 0
+        else
+            Lighting.Brightness = 2
+            Lighting.GlobalShadows = true
+            Lighting.ClockTime = 12
+        end
+    end)
+end})
+
+VisualSec:AddDropdown({
+    Name = "UI Font Customization",
+    Options = {"FredokaOne", "Michroma", "Roboto", "SourceSans", "Arcade", "LuckiestGuy"},
+    Default = "FredokaOne",
+    Callback = function(v)
+        local font = Enum.Font[v] or Enum.Font.FredokaOne
+        NebuState.CurrentFont = font
+        local rootUi = nil
+        for _, root in pairs(game:GetService("CoreGui"):GetChildren()) do if string.find(root.Name, "Nebublox") or root:FindFirstChild("Main") then rootUi = root break end end
+        if rootUi then
+            for _, d in ipairs(rootUi:GetDescendants()) do
+                if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then d.Font = font end
+            end
+        end
+    end
+})
+
+local OptSec = SettingsTab:MakeSection({Name = "Optimization Hacks"})
+
+OptSec:AddButton({Name = "FPS Boost", Icon = "zap", Callback = function()
+    task.spawn(function() pcall(function()
+        local terrain = Workspace:WaitForChild("Terrain", 5)
+        terrain.WaterWaveSize = 0; terrain.WaterWaveSpeed = 0; terrain.WaterReflectance = 0; terrain.WaterTransparency = 0
+        Lighting.GlobalShadows = false; Lighting.FogEnd = 9e9; Lighting.Brightness = 0
+        for _, c in ipairs(Lighting:GetChildren()) do 
+            if c:IsA("PostEffect") or c:IsA("Atmosphere") or c:IsA("Sky") then c:Destroy() end 
+        end
+        for _, descendant in ipairs(Workspace:GetDescendants()) do
+            if descendant:IsA("BasePart") then descendant.Material = Enum.Material.Plastic; descendant.Reflectance = 0; descendant.CastShadow = false
+            elseif descendant:IsA("Decal") or descendant:IsA("Texture") then descendant.Transparency = 1
+            elseif descendant:IsA("ParticleEmitter") or descendant:IsA("Trail") then descendant.Lifetime = NumberRange.new(0, 0)
+            end
+        end
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    end); Window:Notify({Title="Settings", Content="FPS Boost Enabled!", Type="info"}) end)
+end})
+
+OptSec:AddButton({Name = "Destroy Script", Icon = "power", Danger = true, Callback = function()
+    Window:Destroy()
+    NebuState.Running = false
+end})
+
+-- ═══════════════════════════════════════
+--  ENHANCED LIVE ID & INVENTORY SCANNER
+-- ═══════════════════════════════════════
+local ScraperSec = SettingsTab:MakeSection({Name = "Live Assets & Memory"})
+
+local targetUser = ""
+ScraperSec:AddTextbox({Name = "Target Username", Placeholder = "Enter name for ID lookup...", Callback = function(t) targetUser = t end})
+
+ScraperSec:AddButton({Name = "Scrape Live Workspace IDs", Icon = "download", Callback = function()
+    task.spawn(function()
+        Window:Notify({Title="Scraper", Content="Scanning workspace & memory... Check console.", Type="info", Duration=3})
+        
+        local MarketplaceService = game:GetService("MarketplaceService")
+        local Stats = game:GetService("Stats")
+        local liveIDs = {}
+        local results = "--- NEBUBLOX ENHANCED SCANNER ---\n"
+        
+        -- User ID Lookup
+        local targetUserId = nil
+        if targetUser ~= "" then
+            local success, userId = pcall(function() return Players:GetUserIdFromNameAsync(targetUser) end)
+            if success then
+                targetUserId = userId
+                results = results .. "Target User: " .. targetUser .. " | ID: " .. tostring(userId) .. "\n"
+                print("[NEBUBLOX] Found User ID for " .. targetUser .. ": " .. tostring(userId))
+            end
+        end
+
+        -- Memory Sniffing
+        pcall(function()
+            local marketMem = Stats.PerformanceStats.Memory.CoreMemory["internal/MarketplaceService"]
+            results = results .. "MarketplaceService Memory: " .. tostring(marketMem) .. " MB\n"
+            print("[NEBUBLOX] Marketplace Memory: " .. tostring(marketMem))
+        end)
+
+        local function getCleanID(assetString)
+            if type(assetString) ~= "string" then return nil end
+            return string.match(assetString, "%d+")
+        end
+
+        local function checkLiveStatus(assetId)
+            local success, info = pcall(function() return MarketplaceService:GetProductInfo(tonumber(assetId) or 0) end)
+            if success and info then return info end
+            return nil
+        end
+
+        local count = 0
+        for _, object in pairs(workspace:GetDescendants()) do
+            if count >= 150 then break end
+            local idFound = nil
+            if object:IsA("MeshPart") then idFound = object.MeshId
+            elseif object:IsA("SpecialMesh") then idFound = object.MeshId
+            elseif object:IsA("Decal") or object:IsA("Texture") then idFound = object.Texture
+            elseif object:IsA("Sound") then idFound = object.SoundId
+            elseif object:IsA("Animation") then idFound = object.AnimationId
+            elseif object:IsA("ImageLabel") or object:IsA("ImageButton") then idFound = object.Image
+            end
+
+            if idFound and idFound ~= "" then
+                local clean = getCleanID(idFound)
+                if clean and not liveIDs[clean] then
+                    liveIDs[clean] = true
+                    local info = checkLiveStatus(clean)
+                    if info then
+                        count = count + 1
+                        local name = info.Name or "Unknown"
+                        local logStr = "[LIVE] ID: " .. clean .. " | Name: " .. name .. " | Source: " .. object.Name
+                        
+                        if targetUserId then
+                            local isOwned = false
+                            pcall(function() isOwned = MarketplaceService:PlayerOwnsAsset(targetUserId, tonumber(clean)) end)
+                            if isOwned then logStr = logStr .. " [OWNED BY TARGET]" end
+                        end
+                        
+                        print(logStr)
+                        results = results .. logStr .. "\n"
+                    end
+                end
+            end
+        end
+        
+        results = results .. "\nTotal Scraped: " .. tostring(count)
+        pcall(function()
+            if not isfolder("Nebublox") then makefolder("Nebublox") end
+            writefile("Nebublox/Scanner_" .. tostring(os.time()) .. ".txt", results)
+            Window:Notify({Title="Scanner Complete", Content="Saved data to Nebublox folder.", Type="success", Duration=5})
+        end)
+    end)
+end})
+
+local SetSec = SettingsTab:MakeSection({Name = "Configuration Management"})
+local FolderName = "Nebublox"
+local ConfigsFolder = FolderName .. "/Configs"
+pcall(function() if not isfolder(FolderName) then makefolder(FolderName) end; if not isfolder(ConfigsFolder) then makefolder(ConfigsFolder) end end)
+
+local ConfName = ""
+local function GetConfigs() local files = {"None"}; pcall(function() for _, f in ipairs(listfiles(ConfigsFolder)) do if f:match("%.json$") then table.insert(files, f:match("([^/\\\\]+)%.json$")) end end end); return files end
+
+local confRow1 = SetSec:AddRow({Columns = 2, Widths = {0.8, 0.2}})
+local ConfDrop = confRow1[1]:AddDropdown({Name = "Saved Profiles", Options = GetConfigs(), Default = "None", Callback = function(v) if v ~= "None" then ConfName = v end end})
+confRow1[2]:AddButton({Name = "🔄", Primary = true, Center = true, Callback = function()
+    local files = GetConfigs()
+    if ConfDrop and ConfDrop.Refresh then ConfDrop:Refresh(files, files[1]) end
+end})
+
+SetSec:AddDivider()
+SetSec:AddTextbox({Name = "Profile Name", Placeholder = "Enter config name...", Callback = function(t) ConfName = t end})
+SetSec:AddDivider()
+
+local confRow2 = SetSec:AddRow({Columns = 3, Widths = {0.33, 0.33, 0.33}})
+confRow2[1]:AddButton({Name = "Save", Primary = true, Center = true, Callback = function() 
+    if ConfName ~= "" and ConfName ~= "None" then 
+        pcall(function() writefile(ConfigsFolder.."/"..ConfName..".json", game:GetService("HttpService"):JSONEncode(NebuState or {})) end)
+        Window:Notify({Title="Config",Content="Saved: "..ConfName,Type="success"}) 
+    end 
+end})
+confRow2[2]:AddButton({Name = "Load", Center = true, Callback = function() 
+    if ConfName ~= "" and ConfName ~= "None" then 
+        pcall(function() local p = ConfigsFolder.."/"..ConfName..".json"; if isfile(p) then for k,v in pairs(game:GetService("HttpService"):JSONDecode(readfile(p))) do NebuState[k] = v end end end)
+        Window:Notify({Title="Config",Content="Loaded: "..ConfName,Type="success"}) 
+    end 
+end})
+confRow2[3]:AddButton({Name = "Delete", Danger = true, Center = true, Callback = function() 
+    if ConfName ~= "" and ConfName ~= "None" then 
+        pcall(function() delfile(ConfigsFolder.."/"..ConfName..".json") end)
+        Window:Notify({Title="Config",Content="Deleted: "..ConfName,Type="error"}) 
+    end 
+end})
+
+-- // Launch notification
+Window:Notify({Title = "Nebublox", Content = "Anime Creatures Final Masterpiece Loaded!", Type = "success"})
+
+-- // Aesthetics Override Engine
+task.spawn(function()
+    task.wait(3)
+    local cViolet = Color3.fromRGB(170, 0, 255)
+    local cBlue   = Color3.fromRGB(0, 255, 204)
+    local function ApplyGradient(instance, c1, c2)
+        if not instance or not instance:IsA("GuiObject") then return end
+        for _, child in ipairs(instance:GetChildren()) do if child:IsA("UIGradient") then child:Destroy() end end
+        local grad = Instance.new("UIGradient")
+        grad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, c1), ColorSequenceKeypoint.new(1, c2)}
+        grad.Parent = instance
+    end
+
+    local rootUi = nil
+    for _, v in pairs(game:GetService("CoreGui"):GetChildren()) do if string.find(v.Name, "Nebublox") or v:FindFirstChild("Main") then rootUi = v break end end
+    if rootUi then
+        local function styleElement(v)
+            if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then
+                v.Font = NebuState.CurrentFont or Enum.Font.FredokaOne
+                local text = v.Text
+                if text == "NEBUBLOX" or text == "Home" or text == "Settings" then 
+                    ApplyGradient(v, cViolet, cBlue)
+                elseif string.find(text, "Anime") then 
+                    ApplyGradient(v, Color3.fromRGB(255, 170, 0), Color3.fromRGB(255, 100, 0))
+                elseif string.find(text, player.DisplayName) then
+                    ApplyGradient(v, cViolet, cBlue)
+                end
+            end
+        end
+        for _, v in ipairs(rootUi:GetDescendants()) do styleElement(v) end
+        rootUi.DescendantAdded:Connect(styleElement)
+    end
+end)
