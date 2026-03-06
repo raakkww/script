@@ -1,0 +1,15 @@
+local part = script.Parent
+
+part.Touched:Connect(function(hit)
+    local player = game.Players:GetPlayerFromCharacter(hit.Parent)
+    
+    if player then
+        local leaderstats = player:FindFirstChild("leaderstats")
+        if leaderstats then
+            local cash = leaderstats:FindFirstChild("Cash")
+            if cash then
+                cash.Value = cash.Value + 100
+            end
+        end
+    end
+end)
