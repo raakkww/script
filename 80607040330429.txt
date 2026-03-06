@@ -1,0 +1,39 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local Player = require(ReplicatedStorage.Shared.Classes.Level.Player)
+local Obsidian = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/Library.lua"))()
+
+local noclip = false
+
+local oldPlayerDie
+oldPlayerDie = hookfunction(Player.Die, function(...)
+    if noclip then
+        return false
+    end
+
+    return oldPlayerDie(...)
+end)
+
+local window = Obsidian:CreateWindow {
+    Title = "Dash World",
+    Footer = "Right Shift to toggle"
+}
+
+local tab = window:AddTab("Main")
+
+local box = tab:AddLeftGroupbox("Player")
+
+local noclipToggle = box:AddToggle("Noclip", {
+    Text = "Noclip",
+    Default = noclip,
+    Callback = function(value)
+        noclip = value
+    end
+})
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        Obsidian:Toggle()
+    end
+end)
