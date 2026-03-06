@@ -1,0 +1,10 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local playerData = LocalPlayer:FindFirstChild("PlayerData")
+if playerData then
+	local upgradeMagnet = playerData:FindFirstChild("Upgrade_magnet")
+	if upgradeMagnet and upgradeMagnet:IsA("IntValue") then
+		upgradeMagnet.Value = 999999999
+	end
+end
