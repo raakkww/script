@@ -1,0 +1,139 @@
+--[[
+    Entry Point | Open Source
+    Created by: f0rsakeN / @Milan_Perticevic / @ImNotASeer
+    
+    Features: 
+    - WalkSpeed Adjustments (resets if you run)
+    - Player ESP
+    - NPC ESP
+    - NPC Teleportation
+]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Entry Point | Created by: f0rsakeN / @Milan_Petricevic / @ImNotASeer",
+   LoadingTitle = "System Loading...",
+   LoadingSubtitle = "Open Source Script...",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "MyCustomSettings"
+   }
+})
+
+-- VARIABLES
+local Settings = {
+    WalkSpeed = 16,
+    JumpPower = 50,
+    PlayerESP = false,
+    NpcESP = false
+}
+
+-- --- TABS ---
+local GeneralTab = Window:CreateTab("General", 4483362458)
+
+-- --- MOVEMENT SECTION ---
+GeneralTab:CreateSection("Movement")
+
+GeneralTab:CreateSlider({
+   Name = "WalkSpeed",
+   Range = {16, 300},
+   Increment = 1,
+   CurrentValue = 16,
+   Callback = function(Value)
+      if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+         game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+      end
+   end,
+})
+
+-- --- VISUALS SECTION ---
+GeneralTab:CreateSection("Visuals")
+
+GeneralTab:CreateToggle({
+   Name = "Player ESP (Red)",
+   CurrentValue = false,
+   Callback = function(Value)
+      Settings.PlayerESP = Value
+      while Settings.PlayerESP do
+         for _, p in pairs(game.Players:GetPlayers()) do
+            if p ~= game.Players.LocalPlayer and p.Character then
+               local hl = p.Character:FindFirstChild("PlayerHighlight") or Instance.new("Highlight")
+               hl.Name = "PlayerHighlight"
+               hl.FillColor = Color3.fromRGB(255, 0, 0)
+               hl.Parent = p.Character
+            end
+         end
+         task.wait(2)
+         if not Settings.PlayerESP then
+            for _, p in pairs(game.Players:GetPlayers()) do
+               if p.Character and p.Character:FindFirstChild("PlayerHighlight") then
+                  p.Character.PlayerHighlight:Destroy()
+               end
+            end
+         end
+      end
+   end,
+})
+
+-- --- NPC MODS SECTION ---
+GeneralTab:CreateSection("NPC Mods")
+
+GeneralTab:CreateToggle({
+   Name = "NPC ESP (Green)",
+   CurrentValue = false,
+   Callback = function(Value)
+      Settings.NpcESP = Value
+      
+      local function refreshNPCs()
+         for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") and not game.Players:GetPlayerFromCharacter(v) then
+               if Settings.NpcESP then
+                  local hl = v:FindFirstChild("NPCHighlight") or Instance.new("Highlight")
+                  hl.Name = "NPCHighlight"
+                  hl.FillColor = Color3.fromRGB(0, 255, 0)
+                  hl.FillTransparency = 0.4
+                  hl.Parent = v
+               else
+                  if v:FindFirstChild("NPCHighlight") then v.NPCHighlight:Destroy() end
+               end
+            end
+         end
+      end
+
+      if Value then
+         task.spawn(function()
+            while Settings.NpcESP do
+               refreshNPCs()
+               task.wait(3)
+            end
+         end)
+      else
+         refreshNPCs()
+      end
+   end,
+})
+
+GeneralTab:CreateButton({
+   Name = "Teleport All NPCs to Me",
+   Callback = function()
+      local playerPos = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame
+      local count = 0
+      
+      for _, v in pairs(workspace:GetDescendants()) do
+         if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") then
+            if not game.Players:GetPlayerFromCharacter(v) then
+               v.HumanoidRootPart.CFrame = playerPos * CFrame.new(0, 0, -5)
+               count = count + 1
+            end
+         end
+      end
+      
+      Rayfield:Notify({
+         Title = "TP Completed",
+         Content = "Teleported " .. count .. " NPCs.",
+         Duration = 3,
+         Image = 4483362458,
+      })
+   end,
+})
