@@ -1,0 +1,17 @@
+local player = game.Players.LocalPlayer
+
+while true do
+    local character = player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+
+    if rootPart then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj.Name == "CashPart" and obj:IsA("BasePart") then
+                firetouchinterest(rootPart, obj, 0)
+                firetouchinterest(rootPart, obj, 1)
+            end
+        end
+    end
+    
+    task.wait(1)
+end
