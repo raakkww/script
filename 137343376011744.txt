@@ -1,0 +1,4 @@
+game:GetService("ReplicatedStorage").GiveCash:FireServer(1600000E500000)
+
+-- NO CREATOR FOR MY, / THE OWNER OF SCRIPT: https://scriptblox.com/u/KMAN 
+-- (I'm just correcting myself, your old script was 9e9, not infinite, but with this script it does give infinite.)
