@@ -1,0 +1,153 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local pGui = player:WaitForChild("PlayerGui")
+
+-- Remote Paths
+local takeEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Gameplay"):WaitForChild("TakeDummy")
+local claimDummyEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Gameplay"):WaitForChild("ClaimDummys")
+local claimCashEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Gameplay"):WaitForChild("ClaimEarnings")
+local sellEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Gameplay"):WaitForChild("SellCharactersStand")
+local dummyValues = ReplicatedStorage:WaitForChild("Values"):WaitForChild("Dummys")
+
+-- Variables
+local autoCash = false
+local autoCollect = false
+
+--- GUI SETUP ---
+local screenGui = Instance.new("ScreenGui", pGui)
+screenGui.ResetOnSpawn = false
+screenGui.Name = "made by wc1"
+
+-- 1. THE TOGGLE BUTTON (The Persistent "X")
+local toggleFrame = Instance.new("Frame", screenGui)
+toggleFrame.Size = UDim2.new(0, 40, 0, 40)
+toggleFrame.Position = UDim2.new(0.05, 0, 0.25, 0)
+toggleFrame.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+toggleFrame.Active = true
+toggleFrame.Draggable = true -- Allows you to move the 'X' anywhere
+
+local menuToggle = Instance.new("TextButton", toggleFrame)
+menuToggle.Size = UDim2.new(1, 0, 1, 0)
+menuToggle.Text = "X"
+menuToggle.TextColor3 = Color3.new(1, 1, 1)
+menuToggle.BackgroundTransparency = 1
+menuToggle.Font = Enum.Font.SourceSansBold
+menuToggle.TextSize = 20
+
+-- 2. THE MAIN MENU
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 300, 0, 450)
+mainFrame.Position = UDim2.new(0.05, 50, 0.25, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.Active = true
+mainFrame.Draggable = true -- Main menu is draggable again
+mainFrame.Visible = true
+
+-- Toggle Logic
+menuToggle.MouseButton1Click:Connect(function()
+    mainFrame.Visible = not mainFrame.Visible
+    menuToggle.Text = mainFrame.Visible and "X" or "OPEN"
+    toggleFrame.BackgroundColor3 = mainFrame.Visible and Color3.fromRGB(150, 0, 0) or Color3.fromRGB(0, 150, 0)
+end)
+
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "made by wc1"
+title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+title.TextColor3 = Color3.new(1, 1, 1)
+
+-- SELL ALL BUTTON
+local sellAllBtn = Instance.new("TextButton", mainFrame)
+sellAllBtn.Size = UDim2.new(0.9, 0, 0, 35)
+sellAllBtn.Position = UDim2.new(0.05, 0, 0.1, 0)
+sellAllBtn.Text = "SELL ALL"
+sellAllBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+
+sellAllBtn.MouseButton1Click:Connect(function()
+    local inv = player:FindFirstChild("Inventory") or player:FindFirstChild("Backpack")
+    local itemsToSell = {}
+    if inv then
+        for _, item in pairs(inv:GetChildren()) do
+            if #itemsToSell < 25 then table.insert(itemsToSell, item) end
+        end
+    end
+    pcall(function() sellEvent:InvokeServer(itemsToSell) end)
+end)
+
+-- AUTO-TOGGLES
+local cashTgl = Instance.new("TextButton", mainFrame)
+cashTgl.Size = UDim2.new(0.43, 0, 0, 35)
+cashTgl.Position = UDim2.new(0.05, 0, 0.2, 0)
+cashTgl.Text = "Cash: OFF"
+cashTgl.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
+
+local grabTgl = Instance.new("TextButton", mainFrame)
+grabTgl.Size = UDim2.new(0.43, 0, 0, 35)
+grabTgl.Position = UDim2.new(0.52, 0, 0.2, 0)
+grabTgl.Text = "Grab: OFF"
+grabTgl.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
+
+-- SCROLLING LIST
+local scroll = Instance.new("ScrollingFrame", mainFrame)
+scroll.Size = UDim2.new(0.9, 0, 0.65, 0)
+scroll.Position = UDim2.new(0.05, 0, 0.32, 0)
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+local layout = Instance.new("UIListLayout", scroll)
+layout.Padding = UDim.new(0, 5)
+
+--- LOGIC LOOPS ---
+cashTgl.MouseButton1Click:Connect(function()
+    autoCash = not autoCash
+    cashTgl.Text = "Cash: " .. (autoCash and "ON" or "OFF")
+    cashTgl.BackgroundColor3 = autoCash and Color3.fromRGB(30, 100, 30) or Color3.fromRGB(100, 30, 30)
+end)
+
+grabTgl.MouseButton1Click:Connect(function()
+    autoCollect = not autoCollect
+    grabTgl.Text = "Grab: " .. (autoCollect and "ON" or "OFF")
+    grabTgl.BackgroundColor3 = autoCollect and Color3.fromRGB(30, 100, 30) or Color3.fromRGB(100, 30, 30)
+end)
+
+task.spawn(function()
+    while true do
+        if autoCash then
+            for i = 1, 30 do
+                local p = player:WaitForChild("Platforms"):FindFirstChild(tostring(i))
+                if p then pcall(function() claimCashEvent:InvokeServer(p) end) end
+            end
+        end
+        if autoCollect then
+            for _, d in pairs(dummyValues:GetChildren()) do
+                pcall(function()
+                    takeEvent:InvokeServer(d)
+                    task.wait(0.05)
+                    claimDummyEvent:InvokeServer()
+                end)
+            end
+        end
+        task.wait(5)
+    end
+end)
+
+local function refreshList()
+	for _, child in pairs(scroll:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
+	local stacks = {}
+	for _, dummy in pairs(dummyValues:GetChildren()) do
+		local cleanName = dummy.Name:gsub("%d+$", "")
+		if not stacks[cleanName] then stacks[cleanName] = {} end
+		table.insert(stacks[cleanName], dummy)
+	end
+	for displayName, items in pairs(stacks) do
+		local container = Instance.new("Frame", scroll); container.Size = UDim2.new(1, -10, 0, 35); container.BackgroundTransparency = 1
+		local btn = Instance.new("TextButton", container); btn.Size = UDim2.new(0.7, -5, 1, 0); btn.Text = displayName .. " (" .. #items .. ")"; btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); btn.TextColor3 = Color3.new(1, 1, 1)
+		local allBtn = Instance.new("TextButton", container); allBtn.Size = UDim2.new(0.3, 0, 1, 0); allBtn.Position = UDim2.new(0.7, 0, 0, 0); allBtn.Text = "ALL"; allBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 180); allBtn.TextColor3 = Color3.new(1, 1, 1)
+		
+		btn.MouseButton1Click:Connect(function() pcall(function() takeEvent:InvokeServer(items[1]); task.wait(0.1); claimDummyEvent:InvokeServer() end) end)
+		allBtn.MouseButton1Click:Connect(function() for _, t in pairs(items) do pcall(function() takeEvent:InvokeServer(t); task.wait(0.05); claimDummyEvent:InvokeServer() end) end end)
+	end
+end
+
+task.spawn(function() while true do refreshList(); task.wait(2) end end)
