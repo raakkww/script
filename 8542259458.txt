@@ -1,0 +1,965 @@
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local REQUIRED_KEY = "teeksawontop"
+local FLY_SPEED = 60
+
+local function tween(obj, info, props)
+	local tw = TweenService:Create(obj, info, props)
+	tw:Play()
+	return tw
+end
+
+local function trim(s)
+	return (s or ""):match("^%s*(.-)%s*$")
+end
+
+local function startsWith(text, prefix)
+	return string.sub(text, 1, #prefix) == prefix
+end
+
+local function anyKeyDown(keys)
+	for _, keyCode in ipairs(keys) do
+		if UIS:IsKeyDown(keyCode) then
+			return true
+		end
+	end
+	return false
+end
+
+local trackedConnections = {}
+local function connect(signal, fn)
+	local c = signal:Connect(fn)
+	table.insert(trackedConnections, c)
+	return c
+end
+
+local blurName = ("PNF_HUB_BLUR_%d"):format(LocalPlayer.UserId)
+local oldBlur = Lighting:FindFirstChild(blurName)
+if oldBlur then oldBlur:Destroy() end
+
+local worldBlur = Instance.new("BlurEffect")
+worldBlur.Name = blurName
+worldBlur.Size = 0
+worldBlur.Parent = Lighting
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "PNF_HUB_GUI"
+Gui.ResetOnSpawn = false
+Gui.IgnoreGuiInset = true
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.DisplayOrder = 9999
+Gui.Parent = PlayerGui
+
+-- Intro
+local Intro = Instance.new("Frame")
+Intro.Size = UDim2.fromScale(1, 1)
+Intro.BackgroundTransparency = 1
+Intro.ZIndex = 1
+Intro.Parent = Gui
+
+local uiBlur = nil
+do
+	local ok, blurObj = pcall(Instance.new, "UIBlurEffect")
+	if ok and blurObj then
+		local blurHost = Instance.new("Frame")
+		blurHost.Size = UDim2.fromScale(1, 1)
+		blurHost.BackgroundTransparency = 1
+		blurHost.BorderSizePixel = 0
+		blurHost.ZIndex = 1
+		blurHost.Parent = Intro
+
+		blurObj.Size = 0
+		blurObj.Parent = blurHost
+		uiBlur = blurObj
+	end
+end
+
+local IntroTitle = Instance.new("TextLabel")
+IntroTitle.AnchorPoint = Vector2.new(0.5, 0.5)
+IntroTitle.Position = UDim2.new(0.5, 0, 0.46, 16)
+IntroTitle.Size = UDim2.fromOffset(520, 90)
+IntroTitle.BackgroundTransparency = 1
+IntroTitle.Text = "PNF HUB"
+IntroTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+IntroTitle.TextTransparency = 1
+IntroTitle.Font = Enum.Font.GothamBlack
+IntroTitle.TextSize = 68
+IntroTitle.ZIndex = 2
+IntroTitle.Parent = Intro
+
+local IntroBy = Instance.new("TextLabel")
+IntroBy.AnchorPoint = Vector2.new(0.5, 0.5)
+IntroBy.Position = UDim2.new(0.5, 0, 0.53, 22)
+IntroBy.Size = UDim2.fromOffset(260, 30)
+IntroBy.BackgroundTransparency = 1
+IntroBy.Text = "by teeksaw"
+IntroBy.TextColor3 = Color3.fromRGB(220, 220, 220)
+IntroBy.TextTransparency = 1
+IntroBy.Font = Enum.Font.Gotham
+IntroBy.TextSize = 24
+IntroBy.ZIndex = 2
+IntroBy.Parent = Intro
+
+-- Main GUI
+local Main = Instance.new("Frame")
+Main.AnchorPoint = Vector2.new(0.5, 0.5)
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+Main.Size = UDim2.fromOffset(430, 320)
+Main.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+Main.BackgroundTransparency = 0.1
+Main.BorderSizePixel = 0
+Main.Visible = false
+Main.Active = true
+Main.ZIndex = 10
+Main.Parent = Gui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = Main
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(255, 255, 255)
+MainStroke.Transparency = 0.7
+MainStroke.Thickness = 1.1
+MainStroke.Parent = Main
+
+local MainScale = Instance.new("UIScale")
+MainScale.Scale = 1
+MainScale.Parent = Main
+
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 38)
+TopBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+TopBar.BackgroundTransparency = 0.3
+TopBar.BorderSizePixel = 0
+TopBar.Active = true
+TopBar.ZIndex = 11
+TopBar.Parent = Main
+
+local TopLine = Instance.new("Frame")
+TopLine.Size = UDim2.new(1, 0, 0, 1)
+TopLine.Position = UDim2.new(0, 0, 1, -1)
+TopLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TopLine.BackgroundTransparency = 0.82
+TopLine.BorderSizePixel = 0
+TopLine.ZIndex = 12
+TopLine.Parent = TopBar
+
+local TopTitle = Instance.new("TextLabel")
+TopTitle.Size = UDim2.fromOffset(105, 38)
+TopTitle.Position = UDim2.fromOffset(10, 0)
+TopTitle.BackgroundTransparency = 1
+TopTitle.Text = "PNF HUB"
+TopTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+TopTitle.Font = Enum.Font.GothamBold
+TopTitle.TextSize = 20
+TopTitle.TextXAlignment = Enum.TextXAlignment.Left
+TopTitle.ZIndex = 12
+TopTitle.Parent = TopBar
+
+local TopSub = Instance.new("TextLabel")
+TopSub.Size = UDim2.fromOffset(120, 38)
+TopSub.Position = UDim2.fromOffset(116, 0)
+TopSub.BackgroundTransparency = 1
+TopSub.Text = "for SkyWars"
+TopSub.TextColor3 = Color3.fromRGB(190, 190, 190)
+TopSub.Font = Enum.Font.Gotham
+TopSub.TextSize = 13
+TopSub.TextXAlignment = Enum.TextXAlignment.Left
+TopSub.ZIndex = 12
+TopSub.Parent = TopBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.AnchorPoint = Vector2.new(1, 0.5)
+CloseBtn.Position = UDim2.new(1, -8, 0.5, 0)
+CloseBtn.Size = UDim2.fromOffset(30, 28)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 16
+CloseBtn.AutoButtonColor = false
+CloseBtn.ZIndex = 12
+CloseBtn.Parent = TopBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 7)
+CloseCorner.Parent = CloseBtn
+
+local CloseStroke = Instance.new("UIStroke")
+CloseStroke.Color = Color3.fromRGB(255, 255, 255)
+CloseStroke.Transparency = 0.65
+CloseStroke.Parent = CloseBtn
+
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -20, 1, -54)
+Content.Position = UDim2.fromOffset(10, 46)
+Content.BackgroundTransparency = 1
+Content.ZIndex = 11
+Content.Parent = Main
+
+local List = Instance.new("UIListLayout")
+List.FillDirection = Enum.FillDirection.Vertical
+List.HorizontalAlignment = Enum.HorizontalAlignment.Center
+List.SortOrder = Enum.SortOrder.LayoutOrder
+List.Padding = UDim.new(0, 10)
+List.Parent = Content
+
+local function createButton(text, order)
+	local btn = Instance.new("TextButton")
+	btn.LayoutOrder = order
+	btn.Size = UDim2.new(1, 0, 0, 46)
+	btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+	btn.BorderSizePixel = 0
+	btn.Text = text
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 16
+	btn.AutoButtonColor = false
+	btn.ZIndex = 12
+	btn.Parent = Content
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = btn
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(255, 255, 255)
+	stroke.Transparency = 0.65
+	stroke.Thickness = 1
+	stroke.Parent = btn
+
+	connect(btn.MouseEnter, function()
+		tween(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(30, 30, 30)})
+	end)
+
+	connect(btn.MouseLeave, function()
+		tween(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(20, 20, 20)})
+	end)
+
+	return btn
+end
+
+local TpBehindBtn = createButton("TP behind player (T)", 1)
+
+local TpRow = Instance.new("Frame")
+TpRow.LayoutOrder = 2
+TpRow.Size = UDim2.new(1, 0, 0, 46)
+TpRow.BackgroundTransparency = 1
+TpRow.ZIndex = 12
+TpRow.Parent = Content
+
+local TpPlayerBox = Instance.new("TextBox")
+TpPlayerBox.Size = UDim2.new(0.68, 0, 1, 0)
+TpPlayerBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TpPlayerBox.BorderSizePixel = 0
+TpPlayerBox.PlaceholderText = "Player name (min 3 letters)"
+TpPlayerBox.Text = ""
+TpPlayerBox.ClearTextOnFocus = false
+TpPlayerBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpPlayerBox.PlaceholderColor3 = Color3.fromRGB(160, 160, 160)
+TpPlayerBox.Font = Enum.Font.Gotham
+TpPlayerBox.TextSize = 15
+TpPlayerBox.TextXAlignment = Enum.TextXAlignment.Left
+TpPlayerBox.ZIndex = 12
+TpPlayerBox.Parent = TpRow
+
+local TpPlayerBoxCorner = Instance.new("UICorner")
+TpPlayerBoxCorner.CornerRadius = UDim.new(0, 8)
+TpPlayerBoxCorner.Parent = TpPlayerBox
+
+local TpPlayerBoxStroke = Instance.new("UIStroke")
+TpPlayerBoxStroke.Color = Color3.fromRGB(255, 255, 255)
+TpPlayerBoxStroke.Transparency = 0.68
+TpPlayerBoxStroke.Parent = TpPlayerBox
+
+local TpPlayerBtn = Instance.new("TextButton")
+TpPlayerBtn.AnchorPoint = Vector2.new(1, 0)
+TpPlayerBtn.Position = UDim2.new(1, 0, 0, 0)
+TpPlayerBtn.Size = UDim2.new(0.30, 0, 1, 0)
+TpPlayerBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TpPlayerBtn.BorderSizePixel = 0
+TpPlayerBtn.Text = "TP Player"
+TpPlayerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpPlayerBtn.Font = Enum.Font.GothamBold
+TpPlayerBtn.TextSize = 15
+TpPlayerBtn.ZIndex = 12
+TpPlayerBtn.Parent = TpRow
+
+local TpPlayerBtnCorner = Instance.new("UICorner")
+TpPlayerBtnCorner.CornerRadius = UDim.new(0, 8)
+TpPlayerBtnCorner.Parent = TpPlayerBtn
+
+local TpPlayerBtnStroke = Instance.new("UIStroke")
+TpPlayerBtnStroke.Color = Color3.fromRGB(255, 255, 255)
+TpPlayerBtnStroke.Transparency = 0.65
+TpPlayerBtnStroke.Parent = TpPlayerBtn
+
+local FlyBtn = createButton("Fly: OFF (F)", 3)
+local EspBtn = createButton("ESP Rainbow: OFF", 4)
+
+local HubStatus = Instance.new("TextLabel")
+HubStatus.LayoutOrder = 10
+HubStatus.Size = UDim2.new(1, 0, 0, 20)
+HubStatus.BackgroundTransparency = 1
+HubStatus.Text = ""
+HubStatus.TextColor3 = Color3.fromRGB(185, 185, 185)
+HubStatus.Font = Enum.Font.Gotham
+HubStatus.TextSize = 13
+HubStatus.TextXAlignment = Enum.TextXAlignment.Left
+HubStatus.ZIndex = 12
+HubStatus.Parent = Content
+
+local function setHubStatus(msg, color)
+	HubStatus.Text = msg or ""
+	if color then
+		HubStatus.TextColor3 = color
+	else
+		HubStatus.TextColor3 = Color3.fromRGB(185, 185, 185)
+	end
+end
+
+-- Key GUI
+local KeyFrame = Instance.new("Frame")
+KeyFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+KeyFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+KeyFrame.Size = UDim2.fromOffset(350, 170)
+KeyFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+KeyFrame.BackgroundTransparency = 0.08
+KeyFrame.BorderSizePixel = 0
+KeyFrame.Visible = false
+KeyFrame.ZIndex = 20
+KeyFrame.Parent = Gui
+
+local KeyCorner = Instance.new("UICorner")
+KeyCorner.CornerRadius = UDim.new(0, 10)
+KeyCorner.Parent = KeyFrame
+
+local KeyStroke = Instance.new("UIStroke")
+KeyStroke.Color = Color3.fromRGB(255, 255, 255)
+KeyStroke.Transparency = 0.7
+KeyStroke.Thickness = 1.1
+KeyStroke.Parent = KeyFrame
+
+local KeyScale = Instance.new("UIScale")
+KeyScale.Scale = 1
+KeyScale.Parent = KeyFrame
+
+local KeyTitle = Instance.new("TextLabel")
+KeyTitle.Size = UDim2.new(1, -20, 0, 34)
+KeyTitle.Position = UDim2.fromOffset(10, 8)
+KeyTitle.BackgroundTransparency = 1
+KeyTitle.Text = "Enter Key"
+KeyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+KeyTitle.Font = Enum.Font.GothamBold
+KeyTitle.TextSize = 23
+KeyTitle.ZIndex = 21
+KeyTitle.Parent = KeyFrame
+
+local KeyBox = Instance.new("TextBox")
+KeyBox.Size = UDim2.new(1, -20, 0, 40)
+KeyBox.Position = UDim2.fromOffset(10, 52)
+KeyBox.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+KeyBox.BorderSizePixel = 0
+KeyBox.PlaceholderText = "key..."
+KeyBox.Text = ""
+KeyBox.ClearTextOnFocus = false
+KeyBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+KeyBox.PlaceholderColor3 = Color3.fromRGB(160, 160, 160)
+KeyBox.Font = Enum.Font.Gotham
+KeyBox.TextSize = 18
+KeyBox.ZIndex = 21
+KeyBox.Parent = KeyFrame
+
+local KeyBoxCorner = Instance.new("UICorner")
+KeyBoxCorner.CornerRadius = UDim.new(0, 8)
+KeyBoxCorner.Parent = KeyBox
+
+local KeyBoxStroke = Instance.new("UIStroke")
+KeyBoxStroke.Color = Color3.fromRGB(255, 255, 255)
+KeyBoxStroke.Transparency = 0.7
+KeyBoxStroke.Parent = KeyBox
+
+local VerifyBtn = Instance.new("TextButton")
+VerifyBtn.Size = UDim2.new(1, -20, 0, 36)
+VerifyBtn.Position = UDim2.fromOffset(10, 98)
+VerifyBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+VerifyBtn.BorderSizePixel = 0
+VerifyBtn.Text = "Verify"
+VerifyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerifyBtn.Font = Enum.Font.GothamBold
+VerifyBtn.TextSize = 16
+VerifyBtn.ZIndex = 21
+VerifyBtn.Parent = KeyFrame
+
+local VerifyCorner = Instance.new("UICorner")
+VerifyCorner.CornerRadius = UDim.new(0, 8)
+VerifyCorner.Parent = VerifyBtn
+
+local VerifyStroke = Instance.new("UIStroke")
+VerifyStroke.Color = Color3.fromRGB(255, 255, 255)
+VerifyStroke.Transparency = 0.65
+VerifyStroke.Parent = VerifyBtn
+
+local KeyStatus = Instance.new("TextLabel")
+KeyStatus.Size = UDim2.new(1, -20, 0, 20)
+KeyStatus.Position = UDim2.fromOffset(10, 139)
+KeyStatus.BackgroundTransparency = 1
+KeyStatus.Text = ""
+KeyStatus.TextColor3 = Color3.fromRGB(255, 110, 110)
+KeyStatus.Font = Enum.Font.Gotham
+KeyStatus.TextSize = 14
+KeyStatus.TextXAlignment = Enum.TextXAlignment.Left
+KeyStatus.ZIndex = 21
+KeyStatus.Parent = KeyFrame
+
+-- Drag
+local dragging = false
+local dragStart
+local startPos
+
+connect(TopBar.InputBegan, function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = Main.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+connect(UIS.InputChanged, function(input)
+	if not dragging then return end
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		local delta = input.Position - dragStart
+		Main.Position = UDim2.new(
+			startPos.X.Scale, startPos.X.Offset + delta.X,
+			startPos.Y.Scale, startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+-- Player helpers
+local function getAliveCharacter(plr)
+	local char = plr.Character
+	if not char then return nil end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hum or hum.Health <= 0 or not hrp then return nil end
+	return char
+end
+
+local function getClosestPlayer()
+	local myChar = getAliveCharacter(LocalPlayer)
+	if not myChar then return nil end
+	local myHrp = myChar:FindFirstChild("HumanoidRootPart")
+	if not myHrp then return nil end
+
+	local bestPlayer, bestDist = nil, math.huge
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer then
+			local char = getAliveCharacter(plr)
+			if char then
+				local hrp = char:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					local d = (hrp.Position - myHrp.Position).Magnitude
+					if d < bestDist then
+						bestDist = d
+						bestPlayer = plr
+					end
+				end
+			end
+		end
+	end
+	return bestPlayer
+end
+
+local function teleportBehindClosest()
+	local myChar = getAliveCharacter(LocalPlayer)
+	local targetPlayer = getClosestPlayer()
+	if not myChar or not targetPlayer then
+		setHubStatus("No valid player found.", Color3.fromRGB(255, 120, 120))
+		return
+	end
+
+	local myHrp = myChar:FindFirstChild("HumanoidRootPart")
+	local targetChar = getAliveCharacter(targetPlayer)
+	if not myHrp or not targetChar then return end
+	local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
+	if not targetHrp then return end
+
+	local behind = targetHrp.Position - (targetHrp.CFrame.LookVector * 3)
+	myHrp.CFrame = CFrame.new(behind, targetHrp.Position)
+	setHubStatus("TP behind " .. targetPlayer.Name, Color3.fromRGB(170, 255, 170))
+end
+
+local function findPlayerByInput(raw)
+	local query = string.lower(trim(raw))
+	if query == "" then
+		return nil, "Enter a name."
+	end
+
+	local exact = nil
+	local matches = {}
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer then
+			local uname = string.lower(plr.Name)
+			local dname = string.lower(plr.DisplayName)
+
+			if uname == query or dname == query then
+				exact = plr
+				break
+			end
+
+			if #query >= 3 and (startsWith(uname, query) or startsWith(dname, query)) then
+				table.insert(matches, plr)
+			end
+		end
+	end
+
+	if exact then
+		return exact
+	end
+
+	if #query < 3 then
+		return nil, "Use at least 3 letters."
+	end
+
+	if #matches == 0 then
+		return nil, "Player not found."
+	end
+
+	table.sort(matches, function(a, b)
+		return a.Name < b.Name
+	end)
+
+	if #matches > 1 then
+		return matches[1], "Multiple matches, using: " .. matches[1].Name
+	end
+
+	return matches[1]
+end
+
+local function teleportToPlayerInput()
+	local target, note = findPlayerByInput(TpPlayerBox.Text)
+	if not target then
+		setHubStatus(note, Color3.fromRGB(255, 120, 120))
+		return
+	end
+
+	local myChar = getAliveCharacter(LocalPlayer)
+	local targetChar = getAliveCharacter(target)
+	if not myChar or not targetChar then
+		setHubStatus("Target is dead or missing.", Color3.fromRGB(255, 120, 120))
+		return
+	end
+
+	local myHrp = myChar:FindFirstChild("HumanoidRootPart")
+	local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
+	if not myHrp or not targetHrp then
+		setHubStatus("HumanoidRootPart missing.", Color3.fromRGB(255, 120, 120))
+		return
+	end
+
+	myHrp.CFrame = targetHrp.CFrame + Vector3.new(0, 2.8, 0)
+
+	if note then
+		setHubStatus(note, Color3.fromRGB(255, 220, 130))
+	else
+		setHubStatus("TP to " .. target.Name, Color3.fromRGB(170, 255, 170))
+	end
+end
+
+-- Fly
+local flyEnabled = false
+local flyConn = nil
+local flyBV = nil
+local flyBG = nil
+
+local function setFly(state)
+	if flyEnabled == state then return end
+	flyEnabled = state
+	FlyBtn.Text = state and "Fly: ON (F)" or "Fly: OFF (F)"
+
+	if not state then
+		if flyConn then flyConn:Disconnect() flyConn = nil end
+		if flyBV then flyBV:Destroy() flyBV = nil end
+		if flyBG then flyBG:Destroy() flyBG = nil end
+
+		local char = LocalPlayer.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if hum then hum.PlatformStand = false end
+
+		setHubStatus("Fly OFF", Color3.fromRGB(185, 185, 185))
+		return
+	end
+
+	local char = getAliveCharacter(LocalPlayer)
+	if not char then
+		flyEnabled = false
+		FlyBtn.Text = "Fly: OFF (F)"
+		setHubStatus("Character not ready.", Color3.fromRGB(255, 120, 120))
+		return
+	end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hum or not hrp then
+		flyEnabled = false
+		FlyBtn.Text = "Fly: OFF (F)"
+		setHubStatus("Character incomplete.", Color3.fromRGB(255, 120, 120))
+		return
+	end
+
+	hum.PlatformStand = true
+
+	flyBV = Instance.new("BodyVelocity")
+	flyBV.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+	flyBV.P = 4000
+	flyBV.Velocity = Vector3.zero
+	flyBV.Parent = hrp
+
+	flyBG = Instance.new("BodyGyro")
+	flyBG.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+	flyBG.P = 4000
+	flyBG.CFrame = hrp.CFrame
+	flyBG.Parent = hrp
+
+	flyConn = RunService.RenderStepped:Connect(function()
+		if not flyEnabled then return end
+		if not hrp.Parent then
+			setFly(false)
+			return
+		end
+
+		local camera = workspace.CurrentCamera
+		if not camera then return end
+
+		local forward = camera.CFrame.LookVector
+		local right = camera.CFrame.RightVector
+
+		local move = Vector3.zero
+
+		if anyKeyDown({Enum.KeyCode.W, Enum.KeyCode.Z, Enum.KeyCode.Up}) then
+			move += forward
+		end
+		if anyKeyDown({Enum.KeyCode.S, Enum.KeyCode.Down}) then
+			move -= forward
+		end
+		if anyKeyDown({Enum.KeyCode.A, Enum.KeyCode.Q, Enum.KeyCode.Left}) then
+			move -= right
+		end
+		if anyKeyDown({Enum.KeyCode.D, Enum.KeyCode.Right}) then
+			move += right
+		end
+
+		if move.Magnitude > 0 then
+			move = move.Unit * FLY_SPEED
+		end
+
+		flyBV.Velocity = move
+		flyBG.CFrame = camera.CFrame
+	end)
+
+	setHubStatus("Fly ON: F toggle, ZQSD/WASD", Color3.fromRGB(170, 255, 170))
+end
+
+-- ESP rainbow
+local espEnabled = false
+local rainbowConn = nil
+
+local function clearESP(char)
+	local old = char:FindFirstChild("PNF_ESP")
+	if old then old:Destroy() end
+end
+
+local function addESP(plr, char)
+	if plr == LocalPlayer or not espEnabled or not char then return end
+	clearESP(char)
+
+	local folder = Instance.new("Folder")
+	folder.Name = "PNF_ESP"
+	folder.Parent = char
+
+	local h = Instance.new("Highlight")
+	h.Adornee = char
+	h.FillTransparency = 1
+	h.OutlineTransparency = 0
+	h.OutlineColor = Color3.fromRGB(255, 0, 0)
+	h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	h.Parent = folder
+
+	local head = char:FindFirstChild("Head")
+	if head then
+		local bb = Instance.new("BillboardGui")
+		bb.Adornee = head
+		bb.Size = UDim2.fromOffset(180, 40)
+		bb.StudsOffset = Vector3.new(0, 2.3, 0)
+		bb.AlwaysOnTop = true
+		bb.Parent = folder
+
+		local txt = Instance.new("TextLabel")
+		txt.Size = UDim2.fromScale(1, 1)
+		txt.BackgroundTransparency = 1
+		txt.Text = plr.Name
+		txt.TextColor3 = Color3.fromRGB(255, 255, 255)
+		txt.TextStrokeTransparency = 0
+		txt.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+		txt.Font = Enum.Font.GothamBold
+		txt.TextScaled = true
+		txt.Parent = bb
+	end
+end
+
+local function refreshESP()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character then
+			if espEnabled then
+				addESP(plr, plr.Character)
+			else
+				clearESP(plr.Character)
+			end
+		end
+	end
+end
+
+local function setESP(state)
+	espEnabled = state
+	EspBtn.Text = state and "ESP Rainbow: ON" or "ESP Rainbow: OFF"
+
+	if state then
+		refreshESP()
+		if not rainbowConn then
+			rainbowConn = RunService.RenderStepped:Connect(function()
+				local col = Color3.fromHSV((os.clock() * 0.2) % 1, 1, 1)
+				for _, plr in ipairs(Players:GetPlayers()) do
+					if plr ~= LocalPlayer and plr.Character then
+						local folder = plr.Character:FindFirstChild("PNF_ESP")
+						local hi = folder and folder:FindFirstChildOfClass("Highlight")
+						if hi then
+							hi.OutlineColor = col
+						end
+					end
+				end
+			end)
+		end
+		setHubStatus("ESP ON", Color3.fromRGB(170, 255, 170))
+	else
+		if rainbowConn then
+			rainbowConn:Disconnect()
+			rainbowConn = nil
+		end
+		refreshESP()
+		setHubStatus("ESP OFF", Color3.fromRGB(185, 185, 185))
+	end
+end
+
+-- States
+local hubOpen = false
+local unlocked = false
+local destroyed = false
+
+local function setHubOpen(state)
+	if destroyed then return end
+	if hubOpen == state then return end
+	hubOpen = state
+
+	if state then
+		Main.Visible = true
+		MainScale.Scale = 0.86
+		tween(MainScale, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
+	else
+		tween(MainScale, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.92})
+		task.delay(0.12, function()
+			if not hubOpen and Main.Parent then
+				Main.Visible = false
+			end
+		end)
+	end
+end
+
+local function tryUnlock()
+	if string.lower(trim(KeyBox.Text)) == string.lower(REQUIRED_KEY) then
+		unlocked = true
+		KeyStatus.TextColor3 = Color3.fromRGB(170, 255, 170)
+		KeyStatus.Text = "Valid key."
+		task.wait(0.08)
+		KeyFrame.Visible = false
+		setHubOpen(true)
+		setHubStatus("Welcome " .. LocalPlayer.Name, Color3.fromRGB(170, 255, 170))
+	else
+		KeyStatus.TextColor3 = Color3.fromRGB(255, 120, 120)
+		KeyStatus.Text = "Wrong key."
+	end
+end
+
+local function destroyHub()
+	if destroyed then return end
+	destroyed = true
+
+	setFly(false)
+	setESP(false)
+
+	for _, c in ipairs(trackedConnections) do
+		if c and c.Connected then
+			c:Disconnect()
+		end
+	end
+
+	if worldBlur and worldBlur.Parent then
+		worldBlur:Destroy()
+	end
+
+	if Gui and Gui.Parent then
+		Gui:Destroy()
+	end
+end
+
+-- Connections
+connect(TpBehindBtn.MouseButton1Click, function()
+	if unlocked then
+		teleportBehindClosest()
+	end
+end)
+
+connect(TpPlayerBtn.MouseButton1Click, function()
+	if unlocked then
+		teleportToPlayerInput()
+	end
+end)
+
+connect(TpPlayerBox.FocusLost, function(enterPressed)
+	if unlocked and enterPressed then
+		teleportToPlayerInput()
+	end
+end)
+
+connect(FlyBtn.MouseButton1Click, function()
+	if unlocked then
+		setFly(not flyEnabled)
+	end
+end)
+
+connect(EspBtn.MouseButton1Click, function()
+	if unlocked then
+		setESP(not espEnabled)
+	end
+end)
+
+connect(VerifyBtn.MouseButton1Click, tryUnlock)
+connect(KeyBox.FocusLost, function(enterPressed)
+	if enterPressed then
+		tryUnlock()
+	end
+end)
+
+connect(CloseBtn.MouseButton1Click, destroyHub)
+
+connect(UIS.InputBegan, function(input, gameProcessed)
+	if gameProcessed or destroyed then return end
+
+	if input.KeyCode == Enum.KeyCode.RightShift then
+		if unlocked then
+			setHubOpen(not hubOpen)
+		end
+	elseif input.KeyCode == Enum.KeyCode.T then
+		if unlocked then
+			teleportBehindClosest()
+		end
+	elseif input.KeyCode == Enum.KeyCode.F then
+		if unlocked then
+			setFly(not flyEnabled)
+		end
+	end
+end)
+
+connect(LocalPlayer.CharacterAdded, function()
+	if flyEnabled then
+		task.wait(0.1)
+		setFly(false)
+	end
+end)
+
+for _, plr in ipairs(Players:GetPlayers()) do
+	if plr ~= LocalPlayer then
+		connect(plr.CharacterAdded, function(char)
+			task.wait(0.2)
+			if espEnabled then addESP(plr, char) end
+		end)
+	end
+end
+
+connect(Players.PlayerAdded, function(plr)
+	if plr == LocalPlayer then return end
+	connect(plr.CharacterAdded, function(char)
+		task.wait(0.2)
+		if espEnabled then addESP(plr, char) end
+	end)
+end)
+
+connect(Players.PlayerRemoving, function(plr)
+	if plr.Character then
+		clearESP(plr.Character)
+	end
+end)
+
+-- Intro animation (blur active only during intro)
+local function playIntro()
+	tween(worldBlur, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 24})
+	if uiBlur then
+		tween(uiBlur, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 24})
+	end
+
+	tween(IntroTitle, TweenInfo.new(0.30, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		TextTransparency = 0,
+		Position = UDim2.new(0.5, 0, 0.46, 0),
+	})
+
+	task.wait(0.1)
+
+	tween(IntroBy, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		TextTransparency = 0,
+		Position = UDim2.new(0.5, 0, 0.53, 8),
+	})
+
+	task.wait(1.0)
+
+	tween(IntroTitle, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 1})
+	tween(IntroBy, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 1})
+
+	task.wait(0.24)
+
+	tween(worldBlur, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0})
+	if uiBlur then
+		tween(uiBlur, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = 0})
+	end
+
+	task.wait(0.24)
+
+	if worldBlur and worldBlur.Parent then
+		worldBlur:Destroy()
+	end
+
+	Intro:Destroy()
+
+	KeyFrame.Visible = true
+	KeyScale.Scale = 0.9
+	tween(KeyScale, TweenInfo.new(0.20, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1})
+	task.wait(0.05)
+	KeyBox:CaptureFocus()
+end
+
+task.spawn(playIntro)
