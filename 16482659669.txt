@@ -1,0 +1,261 @@
+-- Build & Donate | Rayfield GUI v5 (Shag420 Copy) - Keyless!
+-- pro Hub v5 ð¥
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Build & Donate | pro Hub v5 ð¥",
+   LoadingTitle = "Shag420 Copy + TP",
+   LoadingSubtitle = "Ð¡ÐµÑÐ²ÐµÑÐ½ÑÐ¹ ÐºÐ»Ð¾Ð½ Ð±Ð¸Ð»Ð´Ð¾Ð²",
+   ConfigurationSaving = { Enabled = true, FolderName = "BuildDonateProV5", FileName = "Settings" },
+   KeySystem = false
+})
+
+
+local MainTab = Window:CreateTab("Main", 4483362458)
+local PlayerTab = Window:CreateTab("Player", 4483362458)
+local BuildTab = Window:CreateTab("Builds", 4483362458)
+local TeleTab = Window:CreateTab("Teleport", 4483362458)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+getgenv().FlyEnabled = false
+getgenv().Noclip = false
+getgenv().SpeedValue = 16
+getgenv().CopyTarget = ""
+getgenv().Copying = false
+
+-- ÐÐ¾Ð¸ÑÐº PlotBoundary Ð¸ Assets
+local function findPlotData(player)
+    for _, v in pairs(Workspace.Plots:GetDescendants()) do
+        if v.Name == "Owner" and v.Value == player then
+            local plot = v.Parent
+            return plot:FindFirstChild("PlotBoundary"), plot:FindFirstChild("Assets")
+        end
+    end
+    return nil, nil
+end
+
+-- Fly
+local FlySpeed = 50
+local BodyVelocity, BodyAngularVelocity
+MainTab:CreateToggle({
+   Name = "Fly (WASD + Space/Shift)",
+   CurrentValue = false,
+   Callback = function(Value)
+      getgenv().FlyEnabled = Value
+      local char = LocalPlayer.Character
+      if Value and char and char:FindFirstChild("HumanoidRootPart") then
+         local root = char.HumanoidRootPart
+         BodyVelocity = Instance.new("BodyVelocity")
+         BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+         BodyVelocity.Velocity = Vector3.new(0,0,0)
+         BodyVelocity.Parent = root
+
+         BodyAngularVelocity = Instance.new("BodyAngularVelocity")
+         BodyAngularVelocity.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+         BodyAngularVelocity.AngularVelocity = Vector3.new(0,0,0)
+         BodyAngularVelocity.Parent = root
+
+         RunService:BindToRenderStep("Fly", Enum.RenderPriority.Input.Value, function()
+            if char.Parent and root.Parent then
+               local cam = Workspace.CurrentCamera
+               local uis = game:GetService("UserInputService")
+               local move = Vector3.new(0,0,0)
+               if uis:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+               if uis:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+               if uis:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+               if uis:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+               if uis:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+               if uis:IsKeyDown(Enum.KeyCode.LeftShift) then move -= Vector3.new(0,1,0) end
+               BodyVelocity.Velocity = move.Unit * FlySpeed
+            end
+         end)
+      else
+         if BodyVelocity then BodyVelocity:Destroy() end
+         if BodyAngularVelocity then BodyAngularVelocity:Destroy() end
+         RunService:UnbindFromRenderStep("Fly")
+      end
+   end
+})
+
+-- Speed
+PlayerTab:CreateSlider({
+   Name = "Walk Speed",
+   Range = {16, 500},
+   Increment = 1,
+   Suffix = " Speed",
+   CurrentValue = 16,
+   Callback = function(Value)
+      getgenv().SpeedValue = Value
+      local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+      if hum then hum.WalkSpeed = Value end
+   end
+})
+
+LocalPlayer.CharacterAdded:Connect(function()
+   task.wait(1)
+   local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+   if hum then hum.WalkSpeed = getgenv().SpeedValue end
+end)
+
+-- Noclip
+spawn(function()
+   while true do
+      task.wait()
+      if getgenv().Noclip and LocalPlayer.Character then
+         for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+         end
+      end
+   end
+end)
+
+PlayerTab:CreateToggle({
+   Name = "Noclip",
+   CurrentValue = false,
+   Callback = function(Value) getgenv().Noclip = Value end
+})
+
+-- COPY BUILD (Shag420)
+BuildTab:CreateInput({
+   Name = "Username Ð´Ð»Ñ ÐºÐ¾Ð¿Ð¸ÑÐ¾Ð²Ð°Ð½Ð¸Ñ",
+   PlaceholderText = "Ð¢Ð¾ÑÐ½Ð¾Ðµ Ð¸Ð¼Ñ (Cap Sensitive)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+      getgenv().CopyTarget = Text
+   end
+})
+
+BuildTab:CreateButton({
+   Name = "ð Copy Build (Shag420)",
+   Callback = function()
+      if getgenv().Copying then
+         Rayfield:Notify({Title = "â³ Ð£Ð¶Ðµ Ð¸Ð´ÑÑ ÐºÐ¾Ð¿Ð¸ÑÐ¾Ð²Ð°Ð½Ð¸Ðµ", Content = "ÐÐ¾Ð¶Ð´Ð¸ÑÑ Ð·Ð°Ð²ÐµÑÑÐµÐ½Ð¸Ñ", Duration = 3})
+         return
+      end
+      if getgenv().CopyTarget == "" then
+         Rayfield:Notify({Title = "â ÐÑÐ¸Ð±ÐºÐ°", Content = "ÐÐ²ÐµÐ´Ð¸ username!", Duration = 3})
+         return
+      end
+
+      local PERSONTOCLONE = Players:FindFirstChild(getgenv().CopyTarget)
+      if not PERSONTOCLONE then
+         Rayfield:Notify({Title = "â ÐÐ³ÑÐ¾Ðº Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", Content = getgenv().CopyTarget, Duration = 4})
+         return
+      end
+
+      local MyPlotBoundary, _ = findPlotData(LocalPlayer)
+      if not MyPlotBoundary then
+         Rayfield:Notify({Title = "â Ð¢Ð²Ð¾Ð¹ plot Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", Content = "ÐÐµÑÐµÐ·Ð°Ð¹Ð´Ð¸ Ð² Ð¸Ð³ÑÑ", Duration = 4})
+         return
+      end
+
+      local OriginalPlotBoundary, targetAssets = findPlotData(PERSONTOCLONE)
+      if not OriginalPlotBoundary or not targetAssets then
+         Rayfield:Notify({Title = "â Plot ÑÐµÐ»Ð¸ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½", Content = getgenv().CopyTarget .. " Ð±ÐµÐ· Ð±Ð¸Ð»Ð´Ð°", Duration = 4})
+         return
+      end
+
+      local blocks = targetAssets:GetChildren()
+      if #blocks == 0 then
+         Rayfield:Notify({Title = "â ï¸ ÐÑÑÑÐ¾Ð¹ Ð±Ð¸Ð»Ð´", Content = "ÐÐµÑ Ð¾Ð±ÑÐµÐºÑÐ¾Ð² Ð´Ð»Ñ ÐºÐ¾Ð¿Ð¸ÑÐ¾Ð²Ð°Ð½Ð¸Ñ", Duration = 4})
+         return
+      end
+
+      getgenv().Copying = true
+      Rayfield:Notify({Title = "ð ÐÐ¾Ð¿Ð¸ÑÐ¾Ð²Ð°Ð½Ð¸Ðµ Ð·Ð°Ð¿ÑÑÐµÐ½Ð¾", Content = #blocks .. " Ð±Ð»Ð¾ÐºÐ¾Ð²...", Duration = 4})
+
+      local blockIndex = 1
+      local conn = RunService.Heartbeat:Connect(function()
+         if blockIndex <= #blocks then
+            local c = blocks[blockIndex]
+            blockIndex += 1
+
+            pcall(function()
+               local SHAG = OriginalPlotBoundary.CFrame:Inverse() * c.CFrame
+               local NEWCLONEDPLACE = MyPlotBoundary.CFrame * SHAG
+
+               local args = {
+                  [1] = {
+                     ["CF"] = NEWCLONEDPLACE,
+                     ["Material"] = ReplicatedStorage:WaitForChild("BuildStorage"):WaitForChild("Textures"):WaitForChild(c.Name),
+                     ["Color"] = c.Color
+                  }
+               }
+
+               ReplicatedStorage:WaitForChild("BuildStorage"):WaitForChild("RequestBlockPlace"):InvokeServer(unpack(args))
+            end)
+         else
+            conn:Disconnect()
+            getgenv().Copying = false
+            Rayfield:Notify({Title = "â ÐÐ¾ÑÐ¾Ð²Ð¾!", Content = "ÐÐ¸Ð»Ð´ " .. getgenv().CopyTarget .. " ÑÐºÐ¾Ð¿Ð¸ÑÐ¾Ð²Ð°Ð½", Duration = 6})
+         end
+      end)
+   end
+})
+
+-- TP to Target Plot
+BuildTab:CreateButton({
+   Name = "ð TP Ðº plot ÑÐµÐ»Ð¸",
+   Callback = function()
+      if getgenv().CopyTarget == "" then
+         Rayfield:Notify({Title = "â ÐÑÐ¸Ð±ÐºÐ°", Content = "ÐÐ²ÐµÐ´Ð¸ username!", Duration = 3})
+         return
+      end
+
+      local targetPlayer = Players:FindFirstChild(getgenv().CopyTarget)
+      if not targetPlayer then return end
+
+      local boundary, _ = findPlotData(targetPlayer)
+      if boundary and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+         LocalPlayer.Character.HumanoidRootPart.CFrame = boundary.CFrame + Vector3.new(0, 10, 0)
+         Rayfield:Notify({Title = "ð Ð¢ÐµÐ»ÐµÐ¿Ð¾ÑÑ", Content = "Ð plot " .. getgenv().CopyTarget, Duration = 3})
+      end
+   end
+})
+
+-- Random TP
+TeleTab:CreateButton({
+   Name = "ð² Random Plot",
+   Callback = function()
+      local occupied = {}
+      for _, v in pairs(Workspace.Plots:GetDescendants()) do
+         if v.Name == "Owner" and v.Value and v.Value.Parent then
+            table.insert(occupied, v.Parent.PlotBoundary)
+         end
+      end
+      if #occupied > 0 then
+         local rand = occupied[math.random(1, #occupied)]
+         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = rand.CFrame + Vector3.new(0, 10, 0)
+            Rayfield:Notify({Title = "ð² Ð¢ÐµÐ»ÐµÐ¿Ð¾ÑÑ", Content = "ÐÐ° ÑÐ»ÑÑÐ°Ð¹Ð½ÑÐ¹ plot", Duration = 3})
+         end
+      end
+   end
+})
+
+-- My Plot TP
+TeleTab:CreateButton({
+   Name = "ð  ÐÐ¾Ð¹ Plot",
+   Callback = function()
+      local boundary, _ = findPlotData(LocalPlayer)
+      if boundary and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+         LocalPlayer.Character.HumanoidRootPart.CFrame = boundary.CFrame + Vector3.new(0, 10, 0)
+         Rayfield:Notify({Title = "ð  ÐÐ¾Ð¼Ð¾Ð¹", Content = "ÐÐ° ÑÐ²Ð¾Ð¹ plot", Duration = 3})
+      end
+   end
+})
+
+-- Unload
+MainTab:CreateButton({
+   Name = "ðï¸ ÐÑÐ³ÑÑÐ·Ð¸ÑÑ ÑÐºÑÐ¸Ð¿Ñ",
+   Callback = function()
+      getgenv().Copying = false
+      Rayfield:Destroy()
+   end
+})
