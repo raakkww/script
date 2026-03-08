@@ -1,0 +1,5 @@
+pcall(function() game:GetService("ReplicatedStorage").Signals.Surrender:FireServer() end)
+task.wait(0.5)
+game:GetService("ReplicatedStorage").Signals.ImproveBase:FireServer("Health", -9e+305)
+game:GetService("ReplicatedStorage").Signals.ImproveBase:FireServer("Damage", -9e+305)
+game:GetService("ReplicatedStorage").Signals.ImproveBase:FireServer("Production", -9e+305)
