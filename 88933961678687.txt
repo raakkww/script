@@ -1,0 +1,18 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local stepRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StepTaken")
+-- fuck these retrded devs
+local args = {
+    10000,     -- change this to how many steps you want
+    false  
+}
+
+print("have fun")
+
+while true do
+    for i = 1, 10 do
+        task.spawn(function()
+            stepRemote:FireServer(unpack(args))
+        end)
+    end
+    task.wait()
+end
