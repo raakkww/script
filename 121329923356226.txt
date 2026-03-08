@@ -1,0 +1,158 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local pGui = player:WaitForChild("PlayerGui")
+
+if pGui:FindFirstChild("HitboxManager") then pGui.HitboxManager:Destroy() end
+
+local sg = Instance.new("ScreenGui", pGui)
+sg.Name = "HitboxManager"
+sg.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", sg)
+frame.Size = UDim2.new(0, 240, 0, 190)
+frame.Position = UDim2.new(0.5, -120, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+local stroke = Instance.new("UIStroke", frame)
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(45, 45, 45)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "HITBOX CUSTOMIZER"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.new(1, -20, 0, 35)
+btn.Position = UDim2.new(0, 10, 0, 40)
+btn.Text = "STATUS: OFF"
+btn.Font = Enum.Font.GothamBold
+btn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+btn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+local loopBtn = Instance.new("TextButton", frame)
+loopBtn.Size = UDim2.new(1, -20, 0, 25)
+loopBtn.Position = UDim2.new(0, 10, 0, 80)
+loopBtn.Text = "AUTO-LOOP: OFF"
+loopBtn.Font = Enum.Font.Gotham
+loopBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+loopBtn.TextColor3 = Color3.new(1, 1, 1)
+loopBtn.TextSize = 12
+Instance.new("UICorner", loopBtn).CornerRadius = UDim.new(0, 6)
+
+local sliderBack = Instance.new("Frame", frame)
+sliderBack.Size = UDim2.new(1, -30, 0, 6)
+sliderBack.Position = UDim2.new(0, 15, 0, 125)
+sliderBack.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Instance.new("UICorner", sliderBack)
+
+local sliderFill = Instance.new("Frame", sliderBack)
+sliderFill.Size = UDim2.new(0.1, 0, 1, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+sliderFill.BorderSizePixel = 0
+Instance.new("UICorner", sliderFill)
+
+local label = Instance.new("TextLabel", frame)
+label.Size = UDim2.new(1, 0, 0, 20)
+label.Position = UDim2.new(0, 0, 0, 135)
+label.BackgroundTransparency = 1
+label.Text = "Size: 1.0x"
+label.TextColor3 = Color3.fromRGB(200, 200, 200)
+label.Font = Enum.Font.GothamMedium
+label.TextSize = 12
+
+local isActive = false
+local isLooping = false
+local currentScale = 1
+local originalSizes = {}
+
+local function updateHitbox()
+	local char = player.Character
+	if not char then return end
+	
+	local found = false
+	for _, obj in ipairs(char:GetDescendants()) do
+		if obj.Name == "HitBox" and obj:IsA("BasePart") then
+			found = true
+			if not originalSizes[obj] then originalSizes[obj] = obj.Size end
+			
+			if isActive then
+				obj.Size = originalSizes[obj] * currentScale
+				obj.Transparency = 0.6
+				obj.CanCollide = false
+				btn.Text = "STATUS: ACTIVE"
+				btn.BackgroundColor3 = Color3.fromRGB(40, 180, 80)
+			else
+				obj.Size = originalSizes[obj]
+				obj.Transparency = 1
+				btn.Text = "STATUS: OFF"
+				btn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+			end
+		end
+	end
+	
+	if not found and isActive then
+		btn.Text = "SEARCHING..."
+		btn.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+	end
+end
+
+RunService.Heartbeat:Connect(function()
+	if isLooping and isActive then updateHitbox() end
+end)
+
+local draggingSlider = false
+sliderBack.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = true end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local pos = math.clamp((input.Position.X - sliderBack.AbsolutePosition.X) / sliderBack.AbsoluteSize.X, 0, 1)
+		sliderFill.Size = UDim2.new(pos, 0, 1, 0)
+		currentScale = 1 + (pos * 49)
+		label.Text = "Size: " .. string.format("%.1f", currentScale) .. "x"
+		if isActive then updateHitbox() end
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = false end
+end)
+
+btn.MouseButton1Click:Connect(function()
+	isActive = not isActive
+	updateHitbox()
+end)
+
+loopBtn.MouseButton1Click:Connect(function()
+	isLooping = not isLooping
+	loopBtn.Text = isLooping and "AUTO-LOOP: ON" or "AUTO-LOOP: OFF"
+	loopBtn.BackgroundColor3 = isLooping and Color3.fromRGB(0, 120, 215) or Color3.fromRGB(60, 60, 60)
+end)
+
+local draggingFrame, dragInput, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingFrame = true
+		dragStart = input.Position
+		startPos = frame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then draggingFrame = false end
+		end)
+	end
+end)
+frame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and draggingFrame then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
