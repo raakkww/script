@@ -1,0 +1,1370 @@
+local function __run()
+    
+    local function _uskfurGeYE()
+        -- 🌀 Load WindUI ONCE
+        local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+        if not WindUI then
+            warn("❌ Failed to load WindUI library!")
+            return
+        end
+        
+        ------------------------------------------------------------
+        -- 💬 Welcome popup
+        ------------------------------------------------------------
+        WindUI:Popup({
+            Title = "VezuntHUB loaded",
+            Icon = "bird",
+            Content = "Press P to show/hide UI.",
+            Buttons = {
+                { Title = "Got it", Icon = "check" }
+            }
+        })
+        
+        ------------------------------------------------------------
+        -- 🪟 MAIN WINDOW
+        ------------------------------------------------------------
+        local Window = WindUI:CreateWindow({
+            Title   = "VezuntHUB - Country Manager",
+            Author  = "by you",
+            Icon    = "globe",
+            Theme   = "Dark",
+            Size    = UDim2.fromOffset(640, 520),
+            Resizable = true,
+            ScrollBarEnabled = true,
+            OpenButton = {
+                Title        = "Open VezuntHUB",
+                CornerRadius = UDim.new(1, 0),
+                StrokeThickness = 2,
+                Enabled      = true,
+                Draggable    = true,
+                OnlyMobile   = false,
+                Color        = ColorSequence.new(
+                    Color3.fromRGB(48, 167, 255),
+                    Color3.fromRGB(231, 255, 47)
+                )
+            },
+        })
+        
+        -- тег в окно
+        Window:Tag({
+            Title = "v" .. tostring(WindUI.Version or "1.0"),
+            Icon = "github",
+            Color = Color3.fromHex("#6b31ff")
+        })
+        
+        ------------------------------------------------------------
+        -- 🎨 COLORS
+        ------------------------------------------------------------
+        local COLOR_BLUE   = Color3.fromHex("#30A7FF")
+        local COLOR_GREEN  = Color3.fromHex("#30FF6A")
+        local COLOR_RED    = Color3.fromHex("#FF3B30")
+        local COLOR_YELLOW = Color3.fromHex("#E7FF2F")
+        
+        ------------------------------------------------------------
+        -- 🧠 SERVICES
+        ------------------------------------------------------------
+        local Players           = game:GetService("Players")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local Workspace         = game:GetService("Workspace")
+        local TweenService      = game:GetService("TweenService")
+        local RunService        = game:GetService("RunService")
+        local StatsService      = game:GetService("Stats")
+        local UserInputService  = game:GetService("UserInputService")
+        
+        local player         = Players.LocalPlayer
+        local registry       = ReplicatedStorage:WaitForChild("CountryRegistry")
+        local regions        = Workspace:WaitForChild("Regions")
+        local Remote         = ReplicatedStorage:WaitForChild("RemoteEvent_4")
+        local SoldiersFolder = Workspace:WaitForChild("SoldiersFolder")
+        local RemoteDef      = ReplicatedStorage:FindFirstChild("RemoteEvent_1") or Remote
+        
+        ------------------------------------------------------------
+        -- 🔁 GLOBAL UPDATE CONFIG
+        ------------------------------------------------------------
+        local UpdateConfig = {
+            slowMode         = true,
+            cityFastInterval = 5,
+            citySlowInterval = 60,
+            lbIntervalFast   = 10,
+            lbIntervalSlow   = 60,
+        }
+        
+        ------------------------------------------------------------
+        -- 🛠 UTILITIES
+        ------------------------------------------------------------
+        local function readNumberFrom(country, key)
+            if not country then return 0 end
+            local obj = country:FindFirstChild(key)
+            if obj and obj.Value ~= nil then
+                local n = tonumber(obj.Value)
+                if n then return n end
+            end
+            local attr = country:GetAttribute(key)
+            if attr ~= nil then
+                local n = tonumber(attr)
+                if n then return n end
+            end
+            return 0
+        end
+        
+        local function formatNumber(num)
+            local n = tonumber(num or 0) or 0
+            if n >= 1e9 then return string.format("%dB", math.floor(n/1e9))
+            elseif n >= 1e6 then return string.format("%dM", math.floor(n/1e6))
+            elseif n >= 1e3 then return string.format("%dK", math.floor(n/1e3))
+            else return tostring(math.floor(n)) end
+        end
+        
+        local function tierColor(t)
+            if tonumber(t) and t <= 3 then return "🔴"
+            elseif tonumber(t) and t <= 6 then return "🟡"
+            else return "🟢" end
+        end
+        
+        local function getLeaderAny(country)
+            if not country then return nil end
+            local v = country:FindFirstChild("ActiveLeader") or country:FindFirstChild("Leader") or country:FindFirstChild("Owner")
+            if v and v.Value ~= nil then
+                return v.Value
+            end
+            return country:GetAttribute("ActiveLeader") or country:GetAttribute("Leader") or country:GetAttribute("Owner")
+        end
+        
+        local function isMyLeaderValue(v)
+            if typeof(v) == "string" then
+                return v == player.Name
+            elseif typeof(v) == "Instance" then
+                return v.Name == player.Name
+            end
+            return false
+        end
+        
+        local cachedCountry = nil
+        local cachedCountryTime = 0
+        local COUNTRY_CACHE_DURATION = 2
+        
+        local function findMyCountry()
+            local now = tick()
+            if cachedCountry and cachedCountry.Parent and (now - cachedCountryTime) < COUNTRY_CACHE_DURATION then
+                local leader = getLeaderAny(cachedCountry)
+                if isMyLeaderValue(leader) then
+                    return cachedCountry
+                end
+            end
+            
+            for _, c in ipairs(registry:GetChildren()) do
+                local leader = getLeaderAny(c)
+                if isMyLeaderValue(leader) then
+                    cachedCountry = c
+                    cachedCountryTime = now
+                    return c
+                end
+            end
+            
+            cachedCountry = nil
+            return nil
+        end
+        
+        local function calcMaxUnits(unitType)
+            local c = findMyCountry()
+            if not c then return 0 end
+            local money    = readNumberFrom(c, "Money")
+            local manpower = readNumberFrom(c, "Manpower")
+            if unitType == "Soldier" then
+                return math.min(math.floor(manpower / 1), math.floor(money / 100))
+            elseif unitType == "Tank" then
+                return math.min(math.floor(manpower / 100), math.floor(money / 100000))
+            end
+            return 0
+        end
+        
+        local function getSafeParent()
+            return Players.LocalPlayer:WaitForChild("PlayerGui")
+        end
+        
+        ------------------------------------------------------------
+        -- 📊 STATISTICS TAB
+        ------------------------------------------------------------
+        local StatsTab = Window:Tab({ Title = "Statistics", Icon = "bar-chart-3" })
+        local StatsSection = StatsTab:Section({ Title = "Country stats", Icon = "bar-chart-3" })
+        
+        local statsParagraph = StatsSection:Paragraph({
+            Title = "Country Statistics",
+            Desc  = "Waiting for data...",
+            Color = COLOR_BLUE,
+            ImageSize = 32
+        })
+        
+        StatsTab:Space({ Columns = 1 })
+        
+        local currentCountry = nil
+        local _lastStatsText = ""
+        
+        local function renderStats()
+            local c = currentCountry or findMyCountry()
+            if not c then
+                if _lastStatsText ~= "❌ Country not found." then
+                    statsParagraph:SetDesc("❌ Country not found.")
+                    _lastStatsText = "❌ Country not found."
+                end
+                return
+            end
+            local money    = readNumberFrom(c, "Money")
+            local manpower = readNumberFrom(c, "Manpower")
+            local pp       = readNumberFrom(c, "PoliticalPower")
+            local txt = string.format(
+                "🏛 Country: %s\n💰 Money: %s\n👥 Manpower: %s\n⚖️ PoliticalPower: %s",
+                c.Name, formatNumber(money), formatNumber(manpower), formatNumber(pp)
+            )
+            if txt ~= _lastStatsText then
+                statsParagraph:SetDesc(txt)
+                _lastStatsText = txt
+            end
+        end
+        
+        local RefreshStatsButton
+        RefreshStatsButton = StatsSection:Button({
+            Title = "🔄 Refresh Stats",
+            Desc  = "Update your country info",
+            Icon = "refresh-cw",
+            Color = COLOR_BLUE,
+            Callback = function()
+                RefreshStatsButton:Highlight()
+                currentCountry = findMyCountry()
+                renderStats()
+            end
+        })
+        
+        StatsSection:Space()
+        
+        local statsModeToggle
+        statsModeToggle = StatsSection:Toggle({
+            Title = "Slow update mode",
+            Desc  = "WORLD map -> keep ON. EUROPE map -> you can OFF.",
+            Type  = "Checkbox",
+            Value = UpdateConfig.slowMode,
+            Callback = function(state)
+                UpdateConfig.slowMode = state
+            end
+        })
+        
+        task.spawn(function()
+            while task.wait(1) do
+                currentCountry = findMyCountry() or currentCountry
+                renderStats()
+            end
+        end)
+        
+        ------------------------------------------------------------
+        -- 🌍 AUTO DETECT MAP AFTER 5s
+        ------------------------------------------------------------
+        task.spawn(function()
+            task.wait(5)
+            local countryCount = #registry:GetChildren()
+            local regionCount  = #regions:GetChildren()
+        
+            local isWorld = (regionCount >= 500) or (countryCount >= 150)
+            if isWorld then
+                UpdateConfig.slowMode = true
+                pcall(function()
+                    if statsModeToggle and statsModeToggle.Set then
+                        statsModeToggle:Set(true)
+                    end
+                end)
+                WindUI:Notify({
+                    Title   = "Map detected",
+                    Content = "World map detected. Slow update mode is ON to prevent lag.",
+                    Icon    = "globe",
+                    Duration = 5
+                })
+            else
+                UpdateConfig.slowMode = false
+                pcall(function()
+                    if statsModeToggle and statsModeToggle.Set then
+                        statsModeToggle:Set(false)
+                    end
+                end)
+                WindUI:Notify({
+                    Title   = "Map detected",
+                    Content = "Europe map detected. Normal update mode enabled.",
+                    Icon    = "map",
+                    Duration = 5
+                })
+            end
+        end)
+        
+        ------------------------------------------------------------
+        -- 🏙 TAB: CITIES
+        ------------------------------------------------------------
+        local CitiesTab = Window:Tab({ Title = "Cities", Icon = "building" })
+        local CitiesSection = CitiesTab:Section({ Title = "My Cities", Icon = "building" })
+        
+        local citiesParagraph = CitiesSection:Paragraph({
+            Title = "Cities",
+            Desc  = "No data yet.",
+            Color = COLOR_GREEN
+        })
+        
+        local function cityOwnedBy(city, myCountryName)
+            if not city or not myCountryName then return false end
+            local attr = city:GetAttribute("Country")
+            if attr and attr == myCountryName then return true end
+            local valObj = city:FindFirstChild("Country")
+            if valObj and valObj.Value == myCountryName then return true end
+            return false
+        end
+        
+        local function readCityNum(city, name)
+            if not city then return 0 end
+            local a = city:GetAttribute(name)
+            if a ~= nil then
+                local n = tonumber(a)
+                if n then return n end
+            end
+            local v = city:FindFirstChild(name)
+            if v and v.Value ~= nil then
+                local n = tonumber(v.Value)
+                if n then return n end
+            end
+            return 0
+        end
+        
+        local CityCache = {
+            busy = false,
+            text = "No data yet.",
+        }
+        
+        local function buildCitiesAsync()
+            if CityCache.busy then return end
+            CityCache.busy = true
+        
+            task.spawn(function()
+                local myCountry = findMyCountry()
+                if not myCountry then
+                    CityCache.text = "❌ Country not found."
+                    citiesParagraph:SetDesc(CityCache.text)
+                    CityCache.busy = false
+                    return
+                end
+        
+                local myName = myCountry.Name
+                local regs   = regions:GetChildren()
+                local lines  = {}
+                local total  = #regs
+        
+                for i = 1, total do
+                    local city = regs[i]
+                    if cityOwnedBy(city, myName) then
+                        local tier = readCityNum(city, "DevelopTier")
+                        local def  = readCityNum(city, "DefenceTier")
+                        lines[#lines+1] = string.format(
+                            "%s %s — Tier %d | 🛡 %d",
+                            tierColor(tier),
+                            city.Name,
+                            tier,
+                            def
+                        )
+                    end
+                    if i % 120 == 0 then task.wait() end
+                end
+        
+                if #lines == 0 then
+                    CityCache.text = "No cities found."
+                else
+                    table.sort(lines, function(a, b) return a:lower() < b:lower() end)
+                    if #lines > 200 then
+                        local short = {}
+                        for i = 1, 200 do short[i] = lines[i] end
+                        short[#short+1] = string.format("... and %d more", #lines - 200)
+                        CityCache.text = table.concat(short, "\n")
+                    else
+                        CityCache.text = table.concat(lines, "\n")
+                    end
+                end
+        
+                citiesParagraph:SetDesc(CityCache.text)
+                CityCache.busy = false
+            end)
+        end
+        
+        local UpgradeCitiesButton
+        UpgradeCitiesButton = CitiesSection:Button({
+            Title = "⬆ Upgrade All Cities (Tier)",
+            Desc  = "Develop all owned cities",
+            Icon = "arrow-up",
+            Color = COLOR_GREEN,
+            Callback = function()
+                UpgradeCitiesButton:Highlight()
+                local ctry = findMyCountry()
+                if not ctry then
+                    WindUI:Notify({ Title="No Country", Content="Join or lead a country first.", Icon="x-circle", Duration=2 })
+                    return
+                end
+                local count = 0
+                for _, city in ipairs(regions:GetChildren()) do
+                    if cityOwnedBy(city, ctry.Name) then
+                        pcall(function() Remote:FireServer("DevelopTile", city, "Tier") end)
+                        count += 1
+                        task.wait(0.03)
+                    end
+                end
+                WindUI:Notify({ Title="Success", Content=string.format("Upgraded %d cities (Tier).", count), Icon="check-circle", Duration=2 })
+                buildCitiesAsync()
+            end
+        })
+        
+        CitiesSection:Space()
+        
+        local FortifyCitiesButton
+        FortifyCitiesButton = CitiesSection:Button({
+            Title = "🛡️ Fortify All Cities (Defence)",
+            Desc  = "Raise defence for all owned cities",
+            Icon = "shield",
+            Color = COLOR_BLUE,
+            Callback = function()
+                local ctry = findMyCountry()
+                if not ctry then
+                    WindUI:Notify({ Title="No Country", Content="Join or lead a country first.", Icon="x-circle", Duration=2 })
+                    return
+                end
+                if not RemoteDef then
+                    WindUI:Notify({ Title="Missing RemoteEvent_1", Content="Cannot fortify cities: RemoteEvent_1 not found.", Icon="x-circle", Duration=3 })
+                    return
+                end
+                local count = 0
+                for _, city in ipairs(regions:GetChildren()) do
+                    if cityOwnedBy(city, ctry.Name) then
+                        pcall(function() RemoteDef:FireServer("DevelopTile", city, "Def") end)
+                        count += 1
+                        task.wait(0.03)
+                    end
+                end
+                WindUI:Notify({ Title="Defense Raised", Content=string.format("Fortified %d cities (Defence).", count), Icon="shield", Duration=2 })
+                buildCitiesAsync()
+            end
+        })
+        
+        CitiesSection:Space()
+        
+        local UpgradeFortifyButton
+        UpgradeFortifyButton = CitiesSection:Button({
+            Title = "⬆🛡️ Upgrade & Fortify All",
+            Desc  = "Do both steps for every city",
+            Icon = "zap",
+            Color = COLOR_YELLOW,
+            Callback = function()
+                UpgradeFortifyButton:Highlight()
+                local ctry = findMyCountry()
+                if not ctry then return end
+                local upgraded, fortified = 0, 0
+                for _, city in ipairs(regions:GetChildren()) do
+                    if cityOwnedBy(city, ctry.Name) then
+                        pcall(function() Remote:FireServer("DevelopTile", city, "Tier") end)
+                        upgraded += 1
+                        task.wait(0.02)
+                        if RemoteDef then
+                            pcall(function() RemoteDef:FireServer("DevelopTile", city, "Def") end)
+                            fortified += 1
+                        end
+                        task.wait(0.02)
+                    end
+                end
+                WindUI:Notify({ Title="Done", Content=string.format("Upgraded: %d | Fortified: %d", upgraded, fortified), Icon="check-circle", Duration=3 })
+                buildCitiesAsync()
+            end
+        })
+        
+        task.spawn(function()
+            buildCitiesAsync()
+            while true do
+                local interval = UpdateConfig.slowMode and UpdateConfig.citySlowInterval or UpdateConfig.cityFastInterval
+                buildCitiesAsync()
+                task.wait(interval)
+            end
+        end)
+        
+        ------------------------------------------------------------
+        -- ⚔ ARMY TAB
+        ------------------------------------------------------------
+        local ArmyTab = Window:Tab({ Title = "Army", Icon = "shield" })
+        local ArmySection = ArmyTab:Section({ Title = "Army Management", Icon = "shield" })
+        
+        ArmySection:Paragraph({
+            Title = "How to use",
+            Desc  = "1) Select city\n2) Select unit\n3) Spawn or auto-attack",
+            Color = COLOR_RED
+        })
+        
+        local function getMyCities()
+            local ctry = findMyCountry()
+            if not ctry then return {} end
+            local out = {}
+            for _, city in ipairs(regions:GetChildren()) do
+                if city:GetAttribute("Country") == ctry.Name then
+                    out[#out+1] = city
+                end
+            end
+            table.sort(out, function(a,b) return a.Name:lower() < b.Name:lower() end)
+            return out
+        end
+        
+        local selectedCity  = nil
+        local selectedUnit  = "Soldier"
+        
+        local cityDropdown = ArmySection:Dropdown({
+            Title   = "Select City",
+            Desc    = "Choose one of your cities",
+            Values  = { "--" },
+            Value   = "--",
+            Callback = function(value)
+                if value ~= "--" then
+                    selectedCity = regions:FindFirstChild(value)
+                else
+                    selectedCity = nil
+                end
+            end
+        })
+        
+        local unitDropdown = ArmySection:Dropdown({
+            Title   = "Select Unit",
+            Desc    = "Unit to spawn",
+            Values  = { "Soldier", "Tank" },
+            Value   = "Soldier",
+            Callback = function(value)
+                selectedUnit = value
+            end
+        })
+        
+        local function refreshCityDropdown()
+            local names = { "--" }
+            for _, city in ipairs(getMyCities()) do
+                names[#names+1] = city.Name
+            end
+            pcall(function()
+                cityDropdown:Refresh(names)
+                if selectedCity and table.find(names, selectedCity.Name) then
+                    cityDropdown:Select(selectedCity.Name)
+                else
+                    cityDropdown:Select("--")
+                    selectedCity = nil
+                end
+            end)
+        end
+        
+        task.spawn(function()
+            regions.ChildAdded:Connect(refreshCityDropdown)
+            regions.ChildRemoved:Connect(refreshCityDropdown)
+        end)
+        refreshCityDropdown()
+        
+        ArmySection:Space()
+        
+        local SpawnSelectedButton
+        SpawnSelectedButton = ArmySection:Button({
+            Title = "👥/🛡 Spawn In Selected City (ALL)",
+            Desc  = "Use all available resources",
+            Icon = "users",
+            Color = COLOR_GREEN,
+            Callback = function()
+                SpawnSelectedButton:Highlight()
+                if not selectedCity then
+                    WindUI:Notify({ Title="Select City", Content="Please choose a city first.", Icon="info", Duration=2 })
+                    return
+                end
+                local max = calcMaxUnits(selectedUnit)
+                if max <= 0 then
+                    WindUI:Notify({ Title="Not Enough Resources", Content="You don't have resources to spawn.", Icon="x-circle", Duration=2 })
+                    return
+                end
+                pcall(function() Remote:FireServer("CreateArmyOnTile", selectedCity, selectedUnit, max) end)
+                WindUI:Notify({ Title="Spawned", Content=string.format("%s × %d in %s", selectedUnit, max, selectedCity.Name), Icon="check-circle", Duration=2 })
+            end
+        })
+        
+        ArmySection:Space()
+        
+        local SpawnEvenButton
+        SpawnEvenButton = ArmySection:Button({
+            Title = "🌍 Spawn EVEN Across ALL Cities",
+            Desc  = "Distribute units over all owned cities",
+            Icon = "globe",
+            Color = COLOR_BLUE,
+            Callback = function()
+                SpawnEvenButton:Highlight()
+                local cities = getMyCities()
+                if #cities == 0 then
+                    WindUI:Notify({ Title="No Cities", Content="You have no cities to spawn in.", Icon="x-circle", Duration=2 })
+                    return
+                end
+                local total = calcMaxUnits(selectedUnit)
+                if total <= 0 then
+                    WindUI:Notify({ Title="Not Enough Resources", Content="You don't have resources to spawn.", Icon="x-circle", Duration=2 })
+                    return
+                end
+                local perCity = math.max(1, math.floor(total / #cities))
+                for _, city in ipairs(cities) do
+                    pcall(function() Remote:FireServer("CreateArmyOnTile", city, selectedUnit, perCity) end)
+                    task.wait(0.03)
+                end
+                WindUI:Notify({ Title="Spawned Evenly", Content=string.format("%s × ~%d per city (%d cities)", selectedUnit, perCity, #cities), Icon="check-circle", Duration=3 })
+            end
+        })
+        
+        ArmySection:Space()
+        
+        local EnableAutoAttackButton
+        EnableAutoAttackButton = ArmySection:Button({
+            Title = "⚡ Enable Auto-Attack (ALL my units)",
+            Icon = "zap",
+            Color = COLOR_YELLOW,
+            Callback = function()
+                EnableAutoAttackButton:Highlight()
+                local ctry = findMyCountry()
+                if not ctry then return end
+                for _, unit in ipairs(SoldiersFolder:GetChildren()) do
+                    local cn = unit:FindFirstChild("Country")
+                    if cn and cn.Value == ctry.Name then
+                        pcall(function() Remote:FireServer("ToggleAutoCapture", unit, true) end)
+                    end
+                end
+                WindUI:Notify({ Title="Auto-Attack", Content="Enabled for all your units.", Icon="bolt", Duration=2 })
+            end
+        })
+        
+        ArmySection:Space()
+        
+        local DisableAutoAttackButton
+        DisableAutoAttackButton = ArmySection:Button({
+            Title = "🚫 Disable Auto-Attack (ALL my units)",
+            Icon = "x-circle",
+            Color = COLOR_RED,
+            Callback = function()
+                DisableAutoAttackButton:Highlight()
+                local ctry = findMyCountry()
+                if not ctry then return end
+                for _, unit in ipairs(SoldiersFolder:GetChildren()) do
+                    local cn = unit:FindFirstChild("Country")
+                    if cn and cn.Value == ctry.Name then
+                        pcall(function() Remote:FireServer("ToggleAutoCapture", unit, false) end)
+                    end
+                end
+                WindUI:Notify({ Title="Auto-Attack", Content="Disabled for all your units.", Icon="x-circle", Duration=2 })
+            end
+        })
+        
+        ------------------------------------------------------------
+        -- 👑 LEADERBOARD
+        ------------------------------------------------------------
+        local LeaderTab = Window:Tab({ Title = "Leaderboard", Icon = "crown" })
+        local LeaderSection = LeaderTab:Section({ Title = "Top Leaders", Icon = "crown" })
+        
+        local leaderboardParagraph = LeaderSection:Paragraph({
+            Title = "Top leaders",
+            Desc  = "Loading...",
+            Color = COLOR_YELLOW
+        })
+        
+        local LEADERBOARD_LIMIT  = 15
+        local LEADERBOARD_CHUNK  = 80
+        local _lastLeaderboardText = ""
+        
+        local function pretty(n)
+            n = tonumber(n) or 0
+            if n >= 1e9 then return (math.floor(n/1e9)).."B"
+            elseif n >= 1e6 then return (math.floor(n/1e6)).."M"
+            elseif n >= 1e3 then return (math.floor(n/1e3)).."K"
+            else return tostring(math.floor(n)) end
+        end
+        
+        local function getCountryLeaderName(country)
+            local v = country:FindFirstChild("ActiveLeader") or country:FindFirstChild("Leader") or country:FindFirstChild("Owner")
+            if v then
+                if typeof(v.Value) == "string" and v.Value ~= "" then return v.Value
+                elseif typeof(v.Value) == "Instance" and v.Value then return v.Value.Name end
+            end
+            local attr = country:GetAttribute("ActiveLeader") or country:GetAttribute("Leader") or country:GetAttribute("Owner")
+            if typeof(attr) == "string" and attr ~= "" then return attr end
+            return "—"
+        end
+        
+        local lbRebuildRunning = false
+        local function rebuildLeaderboardAsync()
+            if lbRebuildRunning then return end
+            lbRebuildRunning = true
+            task.spawn(function()
+                local allCountries = registry:GetChildren()
+                if #allCountries == 0 then
+                    if _lastLeaderboardText ~= "No data." then
+                        leaderboardParagraph:SetDesc("No data.")
+                        _lastLeaderboardText = "No data."
+                    end
+                    lbRebuildRunning = false
+                    return
+                end
+        
+                local rows = {}
+                local index = 1
+                local total = #allCountries
+        
+                while index <= total do
+                    local upper = math.min(index + LEADERBOARD_CHUNK - 1, total)
+                    for i = index, upper do
+                        local country = allCountries[i]
+                        rows[#rows+1] = {
+                            name     = getCountryLeaderName(country),
+                            country  = country.Name,
+                            money    = readNumberFrom(country, "Money"),
+                            manpower = readNumberFrom(country, "Manpower"),
+                        }
+                    end
+                    index = upper + 1
+                    task.wait()
+                end
+        
+                table.sort(rows, function(a, b) return (a.money or 0) > (b.money or 0) end)
+        
+                local limit = math.min(#rows, LEADERBOARD_LIMIT)
+                local out = {}
+                for i = 1, limit do
+                    local r = rows[i]
+                    out[#out+1] = string.format("👑 %s | 🏛 %s | 💰 %s | 👥 %s",
+                        tostring(r.name or "—"), tostring(r.country or "?"), pretty(r.money), pretty(r.manpower))
+                end
+                local text = table.concat(out, "\n")
+                if text ~= _lastLeaderboardText then
+                    leaderboardParagraph:SetDesc(text)
+                    _lastLeaderboardText = text
+                end
+        
+                lbRebuildRunning = false
+            end)
+        end
+        
+        task.spawn(function()
+            rebuildLeaderboardAsync()
+            while true do
+                local interval = UpdateConfig.slowMode and UpdateConfig.lbIntervalSlow or UpdateConfig.lbIntervalFast
+                task.wait(interval)
+                rebuildLeaderboardAsync()
+            end
+        end)
+        
+        ------------------------------------------------------------
+        -- 🧩 EXTRAS: FPS/Ping HUD + utility widgets
+        ------------------------------------------------------------
+        local ExtrasTab = Window:Tab({ Title = "Extras", Icon = "monitor" })
+        local ExtrasSection = ExtrasTab:Section({ Title = "UI / HUD", Icon = "monitor" })
+        
+        ExtrasSection:Paragraph({
+            Title = "Controls",
+            Desc  = "HUD, timers and small tools.",
+            Color = COLOR_BLUE
+        })
+        
+        local HUD = {
+            Gui        = nil,
+            Frame      = nil,
+            Info       = nil,
+            Visible    = false,
+            RenderConn = nil,
+            FpsEMA     = 60,
+            Height     = 72,
+        }
+        
+        local function createMainHUD()
+            if HUD.Gui then return end
+            local gui = Instance.new("ScreenGui")
+            gui.Name = "VezuntMainHUD"
+            gui.IgnoreGuiInset = true
+            gui.ResetOnSpawn = false
+            gui.Parent = getSafeParent()
+        
+            local frame = Instance.new("Frame")
+            frame.Size = UDim2.new(0, 230, 0, HUD.Height)
+            frame.Position = UDim2.new(1, -250, 0, 20)
+            frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+            frame.BackgroundTransparency = 0.12
+            frame.BorderSizePixel = 0
+            frame.Parent = gui
+        
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 12)
+            corner.Parent = frame
+        
+            local stroke = Instance.new("UIStroke")
+            stroke.Thickness = 1
+            stroke.Transparency = 0.5
+            stroke.Color = Color3.fromRGB(90, 90, 90)
+            stroke.Parent = frame
+        
+            local title = Instance.new("TextLabel")
+            title.BackgroundTransparency = 1
+            title.Position = UDim2.new(0, 10, 0, 6)
+            title.Size = UDim2.new(1, -20, 0, 22)
+            title.Text = "🧠 VezuntHUD"
+            title.Font = Enum.Font.SourceSansBold
+            title.TextSize = 18
+            title.TextColor3 = Color3.new(1, 1, 1)
+            title.TextXAlignment = Enum.TextXAlignment.Left
+            title.Parent = frame
+        
+            local info = Instance.new("TextLabel")
+            info.BackgroundTransparency = 1
+            info.Position = UDim2.new(0, 10, 0, 32)
+            info.Size = UDim2.new(1, -20, 0, 32)
+            info.Text = "FPS: ... | Ping: ..."
+            info.Font = Enum.Font.SourceSans
+            info.TextSize = 16
+            info.TextColor3 = Color3.new(1, 1, 1)
+            info.TextXAlignment = Enum.TextXAlignment.Left
+            info.Parent = frame
+        
+            HUD.Gui   = gui
+            HUD.Frame = frame
+            HUD.Info  = info
+        end
+        
+        local function showMainHUD()
+            if HUD.Visible then return end
+            createMainHUD()
+            HUD.Visible = true
+            HUD.Frame.Position = UDim2.new(1, 260, 0, 20)
+            TweenService:Create(HUD.Frame, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.new(1, -250, 0, 20) }):Play()
+        
+            if HUD.RenderConn then HUD.RenderConn:Disconnect() end
+            HUD.RenderConn = RunService.RenderStepped:Connect(function(dt)
+                dt = dt > 0 and dt or (1/60)
+                local instFps = 1 / dt
+                HUD.FpsEMA = HUD.FpsEMA + (instFps - HUD.FpsEMA) * 0.2
+            end)
+        
+            task.spawn(function()
+                local pingItem = StatsService.Network
+                    and StatsService.Network.ServerStatsItem
+                    and StatsService.Network.ServerStatsItem["Data Ping"]
+                while HUD.Visible and HUD.Info do
+                    task.wait(1)
+                    local fps  = math.clamp(math.floor(HUD.FpsEMA + 0.5), 1, 1000)
+                    local ping = "N/A"
+                    pcall(function()
+                        if pingItem and pingItem.GetValue then
+                            ping = tostring(math.floor(pingItem:GetValue())) .. "ms"
+                        end
+                    end)
+                    HUD.Info.Text = ("FPS: %s | Ping: %s"):format(fps, ping)
+                end
+            end)
+        end
+        
+        local function hideMainHUD()
+            if not HUD.Visible then return end
+            HUD.Visible = false
+            if HUD.RenderConn then HUD.RenderConn:Disconnect(); HUD.RenderConn = nil end
+            TweenService:Create(HUD.Frame, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(1, 260, 0, 20) }):Play()
+            task.delay(0.29, function()
+                if HUD.Gui then HUD.Gui:Destroy() end
+                HUD.Gui, HUD.Frame, HUD.Info = nil, nil, nil
+            end)
+        end
+        
+        local hudToggleElement
+        hudToggleElement = ExtrasSection:Toggle({
+            Title = "FPS/Ping HUD (H)",
+            Desc  = "Top-right performance overlay.",
+            Type  = "Checkbox",
+            Value = true,
+            Callback = function(state)
+                if state then showMainHUD() else hideMainHUD() end
+            end
+        })
+        
+        showMainHUD()
+        
+        UserInputService.InputBegan:Connect(function(input, gp)
+            if gp then return end
+            if input.KeyCode == Enum.KeyCode.H then
+                if HUD.Visible then
+                    hideMainHUD()
+                    if hudToggleElement and hudToggleElement.Set then hudToggleElement:Set(false) end
+                else
+                    showMainHUD()
+                    if hudToggleElement and hudToggleElement.Set then hudToggleElement:Set(true) end
+                end
+            end
+        end)
+        
+        local function getUtilityBaseY()
+            if HUD.Visible then return 20 + HUD.Height + 10 else return 20 end
+        end
+        
+        local RIGHT_X = -250
+        local GAP_Y   = 6
+        
+        local Utility = {
+            RootGui = nil,
+            Holder  = nil,
+            Widgets = {},
+        }
+        
+        local function getUtilityRoot()
+            if Utility.RootGui and Utility.RootGui.Parent then return Utility.RootGui end
+            local gui = Instance.new("ScreenGui")
+            gui.Name = "VezuntUtilityHUD"
+            gui.IgnoreGuiInset = true
+            gui.ResetOnSpawn = false
+            gui.Parent = getSafeParent()
+            Utility.RootGui = gui
+            return gui
+        end
+        
+        local function getHolder()
+            if Utility.Holder and Utility.Holder.Parent then return Utility.Holder end
+            local root = getUtilityRoot()
+            local holder = Instance.new("Frame")
+            holder.Name = "Holder"
+            holder.AnchorPoint = Vector2.new(0, 0)
+            holder.Size = UDim2.new(0, 230, 0, 0)
+            holder.Position = UDim2.new(1, RIGHT_X, 0, getUtilityBaseY())
+            holder.BackgroundTransparency = 1
+            holder.BorderSizePixel = 0
+            holder.Parent = root
+        
+            local list = Instance.new("UIListLayout")
+            list.FillDirection = Enum.FillDirection.Vertical
+            list.HorizontalAlignment = Enum.HorizontalAlignment.Left
+            list.SortOrder = Enum.SortOrder.LayoutOrder
+            list.Padding = UDim.new(0, GAP_Y)
+            list.Parent = holder
+        
+            Utility.Holder = holder
+            return holder
+        end
+        
+        local function resizeHolderAnimated()
+            local holder = getHolder()
+            local totalH = 0
+            for _, info in pairs(Utility.Widgets) do
+                if info.Visible then totalH = totalH + info.Height + GAP_Y end
+            end
+            if totalH > 0 then totalH = totalH - GAP_Y end
+            TweenService:Create(holder, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size     = UDim2.new(0, 230, 0, totalH),
+                Position = UDim2.new(1, RIGHT_X, 0, getUtilityBaseY())
+            }):Play()
+        end
+        
+        local function createClockWidget()
+            local frame = Instance.new("Frame")
+            frame.Size = UDim2.new(1, 0, 0, 38)
+            frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+            frame.BackgroundTransparency = 0.08
+            frame.BorderSizePixel = 0
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+            local stroke = Instance.new("UIStroke", frame)
+            stroke.Color = Color3.fromRGB(90,90,90); stroke.Transparency = 0.4; stroke.Thickness = 1
+            local label = Instance.new("TextLabel", frame)
+            label.BackgroundTransparency = 1; label.Size = UDim2.new(1,0,1,0)
+            label.Text = "--:--:--"; label.Font = Enum.Font.SourceSansBold; label.TextSize = 16
+            label.TextColor3 = Color3.new(1,1,1); label.TextXAlignment = Enum.TextXAlignment.Center
+            label.TextYAlignment = Enum.TextYAlignment.Center
+            return frame
+        end
+        
+        local function createSessionWidget()
+            local frame = Instance.new("Frame")
+            frame.Size = UDim2.new(1, 0, 0, 34)
+            frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+            frame.BackgroundTransparency = 0.08; frame.BorderSizePixel = 0
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+            local stroke = Instance.new("UIStroke", frame)
+            stroke.Color = Color3.fromRGB(90,90,90); stroke.Transparency = 0.4; stroke.Thickness = 1
+            local label = Instance.new("TextLabel", frame)
+            label.BackgroundTransparency = 1; label.Size = UDim2.new(1,-8,1,0); label.Position = UDim2.new(0,4,0,0)
+            label.Text = "Session: 0:00"; label.Font = Enum.Font.SourceSans; label.TextSize = 14
+            label.TextColor3 = Color3.new(1,1,1); label.TextXAlignment = Enum.TextXAlignment.Left
+            return frame
+        end
+        
+        local function createNotesWidget()
+            local frame = Instance.new("Frame")
+            frame.Size = UDim2.new(1, 0, 0, 110)
+            frame.BackgroundColor3 = Color3.fromRGB(18,18,18)
+            frame.BackgroundTransparency = 0.08; frame.BorderSizePixel = 0
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+            local stroke = Instance.new("UIStroke", frame)
+            stroke.Color = Color3.fromRGB(90,90,90); stroke.Transparency = 0.5; stroke.Thickness = 1
+            local title = Instance.new("TextLabel", frame)
+            title.BackgroundTransparency = 1; title.Position = UDim2.new(0,8,0,4); title.Size = UDim2.new(1,-16,0,16)
+            title.Text = "📒 Notes"; title.Font = Enum.Font.SourceSansBold; title.TextSize = 14
+            title.TextColor3 = Color3.new(1,1,1); title.TextXAlignment = Enum.TextXAlignment.Left
+            local text = Instance.new("TextBox", frame)
+            text.BackgroundTransparency = 0.35; text.BackgroundColor3 = Color3.fromRGB(10,10,10)
+            text.Position = UDim2.new(0,8,0,24); text.Size = UDim2.new(1,-16,1,-32)
+            text.ClearTextOnFocus = false; text.Font = Enum.Font.SourceSans; text.TextSize = 14
+            text.TextColor3 = Color3.new(1,1,1); text.TextXAlignment = Enum.TextXAlignment.Left
+            text.TextYAlignment = Enum.TextYAlignment.Top; text.TextWrapped = true
+            text.MultiLine = true; text.Text = "write here..."
+            Instance.new("UICorner", text).CornerRadius = UDim.new(0, 6)
+            return frame
+        end
+        
+        local function showWidget(name)
+            local holder = getHolder()
+            local info = Utility.Widgets[name]
+        
+            if not info then
+                if name == "clock" then
+                    local frame = createClockWidget()
+                    frame.Parent = holder
+                    Utility.Widgets[name] = { Frame=frame, Height=38, Visible=false, _run=true }
+                    info = Utility.Widgets[name]
+                    task.spawn(function()
+                        while info._run do
+                            task.wait(1)
+                            if info.Visible and info.Frame:FindFirstChild("TextLabel") then
+                                local t = os.date("*t")
+                                info.Frame.TextLabel.Text = string.format("%02d:%02d:%02d", t.hour, t.min, t.sec)
+                            end
+                        end
+                    end)
+                elseif name == "session" then
+                    local frame = createSessionWidget()
+                    frame.Parent = holder
+                    Utility.Widgets[name] = { Frame=frame, Height=34, Visible=false, Start=os.time(), _run=true }
+                    info = Utility.Widgets[name]
+                    task.spawn(function()
+                        while info._run do
+                            task.wait(1)
+                            if info.Visible and info.Frame:FindFirstChild("TextLabel") then
+                                local elapsed = os.time() - info.Start
+                                info.Frame.TextLabel.Text = string.format("Session: %d:%02d", math.floor(elapsed/60), elapsed%60)
+                            end
+                        end
+                    end)
+                elseif name == "notes" then
+                    local frame = createNotesWidget()
+                    frame.Parent = holder
+                    Utility.Widgets[name] = { Frame=frame, Height=110, Visible=false }
+                    info = Utility.Widgets[name]
+                end
+            end
+        
+            if info and not info.Visible then
+                info.Visible = true
+                info.Frame.Visible = true
+                info.Frame.Size = UDim2.new(1, 0, 0, 0)
+                TweenService:Create(info.Frame, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size=UDim2.new(1,0,0,info.Height) }):Play()
+                resizeHolderAnimated()
+            end
+        end
+        
+        local function hideWidget(name)
+            local info = Utility.Widgets[name]
+            if not info or not info.Visible then return end
+            info.Visible = false
+            local frame = info.Frame
+            TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size=UDim2.new(1,0,0,0) }):Play()
+            task.delay(0.21, function()
+                if frame then frame.Visible = false end
+                resizeHolderAnimated()
+            end)
+        end
+        
+        ExtrasSection:Toggle({ Title="Clock HUD", Desc="Show local time.", Type="Checkbox", Value=true,
+            Callback=function(state) if state then showWidget("clock") else hideWidget("clock") end end })
+        ExtrasSection:Toggle({ Title="Session timer", Desc="Time since script loaded.", Type="Checkbox", Value=true,
+            Callback=function(state) if state then showWidget("session") else hideWidget("session") end end })
+        ExtrasSection:Toggle({ Title="Notes HUD", Desc="Small sticky note.", Type="Checkbox", Value=false,
+            Callback=function(state) if state then showWidget("notes") else hideWidget("notes") end end })
+        
+        task.defer(function()
+            showWidget("clock")
+            showWidget("session")
+        end)
+        
+        ------------------------------------------------------------
+        -- 💬 CHAT TAB
+        ------------------------------------------------------------
+        do
+            local HttpService = game:GetService("HttpService")
+            local RELAY_BASE   = "https://cchat-1-ucwf.onrender.com"
+            local SEND_URL     = RELAY_BASE .. "/send"
+            local POLL_URL     = RELAY_BASE .. "/pull"
+            local AUTH_SECRET  = ""
+            local requestFunc = (syn and syn.request) or http_request or request or (http and http.request)
+            local lastNotifyTime = 0
+            local NOTIFY_COOLDOWN = 3
+        
+            local function notifyNewMessage(author, content)
+                local now = tick()
+                if now - lastNotifyTime < NOTIFY_COOLDOWN then return end
+                lastNotifyTime = now
+                local short = tostring(content or "")
+                if #short > 60 then short = short:sub(1, 57) .. "..." end
+                WindUI:Notify({ Title=(author and author ~= "" and ("New message: "..author)) or "New message",
+                    Content=(short ~= "" and short) or "Empty message", Icon="message-square", Duration=3 })
+            end
+        
+            local function sendJSON(url, bodyTable)
+                local bodyStr = HttpService:JSONEncode(bodyTable or {})
+                local headers = { ["Content-Type"]="application/json" }
+                if AUTH_SECRET ~= "" then headers["Authorization"] = "Bearer "..AUTH_SECRET end
+                if requestFunc then
+                    local ok, res = pcall(function() return requestFunc({ Url=url, Method="POST", Headers=headers, Body=bodyStr }) end)
+                    if ok and res and tonumber(res.StatusCode or 0) == 200 then return true end
+                end
+                if HttpService.RequestAsync then
+                    local ok, res = pcall(function() return HttpService:RequestAsync({ Url=url, Method="POST", Headers=headers, Body=bodyStr }) end)
+                    if ok and res and res.Success and tonumber(res.StatusCode or 0) == 200 then return true end
+                end
+                pcall(function() game:HttpPost(url, bodyStr) end)
+                return false
+            end
+        
+            local function getJSON(url)
+                local raw = nil
+                if requestFunc then
+                    local ok, res = pcall(function() return requestFunc({ Url=url, Method="GET" }) end)
+                    if ok and res and res.Body then raw = res.Body end
+                end
+                if not raw or raw == "" then
+                    local ok, r = pcall(function() return game:HttpGet(url) end)
+                    if ok then raw = r end
+                end
+                if not raw or raw == "" then return nil end
+                local ok2, data = pcall(function() return HttpService:JSONDecode(raw) end)
+                if not ok2 then return nil end
+                return data
+            end
+        
+            local ChatTab = Window:Tab({ Title = "Chat", Icon = "message-square" })
+            local ChatSection = ChatTab:Section({ Title = "Discord Live Chat", Icon = "message-square" })
+            local initialLog = "-- Chat System Ready --\n[System]: Waiting for messages...\n[Hint]: If you see 401 error, ENABLE 'Message Content Intent' in Discord Developer Portal!\n"
+            local fullLog = initialLog
+            local ChatLog = ChatSection:Code({ Title = "Messages", Code = fullLog })
+            local SEEN_IDS = {}
+            local LAST_ID  = 0
+            local auto     = true
+        
+            local function appendMessage(author, content, idStr, serverTime)
+                if idStr and SEEN_IDS[idStr] then return end
+                if idStr then SEEN_IDS[idStr] = true end
+                local timeStr
+                if serverTime and #serverTime > 16 then
+                    local T_pos = string.find(serverTime, "T")
+                    if T_pos then timeStr = string.sub(serverTime, T_pos+1, T_pos+5) else timeStr = os.date("%H:%M") end
+                else timeStr = os.date("%H:%M") end
+                local line = string.format("[%s] %s: %s", timeStr, author, content)
+                fullLog = fullLog .. "\n" .. line
+                if #fullLog > 5000 then fullLog = "..." .. fullLog:sub(-5000) end
+                if ChatLog and ChatLog.SetCode then ChatLog:SetCode(fullLog) end
+            end
+        
+            ChatSection:Toggle({ Title="Auto Refresh", Desc="Automatically pull new messages", Value=true,
+                Callback=function(s) auto = s end })
+            ChatSection:Divider()
+        
+            local fromName = (game.Players.LocalPlayer and game.Players.LocalPlayer.Name) or "Player"
+            local draft = ""
+            local msgInput = ChatSection:Input({ Title="Message", Placeholder="Type something...", Callback=function(v) draft = v or "" end })
+        
+            local SendButton
+            SendButton = ChatSection:Button({
+                Title="Send Message", Icon="send", Color=COLOR_GREEN,
+                Callback=function()
+                    SendButton:Highlight()
+                    local text = (draft ~= "" and draft) or " "
+                    local ok = sendJSON(SEND_URL, { from=fromName, message=text })
+                    WindUI:Notify({ Title=ok and "Sent" or "Error", Content=ok and "Message delivered." or "Failed to send.",
+                        Icon=ok and "check-circle" or "x-circle", Duration=2 })
+                    if ok then
+                        draft = ""
+                        pcall(function() msgInput:Set("") end)
+                    end
+                end
+            })
+        
+            task.delay(2, function() appendMessage("System", "UI Ready. Chat loaded.", "sys_init") end)
+        
+            local function pollOnce()
+                local url = POLL_URL .. "?since=" .. tostring(LAST_ID)
+                local data = getJSON(url)
+                if data == nil or type(data) ~= "table" then return false end
+                local msgs = data.items or {}
+                if #msgs == 0 then return false end
+                for i = 1, #msgs do
+                    local m = msgs[i]
+                    local idStr = tostring(m.id)
+                    LAST_ID = idStr
+                    if not SEEN_IDS[idStr] then
+                        appendMessage(tostring(m.author or "User"), tostring(m.text or ""), idStr, tostring(m.time or ""))
+                        notifyNewMessage(tostring(m.author or "User"), tostring(m.text or ""))
+                    end
+                end
+                return true
+            end
+        
+            task.spawn(function()
+                local waitTime = 3
+                while true do
+                    if auto then
+                        local ok = pcall(pollOnce)
+                        waitTime = ok and 3 or 4
+                    end
+                    task.wait(waitTime)
+                end
+            end)
+            pcall(pollOnce)
+        end
+        
+        ------------------------------------------------------------
+        -- 🔴 Border Highlight
+        ------------------------------------------------------------
+        local HIGHLIGHT_COLOR    = Color3.fromRGB(180, 42, 248)
+        local HIGHLIGHT_MATERIAL = "Metal"
+        local originalAttrs      = {}
+        local highlightedRegions = {}
+        local highlightEnabled   = false
+        
+        local function findMyCountryName_auto()
+            local plr = Players.LocalPlayer
+            for _, country in ipairs(registry:GetChildren()) do
+                local v = country:FindFirstChild("ActiveLeader") or country:FindFirstChild("Leader") or country:FindFirstChild("Owner")
+                if v and v.Value ~= nil then
+                    if typeof(v.Value) == "string" and v.Value == plr.Name then return country.Name
+                    elseif typeof(v.Value) == "Instance" and v.Value == plr then return country.Name end
+                end
+                local attr = country:GetAttribute("ActiveLeader") or country:GetAttribute("Leader") or country:GetAttribute("Owner")
+                if attr and attr == plr.Name then return country.Name end
+            end
+            return nil
+        end
+        
+        local function highlightOneRegion(region)
+            local gen = region:FindFirstChild("GeneratedRegion")
+            if not gen then return false end
+            if not originalAttrs[region] then
+                originalAttrs[region] = { color=gen:GetAttribute("Color"), material=gen:GetAttribute("Material") }
+            end
+            gen:SetAttribute("Color", HIGHLIGHT_COLOR)
+            gen:SetAttribute("Material", HIGHLIGHT_MATERIAL)
+            highlightedRegions[region] = true
+            return true
+        end
+        
+        local function restoreOneRegion(region)
+            local gen = region:FindFirstChild("GeneratedRegion")
+            if not gen then return false end
+            local saved = originalAttrs[region]
+            if saved then
+                if saved.color ~= nil then gen:SetAttribute("Color", saved.color) end
+                if saved.material ~= nil then gen:SetAttribute("Material", saved.material) end
+            end
+            originalAttrs[region] = nil
+            highlightedRegions[region] = nil
+            return true
+        end
+        
+        local function enableBorderHighlightAttr()
+            if highlightEnabled then return end
+            local myName = findMyCountryName_auto()
+            if not myName then
+                WindUI:Notify({ Title="Highlight", Content="Could not detect your country.", Icon="x-circle", Duration=3 })
+                return
+            end
+            highlightEnabled = true
+            task.spawn(function()
+                local changed, batch = 0, 0
+                for _, region in ipairs(regions:GetChildren()) do
+                    if not highlightEnabled then break end
+                    if region:GetAttribute("Country") == myName then
+                        if highlightOneRegion(region) then changed += 1; batch += 1 end
+                    end
+                    if batch >= 50 then batch = 0; task.wait() end
+                end
+                WindUI:Notify({ Title="Highlight enabled", Content=string.format("Updated regions: %d", changed), Icon="map", Duration=3 })
+            end)
+        end
+        
+        local function disableBorderHighlightAttr()
+            if not highlightEnabled then return end
+            highlightEnabled = false
+            task.spawn(function()
+                local restored, batch = 0, 0
+                for region, _ in pairs(highlightedRegions) do
+                    if restoreOneRegion(region) then restored += 1 end
+                    batch += 1
+                    if batch >= 60 then batch = 0; task.wait() end
+                end
+                highlightedRegions = {}
+                originalAttrs = {}
+                WindUI:Notify({ Title="Highlight disabled", Content=string.format("Restored regions: %d", restored), Icon="map", Duration=2 })
+            end)
+        end
+        
+        local function reapplyColorToHighlighted()
+            if not highlightEnabled then return end
+            task.spawn(function()
+                local batch = 0
+                for region, _ in pairs(highlightedRegions) do
+                    local gen = region:FindFirstChild("GeneratedRegion")
+                    if gen then gen:SetAttribute("Color", HIGHLIGHT_COLOR) end
+                    batch += 1
+                    if batch >= 60 then batch = 0; task.wait() end
+                end
+            end)
+        end
+        
+        local function reapplyMaterialToHighlighted()
+            if not highlightEnabled then return end
+            task.spawn(function()
+                local batch = 0
+                for region, _ in pairs(highlightedRegions) do
+                    local gen = region:FindFirstChild("GeneratedRegion")
+                    if gen then gen:SetAttribute("Material", HIGHLIGHT_MATERIAL) end
+                    batch += 1
+                    if batch >= 60 then batch = 0; task.wait() end
+                end
+            end)
+        end
+        
+        local HighlightTab = Window:Tab({ Title = "Border Highlight", Icon = "map" })
+        local HighlightSection = HighlightTab:Section({ Title = "My regions", Icon = "map" })
+        
+        HighlightSection:Paragraph({ Title="Region Highlight", Desc="Color + material for your regions. Off by default.", Color=Color3.fromRGB(255,100,100), ImageSize=32 })
+        HighlightSection:Space()
+        HighlightSection:Toggle({ Title="Enable Highlight", Desc="Apply style to your regions (slow on big maps).", Type="Checkbox", Value=false,
+            Callback=function(state) if state then enableBorderHighlightAttr() else disableBorderHighlightAttr() end end })
+        HighlightSection:Space()
+        HighlightSection:Colorpicker({ Title="Highlight Color", Desc="Pick a color.", Default=HIGHLIGHT_COLOR, Transparency=0, Locked=false,
+            Callback=function(color) HIGHLIGHT_COLOR = color; reapplyColorToHighlighted() end })
+        HighlightSection:Space()
+        HighlightSection:Dropdown({ Title="Highlight Material", Desc="Pick a material.", Values={"Metal","SmoothPlastic","Plastic","Neon","Wood","Grass"}, Value="Metal",
+            Callback=function(matName) HIGHLIGHT_MATERIAL = matName; reapplyMaterialToHighlighted() end })
+        HighlightSection:Space()
+        
+        local ResetHighlightButton
+        ResetHighlightButton = HighlightSection:Button({ Title="Reset Highlight", Desc="Restore original values.", Icon="refresh-cw", Color=COLOR_RED,
+            Callback=function() ResetHighlightButton:Highlight(); disableBorderHighlightAttr() end })
+        
+        ------------------------------------------------------------
+        -- ✅ FINAL INIT
+        ------------------------------------------------------------
+        renderStats()
+        refreshCityDropdown()
+        
+        WindUI:Notify({ Title="VezuntHUB Loaded", Content="Press P to show/hide interface", Icon="check-circle", Duration=3 })
+    end
+    
+    local function _rubPFHDGdD()
+        if __GamelistLoader then
+            __GamelistLoader:Destroy()
+        end
+        pcall(_uskfurGeYE)
+    end
+    
+    _rubPFHDGdD()
+end
+
+-- Run directly without any key check
+task.spawn(__run)
