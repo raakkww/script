@@ -1,0 +1,42 @@
+local RunService = game:GetService("RunService")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 200, 0, 100)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local ToggleButton = Instance.new("TextButton", MainFrame)
+ToggleButton.Size = UDim2.new(0, 160, 0, 40)
+ToggleButton.Position = UDim2.new(0.5, -80, 0.5, -20)
+ToggleButton.Text = "OFF"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+
+local active = false
+local rewardPart = workspace:FindFirstChild("Obby") and workspace.Obby:FindFirstChild("RewardPart")
+
+ToggleButton.MouseButton1Click:Connect(function()
+    active = not active
+    if active then
+        ToggleButton.Text = "ON"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        ToggleButton.Text = "OFF"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        if rewardPart and LocalPlayer.Character then
+            firetouchinterest(LocalPlayer.Character.PrimaryPart, rewardPart, 1)
+        end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if active and rewardPart and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        firetouchinterest(root, rewardPart, 0)
+        task.wait()
+        firetouchinterest(root, rewardPart, 1)
+    end
+end)
