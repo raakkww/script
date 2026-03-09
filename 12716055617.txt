@@ -1,0 +1,532 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+local teleportLocations = {
+    Vector3.new(-470.198, 18.863, -1371.971),
+    Vector3.new(-455.111, 24.028, -1354.698),
+    Vector3.new(-438.011, 23.133, -1395.546),
+    Vector3.new(-453.589, 22.863, -1401.278)
+}
+
+local boxFarmLocations = {
+    Vector3.new(464.800, 44.408, -2228.321),
+    Vector3.new(512.141, 48.804, -1763.980),
+    Vector3.new(-1873.560, 44.600, -626.966),
+    Vector3.new(-1686.408, 44.807, -1263.831),
+    Vector3.new(-1314.407, 44.320, -1125.904),
+    Vector3.new(112.494, 72.059, 908.512),
+    Vector3.new(-967.458, 44.581, 224.375)
+}
+
+local jewelryFarmLocations = {
+    Vector3.new(-508.777, 44.219, 322.379),
+    Vector3.new(-518.074, 37.335, 352.412),
+    Vector3.new(-484.384, 37.264, 330.680),
+    Vector3.new(-497.189, 38.559, 349.333)
+}
+
+local currentMode = "Normal"
+local currentIndex = 1
+local teleportEnabled = false
+local platformParts = {}
+local bodyVelocity = nil
+local atLocation = false
+local noclipConnection = nil
+local proximityConnection = nil
+local currentLocationPos = nil
+
+local FLY_SPEED = 150
+local UNDERGROUND_DEPTH = 25
+local ARRIVAL_DISTANCE = 5
+local PROXIMITY_RANGE = 30
+
+local platformCache = {}
+
+local function createPlatform(position)
+    local key = tostring(position)
+    if platformCache[key] and platformCache[key].Parent then
+        return platformCache[key]
+    end
+    
+    local platform = Instance.new("Part")
+    platform.Size = Vector3.new(10, 1, 10)
+    platform.Position = position - Vector3.new(0, 3, 0)
+    platform.Anchored = true
+    platform.CanCollide = true
+    platform.BrickColor = BrickColor.new("Bright blue")
+    platform.Material = Enum.Material.Neon
+    platform.Parent = workspace
+    
+    platformCache[key] = platform
+    return platform
+end
+
+local function removeOldPlatforms()
+    for _, platform in pairs(platformParts) do
+        pcall(function() platform:Destroy() end)
+    end
+    platformParts = {}
+    platformCache = {}
+end
+
+local function enableNoclip()
+    if noclipConnection then noclipConnection:Disconnect() end
+    noclipConnection = RunService.Stepped:Connect(function()
+        if teleportEnabled and character then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+end
+
+local function disableNoclip()
+    if noclipConnection then noclipConnection:Disconnect() noclipConnection = nil end
+    if character then
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+local function enableProximityFire()
+    if proximityConnection then proximityConnection:Disconnect() end
+    proximityConnection = RunService.Heartbeat:Connect(function()
+        if not teleportEnabled or not character or not humanoidRootPart or not atLocation or not currentLocationPos then 
+            return 
+        end
+        
+        local distanceFromLocation = (humanoidRootPart.Position - currentLocationPos).Magnitude
+        if distanceFromLocation > ARRIVAL_DISTANCE + 5 then
+            return
+        end
+        
+        local playerPos = humanoidRootPart.Position
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ProximityPrompt") then
+                local promptPart = v.Parent
+                local partPos = promptPart and (promptPart:IsA("BasePart") and promptPart.Position or (promptPart:IsA("Model") and promptPart.PrimaryPart and promptPart.PrimaryPart.Position))
+                if partPos and (playerPos - partPos).Magnitude <= PROXIMITY_RANGE then
+                    pcall(function() fireproximityprompt(v) end)
+                end
+            end
+        end
+    end)
+end
+
+local function disableProximityFire()
+    if proximityConnection then proximityConnection:Disconnect() proximityConnection = nil end
+end
+
+local function stopBodyVelocity()
+    if bodyVelocity and bodyVelocity.Parent then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+end
+
+local function flyToLocation(targetPos, callback)
+    if not humanoidRootPart then return end
+    
+    stopBodyVelocity()
+    atLocation = false
+    currentLocationPos = nil
+    humanoid.PlatformStand = true
+    
+    local currentPos = humanoidRootPart.Position
+    local undergroundStart = Vector3.new(currentPos.X, currentPos.Y - UNDERGROUND_DEPTH, currentPos.Z)
+    humanoidRootPart.CFrame = CFrame.new(undergroundStart)
+    
+    local undergroundTarget = Vector3.new(targetPos.X, targetPos.Y - UNDERGROUND_DEPTH, targetPos.Z)
+    
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bodyVelocity.P = 1250
+    bodyVelocity.Velocity = (undergroundTarget - undergroundStart).Unit * FLY_SPEED
+    bodyVelocity.Parent = humanoidRootPart
+    
+    local arrival
+    arrival = RunService.Heartbeat:Connect(function()
+        if not teleportEnabled or not bodyVelocity then
+            arrival:Disconnect()
+            return
+        end
+        if (humanoidRootPart.Position - undergroundTarget).Magnitude <= ARRIVAL_DISTANCE then
+            stopBodyVelocity()
+            humanoidRootPart.CFrame = CFrame.new(targetPos)
+            humanoidRootPart.Velocity = Vector3.new(0,0,0)
+            humanoid.PlatformStand = false
+            atLocation = true
+            currentLocationPos = targetPos
+            arrival:Disconnect()
+            if callback then callback() end
+        end
+    end)
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TeleportGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 260, 0, 310)
+mainFrame.Position = UDim2.new(0.5, -130, 0.5, -155)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.BackgroundTransparency = 0.05
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 12)
+uiCorner.Parent = mainFrame
+
+local uiStroke = Instance.new("UIStroke")
+uiStroke.Thickness = 2
+uiStroke.Color = Color3.fromRGB(100, 200, 255)
+uiStroke.Transparency = 0.5
+uiStroke.Parent = mainFrame
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 45)
+titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.Parent = titleBar
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -45, 1, 0)
+title.Position = UDim2.new(0, 15, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "✨ TELEPORT CYCLE"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 18
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -40, 0.5, -15)
+closeButton.BackgroundColor3 = Color3.fromRGB(220, 70, 70)
+closeButton.Text = "✕"
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.TextSize = 20
+closeButton.Font = Enum.Font.GothamBold
+closeButton.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 8)
+closeCorner.Parent = closeButton
+
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -20, 1, -60)
+contentFrame.Position = UDim2.new(0, 10, 0, 50)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = mainFrame
+
+local function createModeButton(name, pos, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.3, 0, 0, 35)
+    btn.Position = UDim2.new(pos, 0, 0, 0)
+    btn.BackgroundColor3 = color
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = contentFrame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = btn
+    
+    return btn
+end
+
+local normalBtn = createModeButton("NORMAL", 0, Color3.fromRGB(50, 150, 255))
+local boxBtn = createModeButton("BOX", 0.35, Color3.fromRGB(100, 100, 100))
+local jewelryBtn = createModeButton("JEWELRY", 0.7, Color3.fromRGB(100, 100, 100))
+
+local statusFrame = Instance.new("Frame")
+statusFrame.Size = UDim2.new(1, 0, 0, 60)
+statusFrame.Position = UDim2.new(0, 0, 0, 45)
+statusFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+statusFrame.BackgroundTransparency = 0.3
+statusFrame.Parent = contentFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 8)
+statusCorner.Parent = statusFrame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.5, -5, 1, 0)
+statusLabel.Position = UDim2.new(0, 10, 0, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "⚪ OFF"
+statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+statusLabel.TextSize = 14
+statusLabel.Font = Enum.Font.GothamBold
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = statusFrame
+
+local locationLabel = Instance.new("TextLabel")
+locationLabel.Size = UDim2.new(0.5, -5, 1, 0)
+locationLabel.Position = UDim2.new(0.5, 5, 0, 0)
+locationLabel.BackgroundTransparency = 1
+locationLabel.Text = "📍 1/4"
+locationLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+locationLabel.TextSize = 14
+locationLabel.Font = Enum.Font.GothamBold
+locationLabel.TextXAlignment = Enum.TextXAlignment.Right
+locationLabel.Parent = statusFrame
+
+local timerLabel = Instance.new("TextLabel")
+timerLabel.Size = UDim2.new(1, -20, 0, 20)
+timerLabel.Position = UDim2.new(0, 10, 0, 115)
+timerLabel.BackgroundTransparency = 1
+timerLabel.Text = ""
+timerLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+timerLabel.TextSize = 14
+timerLabel.Font = Enum.Font.GothamBold
+timerLabel.Parent = contentFrame
+
+local featuresLabel = Instance.new("TextLabel")
+featuresLabel.Size = UDim2.new(1, -20, 0, 20)
+featuresLabel.Position = UDim2.new(0, 10, 0, 135)
+featuresLabel.BackgroundTransparency = 1
+featuresLabel.Text = "🛡️ NOCLIP | 🔥 PROX (AT LOCATION ONLY)"
+featuresLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+featuresLabel.TextSize = 10
+featuresLabel.Font = Enum.Font.Gotham
+featuresLabel.Parent = contentFrame
+
+local holdButton = Instance.new("TextButton")
+holdButton.Size = UDim2.new(1, 0, 0, 45)
+holdButton.Position = UDim2.new(0, 0, 0, 165)
+holdButton.BackgroundColor3 = Color3.fromRGB(70, 180, 70)
+holdButton.Text = "⚡ HOLD TO START"
+holdButton.TextColor3 = Color3.new(1, 1, 1)
+holdButton.TextSize = 14
+holdButton.Font = Enum.Font.GothamBold
+holdButton.Parent = contentFrame
+
+local holdCorner = Instance.new("UICorner")
+holdCorner.CornerRadius = UDim.new(0, 8)
+holdCorner.Parent = holdButton
+
+local holdProgress = Instance.new("Frame")
+holdProgress.Size = UDim2.new(0, 0, 1, 0)
+holdProgress.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
+holdProgress.BackgroundTransparency = 0.5
+holdProgress.BorderSizePixel = 0
+holdProgress.Parent = holdButton
+
+local progressCorner = Instance.new("UICorner")
+progressCorner.CornerRadius = UDim.new(0, 8)
+progressCorner.Parent = holdProgress
+
+local miniButton = Instance.new("TextButton")
+miniButton.Size = UDim2.new(0, 50, 0, 50)
+miniButton.Position = UDim2.new(0, 20, 0, 20)
+miniButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+miniButton.Text = "📍"
+miniButton.TextColor3 = Color3.fromRGB(100, 200, 255)
+miniButton.TextSize = 24
+miniButton.Visible = false
+miniButton.Parent = screenGui
+miniButton.Active = true
+miniButton.Draggable = true
+
+local miniCorner = Instance.new("UICorner")
+miniCorner.CornerRadius = UDim.new(1, 0)
+miniCorner.Parent = miniButton
+
+local miniStroke = Instance.new("UIStroke")
+miniStroke.Thickness = 2
+miniStroke.Color = Color3.fromRGB(100, 200, 255)
+miniStroke.Transparency = 0.3
+miniStroke.Parent = miniButton
+
+local function toggleMainFrame()
+    mainFrame.Visible = not mainFrame.Visible
+    miniButton.Visible = not mainFrame.Visible
+end
+
+closeButton.MouseButton1Click:Connect(toggleMainFrame)
+closeButton.TouchTap:Connect(toggleMainFrame)
+miniButton.MouseButton1Click:Connect(toggleMainFrame)
+miniButton.TouchTap:Connect(toggleMainFrame)
+
+local function updateModeColors()
+    normalBtn.BackgroundColor3 = currentMode == "Normal" and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(80, 80, 90)
+    boxBtn.BackgroundColor3 = currentMode == "Box Farm" and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(80, 80, 90)
+    jewelryBtn.BackgroundColor3 = currentMode == "Jewelry" and Color3.fromRGB(50, 150, 255) or Color3.fromRGB(80, 80, 90)
+end
+
+normalBtn.MouseButton1Click:Connect(function()
+    if not teleportEnabled then currentMode = "Normal" currentIndex = 1 updateModeColors() locationLabel.Text = "📍 1/"..#teleportLocations end
+end)
+
+boxBtn.MouseButton1Click:Connect(function()
+    if not teleportEnabled then currentMode = "Box Farm" currentIndex = 1 updateModeColors() locationLabel.Text = "📍 1/"..#boxFarmLocations end
+end)
+
+jewelryBtn.MouseButton1Click:Connect(function()
+    if not teleportEnabled then currentMode = "Jewelry" currentIndex = 1 updateModeColors() locationLabel.Text = "📍 1/"..#jewelryFarmLocations end
+end)
+
+local function updateUI()
+    if teleportEnabled then
+        statusLabel.Text = "🔵 ON"
+        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        holdButton.Text = "⏹️ HOLD TO STOP"
+        holdButton.BackgroundColor3 = Color3.fromRGB(220, 70, 70)
+        featuresLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        statusLabel.Text = "⚪ OFF"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        holdButton.Text = "⚡ HOLD TO START"
+        holdButton.BackgroundColor3 = Color3.fromRGB(70, 180, 70)
+        timerLabel.Text = ""
+        featuresLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+        stopBodyVelocity()
+        removeOldPlatforms()
+    end
+    holdProgress.Size = UDim2.new(0, 0, 1, 0)
+end
+
+local function getCurrentLocations()
+    if currentMode == "Normal" then return teleportLocations
+    elseif currentMode == "Box Farm" then return boxFarmLocations
+    else return jewelryFarmLocations end
+end
+
+local function waitAtLocation()
+    if not teleportEnabled then return end
+    for i = 10,1,-1 do
+        timerLabel.Text = "⏳ "..i.."s"
+        task.wait(1)
+        if not teleportEnabled or not atLocation then 
+            timerLabel.Text = ""
+            return 
+        end
+    end
+    timerLabel.Text = ""
+    if teleportEnabled and atLocation then
+        currentIndex = currentIndex + 1
+        local locations = getCurrentLocations()
+        if currentIndex > #locations then currentIndex = 1 end
+        locationLabel.Text = "📍 "..currentIndex.."/"..#locations
+        
+        local nextLocation = locations[currentIndex]
+        if currentMode == "Normal" or currentMode == "Jewelry" then
+            removeOldPlatforms()
+            table.insert(platformParts, createPlatform(nextLocation))
+        end
+        
+        flyToLocation(nextLocation, waitAtLocation)
+    end
+end
+
+local function startTeleport()
+    teleportEnabled = true
+    updateUI()
+    enableNoclip()
+    enableProximityFire()
+    
+    currentIndex = 1
+    local locations = getCurrentLocations()
+    locationLabel.Text = "📍 1/"..#locations
+    
+    local firstLocation = locations[currentIndex]
+    if currentMode == "Normal" or currentMode == "Jewelry" then
+        table.insert(platformParts, createPlatform(firstLocation))
+    end
+    
+    flyToLocation(firstLocation, waitAtLocation)
+end
+
+local function stopTeleport()
+    teleportEnabled = false
+    updateUI()
+    disableNoclip()
+    disableProximityFire()
+    atLocation = false
+    currentLocationPos = nil
+    removeOldPlatforms()
+    stopBodyVelocity()
+    if humanoid then humanoid.PlatformStand = false end
+end
+
+local holdActive = false
+local holdStartTime = 0
+local holdConnection = nil
+
+local function updateHold()
+    if holdActive and not teleportEnabled then
+        local progress = math.min((tick() - holdStartTime)/1,1)
+        holdProgress.Size = UDim2.new(progress,0,1,0)
+        if progress >= 1 then 
+            holdActive = false 
+            if holdConnection then holdConnection:Disconnect() holdConnection = nil end
+            startTeleport() 
+        end
+    elseif holdActive and teleportEnabled then
+        local progress = math.min((tick() - holdStartTime)/1,1)
+        holdProgress.Size = UDim2.new(progress,0,1,0)
+        if progress >= 1 then 
+            holdActive = false 
+            if holdConnection then holdConnection:Disconnect() holdConnection = nil end
+            stopTeleport() 
+        end
+    end
+end
+
+holdButton.MouseButton1Down:Connect(function()
+    holdActive = true
+    holdStartTime = tick()
+    holdConnection = RunService.Heartbeat:Connect(updateHold)
+end)
+
+holdButton.MouseButton1Up:Connect(function()
+    holdActive = false
+    if holdConnection then holdConnection:Disconnect() holdConnection = nil end
+    holdProgress.Size = UDim2.new(0,0,1,0)
+end)
+
+holdButton.TouchLongPress:Connect(function()
+    if not teleportEnabled then startTeleport() else stopTeleport() end
+end)
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.T then toggleMainFrame() end
+end)
+
+updateModeColors()
+updateUI()
+
+player.CharacterAdded:Connect(function(newChar)
+    task.wait(0.5)
+    character = newChar
+    humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
+    humanoid = newChar:WaitForChild("Humanoid")
+    if teleportEnabled then
+        enableNoclip()
+        enableProximityFire()
+    end
+end)
