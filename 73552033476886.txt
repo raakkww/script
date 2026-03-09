@@ -1,0 +1,195 @@
+--[[
+    JG HUB V1.0 | LIVE OF LIFE
+    Developed by Jol Games
+    Optimized for Mobile Executors
+]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "JG HUB V1.0 | LIVE OF LIFE",
+   LoadingTitle = "JG HUB",
+   LoadingSubtitle = "by Jol Games",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "JGHUB", 
+      FileName = "LiveOfLifeConfig"
+   },
+   KeySystem = false -- Set to true if you want to add a key system later
+})
+
+-- Service References
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Variables for Logic
+local WalkSpeedValue = 16
+local InfiniteStaminaEnabled = false
+local NoClipEnabled = false
+local ESPEnabled = false
+local StaminaConnection
+
+-- Tabs
+local PlayerTab = Window:CreateTab("Player", 4483362458)
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+
+--- [ PLAYER TAB FEATURES ] ---
+
+-- Speed Multiplier Slider
+PlayerTab:CreateSlider({
+   Name = "Speed Multiplier",
+   Info = "Default speed is 16",
+   Range = {16, 250},
+   Increment = 1,
+   Suffix = " Speed",
+   CurrentValue = 16,
+   Flag = "SpeedSlider",
+   Callback = function(Value)
+      WalkSpeedValue = Value
+   end,
+})
+
+-- No Clip Toggle
+PlayerTab:CreateToggle({
+   Name = "No Clip",
+   CurrentValue = false,
+   Flag = "NoClip",
+   Callback = function(Value)
+      NoClipEnabled = Value
+   end,
+})
+
+-- Infinite Stamina Toggle
+PlayerTab:CreateToggle({
+   Name = "Infinite Stamina",
+   CurrentValue = false,
+   Flag = "InfStamina", 
+   Callback = function(Value)
+      InfiniteStaminaEnabled = Value
+      local char = LocalPlayer.Character
+      if char and InfiniteStaminaEnabled then 
+          applyStamina(char) 
+      end
+   end,
+})
+
+--- [ VISUALS TAB FEATURES ] ---
+
+-- Player ESP Toggle
+VisualsTab:CreateToggle({
+   Name = "Player ESP",
+   CurrentValue = false,
+   Flag = "PlayerESP",
+   Callback = function(Value)
+      ESPEnabled = Value
+      if ESPEnabled then
+          for _, player in pairs(Players:GetPlayers()) do
+              CreateESP(player)
+          end
+      else
+          -- Clean up highlights when disabled
+          for _, player in pairs(Players:GetPlayers()) do
+              if player.Character and player.Character:FindFirstChild("ESP") then
+                  player.Character.ESP:Destroy()
+              end
+          end
+      end
+   end,
+})
+
+--- [ CORE LOGIC FUNCTIONS ] ---
+
+-- Stamina Implementation
+function applyStamina(character)
+    local sprintStuff = character:WaitForChild("SprintStuff", 5)
+    if sprintStuff then
+        local stamina = sprintStuff:WaitForChild("Stamina", 5)
+        local maxStamina = sprintStuff:WaitForChild("MaxStamina", 5)
+        
+        if stamina and maxStamina then
+            if StaminaConnection then StaminaConnection:Disconnect() end
+            
+            StaminaConnection = stamina.Changed:Connect(function()
+                if InfiniteStaminaEnabled then
+                    stamina.Value = maxStamina.Value
+                end
+            end)
+            
+            if InfiniteStaminaEnabled then
+                stamina.Value = maxStamina.Value
+            end
+        end
+    end
+end
+
+-- ESP Implementation
+function CreateESP(player)
+    if player ~= LocalPlayer then
+        -- Handle future respawns for other players
+        player.CharacterAdded:Connect(function(char)
+            if ESPEnabled then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "ESP"
+                highlight.FillTransparency = 0.5
+                highlight.FillColor = Color3.fromRGB(0, 255, 0) -- Neon Green
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.Parent = char
+            end
+        end)
+        
+        -- Apply to current character of other players
+        if player.Character and ESPEnabled then
+            if not player.Character:FindFirstChild("ESP") then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "ESP"
+                highlight.FillTransparency = 0.5
+                highlight.FillColor = Color3.fromRGB(0, 255, 0)
+                highlight.Parent = player.Character
+            end
+        end
+    end
+end
+
+--- [ GLOBAL LOOPS & CONNECTIONS ] ---
+
+-- Unified Stepped Connection for Speed and NoClip (Best for Mobile)
+RunService.Stepped:Connect(function()
+    pcall(function()
+        local character = LocalPlayer.Character
+        if character then
+            -- Speed Management
+            if character:FindFirstChild("Humanoid") and WalkSpeedValue > 16 then
+                character.Humanoid.WalkSpeed = WalkSpeedValue
+            end
+            
+            -- No Clip Management
+            if NoClipEnabled then
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+-- Handle LocalPlayer Respawns
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(1)
+    if InfiniteStaminaEnabled then
+        applyStamina(char)
+    end
+end)
+
+-- Handle New Players joining
+Players.PlayerAdded:Connect(CreateESP)
+
+-- Final Notification
+Rayfield:Notify({
+    Title = "JG HUB V1.0",
+    Content = "Successfully loaded Live of Life features!",
+    Duration = 5,
+    Image = 4483362458,
+})
