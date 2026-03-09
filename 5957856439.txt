@@ -1,0 +1,54 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local gunEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("GunEvent")
+local excludedName = "YourUsernameHere" --IMPORTANT
+
+local pos = vector.create(-24.041393280029297, 246.24285888671875, 93.0785140991211)
+local dir = vector.create(-0.15402449667453766, -0.18339668214321136, 0.9708976149559021)
+
+local toggled = false
+local connection
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.H then
+        toggled = not toggled
+        
+        -- Always disconnect first to clean up
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+        
+        if toggled then
+            print("Script toggled ON")
+            -- Initial fire
+            spawn(function()
+                fireAllHeads()
+            end)
+            
+            -- Loop with delay to avoid spam detection
+            connection = RunService.Heartbeat:Connect(function()
+                if tick() % 0.1 < 0.016 then  -- Fires ~every 0.1s instead of every frame
+                    fireAllHeads()
+                end
+            end)
+        else
+            print("Script toggled OFF")
+        end
+    end
+end)
+
+function fireAllHeads()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Name == excludedName then continue end
+        local char = plr.Character
+        if char and char:FindFirstChild("Head") then
+            gunEvent:FireServer(char.Head, pos, dir)
+        end
+    end
+end
