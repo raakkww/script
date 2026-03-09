@@ -1,3 +1,4 @@
+-- Execute with key check
 local function __run()
     
     local function _uskfurGeYE()
@@ -12,7 +13,7 @@ local function __run()
         -- 💬 Welcome popup
         ------------------------------------------------------------
         WindUI:Popup({
-            Title = "VezuntHUB loaded",
+            Title = "",
             Icon = "bird",
             Content = "Press P to show/hide UI.",
             Buttons = {
@@ -21,11 +22,11 @@ local function __run()
         })
         
         ------------------------------------------------------------
-        -- 🪟 MAIN WINDOW
+        -- 🪟 MAIN WINDOW (с key system)
         ------------------------------------------------------------
         local Window = WindUI:CreateWindow({
-            Title   = "VezuntHUB - Country Manager",
-            Author  = "by you",
+            Title   = "",
+            Author  = "",
             Icon    = "globe",
             Theme   = "Dark",
             Size    = UDim2.fromOffset(640, 520),
@@ -80,9 +81,10 @@ local function __run()
         
         ------------------------------------------------------------
         -- 🔁 GLOBAL UPDATE CONFIG
+        -- default: SLOW = true
         ------------------------------------------------------------
         local UpdateConfig = {
-            slowMode         = true,
+            slowMode         = true,  -- твоя просьба
             cityFastInterval = 5,
             citySlowInterval = 60,
             lbIntervalFast   = 10,
@@ -139,12 +141,14 @@ local function __run()
             return false
         end
         
+        -- Кэш для findMyCountry (инвалидируется при изменении лидера)
         local cachedCountry = nil
         local cachedCountryTime = 0
-        local COUNTRY_CACHE_DURATION = 2
+        local COUNTRY_CACHE_DURATION = 2 -- секунды
         
         local function findMyCountry()
             local now = tick()
+            -- Используем кэш если он свежий
             if cachedCountry and cachedCountry.Parent and (now - cachedCountryTime) < COUNTRY_CACHE_DURATION then
                 local leader = getLeaderAny(cachedCountry)
                 if isMyLeaderValue(leader) then
@@ -152,6 +156,7 @@ local function __run()
                 end
             end
             
+            -- Ищем заново
             for _, c in ipairs(registry:GetChildren()) do
                 local leader = getLeaderAny(c)
                 if isMyLeaderValue(leader) then
@@ -237,6 +242,7 @@ local function __run()
         
         StatsSection:Space()
         
+        -- toggle for slow/fast mode (user visible)
         local statsModeToggle
         statsModeToggle = StatsSection:Toggle({
             Title = "Slow update mode",
@@ -248,6 +254,7 @@ local function __run()
             end
         })
         
+        -- stats itself not heavy, can update every second
         task.spawn(function()
             while task.wait(1) do
                 currentCountry = findMyCountry() or currentCountry
@@ -294,7 +301,7 @@ local function __run()
         end)
         
         ------------------------------------------------------------
-        -- 🏙 TAB: CITIES
+        -- 🏙 TAB: CITIES (fixed ownership + chunked)
         ------------------------------------------------------------
         local CitiesTab = Window:Tab({ Title = "Cities", Icon = "building" })
         local CitiesSection = CitiesTab:Section({ Title = "My Cities", Icon = "building" })
@@ -305,22 +312,34 @@ local function __run()
             Color = COLOR_GREEN
         })
         
+        -- вспомогалки именно для городов
         local function cityOwnedBy(city, myCountryName)
             if not city or not myCountryName then return false end
+        
+            -- 1) атрибут
             local attr = city:GetAttribute("Country")
-            if attr and attr == myCountryName then return true end
+            if attr and attr == myCountryName then
+                return true
+            end
+        
+            -- 2) вложенный объект City.Country
             local valObj = city:FindFirstChild("Country")
-            if valObj and valObj.Value == myCountryName then return true end
+            if valObj and valObj.Value == myCountryName then
+                return true
+            end
+        
             return false
         end
         
         local function readCityNum(city, name)
             if not city then return 0 end
+            -- сначала атрибут
             local a = city:GetAttribute(name)
             if a ~= nil then
                 local n = tonumber(a)
                 if n then return n end
             end
+            -- потом вложенный объект
             local v = city:FindFirstChild(name)
             if v and v.Value ~= nil then
                 local n = tonumber(v.Value)
@@ -329,6 +348,7 @@ local function __run()
             return 0
         end
         
+        -- кэш, чтобы не спамить UI
         local CityCache = {
             busy = false,
             text = "No data yet.",
@@ -365,7 +385,11 @@ local function __run()
                             def
                         )
                     end
-                    if i % 120 == 0 then task.wait() end
+        
+                    -- отдаём кадр каждые 120 штук, чтобы не фризило
+                    if i % 120 == 0 then
+                        task.wait()
+                    end
                 end
         
                 if #lines == 0 then
@@ -374,7 +398,9 @@ local function __run()
                     table.sort(lines, function(a, b) return a:lower() < b:lower() end)
                     if #lines > 200 then
                         local short = {}
-                        for i = 1, 200 do short[i] = lines[i] end
+                        for i = 1, 200 do
+                            short[i] = lines[i]
+                        end
                         short[#short+1] = string.format("... and %d more", #lines - 200)
                         CityCache.text = table.concat(short, "\n")
                     else
@@ -387,6 +413,7 @@ local function __run()
             end)
         end
         
+        -- кнопки остаются, только после них перерисовываем
         local UpgradeCitiesButton
         UpgradeCitiesButton = CitiesSection:Button({
             Title = "⬆ Upgrade All Cities (Tier)",
@@ -403,12 +430,19 @@ local function __run()
                 local count = 0
                 for _, city in ipairs(regions:GetChildren()) do
                     if cityOwnedBy(city, ctry.Name) then
-                        pcall(function() Remote:FireServer("DevelopTile", city, "Tier") end)
+                        pcall(function()
+                            Remote:FireServer("DevelopTile", city, "Tier")
+                        end)
                         count += 1
                         task.wait(0.03)
                     end
                 end
-                WindUI:Notify({ Title="Success", Content=string.format("Upgraded %d cities (Tier).", count), Icon="check-circle", Duration=2 })
+                WindUI:Notify({
+                    Title   = "Success",
+                    Content = string.format("Upgraded %d cities (Tier).", count),
+                    Icon    = "check-circle",
+                    Duration = 2
+                })
                 buildCitiesAsync()
             end
         })
@@ -428,18 +462,29 @@ local function __run()
                     return
                 end
                 if not RemoteDef then
-                    WindUI:Notify({ Title="Missing RemoteEvent_1", Content="Cannot fortify cities: RemoteEvent_1 not found.", Icon="x-circle", Duration=3 })
+                    WindUI:Notify({
+                        Title = "Missing RemoteEvent_1",
+                        Content = "Cannot fortify cities: RemoteEvent_1 not found.",
+                        Icon = "x-circle", Duration = 3
+                    })
                     return
                 end
                 local count = 0
                 for _, city in ipairs(regions:GetChildren()) do
                     if cityOwnedBy(city, ctry.Name) then
-                        pcall(function() RemoteDef:FireServer("DevelopTile", city, "Def") end)
+                        pcall(function()
+                            RemoteDef:FireServer("DevelopTile", city, "Def")
+                        end)
                         count += 1
                         task.wait(0.03)
                     end
                 end
-                WindUI:Notify({ Title="Defense Raised", Content=string.format("Fortified %d cities (Defence).", count), Icon="shield", Duration=2 })
+                WindUI:Notify({
+                    Title   = "Defense Raised",
+                    Content = string.format("Fortified %d cities (Defence).", count),
+                    Icon    = "shield",
+                    Duration = 2
+                })
                 buildCitiesAsync()
             end
         })
@@ -469,13 +514,18 @@ local function __run()
                         task.wait(0.02)
                     end
                 end
-                WindUI:Notify({ Title="Done", Content=string.format("Upgraded: %d | Fortified: %d", upgraded, fortified), Icon="check-circle", Duration=3 })
+                WindUI:Notify({
+                    Title   = "Done",
+                    Content = string.format("Upgraded: %d | Fortified: %d", upgraded, fortified),
+                    Icon    = "check-circle", Duration = 3
+                })
                 buildCitiesAsync()
             end
         })
         
+        -- фоновое обновление с учётом slowMode
         task.spawn(function()
-            buildCitiesAsync()
+            buildCitiesAsync() -- первый раз сразу
             while true do
                 local interval = UpdateConfig.slowMode and UpdateConfig.citySlowInterval or UpdateConfig.cityFastInterval
                 buildCitiesAsync()
@@ -484,7 +534,7 @@ local function __run()
         end)
         
         ------------------------------------------------------------
-        -- ⚔ ARMY TAB
+        -- ⚔ ARMY TAB (same as before)
         ------------------------------------------------------------
         local ArmyTab = Window:Tab({ Title = "Army", Icon = "shield" })
         local ArmySection = ArmyTab:Section({ Title = "Army Management", Icon = "shield" })
@@ -551,6 +601,7 @@ local function __run()
             end)
         end
         
+        -- hook add/remove
         task.spawn(function()
             regions.ChildAdded:Connect(refreshCityDropdown)
             regions.ChildRemoved:Connect(refreshCityDropdown)
@@ -577,7 +628,12 @@ local function __run()
                     return
                 end
                 pcall(function() Remote:FireServer("CreateArmyOnTile", selectedCity, selectedUnit, max) end)
-                WindUI:Notify({ Title="Spawned", Content=string.format("%s × %d in %s", selectedUnit, max, selectedCity.Name), Icon="check-circle", Duration=2 })
+                WindUI:Notify({
+                    Title   = "Spawned",
+                    Content = string.format("%s × %d in %s", selectedUnit, max, selectedCity.Name),
+                    Icon    = "check-circle",
+                    Duration = 2
+                })
             end
         })
         
@@ -606,7 +662,12 @@ local function __run()
                     pcall(function() Remote:FireServer("CreateArmyOnTile", city, selectedUnit, perCity) end)
                     task.wait(0.03)
                 end
-                WindUI:Notify({ Title="Spawned Evenly", Content=string.format("%s × ~%d per city (%d cities)", selectedUnit, perCity, #cities), Icon="check-circle", Duration=3 })
+                WindUI:Notify({
+                    Title   = "Spawned Evenly",
+                    Content = string.format("%s × ~%d per city (%d cities)", selectedUnit, perCity, #cities),
+                    Icon    = "check-circle",
+                    Duration = 3
+                })
             end
         })
         
@@ -653,7 +714,7 @@ local function __run()
         })
         
         ------------------------------------------------------------
-        -- 👑 LEADERBOARD
+        -- 👑 LEADERBOARD (chunked + respects UpdateConfig)
         ------------------------------------------------------------
         local LeaderTab = Window:Tab({ Title = "Leaderboard", Icon = "crown" })
         local LeaderSection = LeaderTab:Section({ Title = "Top Leaders", Icon = "crown" })
@@ -665,7 +726,7 @@ local function __run()
         })
         
         local LEADERBOARD_LIMIT  = 15
-        local LEADERBOARD_CHUNK  = 80
+        local LEADERBOARD_CHUNK  = 80 -- per frame
         local _lastLeaderboardText = ""
         
         local function pretty(n)
@@ -679,11 +740,16 @@ local function __run()
         local function getCountryLeaderName(country)
             local v = country:FindFirstChild("ActiveLeader") or country:FindFirstChild("Leader") or country:FindFirstChild("Owner")
             if v then
-                if typeof(v.Value) == "string" and v.Value ~= "" then return v.Value
-                elseif typeof(v.Value) == "Instance" and v.Value then return v.Value.Name end
+                if typeof(v.Value) == "string" and v.Value ~= "" then
+                    return v.Value
+                elseif typeof(v.Value) == "Instance" and v.Value then
+                    return v.Value.Name
+                end
             end
             local attr = country:GetAttribute("ActiveLeader") or country:GetAttribute("Leader") or country:GetAttribute("Owner")
-            if typeof(attr) == "string" and attr ~= "" then return attr end
+            if typeof(attr) == "string" and attr ~= "" then
+                return attr
+            end
             return "—"
         end
         
@@ -718,17 +784,23 @@ local function __run()
                         }
                     end
                     index = upper + 1
-                    task.wait()
+                    task.wait() -- yield
                 end
         
-                table.sort(rows, function(a, b) return (a.money or 0) > (b.money or 0) end)
+                table.sort(rows, function(a, b)
+                    return (a.money or 0) > (b.money or 0)
+                end)
         
                 local limit = math.min(#rows, LEADERBOARD_LIMIT)
                 local out = {}
                 for i = 1, limit do
                     local r = rows[i]
                     out[#out+1] = string.format("👑 %s | 🏛 %s | 💰 %s | 👥 %s",
-                        tostring(r.name or "—"), tostring(r.country or "?"), pretty(r.money), pretty(r.manpower))
+                        tostring(r.name or "—"),
+                        tostring(r.country or "?"),
+                        pretty(r.money),
+                        pretty(r.manpower)
+                    )
                 end
                 local text = table.concat(out, "\n")
                 if text ~= _lastLeaderboardText then
@@ -740,6 +812,7 @@ local function __run()
             end)
         end
         
+        -- loop with dynamic interval
         task.spawn(function()
             rebuildLeaderboardAsync()
             while true do
@@ -750,7 +823,7 @@ local function __run()
         end)
         
         ------------------------------------------------------------
-        -- 🧩 EXTRAS: FPS/Ping HUD + utility widgets
+        -- 🧩 EXTRAS: FPS/Ping HUD (top-right) + utility widgets
         ------------------------------------------------------------
         local ExtrasTab = Window:Tab({ Title = "Extras", Icon = "monitor" })
         local ExtrasSection = ExtrasTab:Section({ Title = "UI / HUD", Icon = "monitor" })
@@ -761,6 +834,7 @@ local function __run()
             Color = COLOR_BLUE
         })
         
+        -- main HUD
         local HUD = {
             Gui        = nil,
             Frame      = nil,
@@ -829,7 +903,11 @@ local function __run()
             createMainHUD()
             HUD.Visible = true
             HUD.Frame.Position = UDim2.new(1, 260, 0, 20)
-            TweenService:Create(HUD.Frame, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.new(1, -250, 0, 20) }):Play()
+            TweenService:Create(
+                HUD.Frame,
+                TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+                { Position = UDim2.new(1, -250, 0, 20) }
+            ):Play()
         
             if HUD.RenderConn then HUD.RenderConn:Disconnect() end
             HUD.RenderConn = RunService.RenderStepped:Connect(function(dt)
@@ -860,7 +938,11 @@ local function __run()
             if not HUD.Visible then return end
             HUD.Visible = false
             if HUD.RenderConn then HUD.RenderConn:Disconnect(); HUD.RenderConn = nil end
-            TweenService:Create(HUD.Frame, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(1, 260, 0, 20) }):Play()
+            TweenService:Create(
+                HUD.Frame,
+                TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                { Position = UDim2.new(1, 260, 0, 20) }
+            ):Play()
             task.delay(0.29, function()
                 if HUD.Gui then HUD.Gui:Destroy() end
                 HUD.Gui, HUD.Frame, HUD.Info = nil, nil, nil
@@ -893,8 +975,15 @@ local function __run()
             end
         end)
         
+        ------------------------------------------------------------
+        -- utility HUD under main (clock, session, notes)
+        ------------------------------------------------------------
         local function getUtilityBaseY()
-            if HUD.Visible then return 20 + HUD.Height + 10 else return 20 end
+            if HUD.Visible then
+                return 20 + HUD.Height + 10
+            else
+                return 20
+            end
         end
         
         local RIGHT_X = -250
@@ -907,7 +996,9 @@ local function __run()
         }
         
         local function getUtilityRoot()
-            if Utility.RootGui and Utility.RootGui.Parent then return Utility.RootGui end
+            if Utility.RootGui and Utility.RootGui.Parent then
+                return Utility.RootGui
+            end
             local gui = Instance.new("ScreenGui")
             gui.Name = "VezuntUtilityHUD"
             gui.IgnoreGuiInset = true
@@ -918,7 +1009,9 @@ local function __run()
         end
         
         local function getHolder()
-            if Utility.Holder and Utility.Holder.Parent then return Utility.Holder end
+            if Utility.Holder and Utility.Holder.Parent then
+                return Utility.Holder
+            end
             local root = getUtilityRoot()
             local holder = Instance.new("Frame")
             holder.Name = "Holder"
@@ -944,13 +1037,19 @@ local function __run()
             local holder = getHolder()
             local totalH = 0
             for _, info in pairs(Utility.Widgets) do
-                if info.Visible then totalH = totalH + info.Height + GAP_Y end
+                if info.Visible then
+                    totalH = totalH + info.Height + GAP_Y
+                end
             end
             if totalH > 0 then totalH = totalH - GAP_Y end
-            TweenService:Create(holder, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Size     = UDim2.new(0, 230, 0, totalH),
-                Position = UDim2.new(1, RIGHT_X, 0, getUtilityBaseY())
-            }):Play()
+            TweenService:Create(
+                holder,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {
+                    Size     = UDim2.new(0, 230, 0, totalH),
+                    Position = UDim2.new(1, RIGHT_X, 0, getUtilityBaseY())
+                }
+            ):Play()
         end
         
         local function createClockWidget()
@@ -959,14 +1058,28 @@ local function __run()
             frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
             frame.BackgroundTransparency = 0.08
             frame.BorderSizePixel = 0
-            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-            local stroke = Instance.new("UIStroke", frame)
-            stroke.Color = Color3.fromRGB(90,90,90); stroke.Transparency = 0.4; stroke.Thickness = 1
-            local label = Instance.new("TextLabel", frame)
-            label.BackgroundTransparency = 1; label.Size = UDim2.new(1,0,1,0)
-            label.Text = "--:--:--"; label.Font = Enum.Font.SourceSansBold; label.TextSize = 16
-            label.TextColor3 = Color3.new(1,1,1); label.TextXAlignment = Enum.TextXAlignment.Center
+        
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 10)
+            corner.Parent = frame
+        
+            local stroke = Instance.new("UIStroke")
+            stroke.Color = Color3.fromRGB(90,90,90)
+            stroke.Transparency = 0.4
+            stroke.Thickness = 1
+            stroke.Parent = frame
+        
+            local label = Instance.new("TextLabel")
+            label.BackgroundTransparency = 1
+            label.Size = UDim2.new(1, 0, 1, 0)
+            label.Text = "--:--:--"
+            label.Font = Enum.Font.SourceSansBold
+            label.TextSize = 16
+            label.TextColor3 = Color3.new(1,1,1)
+            label.TextXAlignment = Enum.TextXAlignment.Center
             label.TextYAlignment = Enum.TextYAlignment.Center
+            label.Parent = frame
+        
             return frame
         end
         
@@ -974,14 +1087,30 @@ local function __run()
             local frame = Instance.new("Frame")
             frame.Size = UDim2.new(1, 0, 0, 34)
             frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
-            frame.BackgroundTransparency = 0.08; frame.BorderSizePixel = 0
-            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-            local stroke = Instance.new("UIStroke", frame)
-            stroke.Color = Color3.fromRGB(90,90,90); stroke.Transparency = 0.4; stroke.Thickness = 1
-            local label = Instance.new("TextLabel", frame)
-            label.BackgroundTransparency = 1; label.Size = UDim2.new(1,-8,1,0); label.Position = UDim2.new(0,4,0,0)
-            label.Text = "Session: 0:00"; label.Font = Enum.Font.SourceSans; label.TextSize = 14
-            label.TextColor3 = Color3.new(1,1,1); label.TextXAlignment = Enum.TextXAlignment.Left
+            frame.BackgroundTransparency = 0.08
+            frame.BorderSizePixel = 0
+        
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 10)
+            corner.Parent = frame
+        
+            local stroke = Instance.new("UIStroke")
+            stroke.Color = Color3.fromRGB(90,90,90)
+            stroke.Transparency = 0.4
+            stroke.Thickness = 1
+            stroke.Parent = frame
+        
+            local label = Instance.new("TextLabel")
+            label.BackgroundTransparency = 1
+            label.Size = UDim2.new(1, -8, 1, 0)
+            label.Position = UDim2.new(0,4,0,0)
+            label.Text = "Session: 0:00"
+            label.Font = Enum.Font.SourceSans
+            label.TextSize = 14
+            label.TextColor3 = Color3.new(1,1,1)
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Parent = frame
+        
             return frame
         end
         
@@ -989,22 +1118,50 @@ local function __run()
             local frame = Instance.new("Frame")
             frame.Size = UDim2.new(1, 0, 0, 110)
             frame.BackgroundColor3 = Color3.fromRGB(18,18,18)
-            frame.BackgroundTransparency = 0.08; frame.BorderSizePixel = 0
-            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-            local stroke = Instance.new("UIStroke", frame)
-            stroke.Color = Color3.fromRGB(90,90,90); stroke.Transparency = 0.5; stroke.Thickness = 1
-            local title = Instance.new("TextLabel", frame)
-            title.BackgroundTransparency = 1; title.Position = UDim2.new(0,8,0,4); title.Size = UDim2.new(1,-16,0,16)
-            title.Text = "📒 Notes"; title.Font = Enum.Font.SourceSansBold; title.TextSize = 14
-            title.TextColor3 = Color3.new(1,1,1); title.TextXAlignment = Enum.TextXAlignment.Left
-            local text = Instance.new("TextBox", frame)
-            text.BackgroundTransparency = 0.35; text.BackgroundColor3 = Color3.fromRGB(10,10,10)
-            text.Position = UDim2.new(0,8,0,24); text.Size = UDim2.new(1,-16,1,-32)
-            text.ClearTextOnFocus = false; text.Font = Enum.Font.SourceSans; text.TextSize = 14
-            text.TextColor3 = Color3.new(1,1,1); text.TextXAlignment = Enum.TextXAlignment.Left
-            text.TextYAlignment = Enum.TextYAlignment.Top; text.TextWrapped = true
-            text.MultiLine = true; text.Text = "write here..."
-            Instance.new("UICorner", text).CornerRadius = UDim.new(0, 6)
+            frame.BackgroundTransparency = 0.08
+            frame.BorderSizePixel = 0
+        
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 10)
+            corner.Parent = frame
+        
+            local stroke = Instance.new("UIStroke")
+            stroke.Color = Color3.fromRGB(90,90,90)
+            stroke.Transparency = 0.5
+            stroke.Thickness = 1
+            stroke.Parent = frame
+        
+            local title = Instance.new("TextLabel")
+            title.BackgroundTransparency = 1
+            title.Position = UDim2.new(0,8,0,4)
+            title.Size = UDim2.new(1, -16, 0, 16)
+            title.Text = "📒 Notes"
+            title.Font = Enum.Font.SourceSansBold
+            title.TextSize = 14
+            title.TextColor3 = Color3.new(1,1,1)
+            title.TextXAlignment = Enum.TextXAlignment.Left
+            title.Parent = frame
+        
+            local text = Instance.new("TextBox")
+            text.BackgroundTransparency = 0.35
+            text.BackgroundColor3 = Color3.fromRGB(10,10,10)
+            text.Position = UDim2.new(0,8,0,24)
+            text.Size = UDim2.new(1, -16, 1, -32)
+            text.ClearTextOnFocus = false
+            text.Font = Enum.Font.SourceSans
+            text.TextSize = 14
+            text.TextColor3 = Color3.new(1,1,1)
+            text.TextXAlignment = Enum.TextXAlignment.Left
+            text.TextYAlignment = Enum.TextYAlignment.Top
+            text.TextWrapped = true
+            text.MultiLine = true
+            text.Text = "write here..."
+            text.Parent = frame
+        
+            local corner2 = Instance.new("UICorner")
+            corner2.CornerRadius = UDim.new(0, 6)
+            corner2.Parent = text
+        
             return frame
         end
         
@@ -1016,7 +1173,12 @@ local function __run()
                 if name == "clock" then
                     local frame = createClockWidget()
                     frame.Parent = holder
-                    Utility.Widgets[name] = { Frame=frame, Height=38, Visible=false, _run=true }
+                    Utility.Widgets[name] = {
+                        Frame = frame,
+                        Height = 38,
+                        Visible = false,
+                        _run = true,
+                    }
                     info = Utility.Widgets[name]
                     task.spawn(function()
                         while info._run do
@@ -1030,21 +1192,33 @@ local function __run()
                 elseif name == "session" then
                     local frame = createSessionWidget()
                     frame.Parent = holder
-                    Utility.Widgets[name] = { Frame=frame, Height=34, Visible=false, Start=os.time(), _run=true }
+                    Utility.Widgets[name] = {
+                        Frame = frame,
+                        Height = 34,
+                        Visible = false,
+                        Start   = os.time(),
+                        _run    = true,
+                    }
                     info = Utility.Widgets[name]
                     task.spawn(function()
                         while info._run do
                             task.wait(1)
                             if info.Visible and info.Frame:FindFirstChild("TextLabel") then
                                 local elapsed = os.time() - info.Start
-                                info.Frame.TextLabel.Text = string.format("Session: %d:%02d", math.floor(elapsed/60), elapsed%60)
+                                local m = math.floor(elapsed / 60)
+                                local s = elapsed % 60
+                                info.Frame.TextLabel.Text = string.format("Session: %d:%02d", m, s)
                             end
                         end
                     end)
                 elseif name == "notes" then
                     local frame = createNotesWidget()
                     frame.Parent = holder
-                    Utility.Widgets[name] = { Frame=frame, Height=110, Visible=false }
+                    Utility.Widgets[name] = {
+                        Frame = frame,
+                        Height = 110,
+                        Visible = false,
+                    }
                     info = Utility.Widgets[name]
                 end
             end
@@ -1053,7 +1227,11 @@ local function __run()
                 info.Visible = true
                 info.Frame.Visible = true
                 info.Frame.Size = UDim2.new(1, 0, 0, 0)
-                TweenService:Create(info.Frame, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size=UDim2.new(1,0,0,info.Height) }):Play()
+                TweenService:Create(
+                    info.Frame,
+                    TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    { Size = UDim2.new(1, 0, 0, info.Height) }
+                ):Play()
                 resizeHolderAnimated()
             end
         end
@@ -1063,19 +1241,46 @@ local function __run()
             if not info or not info.Visible then return end
             info.Visible = false
             local frame = info.Frame
-            TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size=UDim2.new(1,0,0,0) }):Play()
+            TweenService:Create(
+                frame,
+                TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                { Size = UDim2.new(1, 0, 0, 0) }
+            ):Play()
             task.delay(0.21, function()
                 if frame then frame.Visible = false end
                 resizeHolderAnimated()
             end)
         end
         
-        ExtrasSection:Toggle({ Title="Clock HUD", Desc="Show local time.", Type="Checkbox", Value=true,
-            Callback=function(state) if state then showWidget("clock") else hideWidget("clock") end end })
-        ExtrasSection:Toggle({ Title="Session timer", Desc="Time since script loaded.", Type="Checkbox", Value=true,
-            Callback=function(state) if state then showWidget("session") else hideWidget("session") end end })
-        ExtrasSection:Toggle({ Title="Notes HUD", Desc="Small sticky note.", Type="Checkbox", Value=false,
-            Callback=function(state) if state then showWidget("notes") else hideWidget("notes") end end })
+        ExtrasSection:Toggle({
+            Title = "Clock HUD",
+            Desc  = "Show local time.",
+            Type  = "Checkbox",
+            Value = true,
+            Callback = function(state)
+                if state then showWidget("clock") else hideWidget("clock") end
+            end
+        })
+        
+        ExtrasSection:Toggle({
+            Title = "Session timer",
+            Desc  = "Time since script loaded.",
+            Type  = "Checkbox",
+            Value = true,
+            Callback = function(state)
+                if state then showWidget("session") else hideWidget("session") end
+            end
+        })
+        
+        ExtrasSection:Toggle({
+            Title = "Notes HUD",
+            Desc  = "Small sticky note.",
+            Type  = "Checkbox",
+            Value = false,
+            Callback = function(state)
+                if state then showWidget("notes") else hideWidget("notes") end
+            end
+        })
         
         task.defer(function()
             showWidget("clock")
@@ -1083,15 +1288,18 @@ local function __run()
         end)
         
         ------------------------------------------------------------
-        -- 💬 CHAT TAB
+        -- 💬 CHAT TAB with notifications (same logic)
         ------------------------------------------------------------
         do
             local HttpService = game:GetService("HttpService")
+        
             local RELAY_BASE   = "https://cchat-1-ucwf.onrender.com"
             local SEND_URL     = RELAY_BASE .. "/send"
             local POLL_URL     = RELAY_BASE .. "/pull"
             local AUTH_SECRET  = ""
+        
             local requestFunc = (syn and syn.request) or http_request or request or (http and http.request)
+        
             local lastNotifyTime = 0
             local NOTIFY_COOLDOWN = 3
         
@@ -1100,105 +1308,213 @@ local function __run()
                 if now - lastNotifyTime < NOTIFY_COOLDOWN then return end
                 lastNotifyTime = now
                 local short = tostring(content or "")
-                if #short > 60 then short = short:sub(1, 57) .. "..." end
-                WindUI:Notify({ Title=(author and author ~= "" and ("New message: "..author)) or "New message",
-                    Content=(short ~= "" and short) or "Empty message", Icon="message-square", Duration=3 })
+                if #short > 60 then
+                    short = short:sub(1, 57) .. "..."
+                end
+                WindUI:Notify({
+                    Title = (author and author ~= "" and ("New message: " .. author)) or "New message",
+                    Content = (short ~= "" and short) or "Empty message",
+                    Icon = "message-square",
+                    Duration = 3
+                })
             end
         
             local function sendJSON(url, bodyTable)
                 local bodyStr = HttpService:JSONEncode(bodyTable or {})
-                local headers = { ["Content-Type"]="application/json" }
-                if AUTH_SECRET ~= "" then headers["Authorization"] = "Bearer "..AUTH_SECRET end
+                local headers = { ["Content-Type"] = "application/json" }
+                if AUTH_SECRET ~= "" then
+                    headers["Authorization"] = "Bearer " .. AUTH_SECRET
+                end
                 if requestFunc then
-                    local ok, res = pcall(function() return requestFunc({ Url=url, Method="POST", Headers=headers, Body=bodyStr }) end)
-                    if ok and res and tonumber(res.StatusCode or 0) == 200 then return true end
+                    local ok, res = pcall(function()
+                        return requestFunc({
+                            Url = url,
+                            Method = "POST",
+                            Headers = headers,
+                            Body = bodyStr
+                        })
+                    end)
+                    if ok and res and tonumber(res.StatusCode or 0) == 200 then
+                        return true
+                    end
                 end
                 if HttpService.RequestAsync then
-                    local ok, res = pcall(function() return HttpService:RequestAsync({ Url=url, Method="POST", Headers=headers, Body=bodyStr }) end)
-                    if ok and res and res.Success and tonumber(res.StatusCode or 0) == 200 then return true end
+                    local ok, res = pcall(function()
+                        return HttpService:RequestAsync({
+                            Url = url,
+                            Method = "POST",
+                            Headers = headers,
+                            Body = bodyStr
+                        })
+                    end)
+                    if ok and res and res.Success and tonumber(res.StatusCode or 0) == 200 then
+                        return true
+                    end
                 end
-                pcall(function() game:HttpPost(url, bodyStr) end)
+                pcall(function()
+                    game:HttpPost(url, bodyStr)
+                end)
                 return false
             end
         
             local function getJSON(url)
                 local raw = nil
+                -- 1. Try request function (syn.request / http.request / request)
                 if requestFunc then
-                    local ok, res = pcall(function() return requestFunc({ Url=url, Method="GET" }) end)
-                    if ok and res and res.Body then raw = res.Body end
+                    local ok, res = pcall(function()
+                        return requestFunc({
+                            Url = url,
+                            Method = "GET"
+                        })
+                    end)
+                    if ok and res and res.Body then
+                        raw = res.Body
+                    end
                 end
+                
+                -- 2. Fallback to game:HttpGet
                 if not raw or raw == "" then
                     local ok, r = pcall(function() return game:HttpGet(url) end)
                     if ok then raw = r end
                 end
+    
                 if not raw or raw == "" then return nil end
-                local ok2, data = pcall(function() return HttpService:JSONDecode(raw) end)
+    
+                local ok2, data = pcall(function()
+                    return HttpService:JSONDecode(raw)
+                end)
                 if not ok2 then return nil end
                 return data
             end
         
             local ChatTab = Window:Tab({ Title = "Chat", Icon = "message-square" })
             local ChatSection = ChatTab:Section({ Title = "Discord Live Chat", Icon = "message-square" })
-            local initialLog = "-- Chat System Ready --\n[System]: Waiting for messages...\n[Hint]: If you see 401 error, ENABLE 'Message Content Intent' in Discord Developer Portal!\n"
+    
+            -- 1. Chat Log (Top)
+            local initialLog = [[
+    -- Chat System Ready --
+    [System]: Waiting for messages...
+    [Hint]: If you see 401 error, ENABLE 'Message Content Intent' in Discord Developer Portal!
+    ]]
             local fullLog = initialLog
-            local ChatLog = ChatSection:Code({ Title = "Messages", Code = fullLog })
-            local SEEN_IDS = {}
-            local LAST_ID  = 0
-            local auto     = true
-        
+            
+            local ChatLog = ChatSection:Code({
+                Title = "Messages",
+                Code = fullLog
+            })
+    
+            local SEEN_IDS   = {}
+            local LAST_ID    = 0
+            local auto       = true 
+    
             local function appendMessage(author, content, idStr, serverTime)
                 if idStr and SEEN_IDS[idStr] then return end
                 if idStr then SEEN_IDS[idStr] = true end
+    
                 local timeStr
                 if serverTime and #serverTime > 16 then
                     local T_pos = string.find(serverTime, "T")
-                    if T_pos then timeStr = string.sub(serverTime, T_pos+1, T_pos+5) else timeStr = os.date("%H:%M") end
-                else timeStr = os.date("%H:%M") end
+                    if T_pos then
+                        timeStr = string.sub(serverTime, T_pos + 1, T_pos + 5)
+                    else
+                        timeStr = os.date("%H:%M")
+                    end
+                else
+                    timeStr = os.date("%H:%M")
+                end
+    
                 local line = string.format("[%s] %s: %s", timeStr, author, content)
+                
                 fullLog = fullLog .. "\n" .. line
-                if #fullLog > 5000 then fullLog = "..." .. fullLog:sub(-5000) end
-                if ChatLog and ChatLog.SetCode then ChatLog:SetCode(fullLog) end
+                
+                -- Limit log size to prevent lag (keep last ~5000 chars)
+                if #fullLog > 5000 then
+                    fullLog = "..." .. fullLog:sub(-5000)
+                end
+                
+                if ChatLog and ChatLog.SetCode then
+                    ChatLog:SetCode(fullLog)
+                end
             end
-        
-            ChatSection:Toggle({ Title="Auto Refresh", Desc="Automatically pull new messages", Value=true,
-                Callback=function(s) auto = s end })
+    
+            ChatSection:Toggle({
+                Title = "Auto Refresh",
+                Desc  = "Automatically pull new messages",
+                Value = true,
+                Callback = function(s) auto = s end
+            })
+    
             ChatSection:Divider()
-        
+    
+            -- 2. Input Controls (Bottom)
             local fromName = (game.Players.LocalPlayer and game.Players.LocalPlayer.Name) or "Player"
             local draft = ""
-            local msgInput = ChatSection:Input({ Title="Message", Placeholder="Type something...", Callback=function(v) draft = v or "" end })
-        
+    
+            local msgInput = ChatSection:Input({
+                Title = "Message",
+                Placeholder = "Type something...",
+                Callback = function(v) draft = v or "" end
+            })
+    
             local SendButton
             SendButton = ChatSection:Button({
-                Title="Send Message", Icon="send", Color=COLOR_GREEN,
-                Callback=function()
+                Title = "Send Message",
+                Icon = "send",
+                Color = COLOR_GREEN,
+                Callback = function()
                     SendButton:Highlight()
                     local text = (draft ~= "" and draft) or " "
-                    local ok = sendJSON(SEND_URL, { from=fromName, message=text })
-                    WindUI:Notify({ Title=ok and "Sent" or "Error", Content=ok and "Message delivered." or "Failed to send.",
-                        Icon=ok and "check-circle" or "x-circle", Duration=2 })
+                    local ok = sendJSON(SEND_URL, { from = fromName, message = text })
+                    
+                    WindUI:Notify({
+                        Title   = ok and "Sent" or "Error",
+                        Content = ok and "Message delivered." or "Failed to send.",
+                        Icon    = ok and "check-circle" or "x-circle",
+                        Duration = 2
+                    })
+                    
                     if ok then
                         draft = ""
                         pcall(function() msgInput:Set("") end)
+                        task.delay(1, function() 
+                            if pollOnce then pcall(pollOnce) end 
+                        end)
                     end
                 end
             })
-        
-            task.delay(2, function() appendMessage("System", "UI Ready. Chat loaded.", "sys_init") end)
-        
+    
+            -- TEST
+            task.delay(2, function()
+                appendMessage("System", "UI Ready. Chat loaded.", "sys_init")
+            end)
+    
+    
             local function pollOnce()
                 local url = POLL_URL .. "?since=" .. tostring(LAST_ID)
                 local data = getJSON(url)
-                if data == nil or type(data) ~= "table" then return false end
+                
+                -- Debugging: Notify if fetch fails
+                if data == nil then
+                    -- WindUI:Notify({ Title="Debug", Content="Fetch returned nil", Duration=2 })
+                    return false
+                end
+                
+                if type(data) ~= "table" then return false end
                 local msgs = data.items or {}
+                
                 if #msgs == 0 then return false end
+                
                 for i = 1, #msgs do
                     local m = msgs[i]
                     local idStr = tostring(m.id)
                     LAST_ID = idStr
+                    
                     if not SEEN_IDS[idStr] then
-                        appendMessage(tostring(m.author or "User"), tostring(m.text or ""), idStr, tostring(m.time or ""))
-                        notifyNewMessage(tostring(m.author or "User"), tostring(m.text or ""))
+                        local author  = tostring(m.author or "User")
+                        local content = tostring(m.text or "")
+                        local time    = tostring(m.time or "")
+                        appendMessage(author, content, idStr, time)
+                        notifyNewMessage(author, content)
                     end
                 end
                 return true
@@ -1209,16 +1525,17 @@ local function __run()
                 while true do
                     if auto then
                         local ok = pcall(pollOnce)
-                        waitTime = ok and 3 or 4
+                        if ok then waitTime = 3 else waitTime = 4 end
                     end
                     task.wait(waitTime)
                 end
             end)
+        
             pcall(pollOnce)
         end
         
         ------------------------------------------------------------
-        -- 🔴 Border Highlight
+        -- 🔴 Border Highlight (OFF by default, chunked)
         ------------------------------------------------------------
         local HIGHLIGHT_COLOR    = Color3.fromRGB(180, 42, 248)
         local HIGHLIGHT_MATERIAL = "Metal"
@@ -1231,11 +1548,16 @@ local function __run()
             for _, country in ipairs(registry:GetChildren()) do
                 local v = country:FindFirstChild("ActiveLeader") or country:FindFirstChild("Leader") or country:FindFirstChild("Owner")
                 if v and v.Value ~= nil then
-                    if typeof(v.Value) == "string" and v.Value == plr.Name then return country.Name
-                    elseif typeof(v.Value) == "Instance" and v.Value == plr then return country.Name end
+                    if typeof(v.Value) == "string" and v.Value == plr.Name then
+                        return country.Name
+                    elseif typeof(v.Value) == "Instance" and v.Value == plr then
+                        return country.Name
+                    end
                 end
                 local attr = country:GetAttribute("ActiveLeader") or country:GetAttribute("Leader") or country:GetAttribute("Owner")
-                if attr and attr == plr.Name then return country.Name end
+                if attr and attr == plr.Name then
+                    return country.Name
+                end
             end
             return nil
         end
@@ -1244,7 +1566,10 @@ local function __run()
             local gen = region:FindFirstChild("GeneratedRegion")
             if not gen then return false end
             if not originalAttrs[region] then
-                originalAttrs[region] = { color=gen:GetAttribute("Color"), material=gen:GetAttribute("Material") }
+                originalAttrs[region] = {
+                    color    = gen:GetAttribute("Color"),
+                    material = gen:GetAttribute("Material"),
+                }
             end
             gen:SetAttribute("Color", HIGHLIGHT_COLOR)
             gen:SetAttribute("Material", HIGHLIGHT_MATERIAL)
@@ -1269,7 +1594,12 @@ local function __run()
             if highlightEnabled then return end
             local myName = findMyCountryName_auto()
             if not myName then
-                WindUI:Notify({ Title="Highlight", Content="Could not detect your country.", Icon="x-circle", Duration=3 })
+                WindUI:Notify({
+                    Title = "Highlight",
+                    Content = "Could not detect your country.",
+                    Icon = "x-circle",
+                    Duration = 3
+                })
                 return
             end
             highlightEnabled = true
@@ -1278,11 +1608,22 @@ local function __run()
                 for _, region in ipairs(regions:GetChildren()) do
                     if not highlightEnabled then break end
                     if region:GetAttribute("Country") == myName then
-                        if highlightOneRegion(region) then changed += 1; batch += 1 end
+                        if highlightOneRegion(region) then
+                            changed += 1
+                            batch += 1
+                        end
                     end
-                    if batch >= 50 then batch = 0; task.wait() end
+                    if batch >= 50 then
+                        batch = 0
+                        task.wait()
+                    end
                 end
-                WindUI:Notify({ Title="Highlight enabled", Content=string.format("Updated regions: %d", changed), Icon="map", Duration=3 })
+                WindUI:Notify({
+                    Title   = "Highlight enabled",
+                    Content = string.format("Updated regions: %d", changed),
+                    Icon    = "map",
+                    Duration = 3
+                })
             end)
         end
         
@@ -1292,13 +1633,23 @@ local function __run()
             task.spawn(function()
                 local restored, batch = 0, 0
                 for region, _ in pairs(highlightedRegions) do
-                    if restoreOneRegion(region) then restored += 1 end
+                    if restoreOneRegion(region) then
+                        restored += 1
+                    end
                     batch += 1
-                    if batch >= 60 then batch = 0; task.wait() end
+                    if batch >= 60 then
+                        batch = 0
+                        task.wait()
+                    end
                 end
                 highlightedRegions = {}
                 originalAttrs = {}
-                WindUI:Notify({ Title="Highlight disabled", Content=string.format("Restored regions: %d", restored), Icon="map", Duration=2 })
+                WindUI:Notify({
+                    Title   = "Highlight disabled",
+                    Content = string.format("Restored regions: %d", restored),
+                    Icon    = "map",
+                    Duration = 2
+                })
             end)
         end
         
@@ -1308,9 +1659,14 @@ local function __run()
                 local batch = 0
                 for region, _ in pairs(highlightedRegions) do
                     local gen = region:FindFirstChild("GeneratedRegion")
-                    if gen then gen:SetAttribute("Color", HIGHLIGHT_COLOR) end
+                    if gen then
+                        gen:SetAttribute("Color", HIGHLIGHT_COLOR)
+                    end
                     batch += 1
-                    if batch >= 60 then batch = 0; task.wait() end
+                    if batch >= 60 then
+                        batch = 0
+                        task.wait()
+                    end
                 end
             end)
         end
@@ -1321,9 +1677,14 @@ local function __run()
                 local batch = 0
                 for region, _ in pairs(highlightedRegions) do
                     local gen = region:FindFirstChild("GeneratedRegion")
-                    if gen then gen:SetAttribute("Material", HIGHLIGHT_MATERIAL) end
+                    if gen then
+                        gen:SetAttribute("Material", HIGHLIGHT_MATERIAL)
+                    end
                     batch += 1
-                    if batch >= 60 then batch = 0; task.wait() end
+                    if batch >= 60 then
+                        batch = 0
+                        task.wait()
+                    end
                 end
             end)
         end
@@ -1331,21 +1692,69 @@ local function __run()
         local HighlightTab = Window:Tab({ Title = "Border Highlight", Icon = "map" })
         local HighlightSection = HighlightTab:Section({ Title = "My regions", Icon = "map" })
         
-        HighlightSection:Paragraph({ Title="Region Highlight", Desc="Color + material for your regions. Off by default.", Color=Color3.fromRGB(255,100,100), ImageSize=32 })
+        HighlightSection:Paragraph({
+            Title = "Region Highlight",
+            Desc  = "Color + material for your regions. Off by default.",
+            Color = Color3.fromRGB(255, 100, 100),
+            ImageSize = 32
+        })
+        
         HighlightSection:Space()
-        HighlightSection:Toggle({ Title="Enable Highlight", Desc="Apply style to your regions (slow on big maps).", Type="Checkbox", Value=false,
-            Callback=function(state) if state then enableBorderHighlightAttr() else disableBorderHighlightAttr() end end })
+        
+        HighlightSection:Toggle({
+            Title = "Enable Highlight",
+            Desc  = "Apply style to your regions (slow on big maps).",
+            Type  = "Checkbox",
+            Value = false,
+            Callback = function(state)
+                if state then
+                    enableBorderHighlightAttr()
+                else
+                    disableBorderHighlightAttr()
+                end
+            end
+        })
+        
         HighlightSection:Space()
-        HighlightSection:Colorpicker({ Title="Highlight Color", Desc="Pick a color.", Default=HIGHLIGHT_COLOR, Transparency=0, Locked=false,
-            Callback=function(color) HIGHLIGHT_COLOR = color; reapplyColorToHighlighted() end })
+        
+        HighlightSection:Colorpicker({
+            Title = "Highlight Color",
+            Desc  = "Pick a color.",
+            Default = HIGHLIGHT_COLOR,
+            Transparency = 0,
+            Locked = false,
+            Callback = function(color)
+                HIGHLIGHT_COLOR = color
+                reapplyColorToHighlighted()
+            end
+        })
+        
         HighlightSection:Space()
-        HighlightSection:Dropdown({ Title="Highlight Material", Desc="Pick a material.", Values={"Metal","SmoothPlastic","Plastic","Neon","Wood","Grass"}, Value="Metal",
-            Callback=function(matName) HIGHLIGHT_MATERIAL = matName; reapplyMaterialToHighlighted() end })
+        
+        HighlightSection:Dropdown({
+            Title = "Highlight Material",
+            Desc  = "Pick a material.",
+            Values = { "Metal", "SmoothPlastic", "Plastic", "Neon", "Wood", "Grass" },
+            Value  = "Metal",
+            Callback = function(matName)
+                HIGHLIGHT_MATERIAL = matName
+                reapplyMaterialToHighlighted()
+            end
+        })
+        
         HighlightSection:Space()
         
         local ResetHighlightButton
-        ResetHighlightButton = HighlightSection:Button({ Title="Reset Highlight", Desc="Restore original values.", Icon="refresh-cw", Color=COLOR_RED,
-            Callback=function() ResetHighlightButton:Highlight(); disableBorderHighlightAttr() end })
+        ResetHighlightButton = HighlightSection:Button({
+            Title = "Reset Highlight",
+            Desc  = "Restore original values.",
+            Icon = "refresh-cw",
+            Color = COLOR_RED,
+            Callback = function()
+                ResetHighlightButton:Highlight()
+                disableBorderHighlightAttr()
+            end
+        })
         
         ------------------------------------------------------------
         -- ✅ FINAL INIT
@@ -1353,18 +1762,13 @@ local function __run()
         renderStats()
         refreshCityDropdown()
         
-        WindUI:Notify({ Title="VezuntHUB Loaded", Content="Press P to show/hide interface", Icon="check-circle", Duration=3 })
-    end
-    
-    local function _rubPFHDGdD()
-        if __GamelistLoader then
-            __GamelistLoader:Destroy()
-        end
-        pcall(_uskfurGeYE)
-    end
-    
-    _rubPFHDGdD()
+    WindUI:Notify({
+        Title = "VezuntHUB Loaded",
+        Content = "Press P to show/hide interface",
+        Icon = "check-circle",
+        Duration = 3
+    })
 end
 
--- Run directly without any key check
-task.spawn(__run)
+-- Run directly without key system
+pcall(_uskfurGeYE)
