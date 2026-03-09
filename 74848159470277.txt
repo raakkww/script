@@ -1,0 +1,538 @@
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+local Window = Rayfield:CreateWindow({
+	Name = "LevelBound Helper",
+	LoadingTitle = "Initializing...",
+	LoadingSubtitle = "Rayfield UI",
+	ConfigurationSaving = {
+		Enabled = true,
+		FolderName = "LevelBound",
+		FileName = "Config"
+	}
+})
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+local AttackRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("AttackV2")
+
+local SETTINGS = {
+	RANGE = 20,
+	DAMAGE_TIMES = 15,
+	ATTACK_INTERVAL = 0.15,
+	DEFAULT_WALKSPEED = 16,
+	BOOSTED_WALKSPEED = 30
+}
+
+-- PVP pressure system to looks legit in INVASION
+local PRESSURE_SETTINGS = {
+	ENABLED = false,
+
+	RANGE = 20,
+	LOW_HEALTH_THRESHOLD = 0.85,
+	CRITICAL_HEALTH = 0.60,
+
+	MAX_EXTRA_HITS = 3,
+	INTERVAL = 0.10
+}
+
+
+local combo1, combo2 = 1, 1
+
+local WalkSpeedEnabled = false
+local AutoAttackEnabled = false
+
+local function onCharacterAdded(char)
+	character = char
+	hrp = char:WaitForChild("HumanoidRootPart")
+	humanoid = char:WaitForChild("Humanoid")
+	humanoid.WalkSpeed = WalkSpeedEnabled and SETTINGS.BOOSTED_WALKSPEED or SETTINGS.DEFAULT_WALKSPEED
+	combo1, combo2 = 1, 1
+end
+player.CharacterAdded:Connect(onCharacterAdded)
+
+local function advanceCombo()
+	combo1 += 1
+	if combo1 > 3 then
+		combo1 = 1
+		combo2 += 1
+		if combo2 > 3 then
+			combo2 = 1
+		end
+	end
+	return combo1, combo2
+end
+
+local function performAutoAttack()
+	while true do
+		if AutoAttackEnabled and hrp then
+			for _, mob in ipairs(Workspace.Characters:GetChildren()) do
+				if not mob:IsA("Model") then continue end
+				if string.find(mob.Name, "%(NPC%)") then continue end
+
+				local mobHRP = mob:FindFirstChild("HumanoidRootPart")
+				local mobId = mob:GetAttribute("ID")
+				if not mobHRP or not mobId or mobId < 0 then continue end
+				if (mobHRP.Position - hrp.Position).Magnitude <= SETTINGS.RANGE then
+					for i = 1, SETTINGS.DAMAGE_TIMES do
+						local c1, c2 = advanceCombo()
+						AttackRemote:FireServer(c1, c2, { mobId })
+					end
+				end
+			end
+		end
+		task.wait(SETTINGS.ATTACK_INTERVAL)
+	end
+end
+task.spawn(performAutoAttack)
+
+local function getPressureTargets(range)
+	local targets = {}
+
+	for _, model in ipairs(Workspace.Characters:GetChildren()) do
+		if not model:IsA("Model") then continue end
+		if model == character then continue end -- never self in case they use this as detection
+
+		local hum = model:FindFirstChildOfClass("Humanoid")
+		local mhrp = model:FindFirstChild("HumanoidRootPart")
+		local mobId = model:GetAttribute("ID") -- keep ID for attacks to filter
+
+		if hum and hum.Health > 0 and mhrp and mobId then
+			if (mhrp.Position - hrp.Position).Magnitude <= range then
+				table.insert(targets, model)
+			end
+		end
+	end
+
+	return targets
+end
+
+task.spawn(function()
+	while true do
+		if PRESSURE_SETTINGS.ENABLED and humanoid and hrp then
+			local healthRatio = humanoid.Health / humanoid.MaxHealth
+			print("[Pressure] Health Ratio:", healthRatio)
+
+			if healthRatio <= PRESSURE_SETTINGS.LOW_HEALTH_THRESHOLD then
+				local targets = getPressureTargets(PRESSURE_SETTINGS.RANGE)
+				print("[Pressure] Nearby targets found:", #targets)
+
+				if #targets > 0 then
+					-- determine extra hits
+					local extraHits = 3
+					if healthRatio <= PRESSURE_SETTINGS.CRITICAL_HEALTH or #targets >= 2 then
+						extraHits = PRESSURE_SETTINGS.MAX_EXTRA_HITS
+					end
+					print("[Pressure] Extra hits set to:", extraHits)
+
+					for _, mob in ipairs(targets) do
+						local mobId = mob:GetAttribute("ID")
+						if mobId then
+							print("[Pressure] Attacking mob ID:", mobId)
+							for i = 1, extraHits do
+								local c1, c2 = advanceCombo()
+								print(string.format("[Pressure] FireServer -> Combo: %d, %d, MobID: %s (Hit %d/%d)", c1, c2, tostring(mobId), i, extraHits))
+								AttackRemote:FireServer(c1, c2, { mobId })
+								task.wait(PRESSURE_SETTINGS.INTERVAL)
+							end
+						else
+							print("[Pressure] Skipping mob (no ID):", mob.Name)
+						end
+					end
+				else
+					print("[Pressure] No targets in range")
+				end
+			else
+				print("[Pressure] Health above threshold, skipping")
+			end
+		end
+		task.wait(PRESSURE_SETTINGS.INTERVAL)
+	end
+end)
+
+
+
+task.spawn(function()
+	while true do
+		if humanoid then
+			humanoid.WalkSpeed = WalkSpeedEnabled and SETTINGS.BOOSTED_WALKSPEED or SETTINGS.DEFAULT_WALKSPEED
+		end
+		task.wait(0.1)
+	end
+end)
+
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+
+CombatTab:CreateToggle({
+	Name = "Auto Attack Mobs",
+	CurrentValue = false,
+	Flag = "AutoAttack",
+	Callback = function(state)
+		AutoAttackEnabled = state
+	end
+})
+
+CombatTab:CreateToggle({
+	Name = "WalkSpeed 30",
+	CurrentValue = false,
+	Flag = "WalkSpeedToggle",
+	Callback = function(state)
+		WalkSpeedEnabled = state
+	end
+})
+
+CombatTab:CreateToggle({
+	Name = "Semi Legit PVP Aura",
+	CurrentValue = false,
+	Flag = "PressureCombat",
+	Callback = function(state)
+		PRESSURE_SETTINGS.ENABLED = state
+	end
+})
+
+local VisualTab = Window:CreateTab("Visuals", 4483362458)
+local Tower = Workspace:WaitForChild("Tower")
+
+local ESPStates = {
+	Chest = false,
+	SecretChest = false,
+	Ruby = false,
+	GoldBag = false,
+	ChallengeRug = false,
+}
+
+local ESPColors = {
+	Ruby = Color3.fromRGB(220, 20, 60),
+	GoldBag = Color3.fromRGB(255, 0, 255),
+}
+
+local ActiveHighlights = {}
+
+local function removeESP(obj)
+	local h = ActiveHighlights[obj]
+	if h then
+		h:Destroy()
+		ActiveHighlights[obj] = nil
+	end
+end
+
+local function bindChestColor(model, highlight)
+	local bound = false
+	local conn
+
+	local function bind(mesh)
+		if bound then return end
+		bound = true
+
+		highlight.FillColor = mesh.Color
+
+		mesh:GetPropertyChangedSignal("Color"):Connect(function()
+			if highlight.Parent then
+				highlight.FillColor = mesh.Color
+			end
+		end)
+
+		if conn then conn:Disconnect() end
+	end
+
+	for _, part in ipairs(model:GetDescendants()) do
+		if part:IsA("MeshPart") and (part.Name == "Up" or part.Name == "Down") then
+			bind(part)
+			return
+		end
+	end
+
+	conn = model.DescendantAdded:Connect(function(part)
+		if part:IsA("MeshPart") and (part.Name == "Up" or part.Name == "Down") then
+			bind(part)
+		end
+	end)
+
+	highlight.FillColor = Color3.fromRGB(255, 215, 0)
+end
+
+local function applyESP(obj)
+	if ActiveHighlights[obj] then return end
+	if not ESPStates[obj.Name] then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ESPHighlight"
+	highlight.OutlineColor = Color3.new(1, 1, 1)
+	highlight.FillTransparency = 0.35
+	highlight.OutlineTransparency = 0
+	highlight.Adornee = obj
+	highlight.Parent = obj
+
+	ActiveHighlights[obj] = highlight
+
+	if obj.Name == "Chest" or obj.Name == "SecretChest" then
+		bindChestColor(obj, highlight)
+	else
+		highlight.FillColor = ESPColors[obj.Name]
+	end
+end
+
+local function scanTower()
+	for _, obj in ipairs(Tower:GetDescendants()) do
+		if ESPStates[obj.Name] and (obj:IsA("Model") or obj:IsA("BasePart")) then
+			applyESP(obj)
+		elseif ActiveHighlights[obj] then
+			removeESP(obj)
+		end
+	end
+end
+
+Tower.DescendantAdded:Connect(function(obj)
+	if not (obj:IsA("Model") or obj:IsA("BasePart")) then return end
+	if not ESPStates[obj.Name] then return end
+
+	task.defer(function()
+		if obj.Parent then
+			applyESP(obj)
+		end
+	end)
+end)
+
+Tower.DescendantRemoving:Connect(removeESP)
+
+VisualTab:CreateToggle({
+	Name = "Chest ESP (Rarity Based)",
+	CurrentValue = false,
+	Callback = function(state)
+		ESPStates.Chest = state
+		ESPStates.SecretChest = state
+		scanTower()
+	end
+})
+
+VisualTab:CreateToggle({
+	Name = "Ruby ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		ESPStates.Ruby = state
+		scanTower()
+	end
+})
+
+VisualTab:CreateToggle({
+	Name = "GoldBag ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		ESPStates.GoldBag = state
+		scanTower()
+	end
+})
+
+local MiscTab = Window:CreateTab("MISC", 4483362458)
+local IgnoreRaycast = Workspace:WaitForChild("IgnoreRaycast")
+local Tower = Workspace:WaitForChild("Tower")
+
+local CampfireTPEnabled = false
+local CampfireHitboxes = {}
+
+local function registerCampfire(obj)
+	if obj:IsA("Model") and obj.Name == "Campfire" then
+		local hitbox = obj:FindFirstChild("Hitbox", true)
+		if hitbox and hitbox:IsA("BasePart") then
+			CampfireHitboxes[hitbox] = true
+		end
+	end
+end
+
+for _, obj in ipairs(IgnoreRaycast:GetDescendants()) do
+	registerCampfire(obj)
+end
+
+local startRoom = Tower:FindFirstChild("StartRoom")
+if startRoom then
+	for _, obj in ipairs(startRoom:GetDescendants()) do
+		registerCampfire(obj)
+	end
+end
+
+IgnoreRaycast.DescendantAdded:Connect(registerCampfire)
+
+if startRoom then
+	startRoom.DescendantAdded:Connect(registerCampfire)
+end
+
+task.spawn(function()
+	while true do
+		if CampfireTPEnabled and hrp then
+			for hitbox in pairs(CampfireHitboxes) do
+				if hitbox and hitbox.Parent then
+					hitbox.CFrame = hrp.CFrame
+				else
+					CampfireHitboxes[hitbox] = nil
+				end
+			end
+		end
+		task.wait(0.5)
+	end
+end)
+
+MiscTab:CreateToggle({
+	Name = "Campfire Hitbox TP",
+	CurrentValue = false,
+	Flag = "CampfireTP",
+	Callback = function(state)
+		CampfireTPEnabled = state
+	end
+})
+
+local BellTPEnabled = false
+local IgnoreRayTPEnabled = false
+local TrackedObjects = {}
+
+local function sizeMatches(part, targetSize)
+	local tolerance = 0.01
+	return math.abs(part.Size.X - targetSize.X) < tolerance
+	   and math.abs(part.Size.Y - targetSize.Y) < tolerance
+	   and math.abs(part.Size.Z - targetSize.Z) < tolerance
+end
+
+local function breakPartWelds(part)
+	for _, obj in ipairs(part:GetChildren()) do
+		if obj:IsA("Weld")
+		or obj:IsA("WeldConstraint")
+		or obj:IsA("Motor6D") then
+			obj:Destroy()
+		end
+	end
+end
+
+local function register(obj)
+	if obj:IsA("BasePart")
+	and obj.Name == "Hitbox"
+	and obj.Parent
+	and obj.Parent.Name == "Bell" then
+		TrackedObjects[obj] = "Bell"
+	end
+
+--Ground Heal
+	if obj:IsA("BasePart")
+	and obj.Name == "Hitbox"
+	and sizeMatches(obj, Vector3.new(1.5, 24, 24)) then
+		TrackedObjects[obj] = "IgnoreRayHitbox"
+	end
+end
+
+for _, obj in ipairs(IgnoreRaycast:GetDescendants()) do
+	register(obj)
+end
+
+IgnoreRaycast.DescendantAdded:Connect(register)
+
+task.spawn(function()
+	while true do
+		if hrp then
+			for obj, objType in pairs(TrackedObjects) do
+				if obj and obj.Parent then
+
+					breakPartWelds(obj)
+
+					if objType == "Bell" and BellTPEnabled then
+						obj.Anchored = true
+						obj.CanCollide = false
+						obj.Size = Vector3.new(20, 20, 20)
+						obj.CFrame = hrp.CFrame
+
+					elseif objType == "IgnoreRayHitbox" and IgnoreRayTPEnabled then
+						obj.Anchored = true
+						obj.CanCollide = false
+						obj.Size = Vector3.new(22, 22, 22)
+						obj.CFrame = hrp.CFrame
+					end
+
+				else
+					TrackedObjects[obj] = nil
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+end)
+
+MiscTab:CreateToggle({
+	Name = "Bell TP",
+	CurrentValue = false,
+	Flag = "BellTP",
+	Callback = function(state)
+		BellTPEnabled = state
+	end
+})
+
+MiscTab:CreateToggle({
+	Name = "Ground HealTP",
+	CurrentValue = false,
+	Flag = "IgnoreRayTP",
+	Callback = function(state)
+		IgnoreRayTPEnabled = state
+	end
+})
+
+
+local IgnoreFolder = workspace:WaitForChild("IgnoreRaycast")
+
+local REMOVE_NAMES = {
+	FireThrower = true,
+	LiftingLava = true
+}
+
+local removeRunning = false
+
+MiscTab:CreateToggle({
+	Name = "Remove Flamethrower / Lava",
+	CurrentValue = false,
+	Flag = "RemoveIgnoreRaycastHazards",
+	Callback = function(state)
+		removeRunning = state
+
+		if state then
+			task.spawn(function()
+				while removeRunning do
+					for _, obj in ipairs(IgnoreFolder:GetChildren()) do
+						if REMOVE_NAMES[obj.Name] then
+							obj:Destroy()
+						end
+					end
+					task.wait(0.2) -- safe interval
+				end
+			end)
+		end
+	end,
+})
+
+
+--Notifier for invasion
+local HighestTowerRoom = 0
+local function getRoomNumber(obj) return tonumber(obj.Name) end
+local function updateHighestTowerRoom(num)
+	if num > HighestTowerRoom then
+		HighestTowerRoom = num
+		Rayfield:Notify({ Title="Tower Progress", Content="Reached Room "..HighestTowerRoom, Duration=4 })
+	end
+end
+
+-- Initial & live updates
+for _, room in ipairs(Tower:GetChildren()) do
+	local num = getRoomNumber(room)
+	if num then updateHighestTowerRoom(num) end
+end
+
+Tower.ChildAdded:Connect(function(room)
+	local num = getRoomNumber(room)
+	if num then updateHighestTowerRoom(num) end
+end)
+
+Rayfield:Notify({
+	Title = "Loaded",
+	Content = "Menu initialized successfully.",
+	Duration = 5,
+	Image = 4483362458
+})
