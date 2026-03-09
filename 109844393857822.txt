@@ -1,0 +1,112 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+
+local Remote = ReplicatedStorage
+    :WaitForChild("RemoteEvents")
+    :WaitForChild("Combat")
+    :WaitForChild("HitHumanoid")
+
+local Levels = {"Low","High"}
+
+local MAX_DISTANCE = 20
+local MAX_DISTANCE_SQ = MAX_DISTANCE * MAX_DISTANCE
+
+local enemies = {}
+
+local function getWeapon(character)
+    for _, v in ipairs(character:GetChildren()) do
+        if v:IsA("Tool") then
+            return v
+        end
+    end
+end
+
+local function trackModel(model)
+
+    if Players:GetPlayerFromCharacter(model) then
+        return
+    end
+
+    local humanoid = model:FindFirstChildOfClass("Humanoid")
+    local root = model:FindFirstChild("HumanoidRootPart")
+
+    if humanoid and root then
+        enemies[model] = {
+            humanoid = humanoid,
+            root = root
+        }
+
+        humanoid.Died:Connect(function()
+            enemies[model] = nil
+        end)
+
+        model.AncestryChanged:Connect(function(_, parent)
+            if not parent then
+                enemies[model] = nil
+            end
+        end)
+    end
+end
+
+local function scanContainer(container)
+    for _, v in ipairs(container:GetChildren()) do
+        if v:IsA("Model") then
+            trackModel(v)
+        end
+    end
+
+    container.ChildAdded:Connect(function(child)
+        if child:IsA("Model") then
+            trackModel(child)
+        end
+    end)
+end
+
+-- scan existing workspace containers
+for _, v in ipairs(workspace:GetChildren()) do
+    if v:IsA("Folder") then
+        scanContainer(v)
+    end
+end
+
+-- detect new folders (map changes)
+workspace.ChildAdded:Connect(function(child)
+    if child:IsA("Folder") then
+        scanContainer(child)
+    end
+end)
+
+while true do
+    task.wait(0.15)
+
+    local Character = LocalPlayer.Character
+    if not Character then continue end
+
+    local Root = Character:FindFirstChild("HumanoidRootPart")
+    local Weapon = getWeapon(Character)
+
+    if not Root or not Weapon then continue end
+
+    for model,data in pairs(enemies) do
+
+        local humanoid = data.humanoid
+        local enemyRoot = data.root
+
+        if humanoid.Health > 0 then
+
+            local diff = enemyRoot.Position - Root.Position
+
+            if diff:Dot(diff) <= MAX_DISTANCE_SQ then
+                Remote:FireServer(
+                    Weapon,
+                    humanoid,
+                    Levels[math.random(1,2)]
+                )
+            end
+
+        end
+
+    end
+end
