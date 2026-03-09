@@ -1,0 +1,652 @@
+-- Candy Auto Farm Script gc.idk --
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+-- Prevent sitting - AGGRESSIVE
+local function preventSitting()
+    if humanoid then
+        humanoid.Sit = false
+        humanoid.Jump = true
+    end
+end
+
+-- Connect to property changes to prevent sitting
+humanoid:GetPropertyChangedSignal("Sit"):Connect(function()
+    if humanoid.Sit then
+        humanoid.Sit = false
+        humanoid.Jump = true
+        
+        -- Find and destroy the seat
+        local seat = character:FindFirstChildOfClass("Seat")
+        if seat then
+            seat:Destroy()
+        end
+        
+        -- Find and destroy VehicleSeat
+        local vehicleSeat = character:FindFirstChildOfClass("VehicleSeat")
+        if vehicleSeat then
+            vehicleSeat:Destroy()
+        end
+    end
+end)
+
+-- Also prevent sitting on heartbeat (more reliable)
+RunService.Heartbeat:Connect(function()
+    if humanoid and humanoid.Sit then
+        humanoid.Sit = false
+        humanoid.Jump = true
+        
+        -- Find and destroy the seat
+        local seat = character:FindFirstChildOfClass("Seat")
+        if seat then
+            seat:Destroy()
+        end
+        
+        -- Find and destroy VehicleSeat
+        local vehicleSeat = character:FindFirstChildOfClass("VehicleSeat")
+        if vehicleSeat then
+            vehicleSeat:Destroy()
+        end
+    end
+end)
+
+-- Aggressive anti-chair system
+local function destroyAllSeats()
+    if not character then
+        return
+    end
+    
+    -- Destroy any Seat in character
+    local seat = character:FindFirstChildOfClass("Seat")
+    while seat do
+        seat:Destroy()
+        seat = character:FindFirstChildOfClass("Seat")
+    end
+    
+    -- Destroy any VehicleSeat in character
+    local vehicleSeat = character:FindFirstChildOfClass("VehicleSeat")
+    while vehicleSeat do
+        vehicleSeat:Destroy()
+        vehicleSeat = character:FindFirstChildOfClass("VehicleSeat")
+    end
+    
+    -- Force humanoid to not sit
+    if humanoid then
+        humanoid.Sit = false
+        humanoid.Jump = true
+    end
+end
+
+-- GUI management (MUST be declared before functions that use it)
+local disabledGuis = {}
+
+-- GUI disable system
+local function disableOtherGuis()
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if not playerGui then
+        return 0
+    end
+    
+    local disabledCount = 0
+    for _, gui in playerGui:GetChildren() do
+        if gui.Name ~= "CandyAutoFarmGui" and gui:IsA("ScreenGui") then
+            -- Store reference and disable instead of destroying
+            table.insert(disabledGuis, gui)
+            gui.Enabled = false
+            disabledCount = disabledCount + 1
+        end
+    end
+    
+    return disabledCount
+end
+
+-- GUI enable system
+local function enableOtherGuis()
+    local enabledCount = 0
+    for _, gui in disabledGuis do
+        if gui and gui.Parent then
+            gui.Enabled = true
+            enabledCount = enabledCount + 1
+        end
+    end
+    
+    -- Clear the table
+    disabledGuis = {}
+    
+    return enabledCount
+end
+
+-- Continuous GUI disable
+RunService.RenderStepped:Connect(function()
+    if autoFarmEnabled then
+        local playerGui = player:FindFirstChild("PlayerGui")
+        if playerGui then
+            for _, gui in playerGui:GetChildren() do
+                if gui.Name ~= "CandyAutoFarmGui" and gui:IsA("ScreenGui") and gui.Enabled then
+                    -- Disable any newly enabled GUIs
+                    table.insert(disabledGuis, gui)
+                    gui.Enabled = false
+                end
+            end
+        end
+    end
+end)
+
+-- No-clip functions
+local function enableNoClip()
+    if isNoClipping or not character then
+        return
+    end
+    
+    isNoClipping = true
+    
+    -- Set all character parts to CanCollide = false
+    for _, part in character:GetDescendants() do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+end
+
+local function disableNoClip()
+    if not isNoClipping or not character then
+        return
+    end
+    
+    isNoClipping = false
+    
+    -- Restore CanCollide for character parts (except HumanoidRootPart)
+    for _, part in character:GetDescendants() do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            part.CanCollide = true
+        end
+    end
+end
+
+-- Continuous no-clip maintenance + anti-chair
+RunService.Heartbeat:Connect(function()
+    if autoFarmEnabled and character then
+        -- Keep no-clip enabled while auto-farming
+        if not isNoClipping then
+            enableNoClip()
+        end
+        
+        -- Ensure all parts stay no-clipped
+        for _, part in character:GetDescendants() do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+        
+        -- Aggressively destroy seats
+        destroyAllSeats()
+    end
+end)
+
+-- Auto farm state
+local autoFarmEnabled = false
+local currentCandyIndex = 1
+local candyModels = {}
+local vaultsData = {}
+local ufosData = {}
+local fusionMachinesData = {}
+local deletedKillbricks = {}
+
+-- No-clip system for unstucking
+local lastPosition = Vector3.new(0, 0, 0)
+local positionCheckTime = 0
+local isNoClipping = false
+
+-- Stuck detection system
+local stuckStartTime = 0
+local stuckThreshold = 5  -- 5 seconds before killing
+local lastStuckCheckPosition = Vector3.new(0, 0, 0)
+local stuckCheckInterval = 0.5  -- Check every 0.5 seconds
+local lastStuckCheckTime = 0
+
+-- Listen to Events folder for game info
+local function setupEventListeners()
+
+-- Killbrick deletion system
+local function isKillbrick(part)
+    if not part:IsA("BasePart") then
+        return false
+    end
+    
+    -- Check for EnemyFloor collision group
+    if part.CollisionGroup == "EnemyFloor" then
+        return true
+    end
+    
+    -- Check for red color + CanTouch = false (common killbrick pattern)
+    local r, g, b = part.Color.R * 255, part.Color.G * 255, part.Color.B * 255
+    if r > 200 and g < 100 and b < 100 and not part.CanTouch then
+        return true
+    end
+    
+    -- Check for killbrick attributes
+    if part:GetAttribute("Kill") or part:GetAttribute("Damage") or part:GetAttribute("KillBrick") then
+        return true
+    end
+    
+    -- Check for killbrick names
+    local name = string.lower(part.Name)
+    if name:find("lava") or name:find("kill") or name:find("acid") or name:find("spike") or name:find("danger") then
+        return true
+    end
+    
+    return false
+end
+
+local function deleteKillbrick(part)
+    if not part or not part.Parent then
+        return
+    end
+    
+    local uniqueId = part:GetDebugId()
+    if deletedKillbricks[uniqueId] then
+        return
+    end
+    
+    deletedKillbricks[uniqueId] = true
+    part.Parent = nil
+end
+
+-- Delete all existing killbricks
+local function deleteAllKillbricks()
+    local count = 0
+    for _, descendant in workspace:GetDescendants() do
+        if isKillbrick(descendant) then
+            deleteKillbrick(descendant)
+            count = count + 1
+        end
+    end
+    return count
+end
+
+-- Delete killbricks on startup
+local initialDeleted = deleteAllKillbricks()
+print("[CandyAutoFarm] Deleted " .. initialDeleted .. " killbricks on startup")
+
+-- Continuously check for new killbricks
+workspace.DescendantAdded:Connect(function(descendant)
+    if isKillbrick(descendant) then
+        deleteKillbrick(descendant)
+    end
+end)
+    -- Listen to TreasureVault updates
+    local treasureVaultEvent = ReplicatedStorage:FindFirstChild("RemoteEvents")
+    if treasureVaultEvent then
+        local vaultActionEvent = treasureVaultEvent:FindFirstChild("TreasureVaultActionEvent")
+        if vaultActionEvent then
+            vaultActionEvent.OnClientEvent:Connect(function(action, data)
+                if action == "Update" and data and data.id then
+                    vaultsData[data.id] = data
+                end
+            end)
+        end
+    end
+    
+    -- Listen to SpaceUFO events
+    local ufoEvent = treasureVaultEvent and treasureVaultEvent:FindFirstChild("SpaceUFOActionEvent")
+    if ufoEvent then
+        ufoEvent.OnClientEvent:Connect(function(action, data)
+            if action == "Update" and data and data.id then
+                ufosData[data.id] = data
+            end
+        end)
+    end
+    
+    -- Listen to FusionMachine events
+    local fusionEvent = treasureVaultEvent and treasureVaultEvent:FindFirstChild("FusionMachineActionEvent")
+    if fusionEvent then
+        fusionEvent.OnClientEvent:Connect(function(action, data)
+            if action == "Update" and data and data.id then
+                fusionMachinesData[data.id] = data
+            end
+        end)
+    end
+end
+
+setupEventListeners()
+
+-- Get ALL candy models (including unknown/new ones)
+-- Detects candies by checking for DetectionZone part
+local function getCandyModels()
+    local models = {}
+    
+    local candiesFolder = workspace:FindFirstChild("Candies")
+    if not candiesFolder then
+        warn("Candies folder not found!")
+        return models
+    end
+    
+    -- Get ALL models in the Candies folder
+    for _, child in candiesFolder:GetChildren() do
+        if child:IsA("Model") then
+            -- Check if it has a DetectionZone (indicates it's a collectible candy)
+            local detectionZone = child:FindFirstChild("DetectionZone")
+            if detectionZone and detectionZone:IsA("BasePart") then
+                table.insert(models, child)
+            end
+        end
+    end
+    
+    return models
+end
+
+-- Teleport to a specific candy model and collect it
+local function teleportToCandy(candyModel)
+    if not candyModel or not candyModel.Parent then
+        return false
+    end
+    
+    local targetCFrame = candyModel:GetPivot()
+    
+    -- Use TweenService for smooth teleportation
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad)
+    local tween = TweenService:Create(humanoidRootPart, tweenInfo, {CFrame = targetCFrame})
+    tween:Play()
+    tween.Completed:Wait()
+    
+    -- Find the DetectionZone to ensure we're close enough to collect
+    local detectionZone = candyModel:FindFirstChild("DetectionZone")
+    if detectionZone and detectionZone:IsA("BasePart") then
+        -- Move the DetectionZone to touch the player's character
+        local originalCFrame = detectionZone.CFrame
+        detectionZone.CFrame = humanoidRootPart.CFrame
+        task.wait(0.05)
+        detectionZone.CFrame = originalCFrame
+    else
+        -- Alternative: Try to find any part named "Candy" and touch it
+        local candyPart = candyModel:FindFirstChild("Candy")
+        if candyPart and candyPart:IsA("BasePart") then
+            local originalCFrame = candyPart.CFrame
+            candyPart.CFrame = humanoidRootPart.CFrame
+            task.wait(0.05)
+            candyPart.CFrame = originalCFrame
+        end
+    end
+    
+    return true
+end
+
+-- Auto farm loop
+local function autoFarmLoop()
+    while autoFarmEnabled do
+        -- Force jump to prevent sitting
+        if humanoid then
+            humanoid.Jump = true
+            humanoid.Sit = false
+        end
+        
+        -- Destroy any seats
+        destroyAllSeats()
+        
+        -- Stuck detection check
+        local currentTime = tick()
+        if currentTime - lastStuckCheckTime >= stuckCheckInterval then
+            lastStuckCheckTime = currentTime
+            
+            if humanoidRootPart then
+                local currentPosition = humanoidRootPart.Position
+                local distanceMoved = (currentPosition - lastStuckCheckPosition).Magnitude
+                
+                if distanceMoved < 2 then  -- If moved less than 2 studs
+                    if stuckStartTime == 0 then
+                        stuckStartTime = currentTime
+                        print("[CandyAutoFarm] Player might be stuck, monitoring...")
+                    elseif currentTime - stuckStartTime >= stuckThreshold then
+                        -- Player has been stuck for 5+ seconds, kill them
+                        print("[CandyAutoFarm] Player stuck for " .. stuckThreshold .. " seconds! Killing to respawn...")
+                        
+                        if humanoid and humanoid.Health > 0 then
+                            humanoid.Health = 0
+                        end
+                        
+                        -- Reset stuck detection
+                        stuckStartTime = 0
+                        lastStuckCheckPosition = currentPosition
+                    end
+                else
+                    -- Player is moving, reset stuck detection
+                    stuckStartTime = 0
+                    lastStuckCheckPosition = currentPosition
+                end
+            end
+        end
+        
+        if #candyModels == 0 then
+            candyModels = getCandyModels()
+            if #candyModels == 0 then
+                task.wait(2) -- Wait longer if no candies found
+                continue
+            end
+        end
+        
+        if #candyModels > 0 then
+            local candyModel = candyModels[currentCandyIndex]
+            if candyModel and candyModel.Parent then
+                teleportToCandy(candyModel)
+                
+                -- Wait a bit for the candy to be collected
+                task.wait(0.2)
+                
+                -- Move to next candy
+                currentCandyIndex = currentCandyIndex + 1
+                if currentCandyIndex > #candyModels then
+                    currentCandyIndex = 1
+                end
+            else
+                -- Remove invalid candy model
+                table.remove(candyModels, currentCandyIndex)
+                if currentCandyIndex > #candyModels then
+                    currentCandyIndex = 1
+                end
+            end
+        end
+        
+        -- Check if all candies are collected
+        local remainingCandies = getCandyModels()
+        if #remainingCandies == 0 then
+            print("[CandyAutoFarm] All candies collected! Waiting 5 seconds before restart...")
+            
+            -- Wait 5 seconds
+            task.wait(5)
+            
+            -- Disable and re-enable auto-farm
+            autoFarmEnabled = false
+            task.wait(0.5)
+            autoFarmEnabled = true
+            
+            print("[CandyAutoFarm] Restarting auto-farm!")
+            
+            -- Reset index and refresh candy models
+            currentCandyIndex = 1
+            candyModels = getCandyModels()
+            
+            -- Continue to next iteration to collect new candies
+            continue
+        end
+        
+        task.wait(0.3) -- Wait between teleports
+    end
+end
+
+-- Create UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CandyAutoFarmGui"
+screenGui.ResetOnSpawn = false
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 200, 0, 80)
+mainFrame.Position = UDim2.new(0.7, 0, 0.1, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+mainFrame.BorderSizePixel = 0
+mainFrame.BackgroundTransparency = 0.2
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "TitleLabel"
+titleLabel.Size = UDim2.new(1, 0, 0, 30)
+titleLabel.Position = UDim2.new(0, 0, 0, 5)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "gc.idk's Candy Auto-Farm"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 18
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Parent = mainFrame
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Name = "ToggleButton"
+toggleButton.Size = UDim2.new(0, 160, 0, 35)
+toggleButton.Position = UDim2.new(0.5, -80, 0, 40)
+toggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+toggleButton.BorderSizePixel = 0
+toggleButton.Text = "Enable"
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.TextSize = 16
+toggleButton.Font = Enum.Font.GothamSemibold
+toggleButton.Parent = mainFrame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 8)
+buttonCorner.Parent = toggleButton
+
+-- Draggable functionality
+local dragging = false
+local dragInput = nil
+local dragStart = nil
+local startPos = nil
+
+local function update(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+mainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if dragging and dragInput then
+        update(dragInput)
+    end
+end)
+
+-- Toggle button functionality
+toggleButton.MouseButton1Click:Connect(function()
+    autoFarmEnabled = not autoFarmEnabled
+    
+    if autoFarmEnabled then
+        toggleButton.Text = "Disable"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        
+        -- Enable no-clip when auto-farm starts
+        enableNoClip()
+        print("[CandyAutoFarm] No-clip enabled!")
+        
+        -- Disable other GUIs
+        local disabledCount = disableOtherGuis()
+        print("[CandyAutoFarm] Disabled " .. tostring(disabledCount) .. " GUIs!")
+        
+        -- Destroy all seats
+        destroyAllSeats()
+        print("[CandyAutoFarm] Destroyed all seats!")
+        
+        -- Initialize candy models
+        candyModels = getCandyModels()
+        currentCandyIndex = 1
+        
+        -- Initialize stuck detection
+        stuckStartTime = 0
+        lastStuckCheckTime = tick()
+        lastStuckCheckPosition = humanoidRootPart.Position
+        
+        -- Start auto farm loop
+        task.spawn(autoFarmLoop)
+    else
+        toggleButton.Text = "Enable"
+        toggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        
+        -- Disable no-clip when auto-farm stops
+        disableNoClip()
+        print("[CandyAutoFarm] No-clip disabled!")
+        
+        -- Re-enable other GUIs
+        local enabledCount = enableOtherGuis()
+        print("[CandyAutoFarm] Re-enabled " .. tostring(enabledCount) .. " GUIs!")
+        
+        -- Reset stuck detection
+        stuckStartTime = 0
+    end
+end)
+
+-- Handle character respawn
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
+    
+    -- Re-apply anti-sitting
+    humanoid:GetPropertyChangedSignal("Sit"):Connect(function()
+        if humanoid.Sit then
+            humanoid.Sit = false
+        end
+    end)
+    
+    -- Delete any new killbricks that appeared
+    local newDeleted = deleteAllKillbricks()
+    if newDeleted > 0 then
+        print("[CandyAutoFarm] Deleted " .. newDeleted .. " killbricks after respawn")
+    end
+    
+    -- Refresh candy models on respawn
+    candyModels = getCandyModels()
+    
+    -- Reset stuck detection after respawn
+    stuckStartTime = 0
+    lastStuckCheckTime = tick()
+    lastStuckCheckPosition = humanoidRootPart.Position
+    
+    print("[CandyAutoFarm] Respawned! Continuing auto-farm...")
+end)
+
+-- Parent to PlayerGui
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Print Credits Please Do Not Remove This. --
+while true do
+    print("⚠️ DO NOT STEAL OR CLAIM OWNERSHIP OF THIS Auto-Farm, THIS WAS MADE BY @gc.idk On Discord ⚠️")
+    task.wait(5)
+end 
