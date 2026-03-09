@@ -1,0 +1,85 @@
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+-- Wait a moment for everything to load
+wait(0.5)
+
+
+-- Create GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "VanGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game.CoreGui
+
+local button = Instance.new("TextButton")
+button.Name = "VAN"
+button.Size = UDim2.new(0, 100, 0, 50)
+button.Position = UDim2.new(0.5, -50, 0.1, 0)
+button.Text = "VAN"
+button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Font = Enum.Font.SourceSansBold
+button.TextSize = 18
+button.BorderSizePixel = 2
+button.Parent = screenGui
+
+button.MouseButton1Click:Connect(function()
+	local char = player.Character
+	if not char then 
+		warn("Character not found!")
+		return 
+	end
+	
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then 
+		warn("HumanoidRootPart not found!")
+		return 
+	end
+	
+	-- Search for van (case-insensitive)
+	local vanModel = workspace:FindFirstChild("van") or workspace:FindFirstChild("Van") or workspace:FindFirstChild("VAN")
+	
+	if vanModel then
+		local targetPos
+		
+		-- Try to find a valid position
+		if vanModel:IsA("Model") then
+			if vanModel.PrimaryPart then
+				targetPos = vanModel.PrimaryPart.CFrame
+			else
+				for _, part in pairs(vanModel:GetDescendants()) do
+					if part:IsA("BasePart") then
+						targetPos = part.CFrame
+						break
+					end
+				end
+			end
+		elseif vanModel:IsA("BasePart") then
+			targetPos = vanModel.CFrame
+		end
+		
+		if targetPos then
+			-- Disable character physics temporarily for smoother teleport
+			root.Anchored = true
+			
+			-- Teleport above the van
+			root.CFrame = targetPos * CFrame.new(0, 5, 0)
+			
+			wait(0.1)
+			root.Anchored = false
+			
+			print("â Teleported to van!")
+		else
+			warn("â No valid position found in van!")
+		end
+	else
+		warn("â van model not found in workspace!")
+		warn("Searching workspace...")
+		for _, obj in pairs(workspace:GetChildren()) do
+			print("Found: " .. obj.Name)
+		end
+	end
+end)
+
+print("VAN button created! Click it to teleport.")
