@@ -1,0 +1,419 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local WorkspaceService = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = WorkspaceService.CurrentCamera
+local ProcessRemote = ReplicatedStorage:WaitForChild("ACS_Engine"):WaitForChild("Events"):WaitForChild("Process")
+local GameSystem = ReplicatedStorage:WaitForChild("GameSystem")
+
+-- Cheat Variables (Controlled by UI)
+local CheatConfig = {
+    SilentAim = true,
+    ESP = true,
+    WallCheck = true,
+    HeadChance = 25,
+    HitChance = 100,
+    FOVRadius = 180
+}
+
+local NonHeadParts = {"UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm", "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg"}
+
+-- ==========================================
+-- UI CONSTRUCTION (macOS Style)
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+-- Fallback to PlayerGui if CoreGui is restricted by your executor
+local success, err = pcall(function() ScreenGui.Parent = CoreGui end)
+if not success then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 350, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
+MainFrame.BackgroundTransparency = 0.1
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(60, 60, 65)
+UIStroke.Thickness = 1
+UIStroke.Parent = MainFrame
+
+-- Top Bar (macOS Traffic Lights)
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundTransparency = 1
+TopBar.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 1, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Settings"
+Title.TextColor3 = Color3.fromRGB(200, 200, 200)
+Title.Font = Enum.Font.GothamMedium
+Title.TextSize = 14
+Title.Parent = TopBar
+
+local function CreateTrafficLight(color, xPos)
+    local Circle = Instance.new("Frame")
+    Circle.Size = UDim2.new(0, 12, 0, 12)
+    Circle.Position = UDim2.new(0, xPos, 0.5, -6)
+    Circle.BackgroundColor3 = color
+    Circle.Parent = TopBar
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(1, 0)
+    Corner.Parent = Circle
+    return Circle
+end
+
+local CloseBtn = CreateTrafficLight(Color3.fromRGB(255, 95, 86), 12)
+local MinBtn = CreateTrafficLight(Color3.fromRGB(255, 189, 46), 32)
+local MaxBtn = CreateTrafficLight(Color3.fromRGB(39, 201, 63), 52)
+
+-- Make UI Draggable
+local dragging, dragInput, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        local delta = dragInput.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- UI Content Container
+local Content = Instance.new("ScrollingFrame")
+Content.Size = UDim2.new(1, -20, 1, -40)
+Content.Position = UDim2.new(0, 10, 0, 35)
+Content.BackgroundTransparency = 1
+Content.ScrollBarThickness = 2
+Content.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.Parent = Content
+
+-- Helper: Create Toggle
+local function CreateToggle(name, defaultState, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 30)
+    Frame.BackgroundTransparency = 1
+    Frame.Parent = Content
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0.7, 0, 1, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    Label.Font = Enum.Font.Gotham
+    Label.TextSize = 14
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+
+    local ToggleBG = Instance.new("TextButton")
+    ToggleBG.Size = UDim2.new(0, 40, 0, 20)
+    ToggleBG.Position = UDim2.new(1, -45, 0.5, -10)
+    ToggleBG.BackgroundColor3 = defaultState and Color3.fromRGB(39, 201, 63) or Color3.fromRGB(60, 60, 60)
+    ToggleBG.Text = ""
+    ToggleBG.Parent = Frame
+    Instance.new("UICorner", ToggleBG).CornerRadius = UDim.new(1, 0)
+
+    local Indicator = Instance.new("Frame")
+    Indicator.Size = UDim2.new(0, 16, 0, 16)
+    Indicator.Position = defaultState and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    Indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Indicator.Parent = ToggleBG
+    Instance.new("UICorner", Indicator).CornerRadius = UDim.new(1, 0)
+
+    local state = defaultState
+    ToggleBG.MouseButton1Click:Connect(function()
+        state = not state
+        ToggleBG.BackgroundColor3 = state and Color3.fromRGB(39, 201, 63) or Color3.fromRGB(60, 60, 60)
+        Indicator.Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+        callback(state)
+    end)
+end
+
+-- Helper: Create Slider
+local function CreateSlider(name, min, max, default, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 45)
+    Frame.BackgroundTransparency = 1
+    Frame.Parent = Content
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, 0, 0, 20)
+    Label.BackgroundTransparency = 1
+    Label.Text = name .. ": " .. default
+    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    Label.Font = Enum.Font.Gotham
+    Label.TextSize = 14
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+
+    local SliderBG = Instance.new("TextButton")
+    SliderBG.Size = UDim2.new(1, -10, 0, 6)
+    SliderBG.Position = UDim2.new(0, 5, 0, 30)
+    SliderBG.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+    SliderBG.Text = ""
+    SliderBG.Parent = Frame
+    Instance.new("UICorner", SliderBG).CornerRadius = UDim.new(1, 0)
+
+    local Fill = Instance.new("Frame")
+    local pct = (default - min) / (max - min)
+    Fill.Size = UDim2.new(pct, 0, 1, 0)
+    Fill.BackgroundColor3 = Color3.fromRGB(10, 132, 255) -- Mac Blue
+    Fill.Parent = SliderBG
+    Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
+
+    local Knob = Instance.new("Frame")
+    Knob.Size = UDim2.new(0, 14, 0, 14)
+    Knob.Position = UDim2.new(pct, -7, 0.5, -7)
+    Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Knob.Parent = SliderBG
+    Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
+
+    local isSliding = false
+    SliderBG.MouseButton1Down:Connect(function() isSliding = true end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then isSliding = false end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if isSliding and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mouseX = input.Position.X
+            local sliderX = SliderBG.AbsolutePosition.X
+            local sliderWidth = SliderBG.AbsoluteSize.X
+            local rawPct = (mouseX - sliderX) / sliderWidth
+            local clampedPct = math.clamp(rawPct, 0, 1)
+            
+            local val = math.floor(min + (max - min) * clampedPct)
+            Fill.Size = UDim2.new(clampedPct, 0, 1, 0)
+            Knob.Position = UDim2.new(clampedPct, -7, 0.5, -7)
+            Label.Text = name .. ": " .. val
+            callback(val)
+        end
+    end)
+end
+
+-- Populate UI Settings
+CreateToggle("Silent Aim", CheatConfig.SilentAim, function(val) CheatConfig.SilentAim = val end)
+CreateToggle("Show ESP", CheatConfig.ESP, function(val) CheatConfig.ESP = val end)
+CreateToggle("Wall Check", CheatConfig.WallCheck, function(val) CheatConfig.WallCheck = val end)
+CreateSlider("Headshot Chance", 0, 100, CheatConfig.HeadChance, function(val) CheatConfig.HeadChance = val end)
+CreateSlider("Hit Chance", 0, 100, CheatConfig.HitChance, function(val) CheatConfig.HitChance = val end)
+CreateSlider("FOV Radius", 10, 500, CheatConfig.FOVRadius, function(val) CheatConfig.FOVRadius = val end)
+
+-- Hide/Show UI Hotkey (RightShift)
+UserInputService.InputBegan:Connect(function(input, gp)
+    if not gp and input.KeyCode == Enum.KeyCode.RightShift then
+        ScreenGui.Enabled = not ScreenGui.Enabled
+    end
+end)
+
+-- ==========================================
+-- EXPLOIT LOGIC (Unchanged Base Functionality)
+-- ==========================================
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1
+FOVCircle.NumSides = 64
+FOVCircle.Filled = false
+FOVCircle.Transparency = 0.6
+FOVCircle.Color = Color3.fromRGB(240, 60, 60)
+
+local TargetDot = Drawing.new("Circle")
+TargetDot.Thickness = 1
+TargetDot.NumSides = 16
+TargetDot.Filled = true
+TargetDot.Radius = 4
+TargetDot.Color = Color3.fromRGB(240, 60, 60)
+
+local ESP_Boxes = {}
+
+local function IsEnemy(TargetPlayer)
+    if TargetPlayer == LocalPlayer then return false end
+    if GameSystem:GetAttribute("FreeForAll") then return true end
+    if LocalPlayer.Team and TargetPlayer.Team then return LocalPlayer.Team ~= TargetPlayer.Team end
+    return true
+end
+
+local function IsVisible(TargetModel)
+    if not CheatConfig.WallCheck then return true end
+    local Head = TargetModel:FindFirstChild("Head")
+    if not Head then return false end
+
+    local RayParams = RaycastParams.new()
+    RayParams.FilterType = Enum.RaycastFilterType.Exclude
+    RayParams.FilterDescendantsInstances = {LocalPlayer.Character, TargetModel}
+    RayParams.IgnoreWater = true
+
+    local Origin = Camera.CFrame.Position
+    local Direction = Head.Position - Origin
+    return WorkspaceService:Raycast(Origin, Direction, RayParams) == nil
+end
+
+local function GetTargetPart(Character)
+    if math.random(1, 100) <= CheatConfig.HeadChance then
+        local Head = Character:FindFirstChild("Head")
+        if Head then return Head end
+    end
+    local Shuffled = table.clone(NonHeadParts)
+    for I = #Shuffled, 2, -1 do
+        local J = math.random(1, I)
+        Shuffled[I], Shuffled[J] = Shuffled[J], Shuffled[I]
+    end
+    for _, Name in ipairs(Shuffled) do
+        local Part = Character:FindFirstChild(Name)
+        if Part then return Part end
+    end
+    return Character:FindFirstChild("Head")
+end
+
+local function GetNearestTarget()
+    if not Camera then return nil, nil end
+    local ViewportSize = Camera.ViewportSize
+    local ScreenCenter = Vector2.new(ViewportSize.X / 2, ViewportSize.Y / 2)
+    local BestDistance = CheatConfig.FOVRadius
+    local BestModel, BestPart = nil, nil
+
+    for _, Player in ipairs(Players:GetPlayers()) do
+        if IsEnemy(Player) then
+            local Character = Player.Character
+            if Character then
+                local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+                local Head = Character:FindFirstChild("Head")
+                if Humanoid and Humanoid.Health > 0 and Head then
+                    local ScreenPos, OnScreen = Camera:WorldToViewportPoint(Head.Position)
+                    if OnScreen then
+                        local ScreenDist = (Vector2.new(ScreenPos.X, ScreenPos.Y) - ScreenCenter).Magnitude
+                        if ScreenDist < BestDistance and IsVisible(Character) then
+                            BestDistance = ScreenDist
+                            BestModel = Character
+                            BestPart = GetTargetPart(Character)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return BestModel, BestPart
+end
+
+-- ACS Namecall Hook
+local OldNamecall
+OldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(Self, ...)
+    local Method = getnamecallmethod()
+
+    if CheatConfig.SilentAim and Method == "FireServer" and Self == ProcessRemote and math.random(1, 100) <= CheatConfig.HitChance then
+        local Tool, RayResult, ShotID = ...
+        if typeof(RayResult) == "table" then
+            local TargetModel, TargetPart = GetNearestTarget() 
+            if TargetModel and TargetPart then
+                local Humanoid = TargetModel:FindFirstChildOfClass("Humanoid")
+                if Humanoid and Humanoid.Health > 0 then
+                    local NewRayResult = {
+                        ["Instance"] = TargetPart,
+                        ["Position"] = TargetPart.Position,
+                        ["Material"] = Enum.Material.Plastic,
+                        ["Normal"] = Vector3.new(0, 1, 0),
+                        ["Distance"] = (TargetPart.Position - WorkspaceService.CurrentCamera.CFrame.Position).Magnitude
+                    }
+                    setnamecallmethod(Method)
+                    return OldNamecall(Self, Tool, NewRayResult, ShotID)
+                end
+            end
+        end
+    end
+    setnamecallmethod(Method)
+    return OldNamecall(Self, ...)
+end))
+
+-- RenderStepped Visuals Loop
+RunService.RenderStepped:Connect(function()
+    if not Camera then return end
+    local ViewportSize = Camera.ViewportSize
+    local ScreenCenter = Vector2.new(ViewportSize.X / 2, ViewportSize.Y / 2)
+    
+    FOVCircle.Position = ScreenCenter
+    FOVCircle.Radius = CheatConfig.FOVRadius
+    FOVCircle.Visible = CheatConfig.SilentAim
+
+    if CheatConfig.SilentAim then
+        local TargetModel, TargetPart = GetNearestTarget()
+        if TargetPart then
+            local ScreenPos, OnScreen = Camera:WorldToViewportPoint(TargetPart.Position)
+            if OnScreen then
+                TargetDot.Position = Vector2.new(ScreenPos.X, ScreenPos.Y)
+                TargetDot.Visible = true
+            else
+                TargetDot.Visible = false
+            end
+        else
+            TargetDot.Visible = false
+        end
+    else
+        TargetDot.Visible = false
+    end
+
+    -- ESP Loop
+    for _, Player in ipairs(Players:GetPlayers()) do
+        if CheatConfig.ESP and Player ~= LocalPlayer then
+            if not ESP_Boxes[Player] then
+                ESP_Boxes[Player] = Drawing.new("Square")
+                ESP_Boxes[Player].Thickness = 1
+                ESP_Boxes[Player].Filled = false
+            end
+            
+            local Box = ESP_Boxes[Player]
+            local Char = Player.Character
+            local Hum = Char and Char:FindFirstChildOfClass("Humanoid")
+            local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+
+            if IsEnemy(Player) and Char and Hum and Hum.Health > 0 and Root then
+                local Pos, OnScreen = Camera:WorldToViewportPoint(Root.Position)
+                if OnScreen then
+                    local SizeY = (Camera:WorldToViewportPoint(Root.Position - Vector3.new(0, 3, 0)).Y - Camera:WorldToViewportPoint(Root.Position + Vector3.new(0, 2.6, 0)).Y)
+                    Box.Size = Vector2.new(SizeY / 1.5, SizeY)
+                    Box.Position = Vector2.new(Pos.X - Box.Size.X / 2, Pos.Y - Box.Size.Y / 2)
+                    Box.Color = IsVisible(Char) and Color3.fromRGB(255, 255, 50) or Color3.fromRGB(255, 50, 50)
+                    Box.Visible = true
+                else
+                    Box.Visible = false
+                end
+            else
+                Box.Visible = false
+            end
+        elseif ESP_Boxes[Player] then
+            ESP_Boxes[Player].Visible = false
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(Player)
+    if ESP_Boxes[Player] then
+        ESP_Boxes[Player]:Remove()
+        ESP_Boxes[Player] = nil
+    end
+end)
