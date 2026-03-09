@@ -1,0 +1,214 @@
+--[[
+    Blood Zone - Open Source
+    Created by: f0rsakeN / @Milan_Perticevic / @ImNotASeer
+    
+    Features: 
+    - Aimbot (Hold RMB)
+    - Enemy ESP (Red)
+    - Constant Follow Enemy From Behind (Instant TP)
+    - Noclip System
+    - Alt + Click Teleport
+]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- // SERVICES //
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+-- // SETTINGS //
+local lp = Players.LocalPlayer
+local charFolder = workspace:WaitForChild("Characters")
+local camera = workspace.CurrentCamera
+
+local flags = {
+    ESP = false,
+    Aimbot = false,
+    Follow = false,
+    AltTP = false,
+    Noclip = false,
+    FollowOffset = 5
+}
+
+local currentTarget = nil 
+
+-- // HELPER FUNCTIONS //
+
+local function isAlive(model)
+    -- Check: Model exists, has a name (not dead), isn't the local player, and has a RootPart/Head
+    return model and 
+           model:IsA("Model") and 
+           model.Name ~= "" and 
+           model.Name ~= "Model" and 
+           model.Name ~= lp.Name and 
+           (model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head"))
+end
+
+-- Find player closest to cursor (for Aimbot)
+local function getPlayerNearCursor()
+    local closest = nil
+    local dist = math.huge
+    local mousePos = UserInputService:GetMouseLocation()
+
+    for _, model in pairs(charFolder:GetChildren()) do
+        if isAlive(model) then
+            local head = model:FindFirstChild("Head")
+            if head then
+                local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local d = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if d < dist then
+                        dist = d
+                        closest = model
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Find closest player in world (for Follow)
+local function getClosestInWorld()
+    local closest = nil
+    local dist = math.huge
+    local myRoot = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil end
+    
+    for _, model in pairs(charFolder:GetChildren()) do
+        if isAlive(model) then
+            local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head")
+            if root then
+                local d = (myRoot.Position - root.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = model
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- // GUI SETUP //
+local Window = Rayfield:CreateWindow({
+    Name = "Blood Zone | Created by: f0rsakeN / @Milan_Perticevic / @ImNotASeer",
+    LoadingTitle = "Initializing Systems...",
+    LoadingSubtitle = "Open Source Script",
+    ConfigurationSaving = { Enabled = false }
+})
+
+local CombatTab = Window:CreateTab("Combat")
+local MoveTab = Window:CreateTab("Movement")
+local VisualsTab = Window:CreateTab("Visuals")
+
+VisualsTab:CreateToggle({
+    Name = "ESP (Highlights)",
+    CurrentValue = false,
+    Callback = function(Value) flags.ESP = Value end
+})
+
+CombatTab:CreateToggle({
+    Name = "Aimbot (Hold RMB)",
+    CurrentValue = false,
+    Callback = function(Value) flags.Aimbot = Value end
+})
+
+MoveTab:CreateToggle({
+    Name = "Follow Behind (Not Recommended)",
+    CurrentValue = false,
+    Callback = function(Value) flags.Follow = Value end
+})
+
+MoveTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Callback = function(Value) flags.Noclip = Value end
+})
+
+MoveTab:CreateToggle({
+    Name = "Alt + Click TP",
+    CurrentValue = false,
+    Callback = function(Value) flags.AltTP = Value end
+})
+
+-- // MAIN LOGIC //
+local lastRefresh = 0
+
+RunService.RenderStepped:Connect(function()
+    local now = tick()
+    
+    -- 1. Refresh & Anti-Stuck Logic (Every 0.1s for fast response)
+    if now - lastRefresh >= 0.1 then
+        lastRefresh = now
+        
+        -- CHECK: Is target still valid?
+        if currentTarget then
+            if not isAlive(currentTarget) or not currentTarget:IsDescendantOf(charFolder) then
+                currentTarget = nil -- Reset if dead, left, or is local player
+            end
+        end
+
+        -- Auto-find new target if Follow is ON and no target is locked
+        if flags.Follow and not currentTarget then
+            currentTarget = getClosestInWorld()
+        end
+
+        -- ESP (Strict filtering for dead bodies)
+        if flags.ESP then
+            for _, model in pairs(charFolder:GetChildren()) do
+                if isAlive(model) then
+                    if not model:FindFirstChild("ESPHighlight") then
+                        local h = Instance.new("Highlight", model)
+                        h.Name = "ESPHighlight"
+                        h.FillColor = Color3.fromRGB(255, 0, 0)
+                    end
+                else
+                    local oldH = model:FindFirstChild("ESPHighlight")
+                    if oldH then oldH:Destroy() end
+                end
+            end
+        end
+    end
+
+    -- 2. Aimbot (Dynamically targets person closest to mouse while holding RMB)
+    if flags.Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local aimTarget = getPlayerNearCursor()
+        if aimTarget and aimTarget:FindFirstChild("Head") then
+            camera.CFrame = CFrame.new(camera.CFrame.Position, aimTarget.Head.Position)
+        end
+    end
+
+    -- 3. Follow Behind (Instant TP)
+    if flags.Follow and currentTarget and lp.Character then
+        local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
+        local tRoot = currentTarget:FindFirstChild("HumanoidRootPart") or currentTarget:FindFirstChild("Head")
+        
+        if myRoot and tRoot then
+            -- pcall to prevent errors if model is destroyed during the frame
+            pcall(function()
+                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, flags.FollowOffset)
+            end)
+        end
+    end
+
+    -- 4. Noclip (Constant Loop)
+    if flags.Noclip and lp.Character then
+        for _, part in pairs(lp.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+end)
+
+-- // ALT + CLICK TP //
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and flags.AltTP and input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt) then
+            local mouse = lp:GetMouse()
+            if mouse.Hit and lp.Character then
+                lp.Character:PivotTo(CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0)))
+            end
+        end
+    end
+end)
