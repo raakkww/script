@@ -1,0 +1,173 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TurretFarmGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 300, 0, 520)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -260)
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = mainFrame
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(70, 70, 110)
+mainStroke.Thickness = 1.5
+mainStroke.Parent = mainFrame
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 42)
+titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 48)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleBarCorner = Instance.new("UICorner")
+titleBarCorner.CornerRadius = UDim.new(0, 12)
+titleBarCorner.Parent = titleBar
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -50, 1, 0)
+titleLabel.Position = UDim2.new(0, 12, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Item Selector"
+titleLabel.TextColor3 = Color3.fromRGB(210, 210, 255)
+titleLabel.TextScaled = true
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 26, 0, 26)
+closeBtn.Position = UDim2.new(1, -34, 0, 8)
+closeBtn.BackgroundColor3 = Color3.fromRGB(180, 45, 45)
+closeBtn.Text = "â"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextScaled = true
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.BorderSizePixel = 0
+closeBtn.ZIndex = 2
+closeBtn.Parent = mainFrame
+
+local closeBtnCorner = Instance.new("UICorner")
+closeBtnCorner.CornerRadius = UDim.new(0, 6)
+closeBtnCorner.Parent = closeBtn
+
+closeBtn.MouseButton1Click:Connect(function()
+	screenGui:Destroy()
+end)
+
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -12, 1, -52)
+scrollFrame.Position = UDim2.new(0, 6, 0, 47)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.BorderSizePixel = 0
+scrollFrame.ScrollBarThickness = 3
+scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 180)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrollFrame.Parent = mainFrame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 5)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = scrollFrame
+
+local listPadding = Instance.new("UIPadding")
+listPadding.PaddingTop = UDim.new(0, 5)
+listPadding.PaddingLeft = UDim.new(0, 3)
+listPadding.PaddingRight = UDim.new(0, 3)
+listPadding.Parent = scrollFrame
+
+local function fireItem(itemName)
+	local args = {
+		"itemSelected",
+		itemName
+	}
+	game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Inventory"):FireServer(unpack(args))
+end
+
+local function createButton(text, itemName, order, bgColor, textColor)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, 0, 0, 36)
+	btn.BackgroundColor3 = bgColor
+	btn.Text = text
+	btn.TextColor3 = textColor or Color3.fromRGB(255, 255, 255)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.Gotham
+	btn.BorderSizePixel = 0
+	btn.LayoutOrder = order
+	btn.Parent = scrollFrame
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 7)
+	btnCorner.Parent = btn
+
+	local btnStroke = Instance.new("UIStroke")
+	btnStroke.Color = Color3.fromRGB(255, 255, 255)
+	btnStroke.Transparency = 0.88
+	btnStroke.Thickness = 1
+	btnStroke.Parent = btn
+
+	local originalColor = bgColor
+
+	btn.MouseEnter:Connect(function()
+		btn.BackgroundColor3 = originalColor:Lerp(Color3.fromRGB(255, 255, 255), 0.12)
+	end)
+
+	btn.MouseLeave:Connect(function()
+		btn.BackgroundColor3 = originalColor
+	end)
+
+	btn.MouseButton1Click:Connect(function()
+		btn.BackgroundTransparency = 0.35
+		task.delay(0.12, function()
+			btn.BackgroundTransparency = 0
+		end)
+		fireItem(itemName)
+	end)
+end
+
+local turretColor = Color3.fromRGB(160, 55, 55)
+local farmColor = Color3.fromRGB(45, 130, 65)
+local limitedColor = Color3.fromRGB(120, 60, 190)
+
+createButton("Turret 1", "Turret1", 1, turretColor)
+createButton("Turret 2", "Turret2", 2, turretColor)
+createButton("Turret 3", "Turret3", 3, turretColor)
+createButton("Turret 4", "Turret4", 4, turretColor)
+createButton("Turret 5", "Turret5", 5, turretColor)
+createButton("Turret 6", "Turret6", 6, turretColor)
+createButton("Turret 7", "Turret7", 7, turretColor)
+createButton("Turret 8", "Turret8", 8, turretColor)
+createButton("Turret 9", "Turret9", 9, turretColor)
+createButton("Turret 10", "Turret10", 10, turretColor)
+createButton("Turret 11", "Turret11", 11, turretColor)
+createButton("Turret 12", "Turret12", 12, turretColor)
+createButton("Turret 13", "Turret13", 13, turretColor)
+createButton("Farm 1", "Farm1", 14, farmColor)
+createButton("Farm 2", "Farm2", 15, farmColor)
+createButton("Farm 3", "Farm3", 16, farmColor)
+createButton("Farm 4", "Farm4", 17, farmColor)
+createButton("Farm 5", "Farm5", 18, farmColor)
+createButton("Farm 6", "Farm6", 19, farmColor)
+createButton("Farm 7", "Farm7", 20, farmColor)
+createButton("Farm 8", "Farm8", 21, farmColor)
+createButton("Farm 9", "Farm9", 22, farmColor)
+createButton("Farm 10", "Farm10", 23, farmColor)
+createButton("Farm 11", "Farm11", 24, farmColor)
+createButton("LimitedTurret 1", "LimitedTurret1", 25, limitedColor)
+createButton("LimitedTurret 2", "LimitedTurret2", 26, limitedColor)
+createButton("LimitedTurret 3", "LimitedTurret3", 27, limitedColor)
