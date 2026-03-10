@@ -1,0 +1,104 @@
+local Players=game:GetService("Players")
+local UserInputService=game:GetService("UserInputService")
+local player=Players.LocalPlayer
+local playerGui=player:WaitForChild("PlayerGui")
+local old=playerGui:FindFirstChild("AutoChatGui")
+if old then old:Destroy()end
+
+local C={
+    bg=Color3.fromRGB(12,8,8),
+    panel=Color3.fromRGB(20,10,10),
+    topBar=Color3.fromRGB(120,15,15),
+    topBarDark=Color3.fromRGB(90,10,10),
+    border=Color3.fromRGB(180,30,30),
+    btn=Color3.fromRGB(140,20,20),
+    btnHover=Color3.fromRGB(180,25,25),
+    btnGreen=Color3.fromRGB(30,120,50),
+    btnRed=Color3.fromRGB(160,30,30),
+    text=Color3.fromRGB(255,220,220),
+    textDim=Color3.fromRGB(180,120,120),
+    accent=Color3.fromRGB(220,50,50),
+}
+
+local sg=Instance.new("ScreenGui",playerGui)
+sg.Name="AutoChatGui" sg.ResetOnSpawn=false sg.IgnoreGuiInset=true
+
+local panel=Instance.new("Frame",sg)
+panel.Size=UDim2.new(0,210,0,120) panel.Position=UDim2.new(0.5,-105,0,60) panel.BackgroundColor3=C.panel panel.BorderSizePixel=0
+Instance.new("UICorner",panel).CornerRadius=UDim.new(0,14)
+local ps=Instance.new("UIStroke",panel) ps.Color=C.border ps.Thickness=1.5
+
+
+local ptb=Instance.new("Frame",panel)
+ptb.Size=UDim2.new(1,0,0,34) ptb.BackgroundColor3=C.topBar ptb.BorderSizePixel=0
+Instance.new("UICorner",ptb).CornerRadius=UDim.new(0,14)
+local ptbFix=Instance.new("Frame",ptb) ptbFix.Size=UDim2.new(1,0,0.5,0) ptbFix.Position=UDim2.new(0,0,0.5,0) ptbFix.BackgroundColor3=C.topBar ptbFix.BorderSizePixel=0
+
+
+local dot=Instance.new("Frame",ptb) dot.Size=UDim2.new(0,6,0,6) dot.Position=UDim2.new(0,10,0.5,-3) dot.BackgroundColor3=Color3.fromRGB(255,100,100) dot.BorderSizePixel=0
+Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
+
+local ptl=Instance.new("TextLabel",ptb) ptl.Text="tbb battle auto get character " ptl.Size=UDim2.new(1,-60,1,0) ptl.Position=UDim2.new(0,22,0,0) ptl.BackgroundTransparency=1 ptl.TextColor3=Color3.fromRGB(255,220,220) ptl.Font=Enum.Font.GothamBold ptl.TextSize=11 ptl.TextXAlignment=Enum.TextXAlignment.Left
+
+local closeBtn=Instance.new("TextButton",ptb)
+closeBtn.Size=UDim2.new(0,22,0,20) closeBtn.Position=UDim2.new(1,-28,0.5,-10) closeBtn.BackgroundColor3=Color3.fromRGB(80,10,10) closeBtn.Text="X" closeBtn.TextColor3=Color3.fromRGB(255,120,120) closeBtn.Font=Enum.Font.GothamBold closeBtn.TextSize=10 closeBtn.BorderSizePixel=0
+Instance.new("UICorner",closeBtn).CornerRadius=UDim.new(0,5)
+closeBtn.MouseButton1Click:Connect(function()sg:Destroy()end)
+
+
+local content=Instance.new("Frame",panel)
+content.Size=UDim2.new(1,-16,1,-42) content.Position=UDim2.new(0,8,0,38) content.BackgroundTransparency=1
+Instance.new("UIListLayout",content).Padding=UDim.new(0,6)
+
+local function sendChat(msg)
+    local ok1=pcall(function()
+        local tcs=game:GetService("TextChatService")
+        local channel=tcs:FindFirstChild("TextChannels") and tcs.TextChannels:FindFirstChild("RBXGeneral")
+        if channel then channel:SendAsync(msg) end
+    end)
+    if ok1 then return true end
+    local ok2=pcall(function()
+        game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg,"All")
+    end)
+    return ok2
+end
+
+local function makeBtn(labelText,msg)
+    local btn=Instance.new("TextButton",content)
+    btn.Size=UDim2.new(1,0,0,32) btn.BackgroundColor3=C.btn btn.Text=labelText btn.TextColor3=C.text btn.Font=Enum.Font.GothamBold btn.TextSize=12 btn.BorderSizePixel=0
+    Instance.new("UICorner",btn).CornerRadius=UDim.new(0,8)
+    local bs=Instance.new("UIStroke",btn) bs.Color=C.border bs.Thickness=1 bs.Transparency=0.5
+
+    btn.MouseButton1Click:Connect(function()
+        local sent=sendChat(msg)
+        if sent then
+            btn.Text="Sent"
+            btn.BackgroundColor3=C.btnGreen
+        else
+            btn.Text="Failed"
+            btn.BackgroundColor3=Color3.fromRGB(100,20,20)
+        end
+        task.wait(1.2)
+        btn.Text=labelText
+        btn.BackgroundColor3=C.btn
+    end)
+    return btn
+end
+
+makeBtn("fatboy being fat ","/fatboy")
+makeBtn("very cool button that said krip","/krip")
+
+
+local dragging,dragStart,startPos=false,nil,nil
+ptb.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.Touch then
+        dragging=true dragStart=i.Position startPos=panel.Position
+        i.Changed:Connect(function()if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(i)
+    if dragging and i.UserInputType==Enum.UserInputType.Touch then
+        local d=i.Position-dragStart
+        panel.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y)
+    end
+end)
