@@ -1,0 +1,690 @@
+--  ██╗   ██╗██╗██████╗ ██╗   ██╗███████╗
+--   ██║   ██║██║██╔══██╗██║   ██║██╔════╝
+---  ██║   ██║██║██████╔╝██║   ██║███████╗
+--  ╚██╗ ██╔╝██║██╔══██╗██║   ██║╚════██║
+--   ╚████╔╝ ██║██║  ██║╚██████╔╝███████║
+--    ╚═══╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝ 
+-- give me credits if you like
+-- dont say it ai 
+-- you can skid it (skidders)
+-- why are you even here for the open source i bet
+
+local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local plrs = game:GetService("Players")
+local ps = game:GetService("PathfindingService")
+local vu = game:GetService("VirtualUser")
+local hs = game:GetService("HttpService")
+local ts = game:GetService("TweenService")
+local lp = plrs.LocalPlayer
+
+local cloneref = cloneref or clonereference or function(i) return i end
+local rsClone = cloneref(rs)
+local replicated = cloneref(game:GetService("ReplicatedStorage"))
+
+local WindUI
+pcall(function()
+    if rsClone:IsStudio() then
+        WindUI = require(cloneref(replicated:WaitForChild("WindUI"):WaitForChild("Init")))
+    else
+        WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+    end
+end)
+
+local win = WindUI:CreateWindow({
+    Title = "Virusware",
+    Folder = "virusware",
+    Icon = "solar:skull-bold",
+    NewElements = true,
+    HideSearchBar = false,
+    OpenButton = {
+        Title = "Open Virusware",
+        CornerRadius = UDim.new(1,0),
+        StrokeThickness = 3,
+        Enabled = true,
+        Draggable = true,
+        Scale = 0.5,
+        Color = ColorSequence.new(Color3.fromHex("#FF0000"), Color3.fromHex("#8B0000"))
+    },
+    Topbar = {
+        Height = 44,
+        ButtonsType = "Default"
+    },
+})
+
+win:Tag({
+    Title = "v" .. WindUI.Version,
+    Icon = "skull",
+    Color = Color3.fromHex("#8B0000"),
+    Border = true,
+})
+
+local red = Color3.fromHex("#EF4F1D")
+local blue = Color3.fromHex("#257AF7")
+local green = Color3.fromHex("#10C550")
+local yellow = Color3.fromHex("#ECA201")
+local purple = Color3.fromHex("#7775F2")
+
+local cfg = {
+    Speed = 17,
+    Jump = 50,
+    Noclip = false,
+    InfJump = false,
+    Invis = false,
+    Spin = false,
+    SpinSpd = 50,
+    BodyLock = false,
+    InstantTag = false,
+    AutoPlay = false,
+    Aura = false,
+    AuraRange = 25,
+    GodMode = false,
+    Depth = 7,
+}
+
+local conn = {}
+local chair = nil
+local spinLoop = nil
+local tagCooldown = false
+local isPathing = false
+local cam = workspace.CurrentCamera
+
+local function randWait(min, max)
+    task.wait(min + (math.random() * (max - min)))
+end
+
+local function isHighlighted(char)
+    if not char then return false end
+    if char:FindFirstChildOfClass("Highlight") then return true end
+    if char:FindFirstChildOfClass("SelectionBox") then return true end
+    for _, v in ipairs(char:GetChildren()) do
+        if v:IsA("Folder") and v:FindFirstChildWhichIsA("Highlight") then return true end
+    end
+    return false
+end
+
+local function getTagged()
+    for _, p in ipairs(plrs:GetPlayers()) do
+        if p ~= lp and p.Character and isHighlighted(p.Character) then
+            return p
+        end
+    end
+    return nil
+end
+
+local function getTaggedRoot()
+    local p = getTagged()
+    return p and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function safeTeleport(target)
+    local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local dist = (root.Position - target.Position).Magnitude
+    local time = math.clamp(dist / 500, 0.05, 0.3)
+    local tween = ts:Create(root, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = target})
+    tween:Play()
+end
+
+local function tpBackLater(time)
+    local char = lp.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local target = getTaggedRoot()
+    if root and target then
+        local old = root.CFrame
+        safeTeleport(target.CFrame * CFrame.new(0,3,0))
+        task.wait(time or 1)
+        if root and root.Parent then
+            safeTeleport(old)
+        end
+    end
+end
+
+local function randomTP()
+    local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if root then
+        local pos = root.Position + Vector3.new(math.random(-50,50), 3, math.random(-50,50))
+        safeTeleport(CFrame.new(pos))
+    end
+end
+
+local function makeChair(pos)
+    if chair and chair.Parent then chair:Destroy() end
+    chair = Instance.new("Part")
+    chair.Name = "chair"
+    chair.Anchored = true
+    chair.CanCollide = false
+    chair.Transparency = 1
+    chair.Size = Vector3.new(2,1,2)
+    chair.Position = pos
+    chair.Parent = workspace
+    task.delay(2, function()
+        if chair and chair.Parent then chair:Destroy() end
+    end)
+    return chair
+end
+
+local function spinToggle(state)
+    if spinLoop then spinLoop:Disconnect() spinLoop = nil end
+    if state then
+        spinLoop = rs.RenderStepped:Connect(function()
+            local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(cfg.SpinSpd), 0)
+            end
+        end)
+    end
+end
+
+local function velocityFling(plr)
+    local char = lp.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = hum and hum.RootPart
+    local tChar = plr and plr.Character
+    local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+    
+    if not (char and hum and root and tChar and tRoot) then return end
+    
+    local oldPos = root.CFrame
+    local oldHeight = workspace.FallenPartsDestroyHeight
+    workspace.FallenPartsDestroyHeight = -5000
+    
+    local bv = Instance.new("BodyVelocity")
+    bv.Parent = root
+    bv.Velocity = Vector3.new(0,0,0)
+    bv.MaxForce = Vector3.new(5000,5000,5000)
+    
+    local bg = Instance.new("BodyGyro")
+    bg.Parent = root
+    bg.MaxTorque = Vector3.new(5000,5000,5000)
+    bg.P = 1000
+    bg.CFrame = tRoot.CFrame * CFrame.Angles(math.rad(90),0,0)
+    
+    hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+    cam.CameraSubject = tRoot
+    
+    for i = 1, 40 do
+        if root and root.Parent then
+            local dir = (tRoot.Position - root.Position).Unit
+            root.Velocity = dir * 150 + Vector3.new(0,50,0)
+            root.RotVelocity = Vector3.new(5000,5000,5000)
+            randWait(0.01, 0.03)
+        end
+    end
+    
+    bv:Destroy()
+    bg:Destroy()
+    hum:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    cam.CameraSubject = hum
+    safeTeleport(oldPos)
+    workspace.FallenPartsDestroyHeight = oldHeight
+end
+
+local playerTab = win:Tab({
+    Title = "Player",
+    Icon = "solar:user-bold",
+    IconColor = blue,
+    Border = true,
+})
+
+local tagTab = win:Tab({
+    Title = "Tag",
+    Icon = "solar:flag-bold",
+    IconColor = yellow,
+    Border = true,
+})
+
+local tpTab = win:Tab({
+    Title = "Teleport",
+    Icon = "solar:map-arrow-square-bold",
+    IconColor = purple,
+    Border = true,
+})
+
+local settingsTab = win:Tab({
+    Title = "Settings",
+    Icon = "solar:settings-bold",
+    Border = true,
+})
+
+local playerSec = playerTab:Section({ Title = "Player" })
+playerSec:Slider({
+    Title = "Walk Speed",
+    Value = { Min = 16, Max = 500, Default = cfg.Speed },
+    Callback = function(v)
+        cfg.Speed = v
+        local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = v end
+    end
+})
+playerSec:Space()
+playerSec:Slider({
+    Title = "Jump Power",
+    Value = { Min = 50, Max = 500, Default = cfg.Jump },
+    Callback = function(v)
+        cfg.Jump = v
+        local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.JumpPower = v end
+    end
+})
+playerSec:Space()
+playerSec:Toggle({
+    Title = "Noclip",
+    Value = cfg.Noclip,
+    Callback = function(v)
+        cfg.Noclip = v
+        if v then
+            conn.Noclip = rs.Stepped:Connect(function()
+                if lp.Character then
+                    for _, p in ipairs(lp.Character:GetDescendants()) do
+                        if p:IsA("BasePart") then p.CanCollide = false end
+                    end
+                end
+            end)
+        elseif conn.Noclip then
+            conn.Noclip:Disconnect()
+            conn.Noclip = nil
+        end
+    end
+})
+playerSec:Space()
+playerSec:Toggle({
+    Title = "Inf Jump",
+    Value = cfg.InfJump,
+    Callback = function(v)
+        cfg.InfJump = v
+        if v then
+            conn.Jump = uis.JumpRequest:Connect(function()
+                local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+                if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+            end)
+        elseif conn.Jump then
+            conn.Jump:Disconnect()
+            conn.Jump = nil
+        end
+    end
+})
+playerSec:Space()
+playerSec:Toggle({
+    Title = "Invisible",
+    Value = cfg.Invis,
+    Callback = function(v)
+        cfg.Invis = v
+        local char = lp.Character
+        if not char then return end
+        if v then
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+                    p.LocalTransparencyModifier = 0.8
+                end
+            end
+            local pos = char.HumanoidRootPart.Position
+            makeChair(pos)
+            char.HumanoidRootPart.CFrame = CFrame.new(0, 500, 0)
+            randWait(0.05, 0.15)
+            char.HumanoidRootPart.CFrame = CFrame.new(pos)
+        else
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    p.LocalTransparencyModifier = 0
+                end
+            end
+            if chair then chair:Destroy() chair = nil end
+        end
+    end
+})
+playerSec:Space()
+playerSec:Toggle({
+    Title = "Spin Bot",
+    Value = cfg.Spin,
+    Callback = function(v)
+        cfg.Spin = v
+        spinToggle(v)
+    end
+})
+playerSec:Space()
+playerSec:Slider({
+    Title = "Spin Speed",
+    Value = { Min = 10, Max = 500, Default = cfg.SpinSpd },
+    Callback = function(v)
+        cfg.SpinSpd = v
+        if cfg.Spin then spinToggle(true) end
+    end
+})
+
+local tagSec = tagTab:Section({ Title = "Tag" })
+tagSec:Button({
+    Title = "TP to Tagged",
+    Icon = "target",
+    Callback = function()
+        local root = getTaggedRoot()
+        if root then safeTeleport(root.CFrame * CFrame.new(0,3,0)) end
+    end
+})
+tagSec:Space()
+tagSec:Button({
+    Title = "TP Back after 1s",
+    Icon = "repeat",
+    Callback = function() tpBackLater(1) end
+})
+tagSec:Space()
+tagSec:Toggle({
+    Title = "Instant Tag",
+    Desc = "blink to them and back",
+    Value = cfg.InstantTag,
+    Callback = function(v)
+        cfg.InstantTag = v
+        if v then
+            if conn.InstantTag then conn.InstantTag:Disconnect() end
+            conn.InstantTag = rs.Heartbeat:Connect(function()
+                if tagCooldown then return end
+                if cam.CameraSubject ~= (lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")) then return end
+                local char = lp.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if root and hum and hum.Health > 0 then
+                    local target = getTaggedRoot()
+                    if target then
+                        tagCooldown = true
+                        local old = root.CFrame
+                        local offset = Vector3.new(math.random(-10,10)/10, 0, math.random(-10,10)/10)
+                        safeTeleport(target.CFrame * CFrame.new(offset))
+                        randWait(0.05, 0.12)
+                        safeTeleport(old)
+                        randWait(0.3, 0.6)
+                        tagCooldown = false
+                    end
+                end
+            end)
+        elseif conn.InstantTag then
+            conn.InstantTag:Disconnect()
+            conn.InstantTag = nil
+        end
+    end
+})
+tagSec:Space()
+tagSec:Toggle({
+    Title = "Body Lock",
+    Desc = "face them smoothly",
+    Value = cfg.BodyLock,
+    Callback = function(v)
+        cfg.BodyLock = v
+        if v then
+            if conn.BodyLock then conn.BodyLock:Disconnect() end
+            conn.BodyLock = rs.Heartbeat:Connect(function()
+                local char = lp.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local target = getTaggedRoot()
+                    if target then
+                        local smooth = 0.15 + math.random() * 0.1
+                        local lookPos = Vector3.new(target.Position.X, root.Position.Y, target.Position.Z)
+                        root.CFrame = root.CFrame:Lerp(CFrame.lookAt(root.Position, lookPos), smooth)
+                    end
+                end
+            end)
+        elseif conn.BodyLock then
+            conn.BodyLock:Disconnect()
+            conn.BodyLock = nil
+        end
+    end
+})
+tagSec:Space()
+tagSec:Toggle({
+    Title = "Tag Aura",
+    Desc = "move to them smoothly",
+    Value = cfg.Aura,
+    Callback = function(v)
+        cfg.Aura = v
+        if v then
+            if conn.Aura then conn.Aura:Disconnect() end
+            conn.Aura = rs.Heartbeat:Connect(function()
+                local char = lp.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+                if cam.CameraSubject ~= (char and char:FindFirstChildOfClass("Humanoid")) then return end
+                for _, p in ipairs(plrs:GetPlayers()) do
+                    if p ~= lp and p.Character and isHighlighted(p.Character) then
+                        local target = p.Character:FindFirstChild("HumanoidRootPart")
+                        if target then
+                            local dist = (root.Position - target.Position).Magnitude
+                            if dist <= cfg.AuraRange and dist > 3 then
+                                local targetPos = target.CFrame * CFrame.new(0, 0, 1.5)
+                                root.CFrame = root.CFrame:Lerp(targetPos, 0.3)
+                            elseif dist <= 3 then
+                                root.CFrame = target.CFrame * CFrame.new(0, 0, 1.5)
+                            end
+                        end
+                    end
+                end
+            end)
+        elseif conn.Aura then
+            conn.Aura:Disconnect()
+            conn.Aura = nil
+        end
+    end
+})
+tagSec:Space()
+tagSec:Slider({
+    Title = "Aura Range",
+    Value = { Min = 10, Max = 50, Default = cfg.AuraRange },
+    Callback = function(v) cfg.AuraRange = v end
+})
+tagSec:Space()
+tagSec:Toggle({
+    Title = "Underground Godmode",
+    Desc = "go underground when tagged and someone gets close",
+    Value = cfg.GodMode,
+    Callback = function(v)
+        cfg.GodMode = v
+        if v then
+            if conn.GodMode then conn.GodMode:Disconnect() end
+            conn.GodMode = rs.Heartbeat:Connect(function()
+                local char = lp.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if not root or not isHighlighted(char) then return end
+                
+                local closestDist = 999
+                for _, p in pairs(plrs:GetPlayers()) do
+                    if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (root.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                        if dist < closestDist then closestDist = dist end
+                    end
+                end
+
+                if closestDist < 12 then
+                    root.CFrame = root.CFrame * CFrame.new(0, -cfg.Depth, 0)
+                    randWait(0.05, 0.15)
+                    root.CFrame = root.CFrame * CFrame.new(0, cfg.Depth, 0)
+                end
+            end)
+        elseif conn.GodMode then
+            conn.GodMode:Disconnect()
+            conn.GodMode = nil
+        end
+    end
+})
+tagSec:Space()
+tagSec:Slider({
+    Title = "Underground Depth",
+    Value = { Min = 5, Max = 20, Default = cfg.Depth },
+    Callback = function(v) cfg.Depth = v end
+})
+
+local tpSec = tpTab:Section({ Title = "Teleport" })
+tpSec:Button({
+    Title = "Teleport to Tagged",
+    Icon = "target",
+    Callback = function()
+        local root = getTaggedRoot()
+        if root then safeTeleport(root.CFrame * CFrame.new(0,3,0)) end
+    end
+})
+tpSec:Space()
+tpSec:Button({
+    Title = "Random Teleport",
+    Icon = "shuffle",
+    Callback = randomTP
+})
+tpSec:Space()
+tpSec:Toggle({
+    Title = "Auto Play (BETA)",
+    Desc = "chase tagged, run if you're it",
+    Value = cfg.AutoPlay,
+    Callback = function(v)
+        cfg.AutoPlay = v
+        if v then
+            if conn.AutoPlay then conn.AutoPlay:Disconnect() end
+            conn.AutoPlay = task.spawn(function()
+                while cfg.AutoPlay do
+                    if not isPathing then
+                        isPathing = true
+                        local char = lp.Character
+                        local root = char and char:FindFirstChild("HumanoidRootPart")
+                        local hum = char and char:FindFirstChildOfClass("Humanoid")
+                        if root and hum then
+                            if isHighlighted(char) then
+                                local away = root.Position * -1
+                                hum:MoveTo(Vector3.new(away.X, root.Position.Y, away.Z))
+                            else
+                                local target = getTaggedRoot()
+                                if target then
+                                    local success, err = pcall(function()
+                                        local path = ps:CreatePath({AgentCanJump = true})
+                                        path:ComputeAsync(root.Position, target.Position)
+                                        if path.Status == Enum.PathStatus.Success then
+                                            local wp = path:GetWaypoints()
+                                            for i = 1, math.min(3, #wp) do
+                                                if wp[i].Action == Enum.PathWaypointAction.Jump then hum.Jump = true end
+                                                hum:MoveTo(wp[i].Position)
+                                                hum.MoveToFinished:Wait(0.5)
+                                            end
+                                        else
+                                            hum:MoveTo(target.Position)
+                                        end
+                                    end)
+                                end
+                            end
+                        end
+                        isPathing = false
+                    end
+                    randWait(0.4, 0.6)
+                end
+            end)
+        elseif conn.AutoPlay then
+            task.cancel(conn.AutoPlay)
+            conn.AutoPlay = nil
+        end
+    end
+})
+tpSec:Space()
+local flingDropdown
+local function refreshFling()
+    local names = {}
+    for _, p in ipairs(plrs:GetPlayers()) do if p ~= lp then table.insert(names, p.Name) end end
+    if flingDropdown then flingDropdown:Refresh(names) end
+end
+flingDropdown = tpSec:Dropdown({ Title = "Fling Player", Values = {} })
+tpSec:Space()
+tpSec:Button({ Title = "Refresh List", Icon = "refresh", Callback = refreshFling })
+tpSec:Space()
+tpSec:Button({
+    Title = "Fling Selected",
+    Icon = "hand",
+    Color = red,
+    Callback = function()
+        local name = flingDropdown:GetValue()
+        if name then velocityFling(plrs:FindFirstChild(name)) end
+    end
+})
+tpSec:Space()
+tpSec:Button({
+    Title = "Fling Tagged",
+    Icon = "flag",
+    Color = purple,
+    Callback = function()
+        local p = getTagged()
+        if p then velocityFling(p) end
+    end
+})
+
+local settingsSec = settingsTab:Section({ Title = "Settings" })
+settingsSec:Keybind({
+    Title = "Toggle UI",
+    Value = "RightShift",
+    Callback = function() win:Toggle() end
+})
+settingsSec:Space()
+settingsSec:Button({
+    Title = "Rejoin",
+    Icon = "refresh",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, lp)
+    end
+})
+settingsSec:Space()
+settingsSec:Button({
+    Title = "Server Hop",
+    Icon = "globe",
+    Callback = function()
+        local req = request or http_request or syn.request
+        if req then
+            local res = req({
+                Url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?limit=100",
+                Method = "GET"
+            })
+            if res and res.StatusCode == 200 then
+                local data = hs:JSONDecode(res.Body)
+                for _, s in ipairs(data.data) do
+                    if s.playing < s.maxPlayers then
+                        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, s.id, lp)
+                        break
+                    end
+                end
+            end
+        end
+    end
+})
+settingsSec:Space()
+settingsSec:Button({
+    Title = "Destroy",
+    Color = Color3.fromHex("#ff4830"),
+    Icon = "trash",
+    Callback = function()
+        win:Destroy()
+        for _, c in pairs(conn) do
+            if type(c) == "thread" then task.cancel(c)
+            elseif c.Disconnect then c:Disconnect() end
+        end
+        if spinLoop then spinLoop:Disconnect() end
+        if chair then chair:Destroy() end
+    end
+})
+
+local function onChar(char)
+    task.wait(0.5)
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = cfg.Speed
+        hum.JumpPower = cfg.Jump
+    end
+    if cfg.Invis then
+        for _, p in ipairs(char:GetDescendants()) do
+            if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+                p.LocalTransparencyModifier = 0.8
+            end
+        end
+    end
+end
+
+lp.CharacterAdded:Connect(onChar)
+if lp.Character then onChar(lp.Character) end
+
+lp.Idled:Connect(function()
+    vu:CaptureController()
+    vu:Button1Down(Vector2.new(), workspace.CurrentCamera.CFrame)
+    task.wait(0.1)
+    vu:Button1Up(Vector2.new(), workspace.CurrentCamera.CFrame)
+end)
+
+refreshFling()
