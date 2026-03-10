@@ -1,0 +1,201 @@
+local player = game.Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+
+-- values
+local powerValue = 67
+local winsValue = 67
+local rebirthValue = 67
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "AbilityTester"
+gui.Parent = player:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 999999
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+-- main frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0,260,0,200)
+frame.Position = UDim2.new(0.7,0,0.2,0)
+frame.BackgroundColor3 = Color3.fromRGB(35,35,35)
+frame.BorderSizePixel = 0
+frame.Parent = gui
+
+Instance.new("UICorner",frame).CornerRadius = UDim.new(0,8)
+
+-- top bar
+local top = Instance.new("Frame")
+top.Size = UDim2.new(1,0,0,30)
+top.BackgroundColor3 = Color3.fromRGB(25,25,25)
+top.BorderSizePixel = 0
+top.Parent = frame
+
+Instance.new("UICorner",top).CornerRadius = UDim.new(0,8)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,-70,1,0)
+title.Position = UDim2.new(0,10,0,0)
+title.Text = "Ability Tester"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 18
+title.Parent = top
+
+-- close button
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0,30,1,0)
+close.Position = UDim2.new(1,-30,0,0)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(180,50,50)
+close.TextColor3 = Color3.new(1,1,1)
+close.Parent = top
+
+close.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
+
+-- minimize button
+local minimize = Instance.new("TextButton")
+minimize.Size = UDim2.new(0,30,1,0)
+minimize.Position = UDim2.new(1,-60,0,0)
+minimize.Text = "-"
+minimize.BackgroundColor3 = Color3.fromRGB(70,70,70)
+minimize.TextColor3 = Color3.new(1,1,1)
+minimize.Parent = top
+
+-- floating circle
+local circle = Instance.new("TextButton")
+circle.Size = UDim2.new(0,55,0,55)
+circle.Position = UDim2.new(0.8,0,0.35,0)
+circle.Text = "67"
+circle.BackgroundColor3 = Color3.fromRGB(40,40,40)
+circle.TextColor3 = Color3.new(1,1,1)
+circle.Visible = false
+circle.Parent = gui
+
+Instance.new("UICorner",circle).CornerRadius = UDim.new(1,0)
+
+circle.MouseButton1Click:Connect(function()
+	frame.Visible = true
+	circle.Visible = false
+end)
+
+minimize.MouseButton1Click:Connect(function()
+	frame.Visible = false
+	circle.Visible = true
+end)
+
+-- smooth dragging
+local function makeDraggable(object)
+
+	local dragging = false
+	local dragStart
+	local startPos
+
+	object.InputBegan:Connect(function(input)
+
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+
+			dragging = true
+			dragStart = input.Position
+			startPos = object.Position
+
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+
+		end
+
+	end)
+
+	UIS.InputChanged:Connect(function(input)
+
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+
+			local delta = input.Position - dragStart
+
+			object.Position = UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset + delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset + delta.Y
+			)
+
+		end
+
+	end)
+
+end
+
+makeDraggable(frame)
+makeDraggable(circle)
+
+-- button creator
+local function createButton(name,value,pos,remote)
+
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1,-20,0,40)
+	button.Position = UDim2.new(0,10,0,pos)
+	button.Text = name.." ("..tostring(value)..")"
+	button.BackgroundColor3 = Color3.fromRGB(60,60,60)
+	button.TextColor3 = Color3.new(1,1,1)
+	button.Font = Enum.Font.SourceSansBold
+	button.TextSize = 18
+	button.Parent = frame
+
+	Instance.new("UICorner",button).CornerRadius = UDim.new(0,6)
+
+	local currentValue = value
+
+	button.MouseButton1Click:Connect(function()
+		game:GetService("ReplicatedStorage").Events.AddValue:FireServer(remote,currentValue,true)
+	end)
+
+	button.MouseButton2Click:Connect(function()
+
+		local edit = Instance.new("TextBox")
+		edit.Size = UDim2.new(1,-20,0,35)
+		edit.Position = UDim2.new(0,10,1,-40)
+		edit.PlaceholderText = "Enter number or math.huge"
+		edit.Text = ""
+		edit.BackgroundColor3 = Color3.fromRGB(50,50,50)
+		edit.TextColor3 = Color3.new(1,1,1)
+		edit.Parent = frame
+
+		Instance.new("UICorner",edit).CornerRadius = UDim.new(0,6)
+
+		edit:CaptureFocus()
+
+		edit.FocusLost:Connect(function(enter)
+
+			if enter then
+
+				if edit.Text == "math.huge" then
+					currentValue = math.huge
+				else
+					local num = tonumber(edit.Text)
+					if num then
+						currentValue = num
+					end
+				end
+
+				button.Text = name.." ("..tostring(currentValue)..")"
+			end
+
+			edit:Destroy()
+
+		end)
+
+	end)
+
+end
+
+-- buttons
+createButton("Power",powerValue,50,"Power")
+createButton("Wins",winsValue,95,"Wins")
+createButton("Rebirths",rebirthValue,140,"Rebirths")
