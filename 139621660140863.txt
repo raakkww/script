@@ -1,0 +1,956 @@
+warn("script will be started in start quickly. . . <3")
+print("loading locals...")
+local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RepStorage = game:GetService("ReplicatedStorage")
+local PromptService = game:GetService("ProximityPromptService")
+local TweenService = game:GetService("TweenService")
+
+local me = Players.LocalPlayer
+
+-- remotes
+local remotesFolder = RepStorage:WaitForChild("Remotes")
+local dropRemote = remotesFolder:WaitForChild("ScrapDrop")
+local eatRemote = RepStorage:WaitForChild("FoodEatRequest")
+
+-- configs
+local safeHeight = 20
+local walkSpeed = 16
+local hipHeight = 2
+
+local originalMapPos = nil
+local originalMapCFrame = nil
+local originalMainPart = nil
+local grindThread = nil
+
+local highlightGroups = {
+	{
+		Path = {"ProcGenGenerated","ProcGenItems"},
+		Color = Color3.fromRGB(0,255,0)
+	},
+	{
+		Path = {"ProcGenGenerated"},
+		TargetName = "Reviver",
+		Color = Color3.fromRGB(0,255,0)
+	},
+	{
+		Path = {"ProcGenGenerated"},
+		TargetName = "Shard",
+		Color = Color3.fromRGB(0,0,255)
+	},
+	{
+		Path = {"Monsters"},
+		Color = Color3.fromRGB(255,0,0)
+	},
+	{
+		Path = {"PlacedTiles","Map"},
+		Color = Color3.fromRGB(0,255,255)
+	}
+}
+
+-- foods
+local yummyFood = {
+	Carrot = true,
+	Ham = true
+}
+
+local activeHighlights = {}
+local highlighting = false
+local grinding = false
+local lastMapPosition = nil
+local minimized = false
+
+-- gui
+local gui = Instance.new("ScreenGui")
+gui.Name = "yunai"
+gui.ResetOnSpawn = false
+gui.Parent = me:WaitForChild("PlayerGui")
+
+local mainBox = Instance.new("Frame")
+mainBox.Size = UDim2.new(0, 220, 0, 275)
+mainBox.Position = UDim2.new(0, 10, 0, 10)
+mainBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainBox.Active = true
+mainBox.Draggable = true
+mainBox.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 6)
+corner.Parent = mainBox
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainBox
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 6)
+titleCorner.Parent = titleBar
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -30, 1, 0)
+titleText.Position = UDim2.new(0, 10, 0, 0)
+titleText.Text = "Yunai Script v1 - Press T Remove"
+titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.BackgroundTransparency = 1
+titleText.Font = Enum.Font.GothamBold
+titleText.TextSize = 12
+titleText.Parent = titleBar
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+minimizeBtn.Position = UDim2.new(1, -25, 0, 5)
+minimizeBtn.Text = "â"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 16
+minimizeBtn.Parent = titleBar
+
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0, 4)
+minCorner.Parent = minimizeBtn
+
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -20, 1, -40)
+contentFrame.Position = UDim2.new(0, 10, 0, 35)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = mainBox
+
+local speedTitle = Instance.new("TextLabel")
+speedTitle.Size = UDim2.new(1, 0, 0, 20)
+speedTitle.Position = UDim2.new(0, 0, 0, 0)
+speedTitle.Text = "Walk Speed (1-64)"
+speedTitle.TextColor3 = Color3.fromRGB(200, 200, 255)
+speedTitle.TextXAlignment = Enum.TextXAlignment.Left
+speedTitle.BackgroundTransparency = 1
+speedTitle.Font = Enum.Font.GothamSemibold
+speedTitle.TextSize = 13
+speedTitle.Parent = contentFrame
+
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(1, 0, 0, 25)
+speedBox.Position = UDim2.new(0, 0, 0, 22)
+speedBox.Text = "16"
+speedBox.PlaceholderText = "16"
+speedBox.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBox.Font = Enum.Font.Gotham
+speedBox.TextSize = 13
+speedBox.ClearTextOnFocus = false
+speedBox.Parent = contentFrame
+
+local speedCorner = Instance.new("UICorner")
+speedCorner.CornerRadius = UDim.new(0, 4)
+speedCorner.Parent = speedBox
+
+local hipTitle = Instance.new("TextLabel")
+hipTitle.Size = UDim2.new(1, 0, 0, 20)
+hipTitle.Position = UDim2.new(0, 0, 0, 60)
+hipTitle.Text = "Hip Height (0-6) - 2 is best"
+hipTitle.TextColor3 = Color3.fromRGB(200, 200, 255)
+hipTitle.TextXAlignment = Enum.TextXAlignment.Left
+hipTitle.BackgroundTransparency = 1
+hipTitle.Font = Enum.Font.GothamSemibold
+hipTitle.TextSize = 13
+hipTitle.Parent = contentFrame
+
+local hipBox = Instance.new("TextBox")
+hipBox.Size = UDim2.new(1, 0, 0, 25)
+hipBox.Position = UDim2.new(0, 0, 0, 82)
+hipBox.Text = "2"
+hipBox.PlaceholderText = "2"
+hipBox.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+hipBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+hipBox.Font = Enum.Font.Gotham
+hipBox.TextSize = 13
+hipBox.ClearTextOnFocus = false
+hipBox.Parent = contentFrame
+
+local hipCorner = Instance.new("UICorner")
+hipCorner.CornerRadius = UDim.new(0, 4)
+hipCorner.Parent = hipBox
+
+local highlightButton = Instance.new("TextButton")
+highlightButton.Size = UDim2.new(0.45, -5, 0, 30)
+highlightButton.Position = UDim2.new(0, 0, 0, 120)
+highlightButton.Text = "HighLight OFF"
+highlightButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+highlightButton.BackgroundColor3 = Color3.fromRGB(60, 60, 160)
+highlightButton.Font = Enum.Font.GothamBold
+highlightButton.TextSize = 12
+highlightButton.Parent = contentFrame
+
+local highlightCorner = Instance.new("UICorner")
+highlightCorner.CornerRadius = UDim.new(0, 4)
+highlightCorner.Parent = highlightButton
+
+local grindButton = Instance.new("TextButton")
+grindButton.Size = UDim2.new(0.45, -5, 0, 30)
+grindButton.Position = UDim2.new(0.55, 5, 0, 120)
+grindButton.Text = "AutoGrind OFF"
+grindButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+grindButton.BackgroundColor3 = Color3.fromRGB(160, 60, 60)
+grindButton.Font = Enum.Font.GothamBold
+grindButton.TextSize = 12
+grindButton.Parent = contentFrame
+
+local grindCorner = Instance.new("UICorner")
+grindCorner.CornerRadius = UDim.new(0, 4)
+grindCorner.Parent = grindButton
+
+local statusBg = Instance.new("Frame")
+statusBg.Size = UDim2.new(1, 0, 0, 45)
+statusBg.Position = UDim2.new(0, 0, 0, 160)
+statusBg.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+statusBg.Parent = contentFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 4)
+statusCorner.Parent = statusBg
+
+local statusText = Instance.new("TextLabel")
+statusText.Size = UDim2.new(1, -10, 0, 20)
+statusText.Position = UDim2.new(0, 5, 0, 5)
+statusText.Text = "Ready"
+statusText.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusText.TextXAlignment = Enum.TextXAlignment.Left
+statusText.BackgroundTransparency = 1
+statusText.Font = Enum.Font.Gotham
+statusText.TextSize = 12
+statusText.Parent = statusBg
+
+local currentValues = Instance.new("TextLabel")
+currentValues.Size = UDim2.new(1, -10, 0, 15)
+currentValues.Position = UDim2.new(0, 5, 0, 25)
+currentValues.Text = "Speed: 16 | Hip: 2"
+currentValues.TextColor3 = Color3.fromRGB(150, 150, 150)
+currentValues.TextXAlignment = Enum.TextXAlignment.Left
+currentValues.BackgroundTransparency = 1
+currentValues.Font = Enum.Font.Gotham
+currentValues.TextSize = 11
+currentValues.Parent = statusBg
+
+local ownerButton = Instance.new("TextButton")
+ownerButton.Size = UDim2.new(1, -10, 0, 20)
+ownerButton.Position = UDim2.new(0, 5, 0, 210)
+ownerButton.Text = "For Owner"
+ownerButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+ownerButton.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+ownerButton.Font = Enum.Font.Gotham
+ownerButton.TextSize = 10
+ownerButton.Parent = contentFrame
+
+local ownerButton = Instance.new("TextButton")
+ownerButton.Size = UDim2.new(1, -10, 0, 20)
+ownerButton.Position = UDim2.new(0, 5, 0, 210)
+ownerButton.Text = "For Owner or Dev's Message"
+ownerButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+ownerButton.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+ownerButton.Font = Enum.Font.Gotham
+ownerButton.TextSize = 10
+ownerButton.Parent = contentFrame
+
+local ownerCorner = Instance.new("UICorner")
+ownerCorner.CornerRadius = UDim.new(0, 4)
+ownerCorner.Parent = ownerButton
+
+-- basic basic functions
+minimizeBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	
+	local targetSize = minimized and UDim2.new(0, 220, 0, 30) or UDim2.new(0, 220, 0, 275)
+	local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	
+	local tween = TweenService:Create(mainBox, tweenInfo, {Size = targetSize})
+	tween:Play()
+	
+	contentFrame.Visible = not minimized
+	minimizeBtn.Text = minimized and "+" or "â"
+end)
+
+local function showNotification(msg, duration)
+	local notification = Instance.new("Frame")
+	notification.Size = UDim2.new(0, 400, 0, 60)
+	notification.Position = UDim2.new(0.5, -200, 0, -70)
+	notification.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+	notification.BackgroundTransparency = 0.2
+	notification.Parent = gui
+	
+	local notifCorner = Instance.new("UICorner")
+	notifCorner.CornerRadius = UDim.new(0, 8)
+	notifCorner.Parent = notification
+	
+	local notifText = Instance.new("TextLabel")
+	notifText.Size = UDim2.new(1, -20, 1, 0)
+	notifText.Position = UDim2.new(0, 10, 0, 0)
+	notifText.Text = msg
+	notifText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	notifText.BackgroundTransparency = 1
+	notifText.Font = Enum.Font.GothamSemibold
+	notifText.TextSize = 16
+	notifText.Parent = notification
+	
+	local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local slideIn = TweenService:Create(notification, tweenInfo, {Position = UDim2.new(0.5, -200, 0, 20)})
+	slideIn:Play()
+	
+	task.wait(duration or 3)
+	
+	local fadeOut = TweenService:Create(notification, tweenInfo, {BackgroundTransparency = 1, Position = UDim2.new(0.5, -200, 0, -70)})
+	fadeOut:Play()
+	
+	task.wait(0.3)
+	notification:Destroy()
+end
+
+-- char stat
+local function updateCharacterStats()
+	local char = me.Character
+	if not char then return end
+	
+	local humanoid = char:FindFirstChild("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = walkSpeed
+		humanoid.HipHeight = hipHeight
+		
+		currentValues.Text = "Speed: " .. walkSpeed .. " | Hip: " .. hipHeight
+	end
+end
+
+-- speed
+speedBox.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		local newSpeed = tonumber(speedBox.Text)
+		if newSpeed then
+			walkSpeed = math.clamp(newSpeed, 1, 64)
+			speedBox.Text = tostring(walkSpeed)
+			updateCharacterStats()
+			statusText.Text = "Speed set to: " .. walkSpeed
+			
+			if walkSpeed == 16 then
+				me.PlayerScripts.SprintClient.Disabled = false
+			else
+				me.PlayerScripts.SprintClient.Disabled = true
+			end
+		else
+			speedBox.Text = tostring(walkSpeed)
+			statusText.Text = "Invalid speed value"
+		end
+	end
+end)
+
+-- hipheight
+hipBox.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		local newHip = tonumber(hipBox.Text)
+		if newHip then
+			hipHeight = math.clamp(newHip, 0, 6)
+			hipBox.Text = tostring(hipHeight)
+			updateCharacterStats()
+			statusText.Text = "Hip Height set to: " .. hipHeight
+		else
+			hipBox.Text = tostring(hipHeight)
+			statusText.Text = "Invalid hip height value"
+		end
+	end
+end)
+
+-- respawn
+me.CharacterAdded:Connect(function(char)
+	task.wait(1)
+	updateCharacterStats()
+end)
+
+if me.Character then
+	task.wait(1)
+	updateCharacterStats()
+end
+
+-- safe place
+local function findMapModel()
+	local tiles = workspace:FindFirstChild("PlacedTiles")
+	if tiles then
+		return tiles:FindFirstChild("Map")
+	end
+	return nil
+end
+
+local function setMapCenter()
+	local map = findMapModel()
+	if not map then return false end
+	
+	local function findAnyPart(model)
+		for _, thing in ipairs(model:GetChildren()) do
+			if thing:IsA("BasePart") then
+				return thing
+			elseif thing:IsA("Model") then
+				local found = findAnyPart(thing)
+				if found then return found end
+			end
+		end
+		return nil
+	end
+	
+	local part = findAnyPart(map)
+	if part then
+		originalMainPart = map.PrimaryPart
+		map.PrimaryPart = part
+		return true
+	end
+	return false
+end
+
+local function liftMap()
+	local map = findMapModel()
+	if not map then 
+		statusText.Text = "cant find map bro"
+		return false 
+	end
+	
+	if not setMapCenter() then
+		statusText.Text = "cant set map center rip"
+		return false
+	end
+	
+	originalMapCFrame = map:GetPrimaryPartCFrame()
+	originalMapPos = originalMapCFrame.Position
+	local newPos = originalMapCFrame.Position + Vector3.new(0, safeHeight, 0)
+	map:SetPrimaryPartCFrame(CFrame.new(newPos))
+	lastMapPosition = newPos
+	statusText.Text = "map lifted " .. safeHeight .. " units"
+	return true
+end
+
+local function dropMap()
+	local map = findMapModel()
+	if map and originalMapCFrame then
+		map:SetPrimaryPartCFrame(originalMapCFrame)
+		if originalMainPart then
+			map.PrimaryPart = originalMainPart
+		end
+		lastMapPosition = originalMapCFrame.Position
+		originalMapCFrame = nil
+		originalMainPart = nil
+		statusText.Text = "map back to normal"
+	end
+end
+
+-- check quota
+local function quotaDone()
+	local roundStuff = RepStorage:FindFirstChild("RoundReplicated")
+	if roundStuff then
+		local quota = roundStuff:FindFirstChild("QuotaMet")
+		if quota then
+			return quota.Value
+		end
+	end
+	return false
+end
+
+-- find items
+local function findStuffToSell()
+	local stuff = {}
+	
+	local carrot = workspace:FindFirstChild("Carrot")
+	if carrot then
+		table.insert(stuff, {
+			obj = carrot,
+			type = "Carrot"
+		})
+	end
+	
+	local upgradeFolder = workspace:FindFirstChild("SpawnedUpgradeItems")
+	if upgradeFolder then
+		for _, item in ipairs(upgradeFolder:GetChildren()) do
+			if item:IsA("BasePart") or item:IsA("Model") or item:IsA("Tool") then
+				table.insert(stuff, {
+					obj = item,
+					type = "UpgradeItem"
+				})
+			end
+		end
+	end
+	
+	return stuff
+end
+
+-- basic functions
+local function getMyHealth()
+	local char = me.Character
+	if not char then return 100 end
+	
+	local human = char:FindFirstChild("Humanoid")
+	if human then
+		return human.Health
+	end
+	return 100
+end
+
+local function playerCount()
+	return #Players:GetPlayers()
+end
+
+local function getTargetObj(obj)
+	if obj:IsA("Tool") then
+		return obj:FindFirstChild("Handle")
+	elseif obj:IsA("Model") or obj:IsA("BasePart") then
+		return obj
+	end
+	return nil
+end
+
+local function addHighlightTo(obj, color)
+	if not highlighting then return end
+	if activeHighlights[obj] then return end
+	local target = getTargetObj(obj)
+	if not target then return end
+	
+	local h = Instance.new("Highlight")
+	h.Name = "yunai"
+	h.FillColor = color
+	h.FillTransparency = 0.4
+	h.OutlineTransparency = 0
+	h.Parent = target
+	activeHighlights[obj] = h
+end
+
+local function removeHighlightFrom(obj)
+	if activeHighlights[obj] then
+		activeHighlights[obj]:Destroy()
+		activeHighlights[obj] = nil
+	end
+end
+
+local function checkPath(obj, path)
+	local current = obj.Parent
+	for i = #path, 1, -1 do
+		if not current or current.Name ~= path[i] then
+			return false
+		end
+		current = current.Parent
+	end
+	return true
+end
+
+local function checkObj(obj)
+	if not highlighting then return end
+	
+	for _, group in ipairs(highlightGroups) do
+		if group.TargetName then
+			if obj.Name == group.TargetName then
+				if group.Path then
+					if checkPath(obj, group.Path) then
+						addHighlightTo(obj, group.Color)
+						return
+					end
+				else
+					addHighlightTo(obj, group.Color)
+					return
+				end
+			end
+		else
+			if checkPath(obj, group.Path) then
+				addHighlightTo(obj, group.Color)
+				return
+			end
+		end
+	end
+	removeHighlightFrom(obj)
+end
+
+local function findPrompt(item)
+	local function search(thing)
+		for _, child in ipairs(thing:GetChildren()) do
+			if child:IsA("ProximityPrompt") then
+				return child
+			end
+			local found = search(child)
+			if found then return found end
+		end
+		return nil
+	end
+	return search(item)
+end
+
+local function triggerPrompt(prompt)
+	if prompt and prompt:IsA("ProximityPrompt") then
+		prompt:InputHoldBegin()
+		task.wait(prompt.HoldDuration or 0)
+		prompt:InputHoldEnd()
+		statusText.Text = "prompt triggered"
+		return true
+	end
+	return false
+end
+
+local function getMapPos()
+	if lastMapPosition then
+		return lastMapPosition + Vector3.new(0, 5, 0)
+	end
+	
+	local map = findMapModel()
+	if map then
+		local pos = map:GetPivot().Position + Vector3.new(0, 5, 0)
+		lastMapPosition = map:GetPivot().Position
+		return pos
+	end
+	return nil
+end
+
+local function getSellPos()
+	local tiles = workspace:FindFirstChild("PlacedTiles")
+	if tiles then
+		local sell = tiles:FindFirstChild("SellStation")
+		return sell and sell:GetPivot().Position or nil
+	end
+	return nil
+end
+
+local function tp(where)
+	local char = me.Character
+	if char and char:FindFirstChild("HumanoidRootPart") then
+		char.HumanoidRootPart.CFrame = CFrame.new(where)
+		return true
+	end
+	return false
+end
+
+local function findTargets()
+	local targets = {}
+	
+	local procGen = workspace:FindFirstChild("ProcGenGenerated")
+	if procGen then
+		local itemsFolder = procGen:FindFirstChild("ProcGenItems")
+		if itemsFolder then
+			for _, item in ipairs(itemsFolder:GetChildren()) do
+				if item:IsA("BasePart") or item:IsA("Model") or item:IsA("Tool") then
+					table.insert(targets, {
+						obj = item,
+						type = "ProcGenItems"
+					})
+				end
+			end
+		end
+	end
+	
+	local function findRevivers(where)
+		for _, child in ipairs(where:GetChildren()) do
+			if child.Name == "Reviver" then
+				table.insert(targets, {
+					obj = child,
+					type = "Reviver"
+				})
+			elseif child:IsA("Model") or child:IsA("Folder") then
+				findRevivers(child)
+			end
+		end
+	end
+	
+	if procGen then
+		findRevivers(procGen)
+	end
+	
+	local function findShards(where)
+		for _, child in ipairs(where:GetChildren()) do
+			if child.Name == "Shard" then
+				table.insert(targets, {
+					obj = child,
+					type = "Shard"
+				})
+			elseif child:IsA("Model") or child:IsA("Folder") then
+				findShards(child)
+			end
+		end
+	end
+	
+	if procGen then
+		findShards(procGen)
+	end
+	
+	return targets
+end
+
+local function sellThis(item)
+	if not item or not item.Parent then return false end
+	
+	local itemPos = item:IsA("Model") and item:GetPivot().Position or item.Position
+	
+	tp(itemPos + Vector3.new(0, 2, 0))
+	task.wait(0.25)
+	
+	local prompt = findPrompt(item)
+	if prompt then
+		triggerPrompt(prompt)
+		task.wait(0.25)
+	end
+	
+	local sellPos = getSellPos()
+	if sellPos then
+		tp(sellPos + Vector3.new(0, 0, -2))
+		task.wait(0.25)
+		
+		local sellStation = workspace:FindFirstChild("PlacedTiles") and 
+						   workspace.PlacedTiles:FindFirstChild("SellStation")
+		if sellStation then
+			local sellPrompt = findPrompt(sellStation)
+			if sellPrompt then
+				triggerPrompt(sellPrompt)
+				return true
+			end
+		end
+	end
+	
+	return false
+end
+
+local function grindLoop()
+	while grinding do
+		local targets = findTargets()
+		local mapPos = getMapPos()
+		local sellPos = getSellPos()
+		local playersOnline = playerCount()
+		
+		if not mapPos or not sellPos then
+			statusText.Text = "map or sell station?? where"
+			task.wait(2)
+		elseif #targets == 0 then
+			if not quotaDone() then
+				statusText.Text = "quota not met, selling random stuff..."
+				
+				local sellable = findStuffToSell()
+				if #sellable > 0 then
+					for _, data in ipairs(sellable) do
+						if not grinding then break end
+						
+						statusText.Text = "selling: " .. data.obj.Name
+						local worked = sellThis(data.obj)
+						
+						if worked then
+							task.wait(0.5)
+						end
+						
+						if quotaDone() then
+							statusText.Text = "quota done!"
+							break
+						end
+					end
+				else
+					statusText.Text = "nothing to sell, waiting..."
+				end
+			else
+				statusText.Text = "quota done, waiting..."
+			end
+			
+			tp(mapPos)
+			task.wait(3)
+		else
+			for _, data in ipairs(targets) do
+				if not grinding then break end
+				
+				local thing = data.obj
+				if not thing or not thing.Parent then continue end
+				
+				statusText.Text = "doing: " .. thing.Name .. " (" .. data.type .. ")"
+				
+				local ogPos = thing:IsA("Model") and thing:GetPivot().Position or thing.Position
+				
+				tp(ogPos + Vector3.new(0, 2, 0))
+				task.wait(0.25)
+				
+				local prompt = findPrompt(thing)
+				if prompt then
+					triggerPrompt(prompt)
+					task.wait(0.25)
+				end
+				
+				if data.type == "Reviver" then
+					if playersOnline <= 1 then
+						statusText.Text = "solo mode, selling reviver"
+						tp(sellPos + Vector3.new(0, 0, -2))
+						task.wait(0.25)
+						
+						local sellStation = workspace:FindFirstChild("PlacedTiles") and 
+										   workspace.PlacedTiles:FindFirstChild("SellStation")
+						if sellStation then
+							local sellPrompt = findPrompt(sellStation)
+							if sellPrompt then
+								triggerPrompt(sellPrompt)
+							end
+						end
+					else
+						statusText.Text = "multiplayer mode, dropping to map"
+						tp(mapPos)
+						task.wait(0.25)
+						
+						dropRemote:FireServer()
+					end
+					
+				elseif data.type == "Shard" then
+					statusText.Text = "activating shard"
+					task.wait(0.25)
+					thing:Destroy()
+					tp(mapPos)
+					
+				else
+					if yummyFood[thing.Name] then
+						local hp = getMyHealth()
+						
+						if hp < 100 then
+							statusText.Text = "hp " .. hp .. ", eating " .. thing.Name
+							tp(mapPos)
+							task.wait(0.25)
+							eatRemote:FireServer()
+							task.wait(1)
+						else
+							statusText.Text = "full hp, selling " .. thing.Name
+							tp(sellPos + Vector3.new(0, 0, -2))
+							task.wait(0.25)
+							
+							local sellStation = workspace:FindFirstChild("PlacedTiles") and 
+											   workspace.PlacedTiles:FindFirstChild("SellStation")
+							if sellStation then
+								local sellPrompt = findPrompt(sellStation)
+								if sellPrompt then
+									triggerPrompt(sellPrompt)
+								end
+							end
+						end
+					else
+						statusText.Text = "selling " .. thing.Name
+						tp(sellPos + Vector3.new(0, 0, -2))
+						task.wait(0.25)
+						
+						local sellStation = workspace:FindFirstChild("PlacedTiles") and 
+										   workspace.PlacedTiles:FindFirstChild("SellStation")
+						if sellStation then
+							local sellPrompt = findPrompt(sellStation)
+							if sellPrompt then
+								triggerPrompt(sellPrompt)
+							end
+						end
+					end
+				end
+				
+				task.wait(0.5)
+			end
+			
+			tp(mapPos)
+			task.wait(2)
+		end
+	end
+end
+
+-- buttons
+highlightButton.MouseButton1Click:Connect(function()
+	highlighting = not highlighting
+	
+	if highlighting then
+		highlightButton.Text = "HighLight ON"
+		highlightButton.BackgroundColor3 = Color3.fromRGB(80, 80, 200)
+		statusText.Text = "highlight on"
+		
+		for _, v in ipairs(workspace:GetDescendants()) do
+			checkObj(v)
+		end
+		
+		workspace.DescendantAdded:Connect(function(obj)
+			task.wait(0.1)
+			if obj and obj.Parent then
+				checkObj(obj)
+			end
+		end)
+		
+	else
+		highlightButton.Text = "HighLight OFF"
+		highlightButton.BackgroundColor3 = Color3.fromRGB(60, 60, 160)
+		statusText.Text = "highlight off"
+		
+		for obj,h in pairs(activeHighlights) do
+			h:Destroy()
+		end
+		activeHighlights = {}
+	end
+end)
+
+grindButton.MouseButton1Click:Connect(function()
+    grinding = not grinding
+    
+    if grinding then
+        grindButton.Text = "AutoGrind ON"
+        grindButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+        statusText.Text = "auto grind starting..."
+        showNotification("AutoGrind On - Please look down or not works ^-^", 3)
+        
+        liftMap()
+        task.wait(0.5)
+
+        if grindThread then
+            task.cancel(grindThread)
+        end
+
+        grindThread = task.spawn(function()
+            grindLoop()
+        end)
+    else
+        grindButton.Text = "AutoGrind OFF"
+        grindButton.BackgroundColor3 = Color3.fromRGB(160, 60, 60)
+        statusText.Text = "auto grind stopped"
+
+        if grindThread then
+            task.cancel(grindThread)
+            grindThread = nil
+        end
+        
+        dropMap()
+        task.wait(0.5)
+        
+        local mapPos = getMapPos()
+        if mapPos then
+            tp(mapPos)
+            statusText.Text = "teleported back to map"
+        end
+    end
+end)
+
+ownerButton.MouseButton1Click:Connect(function()
+	showNotification("pls hire me as a scripter, the game is great tbh :D", 4)
+end)
+
+-- functions
+workspace.DescendantAdded:Connect(function(obj)
+	checkObj(obj)
+end)
+
+workspace.DescendantRemoving:Connect(function(obj)
+	removeHighlightFrom(obj)
+end)
+-- T key to kill script
+UIS.InputBegan:Connect(function(input, typed)
+	if typed then return end
+	if input.KeyCode == Enum.KeyCode.T then
+		highlighting = false
+		grinding = false
+		
+		dropMap()
+		
+		for obj,h in pairs(activeHighlights) do
+			h:Destroy()
+		end
+		
+		local char = me.Character
+		if char then
+			local humanoid = char:FindFirstChild("Humanoid")
+			if humanoid then
+				humanoid.WalkSpeed = 16
+				humanoid.HipHeight = 0
+			end
+		end
+		me.PlayerScripts.SprintClient.Disabled = false
+		gui:Destroy()
+		script:Destroy()
+	end
+end)
