@@ -1,0 +1,68 @@
+-- [[ ECLIPSE VIPER: PRO LOADER + CLEANUP ]] --
+
+local function Notify(title, text)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = title;
+        Text = text;
+        Duration = 5;
+    })
+end
+
+-- // PERFORMANCE GUI
+local function CreatePerfOverlay()
+    -- Check if it already exists to avoid duplicates
+    if game:GetService("CoreGui"):FindFirstChild("Eclipse_Perf") then
+        game:GetService("CoreGui").Eclipse_Perf:Destroy()
+    end
+
+    local PerfGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+    PerfGui.Name = "Eclipse_Perf"
+    PerfGui.ResetOnSpawn = false
+
+    local Container = Instance.new("Frame", PerfGui)
+    Container.Size = UDim2.new(0, 200, 0, 25)
+    Container.Position = UDim2.new(0.5, -100, 0, 5)
+    Container.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    Container.BackgroundTransparency = 0.6
+    Container.BorderSizePixel = 0
+    Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 6)
+
+    local StatsLabel = Instance.new("TextLabel", Container)
+    StatsLabel.Size = UDim2.new(1, 0, 1, 0)
+    StatsLabel.BackgroundTransparency = 1
+    StatsLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+    StatsLabel.Font = Enum.Font.Code
+    StatsLabel.TextSize = 14
+
+    local RunService = game:GetService("RunService")
+    local Stats = game:GetService("Stats")
+    
+    task.spawn(function()
+        -- This loop now checks if the main script is still running
+        while _G.Running do
+            local fps = math.floor(1 / RunService.RenderStepped:Wait())
+            local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+            StatsLabel.Text = "FPS: " .. fps .. " | PING: " .. ping .. "ms"
+            task.wait(1)
+        end
+        -- If _G.Running becomes false, destroy this GUI too
+        PerfGui:Destroy()
+    end)
+end
+
+-- // EXECUTION
+local Success, Error = pcall(function()
+    if not game:IsLoaded() then game.Loaded:Wait() end
+    
+    -- Load Main Script from your Pastebin
+    loadstring(game:HttpGet("https://pastebin.com/raw/GzFAqvxy"))()
+    
+    -- Create the Performance Overlay
+    CreatePerfOverlay()
+end)
+
+if Success then
+    Notify("Eclipse Viper", "Script & Overlay Active!")
+else
+    warn("Eclipse Viper Error: " .. tostring(Error))
+end
