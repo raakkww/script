@@ -1,0 +1,597 @@
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+-- 1. ЗАГРУЗКА
+
+local loadingGui = Instance.new("ScreenGui")
+
+loadingGui.Name = "LoadingGUI"
+
+loadingGui.Parent = player:WaitForChild("PlayerGui")
+
+local darkOverlay = Instance.new("Frame")
+
+darkOverlay.Size = UDim2.new(1, 0, 1, 0)
+
+darkOverlay.Position = UDim2.new(0, 0, 0, 0)
+
+darkOverlay.BackgroundColor3 = Color3.new(0, 0, 0)
+
+darkOverlay.BackgroundTransparency = 0.6
+
+darkOverlay.Parent = loadingGui
+
+local loadingFrame = Instance.new("Frame")
+
+loadingFrame.Size = UDim2.new(0, 250, 0, 90)
+
+loadingFrame.Position = UDim2.new(0.5, -125, 0.5, -45)
+
+loadingFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+
+loadingFrame.BackgroundTransparency = 0.1
+
+loadingFrame.Parent = loadingGui
+
+local loadCorner = Instance.new("UICorner")
+
+loadCorner.CornerRadius = UDim.new(0, 8)
+
+loadCorner.Parent = loadingFrame
+
+local loadText = Instance.new("TextLabel")
+
+loadText.Text = "LOADING"
+
+loadText.Size = UDim2.new(1, 0, 0, 30)
+
+loadText.Position = UDim2.new(0, 0, 0, 8)
+
+loadText.BackgroundTransparency = 1
+
+loadText.TextColor3 = Color3.fromRGB(220, 220, 255)
+
+loadText.Font = Enum.Font.GothamBold
+
+loadText.TextSize = 12
+
+loadText.Parent = loadingFrame
+
+local dotsLabel = Instance.new("TextLabel")
+
+dotsLabel.Text = ""
+
+dotsLabel.Size = UDim2.new(1, 0, 0, 20)
+
+dotsLabel.Position = UDim2.new(0, 0, 0, 40)
+
+dotsLabel.BackgroundTransparency = 1
+
+dotsLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+
+dotsLabel.Font = Enum.Font.GothamBold
+
+dotsLabel.TextSize = 18
+
+dotsLabel.Parent = loadingFrame
+
+local currentDots = 0
+
+local maxDots = 3
+
+local dotsDirection = 1
+
+spawn(function()
+
+    for i = 1, 4 do
+
+        wait(0.5)
+
+        
+
+        if dotsDirection == 1 then
+
+            currentDots = currentDots + 1
+
+            if currentDots >= maxDots then
+
+                dotsDirection = -1
+
+            end
+
+        else
+
+            currentDots = currentDots - 1
+
+            if currentDots <= 0 then
+
+                dotsDirection = 1
+
+            end
+
+        end
+
+        
+
+        local dots = ""
+
+        for i = 1, currentDots do
+
+            dots = dots .. "."
+
+        end
+
+        dotsLabel.Text = dots
+
+    end
+
+    
+
+    loadingGui:Destroy()
+
+end)
+
+wait(2)
+
+-- 2. ОСНОВНОЕ МЕНЮ
+
+local gui = Instance.new("ScreenGui")
+
+gui.Name = "TeleportGUI"
+
+gui.Parent = player:WaitForChild("PlayerGui")
+
+gui.ResetOnSpawn = false
+
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local frame = Instance.new("Frame")
+
+frame.Size = UDim2.new(0, 240, 0, 280)
+
+frame.Position = UDim2.new(0.5, -120, 0.5, -140)
+
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+
+frame.BackgroundTransparency = 0.1
+
+frame.Active = true
+
+frame.Draggable = true
+
+frame.Parent = gui
+
+local UICorner = Instance.new("UICorner")
+
+UICorner.CornerRadius = UDim.new(0, 8)
+
+UICorner.Parent = frame
+
+local title = Instance.new("TextLabel")
+
+title.Text = "TELEPORTER"
+
+title.Size = UDim2.new(1, 0, 0, 30)
+
+title.Position = UDim2.new(0, 0, 0, 0)
+
+title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+
+title.TextColor3 = Color3.fromRGB(255, 220, 100)
+
+title.Font = Enum.Font.GothamBold
+
+title.TextSize = 12
+
+title.Parent = frame
+
+local close = Instance.new("TextButton")
+
+close.Text = "X"
+
+close.Size = UDim2.new(0, 24, 0, 24)
+
+close.Position = UDim2.new(1, -28, 0, 3)
+
+close.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+
+close.TextColor3 = Color3.new(1, 1, 1)
+
+close.Font = Enum.Font.GothamBold
+
+close.TextSize = 12
+
+close.Parent = frame
+
+close.MouseButton1Click:Connect(function()
+
+    gui:Destroy()
+
+end)
+
+local status = Instance.new("TextLabel")
+
+status.Text = "⚫ READY"
+
+status.Size = UDim2.new(1, -10, 0, 18)
+
+status.Position = UDim2.new(0, 5, 0, 32)
+
+status.BackgroundTransparency = 1
+
+status.TextColor3 = Color3.fromRGB(200, 200, 200)
+
+status.Font = Enum.Font.Gotham
+
+status.TextSize = 10
+
+status.TextXAlignment = Enum.TextXAlignment.Left
+
+status.Parent = frame
+
+-- Чекбокс для авто-возврата
+
+local checkboxFrame = Instance.new("Frame")
+
+checkboxFrame.Size = UDim2.new(1, -10, 0, 22)
+
+checkboxFrame.Position = UDim2.new(0, 5, 0, 52)
+
+checkboxFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+
+checkboxFrame.BackgroundTransparency = 0.2
+
+checkboxFrame.Parent = frame
+
+local checkCorner = Instance.new("UICorner")
+
+checkCorner.CornerRadius = UDim.new(0, 4)
+
+checkCorner.Parent = checkboxFrame
+
+local checkbox = Instance.new("TextButton")
+
+checkbox.Text = "☑️ AUTO RETURN"
+
+checkbox.Size = UDim2.new(1, -10, 1, 0)
+
+checkbox.Position = UDim2.new(0, 5, 0, 0)
+
+checkbox.BackgroundTransparency = 1
+
+checkbox.TextColor3 = Color3.fromRGB(200, 255, 200)
+
+checkbox.Font = Enum.Font.Gotham
+
+checkbox.TextSize = 9
+
+checkbox.TextXAlignment = Enum.TextXAlignment.Left
+
+checkbox.Parent = checkboxFrame
+
+local autoReturn = true
+
+checkbox.MouseButton1Click:Connect(function()
+
+    autoReturn = not autoReturn
+
+    checkbox.Text = autoReturn and "☑️ AUTO RETURN" or "⬜ AUTO RETURN"
+
+end)
+
+-- Кнопка флага
+
+local flagBtn = Instance.new("TextButton")
+
+flagBtn.Text = "🚩 FLAG"
+
+flagBtn.Size = UDim2.new(1, -10, 0, 30)
+
+flagBtn.Position = UDim2.new(0, 5, 0, 78)
+
+flagBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+
+flagBtn.TextColor3 = Color3.new(1, 1, 1)
+
+flagBtn.Font = Enum.Font.GothamBold
+
+flagBtn.TextSize = 11
+
+flagBtn.Parent = frame
+
+local flagCorner = Instance.new("UICorner")
+
+flagCorner.CornerRadius = UDim.new(0, 5)
+
+flagCorner.Parent = flagBtn
+
+-- Кнопка TP All
+
+local tpAllBtn = Instance.new("TextButton")
+
+tpAllBtn.Text = "✨ TP ALL COINS"
+
+tpAllBtn.Size = UDim2.new(1, -10, 0, 30)
+
+tpAllBtn.Position = UDim2.new(0, 5, 0, 113)
+
+tpAllBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 200)
+
+tpAllBtn.TextColor3 = Color3.new(1, 1, 1)
+
+tpAllBtn.Font = Enum.Font.GothamBold
+
+tpAllBtn.TextSize = 11
+
+tpAllBtn.Parent = frame
+
+local tpAllCorner = Instance.new("UICorner")
+
+tpAllCorner.CornerRadius = UDim.new(0, 5)
+
+tpAllCorner.Parent = tpAllBtn
+
+-- Список монет
+
+local listFrame = Instance.new("ScrollingFrame")
+
+listFrame.Size = UDim2.new(1, -10, 0, 90)
+
+listFrame.Position = UDim2.new(0, 5, 0, 148)
+
+listFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+
+listFrame.BackgroundTransparency = 0.2
+
+listFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+listFrame.ScrollBarThickness = 4
+
+listFrame.Visible = false
+
+listFrame.Parent = frame
+
+local listCorner = Instance.new("UICorner")
+
+listCorner.CornerRadius = UDim.new(0, 5)
+
+listCorner.Parent = listFrame
+
+local coins = {}
+
+-- Функция NoClip
+
+local function enableNoClip()
+
+    local char = player.Character
+
+    if not char then return end
+
+    
+
+    for _, part in pairs(char:GetDescendants()) do
+
+        if part:IsA("BasePart") then
+
+            part.CanCollide = false
+
+        end
+
+    end
+
+end
+
+-- Функции телепорта с NoClip
+
+local function teleportToFlag()
+
+    local char = player.Character
+
+    if char and char:FindFirstChild("HumanoidRootPart") then
+
+        local flag = workspace.map and workspace.map:FindFirstChild("endzone")
+
+        if flag then
+
+            enableNoClip()
+
+            char:MoveTo(flag.Position)
+
+            status.Text = "✅ FLAG"
+
+            wait(1)
+
+            status.Text = "⚫ READY"
+
+        else
+
+            status.Text = "❌ NO FLAG"
+
+        end
+
+    end
+
+end
+
+local function teleportToCoin(coin)
+
+    local char = player.Character
+
+    if char and char:FindFirstChild("HumanoidRootPart") and coin then
+
+        local lastPos = char.HumanoidRootPart.Position
+
+        enableNoClip()
+
+        char:MoveTo(coin.Position)
+
+        wait(0.3)
+
+        if autoReturn then
+
+            enableNoClip()
+
+            char:MoveTo(lastPos)
+
+        end
+
+    end
+
+end
+
+local function scanForCoins()
+
+    coins = {}
+
+    
+
+    for _, child in pairs(listFrame:GetChildren()) do
+
+        if child:IsA("TextButton") then
+
+            child:Destroy()
+
+        end
+
+    end
+
+    
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+
+        if obj:IsA("BasePart") and (obj.Name:lower():match("coin") or obj.Name:lower():match("money")) then
+
+            table.insert(coins, obj)
+
+        end
+
+    end
+
+    
+
+    if #coins > 0 then
+
+        listFrame.Visible = true
+
+        tpAllBtn.Visible = true
+
+        
+
+        local yPos = 0
+
+        for i, coin in ipairs(coins) do
+
+            local coinBtn = Instance.new("TextButton")
+
+            coinBtn.Text = "💰 Coin " .. i
+
+            coinBtn.Size = UDim2.new(1, -10, 0, 22)
+
+            coinBtn.Position = UDim2.new(0, 5, 0, yPos)
+
+            coinBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+
+            coinBtn.TextColor3 = Color3.new(1, 1, 1)
+
+            coinBtn.Font = Enum.Font.Gotham
+
+            coinBtn.TextSize = 9
+
+            coinBtn.TextXAlignment = Enum.TextXAlignment.Left
+
+            coinBtn.Parent = listFrame
+
+            
+
+            local btnCorner = Instance.new("UICorner")
+
+            btnCorner.CornerRadius = UDim.new(0, 3)
+
+            btnCorner.Parent = coinBtn
+
+            
+
+            coinBtn.MouseButton1Click:Connect(function()
+
+                teleportToCoin(coin)
+
+                status.Text = "✅ DONE"
+
+                wait(1)
+
+                status.Text = "⚫ READY"
+
+            end)
+
+            
+
+            yPos = yPos + 27
+
+        end
+
+        
+
+        listFrame.CanvasSize = UDim2.new(0, 0, 0, yPos)
+
+    else
+
+        listFrame.Visible = false
+
+        tpAllBtn.Visible = false
+
+    end
+
+end
+
+tpAllBtn.MouseButton1Click:Connect(function()
+
+    if #coins == 0 then return end
+
+    status.Text = "🟡 TP ALL..."
+
+    for i, coin in ipairs(coins) do
+
+        teleportToCoin(coin)
+
+        wait(0.2)
+
+    end
+
+    status.Text = "✅ ALL DONE"
+
+    wait(1)
+
+    status.Text = "⚫ READY"
+
+end)
+
+flagBtn.MouseButton1Click:Connect(teleportToFlag)
+
+-- Автоматический скан каждые 3 секунды
+
+spawn(function()
+
+    while true do
+
+        scanForCoins()
+
+        wait(3)
+
+    end
+
+end)
+
+-- Hover эффекты
+
+flagBtn.MouseEnter:Connect(function() flagBtn.BackgroundColor3 = Color3.fromRGB(220, 70, 70) end)
+
+flagBtn.MouseLeave:Connect(function() flagBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) end)
+
+tpAllBtn.MouseEnter:Connect(function() tpAllBtn.BackgroundColor3 = Color3.fromRGB(170, 120, 220) end)
+
+tpAllBtn.MouseLeave:Connect(function() tpAllBtn.BackgroundColor3 = Color3.fromRGB(150, 100, 200) end)
+
+close.MouseEnter:Connect(function() close.BackgroundColor3 = Color3.fromRGB(220, 80, 80) end)
+
+close.MouseLeave:Connect(function() close.BackgroundColor3 = Color3.fromRGB(200, 60, 60) end)
