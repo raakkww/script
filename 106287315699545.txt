@@ -1,0 +1,4 @@
+while true do
+    game:GetService("ReplicatedStorage"):WaitForChild("ShopEvent"):FireServer("Sell", "Phantom Axe")
+    task.wait(0.1)
+end
