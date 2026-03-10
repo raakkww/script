@@ -1,0 +1,184 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Communication = ReplicatedStorage:WaitForChild("Communication")
+
+local HarvestRemote = Communication
+    :WaitForChild("Harvester")
+    :WaitForChild("HarvestRequest")
+
+local AttackRemote = Communication
+    :WaitForChild("Sword")
+    :WaitForChild("AttackRequest")
+
+local CollectRemote = Communication
+    :WaitForChild("Collectible")
+    :WaitForChild("Collected")
+
+local ENABLED = false
+local MULTIPLIER = 10
+
+local ENABLE_HARVEST = true
+local ENABLE_ATTACK = true
+local ENABLE_COLLECT = true
+
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = { ... }
+
+    if ENABLED and method == "FireServer" then
+        if (self == HarvestRemote and ENABLE_HARVEST)
+        or (self == AttackRemote and ENABLE_ATTACK)
+        or (self == CollectRemote and ENABLE_COLLECT) then
+
+            for i = 1, MULTIPLIER - 1 do
+                oldNamecall(self, unpack(args))
+            end
+        end
+    end
+
+    return oldNamecall(self, ...)
+end)
+
+setreadonly(mt, true)
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Remote Multiplier",
+    LoadingTitle = "Unified Hook",
+    LoadingSubtitle = "Harvest â¢ Attack â¢ Collect",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "RemoteMultiplier",
+        FileName = "Config"
+    }
+})
+
+local MainTab = Window:CreateTab("Main", 4483362458)
+local RemoteTab = Window:CreateTab("Remotes", 4483362458)
+
+MainTab:CreateToggle({
+    Name = "Enable Multiplier",
+    CurrentValue = false,
+    Callback = function(v)
+        ENABLED = v
+    end
+})
+
+MainTab:CreateSlider({
+    Name = "Multiplier",
+    Range = {1, 25},
+    Increment = 1,
+    CurrentValue = 10,
+    Callback = function(v)
+        MULTIPLIER = v
+    end
+})
+
+RemoteTab:CreateToggle({
+    Name = "Harvest (Trees / Nodes)",
+    CurrentValue = true,
+    Callback = function(v)
+        ENABLE_HARVEST = v
+    end
+})
+
+RemoteTab:CreateToggle({
+    Name = "Attack (Sword / Combat)",
+    CurrentValue = true,
+    Callback = function(v)
+        ENABLE_ATTACK = v
+    end
+})
+
+RemoteTab:CreateToggle({
+    Name = "Collectibles (Coal / Points / Items)",
+    CurrentValue = true,
+    Callback = function(v)
+        ENABLE_COLLECT = v
+    end
+})
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local CollectibleTab = Window:CreateTab("Spawner", 4483362458)
+
+local ResourceNames = {}
+local SelectedResource = nil
+
+local function fetchResources()
+    table.clear(ResourceNames)
+
+    local holder = LocalPlayer.PlayerGui
+        :WaitForChild("ResourceGui")
+        :WaitForChild("Main")
+        :WaitForChild("Holder")
+
+    for _, item in ipairs(holder:GetChildren()) do
+        local titleFrame = item:FindFirstChild("Title")
+        if titleFrame and titleFrame:FindFirstChild("Title") then
+            local text = titleFrame.Title.Text
+            if text and text ~= "" then
+                table.insert(ResourceNames, text)
+            end
+        end
+    end
+
+    table.sort(ResourceNames)
+end
+
+fetchResources()
+
+local ResourceDropdown = CollectibleTab:CreateDropdown({
+    Name = "Select Item",
+    Options = ResourceNames,
+    CurrentOption = {},
+    Callback = function(opt)
+        SelectedResource = opt[1]
+    end
+})
+
+CollectibleTab:CreateButton({
+    Name = "Refresh Item List",
+    Callback = function()
+        fetchResources()
+        ResourceDropdown:Refresh(ResourceNames)
+    end
+})
+
+local function spawnItem(name, amount)
+    local args = {
+        name,
+        Vector3.zero, -- position usually ignored by server
+        {
+            Amount = amount
+        }
+    }
+
+    CollectRemote:FireServer(unpack(args))
+end
+
+CollectibleTab:CreateButton({
+    Name = "Spawn Selected Ã50",
+    Callback = function()
+        if SelectedResource then
+            spawnItem(SelectedResource, 50)
+        end
+    end
+})
+
+CollectibleTab:CreateButton({
+    Name = "Spawn ALL Ã50",
+    Callback = function()
+        for _, name in ipairs(ResourceNames) do
+            spawnItem(name, 50)
+            task.wait(0.05)
+        end
+    end
+})
