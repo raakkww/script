@@ -1,0 +1,70 @@
+--PLEASE DONT DISLIKE IF YOU DONT HAVE HOOKMETAMETHOD
+--updated VERSION V4, god mode was PATCHED!!!???, bipassed again
+--PUT THIS IN YOUR AUTO EXECUTE:
+--AUTO EXEC SECTION START
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+
+local old_namecall = mt.__namecall
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if method == "Kick" and self == LocalPlayer then
+        warn("Tried to kick!?")
+        return wait(9e9)
+    end
+    
+    return old_namecall(self, ...)
+end)
+
+setreadonly(mt, true)
+
+--AUTO EXEC SECTION END
+
+--IM NOT SURE IS THIS ADONIS BYPASS WORKING ON OTHER EXECUTORS ITS WORKING ON POTASSIUM
+
+local Packets = game:GetService("ReplicatedStorage")
+    :WaitForChild("Communication")
+    :WaitForChild("Packets")
+    :WaitForChild("Packet")
+    :WaitForChild("RemoteEvent")
+
+local BLOCKED_IDS = {
+    [14] = "BlockedTrauma",   -- trauma block
+    [16] = "HurtSelf",        -- selfhurt
+    [17] = "CharHit",         -- idk
+    [34] = "DrainStamina",    -- stamina drain??
+    [35] = "DrainStaminaMax", -- stamina drain??
+    [39] = "RagdollEvent",    -- ragdoll (not working?)
+    [40] = "ImpulseSelf",     -- knockback?
+    [41] = "Fell",            -- ded
+    [42] = "Bounce",          -- ??
+    [43] = "DoKnockback",     -- ??
+    [50] = "BlockedTraumaShowParticle", -- ??
+    [89] = "ClientFell",      -- ded
+}
+
+local hook
+hook = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+    if not checkcaller() then
+        if self == Packets and getnamecallmethod() == "FireServer" then
+            local args = { ... }
+            if type(args[1]) == "buffer" then
+                local id = buffer.readu8(args[1], 0)
+                if BLOCKED_IDS[id] then
+                    warn("[BLOCKED] Packet:", BLOCKED_IDS[id], "| ID:", id)
+                    return
+                end
+            end
+        end
+    end
+    return hook(self, ...)
+end))
+
+print("bipas")
