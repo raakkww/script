@@ -1,0 +1,74 @@
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local function autoCompletePuzzle(gui)
+    local liberarEvent = ReplicatedStorage:FindFirstChild("LiberarEvent")
+    if liberarEvent then
+        liberarEvent:FireServer()
+    end
+    if gui then
+        gui:Destroy()
+    end
+end
+
+local existingGui = PlayerGui:FindFirstChild("FreeYourselfGui")
+if existingGui then
+    autoCompletePuzzle(existingGui)
+end
+
+PlayerGui.ChildAdded:Connect(function(child)
+    if child.Name == "FreeYourselfGui" then
+        autoCompletePuzzle(child)
+    end
+end)
+
+local function createWormESP(model)
+    if model:FindFirstChild("WormHighlight") then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "WormHighlight"
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Parent = model
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "WormESPText"
+    billboard.Size = UDim2.new(0, 100, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = "WORM"
+    textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    textLabel.TextScaled = true
+    textLabel.Font = Enum.Font.GothamBlack
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.Thickness = 2
+    stroke.Parent = textLabel
+
+    textLabel.Parent = billboard
+    billboard.Parent = model
+end
+
+for _, obj in ipairs(Workspace:GetDescendants()) do
+    if obj:IsA("Model") and string.find(string.lower(obj.Name), "worm") then
+        createWormESP(obj)
+    end
+end
+
+Workspace.DescendantAdded:Connect(function(obj)
+    if obj:IsA("Model") and string.find(string.lower(obj.Name), "worm") then
+        task.delay(0.1, function()
+            createWormESP(obj)
+        end)
+    end
+end)
