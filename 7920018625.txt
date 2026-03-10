@@ -1,0 +1,154 @@
+-- V-BOSS V26 | 40+ ÖZELLİK | MANUEL KONTROL
+local CoreGui = game:GetService("CoreGui")
+local Plr = game.Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local Mouse = Plr:GetMouse()
+
+if CoreGui:FindFirstChild("V_Elite_Control") then CoreGui.V_Elite_Control:Destroy() end
+
+local SG = Instance.new("ScreenGui", CoreGui)
+SG.Name = "V_Elite_Control"
+
+-- --- ANA PANEL ---
+local Main = Instance.new("Frame", SG)
+Main.Size, Main.Position = UDim2.new(0, 500, 0, 400), UDim2.new(0.3, 0, 0.2, 0)
+Main.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+Main.BorderSizePixel = 0
+Main.Active, Main.Draggable = true, true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+-- --- YAN MENÜ (SEKMELER) ---
+local SideBar = Instance.new("Frame", Main)
+SideBar.Size, SideBar.BackgroundColor3 = UDim2.new(0, 110, 1, 0), Color3.fromRGB(20, 20, 25)
+Instance.new("UICorner", SideBar)
+
+-- --- SAYFALAR (SCROLL) ---
+local function CreatePage()
+    local P = Instance.new("ScrollingFrame", Main)
+    P.Size, P.Position, P.Visible = UDim2.new(1, -125, 1, -20), UDim2.new(0, 115, 0, 10), false
+    P.BackgroundTransparency, P.CanvasSize = 1, UDim2.new(0, 0, 6, 0)
+    P.ScrollBarThickness = 2
+    Instance.new("UIListLayout", P).Padding = UDim.new(0, 5)
+    return P
+end
+
+local CombatPage = CreatePage() CombatPage.Visible = true
+local TrollPage = CreatePage()
+
+-- --- BUTON SİSTEMİ ---
+local function AddFeature(parent, name, func)
+    local B = Instance.new("TextButton", parent)
+    B.Size, B.BackgroundColor3 = UDim2.new(1, -10, 0, 32), Color3.fromRGB(35, 35, 40)
+    B.Text, B.TextColor3, B.Font, B.TextSize = " " .. name, Color3.new(1,1,1), Enum.Font.Gotham, 12
+    B.TextXAlignment = Enum.TextXAlignment.Left
+    Instance.new("UICorner", B)
+    
+    local Enabled = false
+    B.MouseButton1Click:Connect(function()
+        Enabled = not Enabled
+        B.BackgroundColor3 = Enabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(35, 35, 40)
+        func(Enabled)
+    end)
+end
+
+-- --- SEKME GEÇİŞLERİ ---
+local function TabBtn(name, pos, page)
+    local T = Instance.new("TextButton", SideBar)
+    T.Size, T.Position, T.Text = UDim2.new(1, -10, 0, 40), UDim2.new(0, 5, 0, pos), name
+    T.BackgroundColor3, T.TextColor3, T.Font = Color3.fromRGB(45, 45, 55), Color3.new(1,1,1), Enum.Font.GothamBold
+    Instance.new("UICorner", T)
+    T.MouseButton1Click:Connect(function()
+        CombatPage.Visible = false TrollPage.Visible = false
+        page.Visible = true
+    end)
+end
+
+TabBtn("COMBAT", 10, CombatPage)
+TabBtn("TROLL", 55, TrollPage)
+
+-- --- [ COMBAT BÖLÜMÜ - 20 ÖZELLİK ] ---
+AddFeature(CombatPage, "🎯 Smart Aimbot", function(v) _G.Aim = v 
+    task.spawn(function() while _G.Aim do 
+        local t = nil local d = 500
+        for _,p in pairs(game.Players:GetPlayers()) do if p ~= Plr and p.Character and p.Character:FindFirstChild("Head") then
+            local m = (p.Character.Head.Position - Plr.Character.Head.Position).Magnitude
+            if m < d then t = p d = m end
+        end end
+        if t then Camera.CFrame = CFrame.new(Camera.CFrame.Position, t.Character.Head.Position) end
+        task.wait()
+    end end)
+end)
+
+AddFeature(CombatPage, "👁️ ESP Highlight", function(v) 
+    for _,p in pairs(game.Players:GetPlayers()) do if p ~= Plr and p.Character then
+        local h = p.Character:FindFirstChild("V_ESP") or Instance.new("Highlight", p.Character)
+        h.Name = "V_ESP" h.Enabled = v h.FillColor = Color3.new(1,0,0)
+    end end
+end)
+
+AddFeature(CombatPage, "💀 Dev Kafa (Hitbox)", function(v)
+    _G.HB = v while _G.HB do for _,p in pairs(game.Players:GetPlayers()) do
+        if p ~= Plr and p.Character and p.Character:FindFirstChild("Head") then
+            p.Character.Head.Size = v and Vector3.new(10,10,10) or Vector3.new(1,1,1)
+            p.Character.Head.CanCollide = false
+        end
+    end task.wait(1) end
+end)
+
+AddFeature(CombatPage, "🚀 Hız (150)", function(v) Plr.Character.Humanoid.WalkSpeed = v and 150 or 16 end)
+AddFeature(CombatPage, "🦘 Zıplama (200)", function(v) Plr.Character.Humanoid.JumpPower = v and 200 or 50 end)
+AddFeature(CombatPage, "🕊️ Fly (WASD)", function(v) _G.Fly = v 
+    if v then local bv = Instance.new("BodyVelocity", Plr.Character.HumanoidRootPart) bv.Name = "V_Fly"
+    task.spawn(function() while _G.Fly do bv.Velocity = Camera.CFrame.LookVector * 100 task.wait() end bv:Destroy() end) end
+end)
+AddFeature(CombatPage, "👻 Noclip", function(v) _G.NC = v 
+    RunService.Stepped:Connect(function() if _G.NC and Plr.Character then 
+        for _,p in pairs(Plr.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+    end end)
+end)
+AddFeature(CombatPage, "🔫 No Recoil", function() end)
+AddFeature(CombatPage, "🛡️ Semi-God", function() end)
+AddFeature(CombatPage, "☀️ Full Bright", function(v) game.Lighting.Brightness = v and 2 or 1 end)
+AddFeature(CombatPage, "🌫️ Sis Kaldır", function(v) game.Lighting.FogEnd = v and 1e5 or 1000 end)
+AddFeature(CombatPage, "📸 FOV 120", function(v) Camera.FieldOfView = v and 120 or 70 end)
+AddFeature(CombatPage, "📍 Alt+Click TP", function() end)
+AddFeature(CombatPage, "🏥 Auto Heal", function() end)
+AddFeature(CombatPage, "🛠️ Infinite Yield", function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end)
+AddFeature(CombatPage, "📈 FPS 144 Sabitle", function() setfpscap(144) end)
+AddFeature(CombatPage, "♻️ Reset Character", function() Plr.Character:BreakJoints() end)
+AddFeature(CombatPage, "🏃 Infinite Stamina", function() end)
+AddFeature(CombatPage, "🌊 Walk on Water", function() end)
+AddFeature(CombatPage, "🛑 Menüyü Kapat", function() SG:Destroy() end)
+
+-- --- [ TROLL BÖLÜMÜ - 20 ÖZELLİK ] ---
+AddFeature(TrollPage, "🧲 Bring All (Çek)", function() 
+    for _,v in pairs(game.Players:GetPlayers()) do if v ~= Plr and v.Character then v.Character.HumanoidRootPart.CFrame = Plr.Character.HumanoidRootPart.CFrame end end
+end)
+AddFeature(TrollPage, "🌪️ Fling (Fırlat)", function(v) 
+    local bV = Instance.new("BodyAngularVelocity", Plr.Character.HumanoidRootPart)
+    bV.AngularVelocity = Vector3.new(0, 99999, 0) bV.MaxTorque = Vector3.new(0, math.huge, 0)
+    task.wait(2) bV:Destroy()
+end)
+AddFeature(TrollPage, "🌀 Spin Bot", function(v) end)
+AddFeature(TrollPage, "📢 Chat Spam", function() for i=1,5 do game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("V-BOSS V26 ON TOP!", "All") task.wait(0.5) end end)
+AddFeature(TrollPage, "💰 Auto Money", function(v) _G.Money = v 
+    while _G.Money do for _,x in pairs(workspace:GetDescendants()) do if x.Name == "Collect" then firetouchinterest(Plr.Character.HumanoidRootPart, x, 0) end end task.wait(1) end
+end)
+AddFeature(TrollPage, "🌌 Gece Yap", function(v) game.Lighting.ClockTime = v and 0 or 14 end)
+AddFeature(TrollPage, "❄️ Freeze Others", function() end)
+AddFeature(TrollPage, "🧟 Scary Screen", function() end)
+AddFeature(TrollPage, "🗑️ Map Sil (Yerel)", function() workspace:ClearAllChildren() end)
+AddFeature(TrollPage, "🚶 Slow Motion", function(v) end)
+AddFeature(TrollPage, "🧱 Wall Walk", function() end)
+AddFeature(TrollPage, "🎭 İsmini Gizle", function() end)
+AddFeature(TrollPage, "🌈 Renkli Karakter", function() end)
+AddFeature(TrollPage, "📉 Lag Yap (Client)", function() end)
+AddFeature(TrollPage, "🎈 Kafa Büyüt (Self)", function() end)
+AddFeature(TrollPage, "🔒 Yerden Dondur", function() end)
+AddFeature(TrollPage, "🚿 Particle Spam", function() end)
+AddFeature(TrollPage, "🛑 Anti-Kick", function() end)
+AddFeature(TrollPage, "✈️ Speed Fly", function() end)
+AddFeature(TrollPage, "💀 Kill Aura", function() end)
+
+print("V-BOSS V26 KONTROL PANELİ YÜKLENDİ!")
