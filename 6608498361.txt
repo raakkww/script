@@ -1,0 +1,367 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local Vehicles = workspace:WaitForChild("Vehicles")
+local Highlights = {}
+local Tracers = {}
+local Labels = {}
+
+local OrigLighting = {
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient
+}
+
+local Config = {
+    EnemiesEnabled = true,
+    TeamEnabled = false,
+    NamesEnabled = true,
+    DistanceEnabled = true,
+    TracersEnabled = true,
+    BoxesEnabled = true,
+    HealthEnabled = true,
+    
+    FullBrightEnabled = false,
+    NoFogEnabled = false,
+    BlackSkyEnabled = false,
+    
+    EnemyColor = Color3.fromRGB(255, 40, 40),
+    TeamColor = Color3.fromRGB(40, 255, 120),
+    TracerColor = Color3.fromRGB(255, 255, 255),
+    VisibleColor = Color3.fromRGB(0, 255, 255),
+    
+    TracerOrigin = "Bottom",
+    TextSize = 14,
+    RenderDistance = 5000,
+    RainbowSpeed = 1
+}
+
+local function GetHealth(tank)
+    local hp = tank:GetAttribute("Health") or tank:GetAttribute("HP")
+    local maxHp = tank:GetAttribute("MaxHealth") or tank:GetAttribute("MaxHP") or 100
+    
+    if hp then return hp, maxHp end
+    
+    for _, v in ipairs(tank:GetDescendants()) do
+        if (v:IsA("NumberValue") or v:IsA("IntValue")) and (v.Name:lower():find("health") or v.Name:lower():find("hp")) then
+            return v.Value, 100
+        end
+    end
+    return 100, 100
+end
+
+local function GetPlayerFromTank(model)
+    local name = model.Name:lower()
+    local playerName = name:gsub("chassis", "")
+    for _, player in ipairs(Players:GetPlayers()) do
+        if playerName:find(player.Name:lower()) then
+            return player
+        end
+    end
+    return nil
+end
+
+local function GetType(model)
+    local player = GetPlayerFromTank(model)
+    if not player then return "Enemy" end
+    if player == LocalPlayer then return "Self" end
+    if player.Team == LocalPlayer.Team then return "Ally" end
+    return "Enemy"
+end
+
+local function CreateTracer()
+    local line = Drawing.new("Line")
+    line.Thickness = 1.5
+    line.Transparency = 0.8
+    return line
+end
+
+local function UpdateESP(tank)
+    if not tank:IsA("Model") then return end
+    task.wait(0.5)
+
+    local tankType = GetType(tank)
+    if tankType == "Self" then return end
+
+    local hl = tank:FindFirstChild("Elite_Highlight") or Instance.new("Highlight")
+    hl.Name = "Elite_Highlight"
+    hl.FillTransparency = 0.4
+    hl.OutlineTransparency = 0
+    hl.Parent = tank
+
+    local bg = tank:FindFirstChild("Elite_Billboard") or Instance.new("BillboardGui")
+    bg.Name = "Elite_Billboard"
+    bg.AlwaysOnTop = true
+    bg.Size = UDim2.new(0, 200, 0, 70)
+    bg.StudsOffset = Vector3.new(0, 12, 0)
+    
+    local container = bg:FindFirstChild("Container") or Instance.new("Frame")
+    container.Name = "Container"
+    container.Size = UDim2.new(1, 0, 1, 0)
+    container.BackgroundTransparency = 1
+    container.Parent = bg
+
+    local nameLabel = container:FindFirstChild("Name") or Instance.new("TextLabel")
+    nameLabel.Name = "Name"
+    nameLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    nameLabel.Font = Enum.Font.RobotoMono
+    nameLabel.TextSize = Config.TextSize
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Parent = container
+
+    local distLabel = container:FindFirstChild("Distance") or Instance.new("TextLabel")
+    distLabel.Name = "Distance"
+    distLabel.Position = UDim2.new(0, 0, 0.4, 0)
+    distLabel.Size = UDim2.new(1, 0, 0.3, 0)
+    distLabel.Font = Enum.Font.RobotoMono
+    distLabel.TextSize = Config.TextSize - 2
+    distLabel.TextStrokeTransparency = 0
+    distLabel.BackgroundTransparency = 1
+    distLabel.Parent = container
+
+    local healthLabel = container:FindFirstChild("Health") or Instance.new("TextLabel")
+    healthLabel.Name = "Health"
+    healthLabel.Position = UDim2.new(0, 0, 0.7, 0)
+    healthLabel.Size = UDim2.new(1, 0, 0.3, 0)
+    healthLabel.Font = Enum.Font.RobotoMono
+    healthLabel.TextSize = Config.TextSize - 2
+    healthLabel.TextStrokeTransparency = 0
+    healthLabel.BackgroundTransparency = 1
+    healthLabel.Parent = container
+
+    bg.Parent = tank
+    local tracerLine = CreateTracer()
+
+    Highlights[tank] = {
+        Highlight = hl,
+        Billboard = bg,
+        NameTag = nameLabel,
+        DistTag = distLabel,
+        HPLabel = healthLabel,
+        Tracer = tracerLine,
+        Type = tankType,
+        Owner = GetPlayerFromTank(tank)
+    }
+end
+
+local Window = Rayfield:CreateWindow({
+    Name = "Elite Tanker v2.5",
+    LoadingTitle = "Tactical Suite",
+    LoadingSubtitle = "Environment & Visuals",
+    ConfigurationSaving = { Enabled = true, FolderName = "EliteTanker" }
+})
+
+local VisualsTab = Window:CreateTab("Visuals", 113625996199453)
+local MiscTab = Window:CreateTab("Misc", 107649546350785)
+
+VisualsTab:CreateSection("ESP")
+
+VisualsTab:CreateToggle({
+    Name = "Master Enemy ESP",
+    CurrentValue = true,
+    Callback = function(v) Config.EnemiesEnabled = v end
+})
+
+VisualsTab:CreateToggle({
+    Name = "Show Team ESP",
+    CurrentValue = false,
+    Callback = function(v) Config.TeamEnabled = v end
+})
+
+VisualsTab:CreateSection("Enhancements")
+
+VisualsTab:CreateToggle({
+    Name = "Health Scanner",
+    CurrentValue = true,
+    Callback = function(v) Config.HealthEnabled = v end
+})
+
+VisualsTab:CreateToggle({
+    Name = "Tracers",
+    CurrentValue = true,
+    Callback = function(v) Config.TracersEnabled = v end
+})
+
+VisualsTab:CreateDropdown({
+    Name = "Tracer Origin",
+    Options = {"Bottom", "Center", "Mouse"},
+    CurrentOption = "Bottom",
+    Callback = function(v) Config.TracerOrigin = v end
+})
+
+VisualsTab:CreateSection("Colors")
+
+VisualsTab:CreateColorPicker({
+    Name = "Enemy Color",
+    Color = Config.EnemyColor,
+    Callback = function(v) Config.EnemyColor = v end
+})
+
+MiscTab:CreateSection("World")
+
+MiscTab:CreateToggle({
+    Name = "FullBright & No Sun",
+    CurrentValue = false,
+    Callback = function(v)
+        Config.FullBrightEnabled = v
+        if v then
+            Lighting.Brightness = 2
+            Lighting.GlobalShadows = false
+            Lighting.Ambient = Color3.new(1,1,1)
+            Lighting.OutdoorAmbient = Color3.new(1,1,1)
+            for _, obj in ipairs(Lighting:GetChildren()) do
+                if obj:IsA("Sky") or obj:IsA("Atmosphere") then obj.Parent = nil end
+            end
+        else
+            Lighting.Brightness = OrigLighting.Brightness
+            Lighting.GlobalShadows = OrigLighting.GlobalShadows
+            Lighting.Ambient = OrigLighting.Ambient
+            Lighting.OutdoorAmbient = OrigLighting.OutdoorAmbient
+        end
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "No Fog",
+    CurrentValue = false,
+    Callback = function(v)
+        Config.NoFogEnabled = v
+        Lighting.FogEnd = v and 9e9 or OrigLighting.FogEnd
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "Black Skybox",
+    CurrentValue = false,
+    Callback = function(v)
+        Config.BlackSkyEnabled = v
+        if v then
+            local sky = Instance.new("Sky", Lighting)
+            sky.Name = "Elite_BlackSky"
+            sky.SkyboxBk = "rbxassetid://0"; sky.SkyboxDn = "rbxassetid://0"; sky.SkyboxFt = "rbxassetid://0";
+            sky.SkyboxLf = "rbxassetid://0"; sky.SkyboxRt = "rbxassetid://0"; sky.SkyboxUp = "rbxassetid://0";
+            sky.SunTextureId = "rbxassetid://0"; sky.MoonTextureId = "rbxassetid://0";
+            Lighting.ClockTime = 0
+        else
+            if Lighting:FindFirstChild("Elite_BlackSky") then Lighting.Elite_BlackSky:Destroy() end
+            Lighting.ClockTime = OrigLighting.ClockTime
+        end
+    end
+})
+
+MiscTab:CreateSection("Settings")
+
+MiscTab:CreateSlider({
+    Name = "Render Distance",
+    Range = {100, 10000},
+    Increment = 100,
+    CurrentValue = 5000,
+    Callback = function(v) Config.RenderDistance = v end
+})
+
+MiscTab:CreateButton({
+    Name = "Destroy Script",
+    Callback = function()
+        for _, data in pairs(Highlights) do
+            data.Tracer:Remove()
+            if data.Billboard then data.Billboard:Destroy() end
+        end
+        if Lighting:FindFirstChild("Elite_BlackSky") then Lighting.Elite_BlackSky:Destroy() end
+        Rayfield:Destroy()
+    end
+})
+
+RunService.RenderStepped:Connect(function()
+    if Config.FullBrightEnabled then Lighting.ClockTime = 14 Lighting.Brightness = 2 end
+    if Config.NoFogEnabled then Lighting.FogEnd = 9e9 end
+
+    for tank, data in pairs(Highlights) do
+        if tank and tank.Parent then
+            local player = data.Owner or GetPlayerFromTank(tank)
+            local targetPos = tank.PrimaryPart and tank.PrimaryPart.Position or tank:GetModelCFrame().p
+            local pos, onScreen = Camera:WorldToViewportPoint(targetPos)
+            local dist = (Camera.CFrame.p - targetPos).Magnitude
+            
+            local isAlly = data.Type == "Ally"
+            local show = false
+            
+            if isAlly and Config.TeamEnabled then show = true end
+            if not isAlly and Config.EnemiesEnabled then show = true end
+            if dist > Config.RenderDistance then show = false end
+
+            if show and onScreen then
+                local mainColor = isAlly and Config.TeamColor or Config.EnemyColor
+                
+                data.Highlight.Enabled = true
+                data.Highlight.FillColor = mainColor
+                
+                data.Billboard.Enabled = true
+                data.NameTag.Text = player and player.Name or tank.Name:gsub("Chassis", "")
+                data.NameTag.TextColor3 = mainColor
+                
+                data.DistTag.Visible = Config.DistanceEnabled
+                data.DistTag.Text = "[" .. math.floor(dist) .. "m]"
+                
+                if Config.HealthEnabled then
+                    local hp, mhp = GetHealth(tank)
+                    data.HPLabel.Visible = true
+                    data.HPLabel.Text = "HP: " .. math.floor(hp) .. "/" .. math.floor(mhp)
+                    data.HPLabel.TextColor3 = Color3.fromHSV(math.clamp(hp/mhp, 0, 1) * 0.3, 1, 1)
+                else
+                    data.HPLabel.Visible = false
+                end
+
+                if Config.TracersEnabled then
+                    local origin
+                    if Config.TracerOrigin == "Bottom" then
+                        origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    elseif Config.TracerOrigin == "Center" then
+                        origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                    else
+                        local mousePos = UserInputService:GetMouseLocation()
+                        origin = Vector2.new(mousePos.X, mousePos.Y)
+                    end
+
+                    data.Tracer.Visible = true
+                    data.Tracer.From = origin
+                    data.Tracer.To = Vector2.new(pos.X, pos.Y)
+                    data.Tracer.Color = Config.TracerColor
+                else
+                    data.Tracer.Visible = false
+                end
+            else
+                data.Highlight.Enabled = false
+                data.Billboard.Enabled = false
+                data.Tracer.Visible = false
+            end
+        else
+            if data.Tracer then data.Tracer:Remove() end
+            Highlights[tank] = nil
+        end
+    end
+end)
+
+for _, tank in ipairs(Vehicles:GetChildren()) do
+    UpdateESP(tank)
+end
+Vehicles.ChildAdded:Connect(UpdateESP)
+
+Rayfield:Notify({
+    Title = "Elite Visuals 2026",
+    Content = "System Loaded",
+    Duration = 5
+})
