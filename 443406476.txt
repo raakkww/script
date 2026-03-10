@@ -1,0 +1,668 @@
+--[[
+    PROJECT LAZARUS : ZOMBIES HUB  v5
+    UI: lates-lib by lxte
+    Script: darkyscript
+]]
+
+if getgenv().PLHubLoaded then return end
+getgenv().PLHubLoaded = true
+
+--// SERVICES
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace        = game:GetService("Workspace")
+local LocalPlayer      = Players.LocalPlayer
+
+local function GetCharacter() return LocalPlayer.Character end
+local function GetHumanoid()  local c=GetCharacter(); return c and c:FindFirstChildOfClass("Humanoid") end
+local function GetRootPart()  local c=GetCharacter(); return c and c:FindFirstChild("HumanoidRootPart") end
+
+--// LOAD UI LIBRARY
+local ok_http, raw = pcall(function()
+    return game:HttpGet("https://raw.githubusercontent.com/lxte/lates-lib/main/Main.lua")
+end)
+assert(ok_http and raw and #raw > 100, "HttpGet failed or returned empty: " .. tostring(raw))
+
+local ok_load, Library = pcall(loadstring(raw))
+assert(ok_load and Library, "loadstring/execute failed: " .. tostring(Library))
+
+local Window = Library:CreateWindow({
+    Title           = "PL Zombies Hub  v5",
+    Size            = UDim2.fromOffset(590, 390),
+    Transparency    = 0.2,
+    MinimizeKeybind = Enum.KeyCode.LeftAlt,
+})
+
+Window:SetTheme({
+    Primary       = Color3.fromRGB(30,30,30),
+    Secondary     = Color3.fromRGB(35,35,35),
+    Component     = Color3.fromRGB(40,40,40),
+    Interactables = Color3.fromRGB(45,45,45),
+    Tab           = Color3.fromRGB(200,200,200),
+    Title         = Color3.fromRGB(240,240,240),
+    Description   = Color3.fromRGB(200,200,200),
+    Shadow        = Color3.fromRGB(0,0,0),
+    Outline       = Color3.fromRGB(40,40,40),
+    Icon          = Color3.fromRGB(220,220,220),
+})
+
+--// STATE
+local RoundNum = Workspace:FindFirstChild("RoundNum") or { Value = 1 }
+
+local State = {
+    InfAmmoEnabled   = false,
+    InstaKillEnabled = false,
+    NoRecoilEnabled  = false,
+    NoSpreadEnabled  = false,
+    KillAuraEnabled  = false,
+    KillAuraRange    = 40,
+    FreezeEnabled    = false,
+    AutoFortEnabled  = false,
+    AutoFortRange    = 20,
+    ESPEnabled       = false,
+    ESPBoxes         = {},
+    PointsAmount     = 1000,
+    SpeedEnabled     = false,
+    SpeedValue       = 16,
+    JumpEnabled      = false,
+    JumpValue        = 50,
+    InfiniteJump     = false,
+    NoclipEnabled    = false,
+    FlyEnabled       = false,
+    FlySpeed         = 50,
+    FlyBody          = nil,
+    FlyAtt           = nil,
+    damage_key       = nil,
+    Connections      = {},
+    BoxSpamEnabled   = false,
+}
+
+--// DAMAGE KEY
+local function GetDamageKey()
+    if type(getgc)=="function" and type(getinfo)=="function" and type(getupvalues)=="function" then
+        local ok,gc = pcall(getgc)
+        if ok and gc then
+            for _,fn in next,gc do
+                if type(fn)=="function" then
+                    local ok2,info = pcall(getinfo,fn)
+                    if ok2 and info and info.name=="Knife" then
+                        local ok3,ups = pcall(getupvalues,fn)
+                        if ok3 and ups then
+                            for _,val in next,ups do
+                                if type(val)=="number" then
+                                    State.damage_key=val; return val
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return State.damage_key
+end
+task.spawn(function() while task.wait(2) do pcall(GetDamageKey) end end)
+
+--// SMART DAMAGE
+local function GetSmartDamage()
+    local r = math.max(1, RoundNum.Value or 1)
+    local hp = r < 10 and (50 + 100*r) or (950 * (1.1^(r-9)))
+    return math.ceil(hp * 1.10)
+end
+
+--// GUN PATCHERS
+local GunBackups = {}
+
+local function deepcopy(t, seen)
+    seen = seen or {}
+    if type(t) ~= "table" then return t end
+    if seen[t] then return seen[t] end
+    local c = {}; seen[t] = c
+    for k,v in next,t do c[deepcopy(k,seen)] = deepcopy(v,seen) end
+    setmetatable(c, deepcopy(getmetatable(t), seen))
+    return c
+end
+
+local function BackupGun(m)
+    if not rawget(GunBackups,m) then rawset(GunBackups,m,deepcopy(m)) end
+end
+local function RestoreGun(m)
+    local b = rawget(GunBackups,m); if not b then return end
+    for k,v in next,b do pcall(rawset,m,k,v) end
+end
+local function ZeroTable(t)
+    if type(t)~="table" then return end
+    for k,v in next,t do
+        if type(v)=="number" then rawset(t,k,0)
+        elseif type(v)=="table" then ZeroTable(v) end
+    end
+end
+
+local function PatchAmmo(m)
+    BackupGun(m)
+    local keys = {ammo=true,storedammo=true,maxammo=true,magsize=true,
+        bulletcount=true,clipsize=true,magazinesize=true,reserveammo=true}
+    for k in next,m do
+        if type(k)=="string" and keys[k:lower()] then rawset(m,k,99) end
+    end
+end
+local function PatchRecoil(m)
+    BackupGun(m)
+    for k,v in next,m do
+        if type(k)=="string" then
+            local kl = k:lower()
+            if kl:find("viewkick") or kl:find("recoil") or kl:find("kick") or kl:find("sway") then
+                if type(v)=="table" then ZeroTable(v) else rawset(m,k,0) end
+            end
+        end
+    end
+end
+local function PatchSpread(m)
+    BackupGun(m)
+    for k,v in next,m do
+        if type(k)=="string" then
+            local kl = k:lower()
+            if kl:find("spread") or kl:find("bloom") then
+                if type(v)=="table" then
+                    rawset(v,"Min",0); rawset(v,"Max",0); ZeroTable(v)
+                else rawset(m,k,0) end
+            end
+        end
+    end
+end
+
+local function PatchDamage(m)
+    BackupGun(m)
+    local base = GetSmartDamage()
+    -- ±5% random jitter so value looks like a natural high roll
+    local dmg = math.ceil(base * (1 + (math.random(-5,5) / 100)))
+    for k,v in next,m do
+        if type(k)=="string" then
+            local kl = k:lower()
+            if kl:find("headshot") or kl:find("torsoshot") or kl:find("limbshot") then
+                rawset(m,k,dmg)
+            elseif kl=="damage" and type(v)=="table" then
+                rawset(m,k,{Max=dmg,Min=math.floor(dmg*0.95)})
+            end
+        end
+    end
+end
+
+-- All loaded gun modules stored here
+local LoadedGuns = {}
+
+local function RunPatch(m, forceAll)
+    if forceAll then
+        -- Damage/recoil/spread patched ONCE on equip only
+        if State.InstaKillEnabled then pcall(PatchDamage, m) end
+        if State.NoRecoilEnabled  then pcall(PatchRecoil, m) end
+        if State.NoSpreadEnabled  then pcall(PatchSpread, m) end
+        if not(State.InstaKillEnabled or State.NoRecoilEnabled
+            or State.NoSpreadEnabled or State.InfAmmoEnabled) then
+            pcall(RestoreGun, m)
+        end
+    end
+    -- Ammo: only write when value actually dropped below 90
+    if State.InfAmmoEnabled then
+        local ammoKeys = {ammo=true,storedammo=true,maxammo=true,magsize=true,
+            bulletcount=true,clipsize=true,magazinesize=true,reserveammo=true}
+        for k,v in next,m do
+            if type(k)=="string" and ammoKeys[k:lower()] then
+                if type(v)=="number" and v < 90 then
+                    pcall(rawset, m, k, 99)
+                end
+            end
+        end
+    end
+end
+
+--// RE-PATCH ALL GUNS when a toggle changes
+local function RepatchAll()
+    for _, m in pairs(LoadedGuns) do
+        pcall(RunPatch, m, true)
+    end
+end
+
+--// WEAPON ATTACHMENT
+local function AttachWeapon(child)
+    local slot = child.Name
+    if slot~="Weapon1" and slot~="Weapon2" and slot~="Weapon3" then return end
+    local ok,m = pcall(require,child)
+    if not ok or type(m)~="table" then return end
+    LoadedGuns[slot] = m
+    -- Patch once immediately on equip
+    pcall(RunPatch, m, true)
+end
+local function SetupBackpack()
+    local bp = LocalPlayer:WaitForChild("Backpack",10); if not bp then return end
+    for _,c in ipairs(bp:GetChildren()) do pcall(AttachWeapon,c) end
+    if State.Connections.Backpack then State.Connections.Backpack:Disconnect() end
+    State.Connections.Backpack = bp.ChildAdded:Connect(function(c) pcall(AttachWeapon,c) end)
+end
+
+--// SLOW AMMO REFILL LOOP — only fires every 0.5s, only writes when ammo is low
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if State.InfAmmoEnabled then
+            for _, m in pairs(LoadedGuns) do
+                pcall(RunPatch, m, false)
+            end
+        end
+    end
+end)
+
+--// ZOMBIE HELPERS
+local function GetZombies()
+    local out, chars = {}, {}
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p.Character then chars[p.Character]=true end
+    end
+    for _,obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Health>0 then
+            local model = obj.Parent
+            if model and model:IsA("Model") and not chars[model] then
+                local hrp = model:FindFirstChild("HumanoidRootPart")
+                if hrp then table.insert(out,{model=model,hum=obj,hrp=hrp}) end
+            end
+        end
+    end
+    return out
+end
+local function FindDamageRemote()
+    for _,z in ipairs(GetZombies()) do
+        local r = z.hum:FindFirstChild("Damage")
+        if r and r:IsA("RemoteEvent") then return r, z.hrp end
+    end
+end
+
+--// KILL AURA
+local function StartKillAura()
+    if State.Connections.KillAura then State.Connections.KillAura:Disconnect() end
+    local rate = 0
+    State.Connections.KillAura = RunService.Heartbeat:Connect(function(dt)
+        if not State.KillAuraEnabled then return end
+        rate=rate+dt; if rate<0.15 then return end; rate=0
+        local rp = GetRootPart(); if not rp then return end
+        local key = GetDamageKey()
+        for _,z in ipairs(GetZombies()) do
+            if (z.hrp.Position-rp.Position).Magnitude <= State.KillAuraRange then
+                local r = z.hum:FindFirstChild("Damage")
+                if r and r:IsA("RemoteEvent") then
+                    pcall(function()
+                        r:FireServer({Source=rp.Position,Slash=true,Damage=GetSmartDamage()},key)
+                    end)
+                end
+            end
+        end
+    end)
+end
+local function StopKillAura()
+    if State.Connections.KillAura then
+        State.Connections.KillAura:Disconnect(); State.Connections.KillAura=nil
+    end
+end
+
+--// FREEZE
+local function StartFreeze()
+    if State.Connections.Freeze then State.Connections.Freeze:Disconnect() end
+    State.Connections.Freeze = RunService.Heartbeat:Connect(function()
+        if not State.FreezeEnabled then return end
+        for _,z in ipairs(GetZombies()) do
+            pcall(function() z.hrp.Anchored=true; rawset(z.hum,"WalkSpeed",0) end)
+        end
+    end)
+end
+local function StopFreeze()
+    if State.Connections.Freeze then
+        State.Connections.Freeze:Disconnect(); State.Connections.Freeze=nil
+    end
+    for _,z in ipairs(GetZombies()) do
+        pcall(function() z.hrp.Anchored=false; rawset(z.hum,"WalkSpeed",12) end)
+    end
+end
+
+--// AUTO FORTIFY
+local function StartAutoFort()
+    if State.Connections.AutoFort then State.Connections.AutoFort:Disconnect() end
+    local t = 0
+    State.Connections.AutoFort = RunService.Heartbeat:Connect(function(dt)
+        if not State.AutoFortEnabled then return end
+        t=t+dt; if t<0.5 then return end; t=0
+        local rp = GetRootPart(); if not rp then return end
+        for _,obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                local part = obj.Parent
+                if part and part:IsA("BasePart") and
+                   (part.Position-rp.Position).Magnitude <= State.AutoFortRange then
+                    pcall(function() fireproximityprompt(obj) end)
+                end
+            end
+        end
+        if keypress then pcall(function() keypress(0x46); keyrelease(0x46) end) end
+    end)
+end
+local function StopAutoFort()
+    if State.Connections.AutoFort then
+        State.Connections.AutoFort:Disconnect(); State.Connections.AutoFort=nil
+    end
+end
+
+--// POINTS FARM
+local function FarmPoints()
+    local remote, root = FindDamageRemote()
+    if not remote then
+        Window:Notify({Title="No Zombies",Description="Need at least 1 alive zombie.",Duration=4})
+        return
+    end
+    local iters = math.floor(State.PointsAmount/10)
+    Window:Notify({Title="Farming...",Description="+"..State.PointsAmount.." pts incoming",Duration=3})
+    local key = GetDamageKey()
+    for i=1,iters do
+        pcall(function() remote:FireServer({Source=root.Position,Slash=true,Damage=0},key) end)
+        if i%10==0 then task.wait() end
+    end
+    Window:Notify({Title="Done!",Description="+"..State.PointsAmount.." pts farmed!",Duration=5})
+end
+
+--// ESP
+local espTimer = 0
+local function EnableESP()
+    if State.Connections.ESP then State.Connections.ESP:Disconnect() end
+    State.Connections.ESP = RunService.Heartbeat:Connect(function(dt)
+        if not State.ESPEnabled then return end
+        espTimer=espTimer+dt; if espTimer<0.5 then return end; espTimer=0
+        for _,z in ipairs(GetZombies()) do
+            if not State.ESPBoxes[z.model] then
+                local hl = Instance.new("Highlight")
+                hl.Adornee             = z.model
+                hl.OutlineColor        = Color3.fromRGB(255,50,50)
+                hl.FillColor           = Color3.fromRGB(255,50,50)
+                hl.OutlineTransparency = 0
+                hl.FillTransparency    = 0.75
+                hl.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
+                hl.Parent              = z.model
+                State.ESPBoxes[z.model] = hl
+            end
+        end
+        for model,hl in pairs(State.ESPBoxes) do
+            local hum = model and model:FindFirstChildOfClass("Humanoid")
+            if not model or not model.Parent or (hum and hum.Health<=0) then
+                pcall(function() hl:Destroy() end)
+                State.ESPBoxes[model] = nil
+            end
+        end
+    end)
+end
+local function DisableESP()
+    if State.Connections.ESP then
+        State.Connections.ESP:Disconnect(); State.Connections.ESP=nil
+    end
+    for _,hl in pairs(State.ESPBoxes) do pcall(function() hl:Destroy() end) end
+    State.ESPBoxes = {}
+end
+
+--// MOVEMENT
+local function ApplySpeed(v)
+    local h=GetHumanoid(); if h then pcall(function() rawset(h,"WalkSpeed",v) end) end
+end
+local function ApplyJump(v)
+    local h=GetHumanoid(); if h then pcall(function() rawset(h,"JumpPower",v) end) end
+end
+local function StartNoclip()
+    if State.Connections.Noclip then State.Connections.Noclip:Disconnect() end
+    State.Connections.Noclip = RunService.Stepped:Connect(function()
+        if not State.NoclipEnabled then return end
+        local c=GetCharacter(); if not c then return end
+        for _,p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then pcall(function() p.CanCollide=false end) end
+        end
+    end)
+end
+local function StopNoclip()
+    if State.Connections.Noclip then
+        State.Connections.Noclip:Disconnect(); State.Connections.Noclip=nil
+    end
+end
+local function StartFly()
+    local root = GetRootPart(); if not root then return end
+    local h = GetHumanoid(); if h then h.PlatformStand=true end
+    local att = Instance.new("Attachment"); att.Name="PLFlyAtt"; att.Parent=root
+    local lv  = Instance.new("LinearVelocity")
+    lv.Attachment0=att; lv.VelocityConstraintMode=Enum.VelocityConstraintMode.Vector
+    lv.MaxForce=1e5; lv.RelativeTo=Enum.ActuatorRelativeTo.World
+    lv.VectorVelocity=Vector3.new(0,0,0); lv.Parent=root
+    State.FlyBody=lv; State.FlyAtt=att
+    local conn; conn = RunService.RenderStepped:Connect(function()
+        if not State.FlyEnabled then conn:Disconnect(); return end
+        local cam = Workspace.CurrentCamera
+        local vel = Vector3.new(0,0,0); local s=State.FlySpeed
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then vel=vel+cam.CFrame.LookVector*s end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then vel=vel-cam.CFrame.LookVector*s end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then vel=vel-cam.CFrame.RightVector*s end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then vel=vel+cam.CFrame.RightVector*s end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space)       then vel=vel+Vector3.new(0,s,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vel=vel-Vector3.new(0,s,0) end
+        pcall(function() lv.VectorVelocity=vel end)
+    end)
+end
+local function StopFly()
+    State.FlyEnabled=false
+    if State.FlyBody and State.FlyBody.Parent then State.FlyBody:Destroy() end
+    if State.FlyAtt  and State.FlyAtt.Parent  then State.FlyAtt:Destroy() end
+    State.FlyBody=nil; State.FlyAtt=nil
+    local h=GetHumanoid(); if h then h.PlatformStand=false end
+end
+
+--// MYSTERY BOX
+local BOX_SKIP = {"wood","board","barricade","door","window","plank","debris","wall","fence","ladder"}
+local function IsBarricadePrompt(p)
+    local n = ((p.Parent and p.Parent.Name) or ""):lower()
+    for _,w in ipairs(BOX_SKIP) do if n:find(w,1,true) then return true end end
+    return false
+end
+local function FindBoxPrompt()
+    for _,obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and not IsBarricadePrompt(obj) then
+            local pname = ((obj.Parent and obj.Parent.Name) or ""):lower()
+            local atext = obj.ActionText:lower()
+            if pname:find("mystery") or pname:find("box") or
+               atext:find("mystery") or atext:find("box") or
+               atext:find("spin")    or atext:find("roll") then
+                return obj
+            end
+        end
+    end
+end
+local function StartBoxSpam()
+    if State.Connections.BoxSpam then State.Connections.BoxSpam:Disconnect() end
+    local t = 0
+    State.Connections.BoxSpam = RunService.Heartbeat:Connect(function(dt)
+        if not State.BoxSpamEnabled then return end
+        t=t+dt; if t<0.3 then return end; t=0
+        local prompt = FindBoxPrompt(); if not prompt then return end
+        local rp = GetRootPart(); if not rp then return end
+        pcall(function()
+            local part = prompt.Parent
+            if part and part:IsA("BasePart") then
+                rp.CFrame = part.CFrame + Vector3.new(0,3,0)
+            elseif part and part:IsA("Model") and part.PrimaryPart then
+                rp.CFrame = part.PrimaryPart.CFrame + Vector3.new(0,3,0)
+            end
+            local old = prompt.MaxActivationDistance
+            prompt.MaxActivationDistance = 9999
+            fireproximityprompt(prompt)
+            task.wait(0.05)
+            prompt.MaxActivationDistance = old
+        end)
+    end)
+end
+local function StopBoxSpam()
+    if State.Connections.BoxSpam then
+        State.Connections.BoxSpam:Disconnect(); State.Connections.BoxSpam=nil
+    end
+end
+
+--// INFINITE JUMP
+UserInputService.JumpRequest:Connect(function()
+    if not State.InfiniteJump then return end
+    local h=GetHumanoid()
+    if h then pcall(function() h:ChangeState(Enum.HumanoidStateType.Jumping) end) end
+end)
+
+--// RESPAWN
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(1); char:WaitForChild("Humanoid")
+    LoadedGuns = {}
+    SetupBackpack()
+    if State.SpeedEnabled  then ApplySpeed(State.SpeedValue) end
+    if State.JumpEnabled   then ApplyJump(State.JumpValue)   end
+    if State.NoclipEnabled then StartNoclip()                end
+end)
+SetupBackpack()
+
+--// PROTECTION
+pcall(function()
+    if type(hookfunction)=="function" and type(newcclosure)=="function" then
+        local _g=gcinfo()
+        hookfunction(gcinfo,newcclosure(function() return _g end))
+    end
+end)
+
+--// HEARTBEAT ENFORCER
+RunService.Heartbeat:Connect(function()
+    local h=GetHumanoid(); if not h then return end
+    local isAiming=false; local char=GetCharacter()
+    if char then
+        local tool=char:FindFirstChildOfClass("Tool")
+        if tool then
+            local cam=Workspace.CurrentCamera
+            if cam and cam.CameraType==Enum.CameraType.Scriptable then isAiming=true end
+        end
+    end
+    if isAiming then rawset(h,"WalkSpeed",16)
+    elseif State.SpeedEnabled then rawset(h,"WalkSpeed",State.SpeedValue) end
+    if State.JumpEnabled then rawset(h,"JumpPower",State.JumpValue) end
+end)
+
+--// ══════════════════════════════════════
+--//  UI — TABS
+--// ══════════════════════════════════════
+Window:AddTabSection({ Name="Main",     Order=0 })
+Window:AddTabSection({ Name="Lazarus",  Order=1 })
+Window:AddTabSection({ Name="Player",   Order=2 })
+Window:AddTabSection({ Name="Settings", Order=3 })
+
+-- ── MAIN TAB ────────────────────────────
+local MT = Window:AddTab({ Title="Main", Section="Main", Icon="rbxassetid://11963373994" })
+Window:AddSection({ Name="Credits", Tab=MT })
+Window:AddParagraph({ Title="PL Zombies Hub v5", Description="Script by darkyscript", Tab=MT })
+Window:AddParagraph({ Title="Game",    Description="Project Lazarus: Zombies | ID: 443406476 | Dev: Logitech101", Tab=MT })
+Window:AddParagraph({ Title="Library", Description="lates-lib by lxte", Tab=MT })
+
+-- ── LAZARUS TAB ─────────────────────────
+local LT = Window:AddTab({ Title="Project Lazarus", Section="Lazarus", Icon="rbxassetid://11963373994" })
+
+Window:AddSection({ Name="Gun Mods", Tab=LT })
+Window:AddToggle({ Title="Infinite Ammo", Description="Refills ammo when it drops below 90 (every 0.5s)", Tab=LT,
+    Callback=function(v) State.InfAmmoEnabled=v; RepatchAll() end })
+Window:AddToggle({ Title="Insta Kill", Description="Smart HP formula + 10% buffer, patched once on equip", Tab=LT,
+    Callback=function(v)
+        State.InstaKillEnabled=v
+        if v then
+            RepatchAll()
+            Window:Notify({Title="Insta Kill ON",
+                Description="Round "..(RoundNum.Value or 1).." -> "..GetSmartDamage().." DMG",Duration=4})
+        else
+            for _, m in pairs(LoadedGuns) do pcall(RestoreGun, m) end
+            Window:Notify({Title="Insta Kill OFF",Description="Damage restored to normal",Duration=3})
+        end
+    end })
+Window:AddToggle({ Title="No Recoil", Description="Zeros all ViewKick/Recoil tables on equip", Tab=LT,
+    Callback=function(v) State.NoRecoilEnabled=v; RepatchAll() end })
+Window:AddToggle({ Title="No Spread", Description="Zeros all Spread/Bloom tables on equip", Tab=LT,
+    Callback=function(v) State.NoSpreadEnabled=v; RepatchAll() end })
+
+Window:AddSection({ Name="Kill Aura", Tab=LT })
+Window:AddToggle({ Title="Kill Aura", Description="Fires Damage remote on nearby zombies", Tab=LT,
+    Callback=function(v)
+        State.KillAuraEnabled=v
+        if v then StartKillAura() else StopKillAura() end
+    end })
+Window:AddSlider({ Title="Kill Aura Range", Description="Studs (default 40)", Tab=LT,
+    MaxValue=250, MinValue=10, Default=40, AllowDecimals=false,
+    Callback=function(v) State.KillAuraRange=v end })
+
+Window:AddSection({ Name="Utility", Tab=LT })
+Window:AddToggle({ Title="Freeze Zombies", Description="Anchors HRP + WalkSpeed=0 every frame", Tab=LT,
+    Callback=function(v) State.FreezeEnabled=v; if v then StartFreeze() else StopFreeze() end end })
+Window:AddToggle({ Title="Auto Fortify", Description="Fires prompts + F key for pts per plank", Tab=LT,
+    Callback=function(v) State.AutoFortEnabled=v; if v then StartAutoFort() else StopAutoFort() end end })
+Window:AddSlider({ Title="Fortify Range", Description="Studs", Tab=LT,
+    MaxValue=60, MinValue=5, Default=20, AllowDecimals=false,
+    Callback=function(v) State.AutoFortRange=v end })
+
+Window:AddSection({ Name="Mystery Box", Tab=LT })
+Window:AddParagraph({ Title="Gun Chance Booster",
+    Description="Spams the Mystery Box spin at max speed. Turn off when you see the gun you want.", Tab=LT })
+Window:AddToggle({ Title="Box Spam", Description="Re-spins box every 0.3s, teleports to it automatically", Tab=LT,
+    Callback=function(v)
+        State.BoxSpamEnabled=v
+        if v then StartBoxSpam() else StopBoxSpam() end
+    end })
+
+Window:AddSection({ Name="Visuals", Tab=LT })
+Window:AddToggle({ Title="Zombie ESP", Description="Red highlight through walls (AlwaysOnTop)", Tab=LT,
+    Callback=function(v) State.ESPEnabled=v; if v then EnableESP() else DisableESP() end end })
+
+Window:AddSection({ Name="Points Farm", Tab=LT })
+Window:AddParagraph({ Title="How it works",
+    Description="Fires Damage=0 remote. Each fire = +10 pts. Needs 1 alive zombie.", Tab=LT })
+Window:AddSlider({ Title="Points Amount", Description="Total pts to farm", Tab=LT,
+    MaxValue=1000000, MinValue=10, Default=1000, AllowDecimals=false,
+    Callback=function(v) State.PointsAmount=v end })
+Window:AddButton({ Title="Farm Points Now", Description="Click to farm instantly", Tab=LT,
+    Callback=function() task.spawn(FarmPoints) end })
+
+-- ── PLAYER TAB ──────────────────────────
+local PT = Window:AddTab({ Title="Player", Section="Player", Icon="rbxassetid://11293977610" })
+
+Window:AddSection({ Name="Movement", Tab=PT })
+Window:AddToggle({ Title="Speed Hack", Description="rawset WalkSpeed every frame", Tab=PT,
+    Callback=function(v) State.SpeedEnabled=v; ApplySpeed(v and State.SpeedValue or 16) end })
+Window:AddSlider({ Title="Walk Speed", Description="Default: 16", Tab=PT,
+    MaxValue=250, MinValue=16, Default=16, AllowDecimals=false,
+    Callback=function(v) State.SpeedValue=v; if State.SpeedEnabled then ApplySpeed(v) end end })
+Window:AddToggle({ Title="Jump Hack", Description="rawset JumpPower every frame", Tab=PT,
+    Callback=function(v) State.JumpEnabled=v; ApplyJump(v and State.JumpValue or 50) end })
+Window:AddSlider({ Title="Jump Power", Description="Default: 50", Tab=PT,
+    MaxValue=500, MinValue=50, Default=50, AllowDecimals=false,
+    Callback=function(v) State.JumpValue=v; if State.JumpEnabled then ApplyJump(v) end end })
+Window:AddToggle({ Title="Infinite Jump", Description="Re-jump while mid-air", Tab=PT,
+    Callback=function(v) State.InfiniteJump=v end })
+
+Window:AddSection({ Name="Utility", Tab=PT })
+Window:AddToggle({ Title="Noclip", Description="Walk through all walls", Tab=PT,
+    Callback=function(v) State.NoclipEnabled=v; if v then StartNoclip() else StopNoclip() end end })
+Window:AddToggle({ Title="Fly  [WASD + Space/Ctrl]", Description="LinearVelocity fly", Tab=PT,
+    Callback=function(v) State.FlyEnabled=v; if v then StartFly() else StopFly() end end })
+Window:AddSlider({ Title="Fly Speed", Description="Default: 50", Tab=PT,
+    MaxValue=200, MinValue=10, Default=50, AllowDecimals=false,
+    Callback=function(v) State.FlySpeed=v end })
+Window:AddButton({ Title="Reset Stats", Description="WalkSpeed=16, JumpPower=50", Tab=PT,
+    Callback=function()
+        local h=GetHumanoid()
+        if h then pcall(function() rawset(h,"WalkSpeed",16); rawset(h,"JumpPower",50) end) end
+        State.SpeedEnabled=false; State.JumpEnabled=false
+    end })
+
+-- ── SETTINGS TAB ────────────────────────
+local ST = Window:AddTab({ Title="Settings", Section="Settings", Icon="rbxassetid://11293977610" })
+Library:CreateSettingsPage(Window, {})
+
+Window:Notify({
+    Title="PL Hub v5 Ready",
+    Description="All bypasses active. Left Alt = minimise.",
+    Duration=5,
+})
