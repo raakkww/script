@@ -1,0 +1,66 @@
+local RS = game:GetService("ReplicatedStorage")
+
+local RAYFIELD = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local WIN = RAYFIELD:CreateWindow({
+    Name = "a2c5",
+    LoadingTitle = "a2c5",
+    LoadingSubtitle = "",
+    ConfigurationSaving = { Enabled = true, FileName = "a2c5" },
+    Discord = { Enabled = false },
+    KeySystem = false,
+})
+
+local SPAWNER = WIN:CreateTab("spawner")
+
+local function autoSpawn(flag, remote)
+    local REM = RS:WaitForChild(remote)
+    task.spawn(function()
+        while flag[1] do
+            REM:FireServer()
+            task.wait(1)
+        end
+    end)
+end
+
+local FLAGS = {
+    lucky   = {false},
+    rainbow = {false},
+    galaxy  = {false},
+    diamond = {false},
+    all     = {false},
+}
+
+SPAWNER:CreateToggle({ Name = "lucky block",   CurrentValue = false, Callback = function(v) FLAGS.lucky[1]   = v if v then autoSpawn(FLAGS.lucky,   "SpawnLuckyBlock")   end end })
+SPAWNER:CreateToggle({ Name = "rainbow block", CurrentValue = false, Callback = function(v) FLAGS.rainbow[1] = v if v then autoSpawn(FLAGS.rainbow, "SpawnRainbowBlock") end end })
+SPAWNER:CreateToggle({ Name = "galaxy block",  CurrentValue = false, Callback = function(v) FLAGS.galaxy[1]  = v if v then autoSpawn(FLAGS.galaxy,  "SpawnGalaxyBlock")  end end })
+SPAWNER:CreateToggle({ Name = "diamond block", CurrentValue = false, Callback = function(v) FLAGS.diamond[1] = v if v then autoSpawn(FLAGS.diamond, "SpawnDiamondBlock") end end })
+
+SPAWNER:CreateToggle({
+    Name = "all blocks",
+    CurrentValue = false,
+    Callback = function(v)
+        FLAGS.all[1] = v
+        if not v then return end
+        task.spawn(function()
+            local REMOTES = {
+                RS:WaitForChild("SpawnLuckyBlock"),
+                RS:WaitForChild("SpawnRainbowBlock"),
+                RS:WaitForChild("SpawnGalaxyBlock"),
+                RS:WaitForChild("SpawnDiamondBlock"),
+            }
+            while FLAGS.all[1] do
+                for _, rem in REMOTES do rem:FireServer() end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+local MISC = WIN:CreateTab("misc")
+MISC:CreateButton({
+    Name = "inf yield",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    end
+})
