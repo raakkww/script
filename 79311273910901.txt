@@ -1,0 +1,7 @@
+local args = {
+	9999, -- this number can be increased once you get higher levels
+}
+while wait() do
+game:GetService("ReplicatedStorage"):WaitForChild("ReplicatedStorageHolders"):WaitForChild("Events"):WaitForChild("AddCoins"):FireServer(unpack(args))
+game:GetService("ReplicatedStorage"):WaitForChild("ReplicatedStorageHolders"):WaitForChild("Events"):WaitForChild("AddXP"):FireServer(unpack(args))
+end
