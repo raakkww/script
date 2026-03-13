@@ -1,0 +1,431 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "AutoFarm",
+    LoadingTitle = "AutoFarm",
+    LoadingSubtitle = "Printer Hub",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "PrinterHubConfig",
+        FileName = "Settings"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "no",
+        RememberJoins = false
+    },
+    KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Main", "home")
+local MovementTab = Window:CreateTab("Movement", "move")
+local VisualTab = Window:CreateTab("Visual", "eye")
+local SettingsTab = Window:CreateTab("Settings", "settings")
+
+local brainrot = false
+local cash = false
+local afk = false
+local antilag = false
+local invis = false
+local noclip = false
+local speed = false
+
+local spd = 50
+local brdelay = 1.5
+local cashdelay = 0.5
+
+local brloop = nil
+local cashloop = nil
+local nocliploop = nil
+local speedloop = nil
+local afkconn = nil
+local promptconn = nil
+local chair = nil
+
+local plr = game.Players.LocalPlayer
+local uis = game:GetService("UserInputService")
+local rs = game:GetService("RunService")
+local vim = game:GetService("VirtualInputManager")
+local tween = game:GetService("TweenService")
+
+local function getChar()
+   return plr.Character or plr.CharacterAdded:Wait()
+end
+
+local function getHum()
+   local c = getChar()
+   return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function getRoot()
+   local c = getChar()
+   return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function setTrans(val)
+   local c = getChar()
+   if not c then return end
+   for _, v in pairs(c:GetDescendants()) do
+      if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+         v.Transparency = val
+      end
+   end
+end
+
+local function killLag()
+   settings().Rendering.QualityLevel = 1
+   local l = game:GetService("Lighting")
+   l.GlobalShadows = false
+   l.FogEnd = 1e5
+end
+
+local m = MainTab:CreateSection("Auto Farm")
+
+MainTab:CreateToggle({
+   Name = "Auto Brainrots",
+   CurrentValue = false,
+   Flag = "AutoBrainrots",
+   Callback = function(v)
+      brainrot = v
+      if brainrot then
+         if promptconn then promptconn:Disconnect() end
+         for _, child in pairs(workspace:GetDescendants()) do
+            if child:IsA("ProximityPrompt") then
+               child.HoldDuration = 0
+            end
+         end
+         promptconn = workspace.DescendantAdded:Connect(function(d)
+            if d:IsA("ProximityPrompt") then
+               d.HoldDuration = 0
+            end
+         end)
+         brloop = task.spawn(function()
+            while brainrot do
+               local success = pcall(function()
+               local root = getRoot()
+               if root then
+                  local folder = workspace:FindFirstChild("ActiveBrainrots")
+                  if folder then
+                     local target = nil
+                     local maxDist = -1
+                     for _, item in pairs(folder:GetChildren()) do
+                        if item.Name == "ServerHitbox" and item:IsA("BasePart") then
+                           local dist = (root.Position - item.Position).Magnitude
+                           if dist > maxDist then
+                              target = item
+                              maxDist = dist
+                           end
+                        end
+                     end
+                     if target then
+                        local goal = target.CFrame * CFrame.new(0, 0, 10)
+                        local t = tween:Create(root, TweenInfo.new(0.3 + math.random(0, 10)/100), {CFrame = goal})
+                        t:Play()
+                        t.Completed:Wait()
+                        
+                        task.wait(brdelay + math.random(0, 3)/10)
+                        for i = 1, 20 do
+                           if not target or not target.Parent or not brainrot then break end
+                           vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                           task.wait(0.05 + math.random(0, 2)/100)
+                           vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                           task.wait(0.05 + math.random(0, 2)/100)
+                        end
+                        
+                        local returnTween = tween:Create(root, TweenInfo.new(0.2 + math.random(0, 5)/100), {CFrame = CFrame.new(123.66, -7.34, -23.73)})
+                        returnTween:Play()
+                        returnTween.Completed:Wait()
+                        task.wait(0.2 + math.random(0, 2)/10)
+                     end
+                  end
+               end
+               end)
+               if not success then
+                  task.wait(1)
+               end
+               task.wait(0.5 + math.random(0, 3)/10)
+            end
+         end)
+      else
+         if brloop then
+            task.cancel(brloop)
+            brloop = nil
+         end
+         if promptconn then
+            promptconn:Disconnect()
+            promptconn = nil
+         end
+      end
+   end
+})
+
+MainTab:CreateSlider({
+   Name = "Brainrot Delay",
+   Range = {0.1, 5},
+   Increment = 0.1,
+   CurrentValue = brdelay,
+   Flag = "BrainrotDelay",
+   Callback = function(v)
+      brdelay = v
+   end
+})
+
+MainTab:CreateToggle({
+   Name = "Auto Cash",
+   CurrentValue = false,
+   Flag = "AutoCash",
+   Callback = function(v)
+      cash = v
+      if cash then
+         cashloop = task.spawn(function()
+            while cash do
+               local success = pcall(function()
+               local root = getRoot()
+               if root then
+                  local plots = workspace:FindFirstChild("Plots")
+                  if plots then
+                     for _, plot in pairs(plots:GetChildren()) do
+                        local pods = plot:FindFirstChild("Pods")
+                        if pods then
+                           for _, pod in pairs(pods:GetChildren()) do
+                              local touch = pod:FindFirstChild("TouchPart")
+                              if touch and touch:FindFirstChild("TouchInterest") then
+                                 firetouchinterest(root, touch, 0)
+                                 task.wait(0.03 + math.random(0, 3)/100)
+                                 firetouchinterest(root, touch, 1)
+                              end
+                           end
+                        end
+                        task.wait(0.02 + math.random(0, 2)/100)
+                     end
+                  end
+               end
+               end)
+               if not success then
+                  task.wait(1)
+               end
+               task.wait(cashdelay + math.random(0, 2)/10)
+            end
+         end)
+      else
+         if cashloop then
+            task.cancel(cashloop)
+            cashloop = nil
+         end
+      end
+   end
+})
+
+MainTab:CreateSlider({
+   Name = "Cash Delay",
+   Range = {0.1, 2},
+   Increment = 0.1,
+   CurrentValue = cashdelay,
+   Flag = "CashDelay",
+   Callback = function(v)
+      cashdelay = v
+   end
+})
+
+MainTab:CreateToggle({
+   Name = "Anti AFK",
+   CurrentValue = false,
+   Flag = "AntiAFK",
+   Callback = function(v)
+      afk = v
+      if afk then
+         if afkconn then afkconn:Disconnect() end
+         afkconn = plr.Idled:Connect(function()
+            local vu = game:GetService("VirtualUser")
+            vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+            task.wait(1 + math.random(0, 5)/10)
+            vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+         end)
+      else
+         if afkconn then
+            afkconn:Disconnect()
+            afkconn = nil
+         end
+      end
+   end
+})
+
+local move = MovementTab:CreateSection("Movement")
+
+MovementTab:CreateToggle({
+   Name = "Speed Hack",
+   CurrentValue = false,
+   Flag = "Speed",
+   Callback = function(v)
+      speed = v
+      local hum = getHum()
+      if hum then
+         if speed then
+            hum.WalkSpeed = spd
+            if speedloop then speedloop:Disconnect() end
+            task.spawn(function()
+               while speed do
+                  if hum and hum.Parent then
+                     if hum.WalkSpeed ~= spd then
+                        hum.WalkSpeed = spd
+                     end
+                  end
+                  task.wait(0.3 + math.random(0, 3)/10)
+               end
+            end)
+         else
+            if speedloop then
+               speedloop:Disconnect()
+               speedloop = nil
+            end
+            if hum and hum.Parent then
+               hum.WalkSpeed = 16
+            end
+         end
+      end
+   end
+})
+
+MovementTab:CreateSlider({
+   Name = "Speed Value",
+   Range = {1, 999},
+   Increment = 1,
+   CurrentValue = spd,
+   Flag = "SpeedValue",
+   Callback = function(v)
+      spd = v
+      if speed then
+         local hum = getHum()
+         if hum and hum.Parent then
+            hum.WalkSpeed = v
+         end
+      end
+   end
+})
+
+MovementTab:CreateToggle({
+   Name = "Noclip",
+   CurrentValue = false,
+   Flag = "Noclip",
+   Callback = function(v)
+      noclip = v
+      if noclip then
+         if nocliploop then nocliploop:Disconnect() end
+         task.spawn(function()
+            while noclip do
+               local char = getChar()
+               if char then
+                  for _, part in pairs(char:GetDescendants()) do
+                     if part:IsA("BasePart") and part.Parent then
+                        part.CanCollide = false
+                     end
+                  end
+               end
+               task.wait(0.2 + math.random(0, 3)/10)
+            end
+         end)
+      else
+         if nocliploop then
+            nocliploop:Disconnect()
+            nocliploop = nil
+         end
+      end
+   end
+})
+
+MovementTab:CreateSlider({
+   Name = "Jump Power",
+   Range = {50, 200},
+   Increment = 1,
+   CurrentValue = 50,
+   Flag = "JumpPower",
+   Callback = function(v)
+      local hum = getHum()
+      if hum and hum.Parent then
+         hum.JumpPower = v
+      end
+   end
+})
+
+local vis = VisualTab:CreateSection("Visual")
+
+VisualTab:CreateToggle({
+   Name = "Invisible",
+   CurrentValue = false,
+   Flag = "Invisible",
+   Callback = function(v)
+      invis = v
+      if invis then
+         setTrans(0.5)
+         local root = getRoot()
+         if root then
+            local saved = root.CFrame
+            local char = getChar()
+            char:MoveTo(Vector3.new(-25.95, 84, 3537.55))
+            task.wait(0.15 + math.random(0, 5)/100)
+            if chair then
+               chair:Destroy()
+            end
+            chair = Instance.new("Seat")
+            chair.Anchored = false
+            chair.CanCollide = false
+            chair.Name = "invischair"
+            chair.Transparency = 1
+            chair.Position = Vector3.new(-25.95, 84, 3537.55)
+            chair.Parent = workspace
+            local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+            if torso then
+               local weld = Instance.new("Weld")
+               weld.Part0 = chair
+               weld.Part1 = torso
+               weld.Parent = chair
+            end
+            chair.CFrame = saved
+         end
+      else
+         setTrans(0)
+         if chair then
+            chair:Destroy()
+            chair = nil
+         end
+      end
+   end
+})
+
+VisualTab:CreateToggle({
+   Name = "Anti Lag",
+   CurrentValue = false,
+   Flag = "AntiLag",
+   Callback = function(v)
+      antilag = v
+      if antilag then
+         killLag()
+      else
+         settings().Rendering.QualityLevel = 5
+         local l = game:GetService("Lighting")
+         l.GlobalShadows = true
+      end
+   end
+})
+
+local set = SettingsTab:CreateSection("Settings")
+
+SettingsTab:CreateButton({
+   Name = "Destroy Hub",
+   Callback = function()
+      if brloop then task.cancel(brloop) end
+      if cashloop then task.cancel(cashloop) end
+      if nocliploop then nocliploop:Disconnect() end
+      if speedloop then speedloop:Disconnect() end
+      if afkconn then afkconn:Disconnect() end
+      if promptconn then promptconn:Disconnect() end
+      if chair then chair:Destroy() end
+      local hum = getHum()
+      if hum and hum.Parent then
+         hum.WalkSpeed = 16
+         hum.JumpPower = 50
+      end
+      setTrans(0)
+      Rayfield:Destroy()
+   end
+})
