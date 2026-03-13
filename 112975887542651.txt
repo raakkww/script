@@ -1,0 +1,246 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "+1 Money Prison Escape",
+    LoadingTitle = "+1 Money Prison Escape",
+    LoadingSubtitle = "Loading...",
+    ConfigurationSaving = { Enabled = false }
+})
+
+-- ÐÐÐÐ¤ÐÐÐ£Ð ÐÐ¦ÐÐ
+local RoleConfig = {
+    {Id = "Old Prisoner", Price = 25, Multiplier = 1.1},
+    {Id = "Chef", Price = 50, Multiplier = 1.5},
+    {Id = "Guard", Price = 150, Multiplier = 2},
+    {Id = "Criminal", Price = 300, Multiplier = 3},
+    {Id = "Police", Price = 750, Multiplier = 5},
+    {Id = "Director", Price = 1850, Multiplier = 8.5},
+    {Id = "SWAT", Price = 3500, Multiplier = 15}
+}
+
+local DoorConfig = {
+    {Req = 3, Val = 1}, {Req = 20, Val = 2}, {Req = 100, Val = 3},
+    {Req = 350, Val = 4}, {Req = 1500, Val = 5}, {Req = 10000, Val = 6},
+    {Req = 120000, Val = 7}, {Req = 1000000, Val = 8}, {Req = 12000000, Val = 9},
+    {Req = 250000000, Val = 10}, {Req = 2500000000, Val = 11}
+}
+
+local KeyConfig = {
+    {Id = 1, Wins = 0}, {Id = 2, Wins = 2}, {Id = 3, Wins = 15},
+    {Id = 4, Wins = 100}, {Id = 5, Wins = 750}, {Id = 6, Wins = 7500},
+    {Id = 7, Wins = 100000}, {Id = 8, Wins = 1000000}, {Id = 9, Wins = 15000000},
+    {Id = 10, Wins = 500000000}, {Id = 11, Wins = 10000000000}, {Id = 12, Wins = 600000000000}
+}
+
+local RebirthConfig = {
+    [1] = 100, [2] = 250, [3] = 2250, [4] = 15000, [5] = 250000,
+    [6] = 4500000, [7] = 15000000, [8] = 100000000, [9] = 1000000000, [10] = 25000000000
+}
+
+local RoleRemote = game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RoleAction")
+local RebirthRemote = game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RebirthEvent")
+local Player = game.Players.LocalPlayer
+local CurrentRoleObj = Player:WaitForChild("CurrentRole")
+local RebirthVal = Player:WaitForChild("Rebirth")
+
+_G.SmartFarm = false
+_G.AutoWins = false
+_G.AutoKeys = false
+_G.AutoRebirth = false
+_G.AntiAFK = true -- ÐÐ¾ ÑÐ¼Ð¾Ð»ÑÐ°Ð½Ð¸Ñ Ð²ÐºÐ»ÑÑÐµÐ½Ð¾
+
+-- Ð¤Ð£ÐÐÐ¦ÐÐ
+local function isRoleOwned(roleName)
+    local owned = Player:FindFirstChild("OwnedRoles")
+    return owned and string.find(owned.Value, roleName) ~= nil
+end
+
+local function getBestRole()
+    local bestRole, maxMult = "Old Prisoner", 0
+    for _, role in ipairs(RoleConfig) do
+        if isRoleOwned(role.Id) and role.Multiplier > maxMult then
+            maxMult = role.Multiplier; bestRole = role.Id
+        end
+    end
+    return bestRole
+end
+
+local function SafeEquip(roleName)
+    if roleName and roleName ~= "" and CurrentRoleObj.Value ~= roleName then
+        RoleRemote:FireServer("ToggleEquip", roleName)
+        task.wait(0.4)
+    end
+end
+
+-- ÐÐÐ¢Ð-ÐÐ¤Ð ÐÐÐÐÐÐ
+task.spawn(function()
+    local vu = game:GetService("VirtualUser")
+    Player.Idled:Connect(function()
+        if _G.AntiAFK then
+            vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        end
+    end)
+end)
+
+--- ÐÐÐÐÐÐÐ ---
+local FarmTab = Window:CreateTab("Auto-Farm", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+
+--- ÐÐÐÐ« & Ð ÐÐÐ ---
+FarmTab:CreateSection("Gems & Roles")
+FarmTab:CreateToggle({
+    Name = "Farm Gems & Roles",
+    CurrentValue = false,
+    Flag = "GemToggle",
+    Callback = function(Value)
+        _G.SmartFarm = Value
+        if Value then
+            task.spawn(function()
+                while _G.SmartFarm do
+                    if isRoleOwned("SWAT") then
+                        _G.SmartFarm = false
+                        SafeEquip("SWAT")
+                        Rayfield:Notify({Title = "Farm Completed", Content = "ÐÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ ÑÐ¾Ð»Ñ ÐºÑÐ¿Ð»ÐµÐ½Ð°. Ð¤Ð°ÑÐ¼ ÑÑÐ¾Ð¿.", Duration = 5})
+                        break 
+                    end
+                    local gems = workspace:FindFirstChild("Gems")
+                    if gems then
+                        for _, role in ipairs(RoleConfig) do
+                            if Player.Gems.Value >= role.Price and not isRoleOwned(role.Id) then
+                                RoleRemote:FireServer("BuyCurrency", role.Id)
+                                task.wait(0.3)
+                            end
+                        end
+                        for _, gem in pairs(gems:GetChildren()) do
+                            if not _G.SmartFarm then break end
+                            local roleReq = gem:GetAttribute("Role")
+                            local timer = gem:FindFirstChild("GemGUI") and gem.GemGUI:FindFirstChild("Timer")
+                            if timer and timer.Text == "00:00" then
+                                if not roleReq or roleReq == "" or isRoleOwned(roleReq) then
+                                    if roleReq and roleReq ~= "" then SafeEquip(roleReq) end
+                                    local tp = gem:FindFirstChildWhichIsA("BasePart") or gem
+                                    firetouchinterest(Player.Character.HumanoidRootPart, tp, 0)
+                                    task.wait(0.05)
+                                    firetouchinterest(Player.Character.HumanoidRootPart, tp, 1)
+                                end
+                            end
+                        end
+                        SafeEquip(getBestRole())
+                    end
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+--- ÐÐÐÐÐÐ« ---
+FarmTab:CreateSection("Wins Farming")
+FarmTab:CreateToggle({
+    Name = "Farm Win",
+    CurrentValue = false,
+    Flag = "WinToggle",
+    Callback = function(Value)
+        _G.AutoWins = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoWins do
+                    local myWins = Player.leaderstats.Wins.Value
+                    local myMaxCheck = 0
+                    for _, door in ipairs(DoorConfig) do if myWins >= door.Req then myMaxCheck = door.Val end end
+                    local bestBtn, maxP = nil, -1
+                    local winFolder = workspace:FindFirstChild("WinsButtons")
+                    if winFolder then
+                        for _, btn in pairs(winFolder:GetChildren()) do
+                            local bC, bP = btn:GetAttribute("Check") or 0, btn:GetAttribute("Price") or 0
+                            if bC <= myMaxCheck and not btn:GetAttribute("VIP") and bP > maxP then
+                                maxP = bP; bestBtn = btn
+                            end
+                        end
+                    end
+                    if bestBtn and bestBtn:FindFirstChild("TouchPart") then
+                        firetouchinterest(Player.Character.HumanoidRootPart, bestBtn.TouchPart, 0)
+                        task.wait(0.1); firetouchinterest(Player.Character.HumanoidRootPart, bestBtn.TouchPart, 1)
+                        task.wait(10.5)
+                    else task.wait(2) end
+                end
+            end)
+        end
+    end,
+})
+
+--- ÐÐÐÐÐÐ¢ÐÐÐ¬ (KEYS) ---
+FarmTab:CreateSection("Money Multiplier")
+FarmTab:CreateToggle({
+    Name = "Auto Equip Money Multiplier",
+    CurrentValue = false,
+    Flag = "KeyToggle",
+    Callback = function(Value)
+        _G.AutoKeys = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoKeys do
+                    local myWins = Player.leaderstats.Wins.Value
+                    local bestId = 1
+                    for i = #KeyConfig, 1, -1 do if myWins >= KeyConfig[i].Wins then bestId = i; break end end
+                    local keys = workspace:FindFirstChild("KeysButtons")
+                    if keys then
+                        for _, btn in pairs(keys:GetChildren()) do
+                            if btn:GetAttribute("EquipKey") == bestId and btn:FindFirstChild("TouchPart") then
+                                firetouchinterest(Player.Character.HumanoidRootPart, btn.TouchPart, 0)
+                                task.wait(0.1); firetouchinterest(Player.Character.HumanoidRootPart, btn.TouchPart, 1)
+                                break
+                            end
+                        end
+                    end
+                    task.wait(15)
+                end
+            end)
+        end
+    end,
+})
+
+--- ÐÐÐ ÐÐ ÐÐÐÐÐÐÐ¯ ---
+FarmTab:CreateSection("Rebirth System")
+FarmTab:CreateToggle({
+    Name = "Auto-rebirth",
+    CurrentValue = false,
+    Flag = "RebirthToggle",
+    Callback = function(Value)
+        _G.AutoRebirth = Value
+        if Value then
+            task.spawn(function()
+                while _G.AutoRebirth do
+                    local currentLevel = RebirthVal.Value
+                    local nextLevel = currentLevel + 1
+                    local cost = RebirthConfig[nextLevel]
+                    if cost and Player.leaderstats.Wins.Value >= cost then
+                        RebirthRemote:FireServer()
+                        Rayfield:Notify({Title = "Rebirth", Content = "Ð£ÑÐ¾Ð²ÐµÐ½Ñ Ð¿Ð¾Ð²ÑÑeÐ½", Duration = 3})
+                        task.wait(1)
+                    end
+                    task.wait(5)
+                end
+            end)
+        end
+    end,
+})
+
+--- SETTINGS ---
+SettingsTab:CreateSection("Utility")
+SettingsTab:CreateToggle({
+    Name = "Anti-AFK",
+    CurrentValue = true,
+    Flag = "AntiAFK",
+    Callback = function(Value) _G.AntiAFK = Value end,
+})
+
+SettingsTab:CreateButton({
+    Name = "SELF DESTRUCT (CLOSE)",
+    Callback = function()
+        _G.SmartFarm = false; _G.AutoWins = false; _G.AutoKeys = false; _G.AutoRebirth = false; _G.AntiAFK = false
+        task.wait(0.2); Rayfield:Destroy()
+    end,
+})
