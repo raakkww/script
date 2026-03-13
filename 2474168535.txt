@@ -1,0 +1,821 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+--[[
+    OVERLORD - Westbound Edition
+    Confirmed workspace data:
+      - workspace.Animals  (Fox, BlackBear, DeerFawn, LegendaryCoyote, Bison,
+                            MooseCow, Coyote, Wolf, DeerBuck, GrizzlyBear,
+                            DireWolf, LegendaryBlackBear  — all with UUID suffix)
+      - workspace.NPCs     (empty / loose NPC models)
+      - workspace.Horses
+      - workspace.Banks
+      - workspace.ChestFolder
+      - CashRegister, Safe models in workspace
+    Character:
+      - R15 rig: Head, HumanoidRootPart confirmed
+      - Team = "Cowboys" or "Outlaws"
+      - BoolValue "Ragdolled" inside character
+      - Humanoid with Health/MaxHealth 100
+]]
+
+--// ═══════════════════════════════════════════
+--//  RAYFIELD LOADER
+--// ═══════════════════════════════════════════
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name              = "Overlord  ·  Westbound",
+    LoadingTitle      = "Overlord Hub",
+    LoadingSubtitle   = "Westbound Edition",
+    Theme             = "Default",
+    DisableRayfieldPrompts  = true,
+    DisableBuildWarnings    = true,
+    ConfigurationSaving     = { Enabled = false },
+    KeySystem               = false,
+})
+
+--// ═══════════════════════════════════════════
+--//  SERVICES
+--// ═══════════════════════════════════════════
+local Players               = game:GetService("Players")
+local RunService            = game:GetService("RunService")
+local UserInputService      = game:GetService("UserInputService")
+local Lighting              = game:GetService("Lighting")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+
+local LP     = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+--// ═══════════════════════════════════════════
+--//  ANTI-DETECTION: randomised instance tag names
+--// ═══════════════════════════════════════════
+local _S      = tostring(math.random(10000, 99999))
+local T_PESP  = "WB_P" .. _S
+local T_AESP  = "WB_A" .. _S
+local T_HIGH  = "WB_H" .. _S
+
+--// ═══════════════════════════════════════════
+--//  SETTINGS
+--// ═══════════════════════════════════════════
+local Cfg = {
+    -- Aimbot
+    AimPlayers    = false,
+    AimAnimals    = false,
+    WallCheck     = false,
+    TeamCheck     = true,
+    Prediction    = false,
+    FOV           = 150,
+    ShowFOV       = false,
+    -- Silent Aim
+    SilentAim     = false,
+    SilentSpeed   = 0.15,
+    -- Player ESP
+    ShowName      = false,
+    ShowHP        = false,
+    ShowBox       = false,
+    ShowRole      = false,
+    ShowDist      = false,
+    CowboyColor   = Color3.fromRGB(100, 180, 255),
+    OutlawColor   = Color3.fromRGB(255, 80, 80),
+    -- Animal ESP
+    AnimalESP     = false,
+    AnimalDist    = 8000,
+    AnimalColor   = Color3.fromRGB(100, 220, 100),
+    LegendColor   = Color3.fromRGB(255, 215, 0),
+    ShowAnimalHP  = true,
+    -- World
+    FullBright    = false,
+    TPWalk        = false,
+    TPSpeed       = 3,
+    AntiRagdoll   = false,
+    NoFallDmg     = false,
+    RobAura       = false,
+    TextSize      = 13,
+}
+
+--// ═══════════════════════════════════════════
+--//  FOV CIRCLE
+--// ═══════════════════════════════════════════
+local FOVCircle           = Drawing.new("Circle")
+FOVCircle.Thickness       = 1.2
+FOVCircle.Color           = Color3.fromRGB(255, 255, 255)
+FOVCircle.Filled          = false
+FOVCircle.Transparency    = 1
+FOVCircle.Visible         = false
+
+--// ═══════════════════════════════════════════
+--//  TABS
+--// ═══════════════════════════════════════════
+local TabCombat  = Window:CreateTab("Combat", 4483362458)
+local TabVisuals = Window:CreateTab("Visuals", 4483362458)
+local TabWorld   = Window:CreateTab("World", 4483362458)
+
+--// ═══════════════════════════════════════════
+--//  HELPERS
+--// ═══════════════════════════════════════════
+local function Char() return LP.Character end
+
+local function GetRoot(obj)
+    if not obj then return nil end
+    if obj:IsA("BasePart") then return obj end
+    if obj:IsA("Model") then
+        return obj.PrimaryPart
+            or obj:FindFirstChild("HumanoidRootPart")
+            or obj:FindFirstChildWhichIsA("BasePart")
+    end
+end
+
+local function GetDist(pos)
+    local c = Char()
+    if c and c:FindFirstChild("HumanoidRootPart") then
+        return math.floor((c.HumanoidRootPart.Position - pos).Magnitude)
+    end
+    return 9999
+end
+
+-- Westbound teams are exactly "Cowboys" and "Outlaws"
+local function GetTeamName(player)
+    return player.Team and player.Team.Name or "None"
+end
+
+local function IsSameTeam(player)
+    if not Cfg.TeamCheck then return false end
+    local myTeam = LP.Team and LP.Team.Name or ""
+    local theirTeam = GetTeamName(player)
+    return myTeam ~= "" and myTeam == theirTeam
+end
+
+local function IsVisible(part)
+    if not part then return false end
+    local c = Char()
+    if not c or not c:FindFirstChild("Head") then return false end
+    local origin = Camera.CFrame.Position
+    local dir    = part.Position - origin
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {c, Camera}
+    params.FilterType  = Enum.RaycastFilterType.Exclude
+    params.IgnoreWater = true
+    local result = workspace:Raycast(origin, dir, params)
+    if result then
+        return result.Instance:IsDescendantOf(part.Parent)
+    end
+    return true
+end
+
+local function Predict(part)
+    if not Cfg.Prediction then return part.Position end
+    -- Westbound guns: ~400 studs/s bullet speed
+    local vel  = part.AssemblyLinearVelocity
+    local dist = GetDist(part.Position)
+    return part.Position + vel * (dist / 400)
+end
+
+-- Strip UUID suffix from animal names e.g. "Wolf{73dfbaff-...}" -> "Wolf"
+local function StripUUID(name)
+    return name:gsub("{[^}]+}", ""):gsub("%s+$", "")
+end
+
+-- Map exact Westbound model names to display names
+local ANIMAL_DISPLAY = {
+    Fox                 = "Fox",
+    BlackBear           = "Black Bear",
+    DeerFawn            = "Deer (Fawn)",
+    LegendaryCoyote     = "★ Legendary Coyote",
+    Bison               = "Bison",
+    MooseCow            = "Moose",
+    Coyote              = "Coyote",
+    Wolf                = "Wolf",
+    DeerBuck            = "Deer (Buck)",
+    GrizzlyBear         = "Grizzly Bear",
+    DireWolf            = "Dire Wolf",
+    LegendaryBlackBear  = "★ Legendary Black Bear",
+    LegendaryGrizzly    = "★ Legendary Grizzly",
+    LegendaryDireWolf   = "★ Legendary Dire Wolf",
+    LegendaryWolf       = "★ Legendary Wolf",
+    LegendaryFox        = "★ Legendary Fox",
+    LegendaryBison      = "★ Legendary Bison",
+    LegendaryMoose      = "★ Legendary Moose",
+    NPC                 = "NPC",
+    Goose               = "Goose",
+}
+
+local function GetAnimalDisplay(obj)
+    local stripped = StripUUID(obj.Name)
+    return ANIMAL_DISPLAY[stripped] or stripped
+end
+
+local function IsLegendary(obj)
+    return StripUUID(obj.Name):find("Legendary") ~= nil
+end
+
+--// ═══════════════════════════════════════════
+--//  ESP
+--// ═══════════════════════════════════════════
+local function ManageESP(rootPart, tag, text, color, show)
+    if not rootPart or not rootPart.Parent then return end
+    local bb = rootPart:FindFirstChild(tag)
+    if show then
+        if not bb then
+            bb                  = Instance.new("BillboardGui")
+            bb.Name             = tag
+            bb.Adornee          = rootPart
+            bb.AlwaysOnTop      = true
+            bb.Size             = UDim2.new(0, 220, 0, 80)
+            bb.StudsOffset      = Vector3.new(0, 3.5, 0)
+            bb.Parent           = rootPart
+
+            local lbl                    = Instance.new("TextLabel", bb)
+            lbl.Name                     = "L"
+            lbl.BackgroundTransparency   = 1
+            lbl.Size                     = UDim2.new(1, 0, 1, 0)
+            lbl.TextStrokeTransparency   = 0.3
+            lbl.TextStrokeColor3         = Color3.new(0, 0, 0)
+            lbl.Font                     = Enum.Font.SourceSansBold
+            lbl.TextXAlignment           = Enum.TextXAlignment.Center
+            lbl.TextYAlignment           = Enum.TextYAlignment.Center
+            lbl.TextWrapped              = true
+        end
+        local lbl = bb:FindFirstChild("L")
+        if lbl then
+            lbl.TextSize   = Cfg.TextSize
+            lbl.TextColor3 = color
+            lbl.Text       = text
+        end
+    else
+        if bb then bb:Destroy() end
+    end
+end
+
+local function CleanESP(char)
+    if not char then return end
+    for _, tag in ipairs({T_PESP, T_HIGH}) do
+        local o = char:FindFirstChild(tag, true)
+        if o then o:Destroy() end
+    end
+end
+
+-- Hook all players for instant ESP cleanup on death/respawn
+local function HookPlayer(p)
+    if p == LP then return end
+    p.CharacterRemoving:Connect(CleanESP)
+    p.CharacterAdded:Connect(function(char)
+        task.wait(0.2)
+        CleanESP(char)
+    end)
+end
+Players.PlayerAdded:Connect(HookPlayer)
+for _, p in ipairs(Players:GetPlayers()) do HookPlayer(p) end
+
+--// ═══════════════════════════════════════════
+--//  AIMBOT — uses confirmed Head + HumanoidRootPart
+--// ═══════════════════════════════════════════
+local function GetTarget()
+    local best    = nil
+    local bestMag = Cfg.FOV
+    local center  = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    -- Players
+    if Cfg.AimPlayers then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p == LP then continue end
+            if IsSameTeam(p) then continue end
+            local c = p.Character
+            if not c then continue end
+            local head = c:FindFirstChild("Head")
+            local hum  = c:FindFirstChildOfClass("Humanoid")
+            if not head or not hum or hum.Health <= 0 then continue end
+            if Cfg.WallCheck and not IsVisible(head) then continue end
+            local pos, vis = Camera:WorldToViewportPoint(Predict(head))
+            if vis then
+                local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                if mag < bestMag then
+                    bestMag = mag
+                    best    = head
+                end
+            end
+        end
+    end
+
+    -- Animals — confirmed in workspace.Animals folder
+    if Cfg.AimAnimals then
+        local folder = workspace:FindFirstChild("Animals")
+        if folder then
+            for _, v in ipairs(folder:GetChildren()) do
+                if not v:IsA("Model") then continue end
+                local hum = v:FindFirstChildWhichIsA("Humanoid")
+                if not hum or hum.Health <= 0 then continue end
+                local rp = GetRoot(v)
+                if not rp then continue end
+                if Cfg.WallCheck and not IsVisible(rp) then continue end
+                local pos, vis = Camera:WorldToViewportPoint(Predict(rp))
+                if vis then
+                    local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if mag < bestMag then
+                        bestMag = mag
+                        best    = rp
+                    end
+                end
+            end
+        end
+        -- Also check loose NPC models in workspace root
+        for _, v in ipairs(workspace:GetChildren()) do
+            if v.Name == "NPC" and v:IsA("Model") then
+                local hum = v:FindFirstChildWhichIsA("Humanoid")
+                if not hum or hum.Health <= 0 then continue end
+                local rp = GetRoot(v)
+                if not rp then continue end
+                if Cfg.WallCheck and not IsVisible(rp) then continue end
+                local pos, vis = Camera:WorldToViewportPoint(Predict(rp))
+                if vis then
+                    local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if mag < bestMag then
+                        bestMag = mag
+                        best    = rp
+                    end
+                end
+            end
+        end
+    end
+
+    return best
+end
+
+--// ═══════════════════════════════════════════
+--//  ANIMAL ESP LOOP
+--// ═══════════════════════════════════════════
+task.spawn(function()
+    while task.wait(0.8) do
+        if not Cfg.AnimalESP then continue end
+
+        local folder = workspace:FindFirstChild("Animals")
+        if not folder then continue end
+
+        for _, v in ipairs(folder:GetChildren()) do
+            if not v:IsA("Model") then continue end
+
+            local rp  = GetRoot(v)
+            if not rp then continue end
+
+            local hum  = v:FindFirstChildWhichIsA("Humanoid")
+            local dist = GetDist(rp.Position)
+
+            -- Remove ESP if out of range
+            if dist > Cfg.AnimalDist then
+                local b = rp:FindFirstChild(T_AESP)
+                if b then b:Destroy() end
+                continue
+            end
+
+            local isLeg   = IsLegendary(v)
+            local color   = isLeg and Cfg.LegendColor or Cfg.AnimalColor
+            local name    = GetAnimalDisplay(v)
+            local dead    = hum and hum.Health <= 0
+
+            local lines = {name}
+            if dead then
+                lines[1] = name .. " 💀"
+            elseif hum and Cfg.ShowAnimalHP then
+                table.insert(lines, "HP: " .. math.floor(hum.Health) .. "/" .. math.floor(hum.MaxHealth))
+            end
+            if Cfg.ShowDist then
+                table.insert(lines, dist .. "m")
+            end
+
+            ManageESP(rp, T_AESP, table.concat(lines, "\n"), color, true)
+        end
+    end
+end)
+
+--// ═══════════════════════════════════════════
+--//  ANTI RAGDOLL — sets BoolValue "Ragdolled" to false
+--//  (confirmed exists in character)
+--// ═══════════════════════════════════════════
+local ragdollConn
+local function EnableAntiRagdoll()
+    local c = Char()
+    if not c then return end
+    local rv = c:FindFirstChild("Ragdolled")
+    if rv and rv:IsA("BoolValue") then
+        rv.Value = false
+        ragdollConn = rv:GetPropertyChangedSignal("Value"):Connect(function()
+            if rv.Value == true then rv.Value = false end
+        end)
+    end
+end
+
+local function DisableAntiRagdoll()
+    if ragdollConn then ragdollConn:Disconnect(); ragdollConn = nil end
+end
+
+--// ═══════════════════════════════════════════
+--//  NO FALL DAMAGE
+--//  Westbound handles fall damage server-side.
+--//  We disable the Freefall humanoid state so the
+--//  server never registers a fall in the first place.
+--// ═══════════════════════════════════════════
+local fallConn
+local function EnableNoFallDmg()
+    local c = Char()
+    if not c then return end
+    local hum = c:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    -- Disable freefall state entirely so server never sees a fall
+    hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+    -- Also watch for state changes and cancel them
+    fallConn = hum.StateChanged:Connect(function(old, new)
+        if new == Enum.HumanoidStateType.Freefall 
+        or new == Enum.HumanoidStateType.FallingDown then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end)
+end
+
+local function DisableNoFallDmg()
+    if fallConn then fallConn:Disconnect(); fallConn = nil end
+    local c = Char()
+    if not c then return end
+    local hum = c:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+    hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+end
+
+-- Re-apply on respawn
+LP.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if Cfg.AntiRagdoll then EnableAntiRagdoll() end
+    if Cfg.NoFallDmg   then EnableNoFallDmg()   end
+end)
+
+--// ═══════════════════════════════════════════
+--//  SILENT AIM — hookfunction on shootBullet
+--//  Xeno supports hookfunction + newcclosure.
+--//  We hook the GunLocalModule's shootBullet so
+--//  arg3 (the target position) is replaced with
+--//  our target. Crosshair never moves.
+--// ═══════════════════════════════════════════
+local Mouse = LP:GetMouse()
+
+local function GetSilentTarget()
+    local best, bestMag = nil, Cfg.FOV
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LP then continue end
+        if IsSameTeam(p) then continue end
+        local c = p.Character
+        if not c then continue end
+        local head = c:FindFirstChild("Head")
+        local hum = c:FindFirstChildOfClass("Humanoid")
+        if not head or not hum or hum.Health <= 0 then continue end
+        local pos, vis = Camera:WorldToViewportPoint(head.Position)
+        if vis then
+            local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+            if mag < bestMag then bestMag = mag; best = head end
+        end
+    end
+    local folder = workspace:FindFirstChild("Animals")
+    if folder then
+        for _, v in ipairs(folder:GetChildren()) do
+            if not v:IsA("Model") then continue end
+            local hum = v:FindFirstChildWhichIsA("Humanoid")
+            if not hum or hum.Health <= 0 then continue end
+            local rp = GetRoot(v)
+            if not rp then continue end
+            local pos, vis = Camera:WorldToViewportPoint(rp.Position)
+            if vis then
+                local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                if mag < bestMag then bestMag = mag; best = rp end
+            end
+        end
+    end
+    return best
+end
+
+-- Hook GunLocalModule's CreateShot function
+-- From decompile: CreateShot is called with a table containing cframe
+-- We intercept and replace the cframe direction with our target
+task.spawn(function()
+    -- Wait for gun module to load
+    local GunScripts = game:GetService("ReplicatedStorage"):WaitForChild("GunScripts", 10)
+    if not GunScripts then return end
+    local CreateShotModule = GunScripts:WaitForChild("CreateShot", 10)
+    if not CreateShotModule then return end
+
+    -- Hook the module's CreateShot function via replaceclosure on the require result
+    local ok, mod = pcall(require, CreateShotModule)
+    if not ok or type(mod) ~= "table" then return end
+
+    local origCreateShot = mod.CreateShot
+    if not origCreateShot then return end
+
+    mod.CreateShot = newcclosure(function(self, data)
+        if Cfg.SilentAim and data and data.cframe then
+            local t = GetSilentTarget()
+            if t then
+                local tPos = Predict(t)
+                local origin = data.cframe.Position
+                -- Replace bullet direction to point at target
+                data.cframe = CFrame.new(origin, tPos)
+            end
+        end
+        return origCreateShot(self, data)
+    end)
+end)
+
+--// ═══════════════════════════════════════════
+--//  RENDERSTEP — aimbot / player esp / tpwalk / fullbright
+--// ═══════════════════════════════════════════
+RunService.RenderStepped:Connect(function(dt)
+
+    -- FOV Circle
+    FOVCircle.Visible  = Cfg.ShowFOV
+    FOVCircle.Radius   = Cfg.FOV
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    -- Hard Aimbot: hold RMB to snap camera to target
+    local target = GetTarget()
+    if target and (Cfg.AimPlayers or Cfg.AimAnimals) then
+        local tPos = Predict(target)
+        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, tPos)
+        end
+    end
+
+    -- FullBright
+    if Cfg.FullBright then
+        Lighting.ClockTime     = 14
+        Lighting.Brightness    = 2
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd        = 100000
+    end
+
+    -- TPWalk — delta-time smooth, no jank
+    if Cfg.TPWalk then
+        local c = Char()
+        if c then
+            local hum = c:FindFirstChildOfClass("Humanoid")
+            local hrp = c:FindFirstChild("HumanoidRootPart")
+            if hum and hrp and hum.MoveDirection.Magnitude > 0 then
+                hrp.CFrame = hrp.CFrame + hum.MoveDirection * Cfg.TPSpeed * dt * 22
+            end
+        end
+    end
+
+    -- Player ESP
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LP then continue end
+        local c = p.Character
+        if not c then continue end
+
+        local hum  = c:FindFirstChildOfClass("Humanoid")
+        local head = c:FindFirstChild("Head")
+        local hrp  = c:FindFirstChild("HumanoidRootPart")
+        local rp   = head or hrp
+
+        if rp and hum and hum.Health > 0 then
+            -- Westbound teams: "Cowboys" = blue, "Outlaws" = red
+            local teamName = GetTeamName(p)
+            local isOutlaw = teamName == "Outlaws"
+            local col      = isOutlaw and Cfg.OutlawColor or Cfg.CowboyColor
+
+            local showText = Cfg.ShowName or Cfg.ShowHP or Cfg.ShowRole or Cfg.ShowDist
+            local lines    = {}
+            if Cfg.ShowName then table.insert(lines, p.Name) end
+            if Cfg.ShowRole then
+                local badge = isOutlaw and "[Outlaw]" or "[Cowboy]"
+                table.insert(lines, badge)
+            end
+            if Cfg.ShowHP then
+                table.insert(lines, "HP: " .. math.floor(hum.Health) .. "/" .. math.floor(hum.MaxHealth))
+            end
+            if Cfg.ShowDist then
+                table.insert(lines, GetDist(rp.Position) .. "m")
+            end
+
+            ManageESP(rp, T_PESP, table.concat(lines, "\n"), col, showText)
+
+            -- Highlight / Box ESP
+            local hl = c:FindFirstChild(T_HIGH)
+            if Cfg.ShowBox then
+                if not hl then
+                    hl          = Instance.new("Highlight")
+                    hl.Name     = T_HIGH
+                    hl.Parent   = c
+                end
+                hl.FillColor           = col
+                hl.FillTransparency    = 0.55
+                hl.OutlineColor        = Color3.new(1, 1, 1)
+                hl.OutlineTransparency = 0
+            elseif hl then
+                hl:Destroy()
+            end
+        else
+            CleanESP(c)
+        end
+    end
+end)
+
+--// ═══════════════════════════════════════════
+--//  ROB AURA — auto-triggers Westbound rob prompts
+--//  Confirmed prompt names: "Rob" (Hold F), Safe, CashRegister
+--// ═══════════════════════════════════════════
+ProximityPromptService.PromptShown:Connect(function(prompt)
+    if Cfg.RobAura then
+        local action = prompt.ActionText:lower()
+        local obj    = prompt.ObjectText:lower()
+        local both   = action .. obj
+        local robKW  = {"rob", "loot", "crack", "steal", "open", "safe", "register", "bank", "stash"}
+        for _, kw in ipairs(robKW) do
+            if both:find(kw) then
+                prompt.HoldDuration = 0
+                pcall(fireproximityprompt, prompt)
+                break
+            end
+        end
+    end
+end)
+
+--// ═══════════════════════════════════════════
+--//  UI — COMBAT TAB
+--// ═══════════════════════════════════════════
+TabCombat:CreateSection("Aimbot")
+
+TabCombat:CreateToggle({
+    Name = "Aim at Players", CurrentValue = false, Flag = "AimP",
+    Callback = function(v) Cfg.AimPlayers = v end,
+})
+TabCombat:CreateToggle({
+    Name = "Aim at Animals", CurrentValue = false, Flag = "AimA",
+    Callback = function(v) Cfg.AimAnimals = v end,
+})
+TabCombat:CreateToggle({
+    Name = "Team Check  (skip Cowboys)", CurrentValue = true, Flag = "TC",
+    Callback = function(v) Cfg.TeamCheck = v end,
+})
+TabCombat:CreateToggle({
+    Name = "Wall Check  (visible only)", CurrentValue = false, Flag = "WC",
+    Callback = function(v) Cfg.WallCheck = v end,
+})
+TabCombat:CreateToggle({
+    Name = "Prediction  (lead targets)", CurrentValue = false, Flag = "Pred",
+    Callback = function(v) Cfg.Prediction = v end,
+})
+TabCombat:CreateSlider({
+    Name = "FOV Radius", Range = {0, 800}, Increment = 5,
+    CurrentValue = 150, Flag = "FOV",
+    Callback = function(v) Cfg.FOV = v end,
+})
+TabCombat:CreateToggle({
+    Name = "Show FOV Circle", CurrentValue = false, Flag = "SFOV",
+    Callback = function(v) Cfg.ShowFOV = v end,
+})
+
+TabCombat:CreateSection("Silent Aim")
+
+TabCombat:CreateToggle({
+    Name = "Silent Aim  (crosshair stays, bullets hit target)", CurrentValue = false, Flag = "SA",
+    Callback = function(v) Cfg.SilentAim = v end,
+})
+
+--// ═══════════════════════════════════════════
+--//  UI — VISUALS TAB
+--// ═══════════════════════════════════════════
+TabVisuals:CreateSection("Player ESP")
+
+TabVisuals:CreateToggle({
+    Name = "Show Name", CurrentValue = false, Flag = "PN",
+    Callback = function(v) Cfg.ShowName = v end,
+})
+TabVisuals:CreateToggle({
+    Name = "Show Health", CurrentValue = false, Flag = "PH",
+    Callback = function(v) Cfg.ShowHP = v end,
+})
+TabVisuals:CreateToggle({
+    Name = "Show Role  (Cowboy / Outlaw)", CurrentValue = false, Flag = "PR",
+    Callback = function(v) Cfg.ShowRole = v end,
+})
+TabVisuals:CreateToggle({
+    Name = "Show Distance", CurrentValue = false, Flag = "PD",
+    Callback = function(v) Cfg.ShowDist = v end,
+})
+TabVisuals:CreateToggle({
+    Name = "Box ESP  (Highlight)", CurrentValue = false, Flag = "PB",
+    Callback = function(v) Cfg.ShowBox = v end,
+})
+TabVisuals:CreateColorPicker({
+    Name = "Cowboy Color", Color = Cfg.CowboyColor, Flag = "ColC",
+    Callback = function(v) Cfg.CowboyColor = v end,
+})
+TabVisuals:CreateColorPicker({
+    Name = "Outlaw Color", Color = Cfg.OutlawColor, Flag = "ColO",
+    Callback = function(v) Cfg.OutlawColor = v end,
+})
+
+TabVisuals:CreateSection("Animal ESP")
+
+TabVisuals:CreateToggle({
+    Name = "Animal ESP", CurrentValue = false, Flag = "AE",
+    Callback = function(v)
+        Cfg.AnimalESP = v
+        if not v then
+            -- clean up all animal ESP labels
+            local folder = workspace:FindFirstChild("Animals")
+            if folder then
+                for _, obj in ipairs(folder:GetChildren()) do
+                    local rp = GetRoot(obj)
+                    if rp then
+                        local b = rp:FindFirstChild(T_AESP)
+                        if b then b:Destroy() end
+                    end
+                end
+            end
+        end
+    end,
+})
+TabVisuals:CreateToggle({
+    Name = "Show Animal Health", CurrentValue = true, Flag = "AHP",
+    Callback = function(v) Cfg.ShowAnimalHP = v end,
+})
+TabVisuals:CreateSlider({
+    Name = "Max Animal Range (studs)", Range = {200, 15000}, Increment = 100,
+    CurrentValue = 8000, Flag = "AD",
+    Callback = function(v) Cfg.AnimalDist = v end,
+})
+TabVisuals:CreateColorPicker({
+    Name = "Animal Color", Color = Cfg.AnimalColor, Flag = "ColA",
+    Callback = function(v) Cfg.AnimalColor = v end,
+})
+TabVisuals:CreateColorPicker({
+    Name = "Legendary Color", Color = Cfg.LegendColor, Flag = "ColL",
+    Callback = function(v) Cfg.LegendColor = v end,
+})
+
+TabVisuals:CreateSection("Global")
+
+TabVisuals:CreateSlider({
+    Name = "Text Size", Range = {8, 22}, Increment = 1,
+    CurrentValue = 13, Flag = "TS",
+    Callback = function(v) Cfg.TextSize = v end,
+})
+
+--// ═══════════════════════════════════════════
+--//  UI — WORLD TAB
+--// ═══════════════════════════════════════════
+TabWorld:CreateSection("Movement")
+
+TabWorld:CreateToggle({
+    Name = "TP-Walk  (Speed Boost)", CurrentValue = false, Flag = "TW",
+    Callback = function(v) Cfg.TPWalk = v end,
+})
+TabWorld:CreateSlider({
+    Name = "TP Speed", Range = {1, 15}, Increment = 1,
+    CurrentValue = 3, Flag = "TWS",
+    Callback = function(v) Cfg.TPSpeed = v end,
+})
+TabWorld:CreateToggle({
+    Name = "Anti Ragdoll", CurrentValue = false, Flag = "AR",
+    Callback = function(v)
+        Cfg.AntiRagdoll = v
+        if v then EnableAntiRagdoll() else DisableAntiRagdoll() end
+    end,
+})
+TabWorld:CreateToggle({
+    Name = "No Fall Damage", CurrentValue = false, Flag = "NFD",
+    Callback = function(v)
+        Cfg.NoFallDmg = v
+        if v then EnableNoFallDmg() else DisableNoFallDmg() end
+    end,
+})
+
+TabWorld:CreateSection("World")
+
+TabWorld:CreateToggle({
+    Name = "Full Bright", CurrentValue = false, Flag = "FB",
+    Callback = function(v)
+        Cfg.FullBright = v
+        if not v then
+            Lighting.ClockTime     = 8
+            Lighting.Brightness    = 1
+            Lighting.GlobalShadows = true
+            Lighting.FogEnd        = 1000
+        end
+    end,
+})
+
+TabWorld:CreateSection("Robbery")
+
+TabWorld:CreateToggle({
+    Name = "Rob Aura  (auto-trigger rob prompts)", CurrentValue = false, Flag = "RA",
+    Callback = function(v) Cfg.RobAura = v end,
+})
+
+--// ═══════════════════════════════════════════
+--//  NOTIFICATION
+--// ═══════════════════════════════════════════
+Rayfield:Notify({
+    Title    = "Overlord — Westbound",
+    Content  = "Loaded! Good luck out there, partner 🤠",
+    Duration = 6,
+})
