@@ -1,0 +1,274 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+    Name = "Cool Rarities - Teleport PRO",
+    LoadingTitle = "Loading...",
+    LoadingSubtitle = "by Roxzy • Four > Three + Big Root",
+    ConfigurationSaving = { Enabled = false }
+})
+
+local MainTab = Window:CreateTab("Main", 4483362458)
+
+local Players      = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService   = game:GetService("RunService")
+local Player       = Players.LocalPlayer
+local workspace    = game.Workspace
+
+local clovaFolder = workspace:WaitForChild("clova", 8)
+if not clovaFolder then
+    Rayfield:Notify({Title = "Error", Content = "clova folder not found!", Duration = 6})
+    return
+end
+
+-- RootPart settings
+local rootScale = 1
+local rootTransparency = 0
+local rootYOffsetFix = - (rootScale - 1) * 1
+
+local maxDistance  = 600
+local scanInterval = 0.18
+local tpDelay      = 0.08
+local offsetY      = 3
+
+local teleporting = false
+local isTeleportingInProgress = false
+local connections = {}
+local lastScanTime = 0
+local currentMode = "Idle"
+
+-- Status label
+local statusLabel = MainTab:CreateLabel("Status: Idle")
+
+local function updateStatus(mode)
+    currentMode = mode
+    statusLabel:Set("Status: Teleporting to " .. mode)
+end
+
+local function updateRootPart()
+    local char = Player.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    -- Size adjustment
+    local originalSize = Vector3.new(2, 2, 1)
+    hrp.Size = originalSize * Vector3.new(rootScale, rootScale, rootScale)
+
+    -- Transparency
+    hrp.Transparency = rootTransparency
+
+    -- Fix floating (shift down based on scale)
+    local currentCFrame = hrp.CFrame
+    hrp.CFrame = currentCFrame * CFrame.new(0, rootYOffsetFix, 0)
+
+    -- Camera zoom fix
+    Player.CameraMaxZoomDistance = 400 + (rootScale * 50)
+    Player.CameraMinZoomDistance = 0.5
+
+    hrp.CanCollide = true
+end
+
+local function fixCameraToTorso()
+    local char = Player.Character
+    if not char then return end
+    
+    local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    if torso and torso:IsA("BasePart") then
+        -- Camera focuses on torso instead of rootpart
+        game:GetService("Workspace").CurrentCamera.CameraSubject = torso
+    end
+end
+
+-- Update on character load/respawn
+Player.CharacterAdded:Connect(function()
+    task.wait(1.5)
+    updateRootPart()
+    fixCameraToTorso()
+    if teleporting and not isTeleportingInProgress then
+        task.spawn(TeleportToModels)
+    end
+end)
+
+-- ==================== ROOTPART SETTINGS SLIDERS ====================
+MainTab:CreateSection("HumanoidRootPart Settings (Big Hitbox)")
+
+MainTab:CreateSlider({
+    Name = "RootPart Scale",
+    Range = {1, 15},
+    Increment = 0.5,
+    Suffix = "x",
+    CurrentValue = 1,
+    Callback = function(Value)
+        rootScale = Value
+        rootYOffsetFix = - (Value - 1) * 1
+        updateRootPart()
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "RootPart Transparency",
+    Range = {0, 1},
+    Increment = 0.05,
+    Suffix = "",
+    CurrentValue = 0,
+    Callback = function(Value)
+        rootTransparency = Value
+        updateRootPart()
+    end,
+})
+
+-- ==================== TELEPORT SETTINGS ====================
+MainTab:CreateSection("Teleport Settings")
+
+MainTab:CreateSlider({Name = "Max Distance", Range = {200, 2000}, Increment = 50, Suffix = "studs", CurrentValue = 600, Callback = function(v) maxDistance = v end})
+MainTab:CreateSlider({Name = "Height Offset", Range = {1, 8}, Increment = 0.1, Suffix = "studs", CurrentValue = 3, Callback = function(v) offsetY = v end})
+MainTab:CreateSlider({Name = "Delay After Tween", Range = {0, 0.5}, Increment = 0.01, Suffix = "s", CurrentValue = 0.08, Callback = function(v) tpDelay = v end})
+MainTab:CreateSlider({Name = "Scan Interval", Range = {0.1, 0.6}, Increment = 0.05, Suffix = "s", CurrentValue = 0.18, Callback = function(v) scanInterval = v end})
+
+-- ==================== TOGGLE ====================
+MainTab:CreateToggle({
+    Name = "Enable Auto Teleport",
+    CurrentValue = false,
+    Callback = function(Value)
+        teleporting = Value
+        
+        if teleporting then
+            for _, conn in ipairs(connections) do pcall(function() conn:Disconnect() end) end
+            connections = {}
+
+            updateStatus("Idle")
+
+            task.spawn(TeleportToModels)
+
+            local scanConn = RunService.Heartbeat:Connect(function()
+                if not teleporting then return end
+                local now = tick()
+                if now - lastScanTime < scanInterval then return end
+                lastScanTime = now
+                
+                if not isTeleportingInProgress then
+                    task.spawn(TeleportToModels)
+                end
+            end)
+            table.insert(connections, scanConn)
+
+            Rayfield:Notify({Title = "🚀 ACTIVE", Content = "Prioritizes Four models.\nCamera locked to UpperTorso / Torso.\nBig rootpart doesn't cause floating or zoom issues.", Duration = 6.5})
+        else
+            for _, conn in ipairs(connections) do pcall(function() conn:Disconnect() end) end
+            connections = {}
+            isTeleportingInProgress = false
+            updateStatus("Idle")
+            Rayfield:Notify({Title = "⛔ STOPPED", Content = "Teleport stopped.", Duration = 4})
+        end
+    end,
+})
+
+MainTab:CreateButton({
+    Name = "Teleport Now",
+    Callback = function()
+        if not isTeleportingInProgress then
+            task.spawn(TeleportToModels)
+        end
+    end,
+})
+
+-- ==================== TELEPORT FUNCTION ====================
+function TeleportToModels()
+    if not teleporting then return end
+    if isTeleportingInProgress then return end
+    
+    isTeleportingInProgress = true
+
+    local char = Player.Character
+    if not char then 
+        isTeleportingInProgress = false
+        return 
+    end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not hrp.Parent then 
+        isTeleportingInProgress = false
+        return 
+    end
+
+    updateRootPart()
+    fixCameraToTorso()  -- Ensure camera stays on torso
+
+    local fourTargets = {}
+    local threeTargets = {}
+
+    for _, obj in ipairs(clovaFolder:GetChildren()) do
+        if not (obj:IsA("Model") or obj:IsA("Folder")) then continue end
+        
+        local lowerName = obj.Name:lower()
+        local isFour = lowerName:find("four")
+        local isThree = lowerName:find("three")
+        if not (isFour or isThree) then continue end
+
+        local primary = obj.PrimaryPart or obj:FindFirstChild("Root")
+        if not (primary and primary:IsA("BasePart")) then continue end
+
+        local dist = (primary.Position - hrp.Position).Magnitude
+        if dist > maxDistance then continue end
+
+        local targetData = { primary = primary, dist = dist }
+
+        if isFour then
+            table.insert(fourTargets, targetData)
+        elseif isThree then
+            table.insert(threeTargets, targetData)
+        end
+    end
+
+    local targets = {}
+    local mode = "Idle"
+
+    if #fourTargets > 0 then
+        targets = fourTargets
+        mode = "Four"
+    elseif #threeTargets > 0 then
+        targets = threeTargets
+        mode = "Three"
+    end
+
+    if #targets == 0 then
+        updateStatus("Idle")
+        isTeleportingInProgress = false
+        return
+    end
+
+    updateStatus(mode)
+
+    table.sort(targets, function(a, b) return a.dist < b.dist end)
+
+    for _, data in ipairs(targets) do
+        if not teleporting then break end
+        if not data.primary or not data.primary.Parent then continue end
+
+        local targetPos = data.primary.Position + Vector3.new(0, offsetY, 0)
+
+        pcall(function() hrp:SetNetworkOwner(Player) end)
+
+        local tweenInfo = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(hrp, tweenInfo, {
+            CFrame = CFrame.new(targetPos) * CFrame.Angles(0, math.rad(math.random(-25, 25)), 0)
+        })
+
+        tween:Play()
+        tween.Completed:Wait()
+
+        task.wait(tpDelay)
+    end
+
+    isTeleportingInProgress = false
+end
+
+Rayfield:Notify({
+    Title = "✅ READY",
+    Content = "• Camera locked to UpperTorso / Torso (no zoom issues)\n• RootPart size & transparency adjustable\n• No floating when scaled up\n• Four priority, auto fallback to Three",
+    Duration = 8
+})
