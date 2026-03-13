@@ -1,0 +1,402 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+
+local function waitForCharacter()
+    local character = player.Character or player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:WaitForChild("Humanoid")
+    return character, hrp, humanoid
+end
+
+task.spawn(function()
+    local character, hrp, humanoid = waitForCharacter()
+    local PerfectMeter = ReplicatedStorage:WaitForChild("Events"):WaitForChild("PerfectMeter")
+    local PlayerGui = player:WaitForChild("PlayerGui")
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AutoGreenAndGuardGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = PlayerGui
+
+    local function createLabel(text, yOffset)
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 0, 30)
+        label.Position = UDim2.new(0, 0, 0, yOffset)
+        label.BackgroundTransparency = 0.5
+        label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        label.TextColor3 = Color3.fromRGB(0, 255, 0)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 22
+        label.TextStrokeTransparency = 0.5
+        label.Text = text
+        label.Parent = screenGui
+        return label
+    end
+
+    createLabel("Hold E to autogreen with no contest", 0)
+    createLabel("Hold F to autoguard closest player", 32)
+    createLabel("Hold G to set screen on closest player", 64)
+    createLabel("Press M to Teleport Forward", 96)
+    local lockIndicator = createLabel("Currently locked onto nobody", 128)
+    lockIndicator.TextColor3 = Color3.fromRGB(255, 255, 0)
+    createLabel("Hold Q to Teleport to ball, TAB to select ball", 160)
+
+    -- Basketballs list
+    local basketballs = {
+        game:GetService("Workspace").Courts["1v1 Court_1"].Basketball,
+        game:GetService("Workspace").Courts["1v1 Court_2"].Basketball,
+        game:GetService("Workspace").Courts["3v3"].Basketball,
+        game:GetService("Workspace").Courts["2v2 Court_1"].Basketball,
+        game:GetService("Workspace").Courts["1v1 Court_4"].Basketball,
+        game:GetService("Workspace").Courts["1v1 Court_3"].Basketball,
+        game:GetService("Workspace").Courts["2v2 Court_2"].Basketball,
+    }
+
+    local selectedIndex = 1
+    local isHoldingQ = false
+    local tween
+    local qTweenLoop
+    local indicatorPart
+
+    -- Create indicator arrow part
+    indicatorPart = Instance.new("Part")
+    indicatorPart.Name = "BallIndicator"
+    indicatorPart.Size = Vector3.new(1, 1, 3)
+    indicatorPart.Anchored = true
+    indicatorPart.CanCollide = false
+    indicatorPart.Material = Enum.Material.Neon
+    indicatorPart.Color = Color3.new(0, 0, 0) -- black
+    indicatorPart.Transparency = 0.5
+    indicatorPart.Parent = workspace
+
+    local wedge = Instance.new("WedgePart")
+    wedge.Name = "ArrowTip"
+    wedge.Size = Vector3.new(1, 1, 1)
+    wedge.Anchored = false
+    wedge.CanCollide = false
+    wedge.Material = Enum.Material.Neon
+    wedge.Color = Color3.new(0, 0, 0)
+    wedge.Transparency = 0.5
+    wedge.Parent = indicatorPart
+    wedge.CFrame = indicatorPart.CFrame * CFrame.new(0, 0, -2) * CFrame.Angles(0, math.rad(180), 0)
+
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0 = indicatorPart
+    weld.Part1 = wedge
+    weld.Parent = indicatorPart
+
+    -- Create tracer beam (thin neon black cylinder)
+    local tracer = Instance.new("Part")
+    tracer.Name = "BallTracer"
+    tracer.Anchored = true
+    tracer.CanCollide = false
+    tracer.Material = Enum.Material.Neon
+    tracer.Color = Color3.new(0, 0, 0)
+    tracer.Transparency = 0.5
+    tracer.Size = Vector3.new(0.1, 0.1, 1)
+    tracer.Parent = workspace
+
+    local function updateTracer(fromPos, toPos)
+        local midPoint = (fromPos + toPos) / 2
+        local direction = (toPos - fromPos)
+        local length = direction.Magnitude
+        if length > 0 then
+            tracer.Size = Vector3.new(0.1, 0.1, length)
+            tracer.CFrame = CFrame.new(midPoint, toPos) * CFrame.new(0, 0, -length / 2)
+            tracer.Transparency = 0.5
+        else
+            tracer.Transparency = 1
+        end
+    end
+
+    local function updateBallHighlights()
+        for i, ball in ipairs(basketballs) do
+            if ball and ball:IsA("BasePart") then
+                if i == selectedIndex then
+                    ball.Color = Color3.new(0, 0, 0)
+                    ball.Material = Enum.Material.Neon
+                else
+                    ball.Color = Color3.fromRGB(255, 165, 0)
+                    ball.Material = Enum.Material.SmoothPlastic
+                end
+            end
+        end
+    end
+
+    updateBallHighlights()
+
+    task.spawn(function()
+        while true do
+            firesignal(PerfectMeter.OnClientEvent)
+            task.wait(0.1)
+        end
+    end)
+
+    local function getClosestPlayer()
+        local closestPlayer = nil
+        local shortestDistance = math.huge
+        local myPos = hrp.Position
+        for _, otherPlayer in pairs(Players:GetPlayers()) do
+            if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local otherHRP = otherPlayer.Character.HumanoidRootPart
+                local dist = (otherHRP.Position - myPos).Magnitude
+                if dist < shortestDistance then
+                    shortestDistance = dist
+                    closestPlayer = otherPlayer
+                end
+            end
+        end
+        return closestPlayer
+    end
+
+    -- E - Float Lock
+    local isHoldingE = false
+    local originalPos = nil
+    local lockedPos = nil
+    local offset = Vector3.new(0, 20, 0)
+    local lockConnection
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.E and not isHoldingE then
+            isHoldingE = true
+            originalPos = hrp.Position
+            lockedPos = originalPos + offset
+            hrp.CFrame = CFrame.new(lockedPos)
+
+            lockConnection = RunService.RenderStepped:Connect(function()
+                if isHoldingE and lockedPos then
+                    hrp.Velocity = Vector3.zero
+                    hrp.CFrame = CFrame.new(lockedPos)
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.E and isHoldingE then
+            isHoldingE = false
+            lockedPos = nil
+            if lockConnection then
+                lockConnection:Disconnect()
+                lockConnection = nil
+            end
+            if originalPos then
+                hrp.CFrame = CFrame.new(originalPos)
+            end
+        end
+    end)
+
+    -- F - Auto Guard Closest Player
+    local isHoldingF = false
+    local guardConnection
+    local lockedGuardTarget = nil
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.F and not isHoldingF then
+            isHoldingF = true
+            local targetPlayer = getClosestPlayer()
+            if targetPlayer then
+                lockedGuardTarget = targetPlayer
+                lockIndicator.Text = "Currently locked onto " .. targetPlayer.Name
+
+                guardConnection = RunService.RenderStepped:Connect(function()
+                    if isHoldingF and lockedGuardTarget and lockedGuardTarget.Character and lockedGuardTarget.Character:FindFirstChild("HumanoidRootPart") then
+                        local targetHRP = lockedGuardTarget.Character.HumanoidRootPart
+                        local frontPos = targetHRP.Position + (targetHRP.CFrame.LookVector * 2)
+                        hrp.CFrame = CFrame.new(frontPos, targetHRP.Position)
+                        hrp.Velocity = Vector3.zero
+                    end
+                end)
+            else
+                lockIndicator.Text = "Currently locked onto nobody"
+            end
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.F and isHoldingF then
+            isHoldingF = false
+            if guardConnection then
+                guardConnection:Disconnect()
+                guardConnection = nil
+            end
+            lockedGuardTarget = nil
+            lockIndicator.Text = "Currently locked onto nobody"
+        end
+    end)
+
+    -- G - Screen on closest player with back/forth Z tilt + slam fling
+    local isHoldingG = false
+    local screenTweenConnection
+    local lockedScreenTarget = nil
+    local tiltAngle = 0
+    local tiltDirection = 1
+
+    local function slamFling(targetHRP)
+        local originalPos = hrp.Position
+        local slamDistance = 3
+        local slamCFrame = CFrame.new(targetHRP.Position + (targetHRP.CFrame.LookVector * 0.2))
+
+        hrp.CFrame = slamCFrame
+        hrp.Velocity = Vector3.zero
+
+        task.wait(0.03)
+        hrp.CFrame = CFrame.new(originalPos)
+        hrp.Velocity = Vector3.zero
+    end
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.G and not isHoldingG then
+            isHoldingG = true
+            tiltAngle = 0
+            tiltDirection = 1
+            local targetPlayer = getClosestPlayer()
+            if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                lockedScreenTarget = targetPlayer
+                lockIndicator.Text = "Currently locked onto " .. targetPlayer.Name
+
+                local tweenTime = 0.05
+                local maxTiltAngle = 60
+
+                local function tweenBackAndForth()
+                    while isHoldingG do
+                        if lockedScreenTarget and lockedScreenTarget.Character and lockedScreenTarget.Character:FindFirstChild("HumanoidRootPart") then
+                            local targetHRP = lockedScreenTarget.Character.HumanoidRootPart
+
+                            tiltAngle = tiltAngle + (tiltDirection * 10)
+                            if tiltAngle >= maxTiltAngle then
+                                tiltAngle = maxTiltAngle
+                                tiltDirection = -1
+                            elseif tiltAngle <= -maxTiltAngle then
+                                tiltAngle = -maxTiltAngle
+                                tiltDirection = 1
+                            end
+
+                            local tiltRotation = CFrame.Angles(0, 0, math.rad(tiltAngle))
+
+                            local frontCFrame = CFrame.new(
+                                targetHRP.Position + (targetHRP.CFrame.LookVector * 0.5),
+                                targetHRP.Position
+                            ) * tiltRotation
+
+                            local backCFrame = CFrame.new(
+                                targetHRP.Position + (targetHRP.CFrame.LookVector * 2),
+                                targetHRP.Position
+                            ) * tiltRotation
+
+                            local tweenToBack = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = backCFrame})
+                            local tweenToFront = TweenService:Create(hrp, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = frontCFrame})
+
+                            tweenToBack:Play()
+                            tweenToBack.Completed:Wait()
+                            if not isHoldingG then break end
+
+                            tweenToFront:Play()
+                            tweenToFront.Completed:Wait()
+                            if not isHoldingG then break end
+
+                            slamFling(targetHRP)
+                        else
+                            break
+                        end
+                    end
+                end
+
+                screenTweenConnection = task.spawn(tweenBackAndForth)
+            else
+                lockIndicator.Text = "Currently locked onto nobody"
+            end
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.G and isHoldingG then
+            isHoldingG = false
+            lockedScreenTarget = nil
+            lockIndicator.Text = "Currently locked onto nobody"
+
+            local uprightCFrame = CFrame.new(hrp.Position, hrp.Position + hrp.CFrame.LookVector)
+            local resetTween = TweenService:Create(hrp, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {CFrame = uprightCFrame})
+            resetTween:Play()
+        end
+    end)
+
+    -- M - Teleport Forward
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.M then
+            local lookVector = hrp.CFrame.LookVector
+            hrp.CFrame = hrp.CFrame + lookVector * 10
+            hrp.Velocity = Vector3.zero
+        end
+    end)
+
+    -- Q - Hold to tween instantly (duration 0) to selected ball, TAB to cycle balls continuously
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+
+        if input.KeyCode == Enum.KeyCode.Q and not isHoldingQ then
+            isHoldingQ = true
+
+            qTweenLoop = task.spawn(function()
+                while isHoldingQ do
+                    if tween then
+                        tween:Cancel()
+                        tween = nil
+                    end
+
+                    local ball = basketballs[selectedIndex]
+                    if ball and ball:IsA("BasePart") then
+                        local offsetPosition
+                        local ballVelocity = ball.Velocity
+                        if ballVelocity.Magnitude > 0.1 then
+                            offsetPosition = ball.Position + ballVelocity.Unit * 2 -- increased offset here
+                        else
+                            offsetPosition = ball.Position + Vector3.new(0, 1, 0)
+                        end
+
+                        local targetCFrame = CFrame.new(offsetPosition)
+                        local tweenInfo = TweenInfo.new(0, Enum.EasingStyle.Linear)
+                        tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+                        tween:Play()
+                        tween.Completed:Wait()
+                    end
+                    task.wait(0.015)
+                end
+            end)
+
+        elseif input.KeyCode == Enum.KeyCode.Tab then
+            selectedIndex = selectedIndex + 1
+            if selectedIndex > #basketballs then
+                selectedIndex = 1
+            end
+            updateBallHighlights()
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.Q and isHoldingQ then
+            isHoldingQ = false
+            if tween then
+                tween:Cancel()
+                tween = nil
+            end
+            qTweenLoop = nil
+        end
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        local ball = basketballs[selectedIndex]
+        if ball and ball:IsA("BasePart") then
+            indicatorPart.CFrame = CFrame.new(hrp.Position + Vector3.new(0, 5, 0), ball.Position)
+            updateTracer(hrp.Position, ball.Position)
+            tracer.Transparency = 0.5
+        else
+            tracer.Transparency = 1
+        end
+    end)
+end)
