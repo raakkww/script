@@ -1,0 +1,340 @@
+-- Kasen Hub | Optimized Edition
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Load UI Library
+local Lib = loadstring(game:HttpGet("https://github.com/lxte/Modal/releases/latest/download/main.lua"))()
+local Window = Lib:CreateWindow({
+    Title = "Kasen Hub",
+    SubTitle = "",
+    Size = UDim2.fromOffset(450, 420),
+    Icon = "rbxassetid://68073547",
+})
+
+-- Data Management
+local _G_DATA = {
+    esp = false,
+    infJump = false,
+    speed = false,
+    noclip = false,
+    walkSpeed = 17.9,
+    flySpeedMobile = 50,
+    flySpeedPC = 50, 
+    hideName = false,
+    autoCatch = false,
+    noDiveCooldown = false, 
+    flyMobile = false,
+    flyPC = false
+}
+
+local pcControls = {F = 0, B = 0, L = 0, R = 0, U = 0, D = 0}
+
+-- Mobile Vector Logic
+local GetMobileMoveVector = function() return Vector3.new(0, 0, 0) end
+task.spawn(function()
+    local success, result = pcall(function()
+        return require(LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+    end)
+    if success then
+        GetMobileMoveVector = function() return result:GetMoveVector() end
+    end
+end)
+
+-- Tab Creation
+local MainTab = Window:AddTab("Game")
+local LocalTab = Window:AddTab("Local")
+local VisualsTab = Window:AddTab("Visuals")
+local PlayersTab = Window:AddTab("Players")
+local UtilityTab = Window:AddTab("Utility")
+local SettingsTab = Window:AddTab("Settings")
+
+--- GAME FEATURES ---
+MainTab:New("Title")({ Title = "Exploits" })
+
+MainTab:New("Toggle")({
+    Title = "Auto-Catch",
+    Description = "Automatically catches babies/items nearby",
+    Callback = function(v) _G_DATA.autoCatch = v end
+})
+
+MainTab:New("Toggle")({
+    Title = "No Dive Cooldown",
+    Description = "Instant dive & infinite stamina",
+    Callback = function(v) _G_DATA.noDiveCooldown = v end
+})
+
+MainTab:New("Toggle")({
+    Title = "Infinite Jump",
+    Callback = function(v) _G_DATA.infJump = v end
+})
+
+MainTab:New("Toggle")({
+    Title = "Noclip",
+    Callback = function(v) _G_DATA.noclip = v end
+})
+
+--- LOCAL TAB ---
+LocalTab:New("Title")({ Title = "Physical" })
+
+LocalTab:New("Toggle")({
+    Title = "Speed Hack",
+    Callback = function(v) _G_DATA.speed = v end
+})
+
+LocalTab:New("Slider")({
+    Title = "WalkSpeed",
+    Default = 17.9,
+    Minimum = 16,
+    Maximum = 250,
+    Callback = function(v) _G_DATA.walkSpeed = v end
+})
+
+LocalTab:New("Title")({ Title = "Flight Control" })
+
+LocalTab:New("Toggle")({
+    Title = "Fly (MOBILE)",
+    Callback = function(v) 
+        _G_DATA.flyMobile = v 
+        if not v and LocalPlayer.Character then LocalPlayer.Character.Humanoid.PlatformStand = false end
+    end
+})
+
+LocalTab:New("Slider")({
+    Title = "Mobile Flight Speed",
+    Default = 50, Minimum = 10, Maximum = 250,
+    Callback = function(v) _G_DATA.flySpeedMobile = v end
+})
+
+LocalTab:New("Toggle")({
+    Title = "Fly (PC)",
+    Callback = function(v) 
+        _G_DATA.flyPC = v 
+        if not v and LocalPlayer.Character then LocalPlayer.Character.Humanoid.PlatformStand = false end
+    end
+})
+
+LocalTab:New("Slider")({
+    Title = "PC Flight Speed",
+    Default = 50, Minimum = 10, Maximum = 250,
+    Callback = function(v) _G_DATA.flySpeedPC = v end
+})
+
+--- VISUALS TAB ---
+VisualsTab:New("Toggle")({
+    Title = "Player ESP",
+    Description = "See through walls with highlights",
+    Callback = function(v) 
+        _G_DATA.esp = v 
+        if not v then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p.Character then
+                    if p.Character:FindFirstChild("KasenHighlight") then p.Character.KasenHighlight:Destroy() end
+                    if p.Character:FindFirstChild("HumanoidRootPart") and p.Character.HumanoidRootPart:FindFirstChild("KasenTag") then
+                        p.Character.HumanoidRootPart.KasenTag:Destroy()
+                    end
+                end
+            end
+        end
+    end
+})
+
+--- PLAYERS TAB ---
+local function GetPlayerNames()
+    local names = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then table.insert(names, p.Name) end
+    end
+    return names
+end
+
+local SelectedPlayer = ""
+PlayersTab:New("Dropdown")({
+    Title = "Select Player",
+    Options = GetPlayerNames(),
+    Callback = function(v) SelectedPlayer = v end
+})
+
+PlayersTab:New("Button")({
+    Title = "Teleport",
+    Callback = function()
+        local target = Players:FindFirstChild(SelectedPlayer)
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame
+        end
+    end
+})
+
+--- UTILITY TAB ---
+UtilityTab:New("Button")({
+    Title = "Dark Dex",
+    Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))() end
+})
+
+UtilityTab:New("Button")({
+    Title = "Infinite Yield",
+    Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))() end
+})
+
+--- SETTINGS TAB ---
+SettingsTab:New("Title")({ Title = "Interface Configuration" })
+
+SettingsTab:New("Dropdown")({
+    Title = "Interface Theme",
+    Description = "Select a color profile for the hub",
+    Options = { 
+        "Obsidian (Black)", 
+        "Void (Extra Dark)", 
+        "Scarlet (Red)", 
+        "Amethyst (Violet)", 
+        "Midnight (Indigo)", 
+        "Sapphire (Blue)", 
+        "Emerald (Teal)", 
+        "Nebula (Purple)", 
+        "Abyssal (Dark Purple)" 
+    },
+    Default = "Obsidian (Black)",
+    Callback = function(Theme)
+        if Theme == "Obsidian (Black)" then Window:SetTheme("Dark")
+        elseif Theme == "Void (Extra Dark)" then Window:SetTheme("Midnight")
+        elseif Theme == "Scarlet (Red)" then Window:SetTheme("Rose") -- Library Red
+        elseif Theme == "Emerald (Teal)" then Window:SetTheme("Emerald")
+        else
+            -- Custom Color Mapping for other requested shades
+            local AccentMap = {
+                ["Amethyst (Violet)"] = Color3.fromRGB(155, 89, 182),
+                ["Midnight (Indigo)"] = Color3.fromRGB(63, 81, 181),
+                ["Sapphire (Blue)"] = Color3.fromRGB(33, 150, 243),
+                ["Nebula (Purple)"] = Color3.fromRGB(142, 68, 173),
+                ["Abyssal (Dark Purple)"] = Color3.fromRGB(48, 25, 52)
+            }
+            local selectedColor = AccentMap[Theme]
+            if selectedColor then
+                Window:SetTheme({ Mode = "Dark", Accent = selectedColor })
+            end
+        end
+    end,
+})
+
+SettingsTab:New("Button")({
+    Title = "Destroy UI",
+    Callback = function() Window:Destroy() end
+})
+
+-- BACKGROUND LOGIC LOOPS
+
+-- PC Key Controls
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.W then pcControls.F = -1
+    elseif input.KeyCode == Enum.KeyCode.S then pcControls.B = 1
+    elseif input.KeyCode == Enum.KeyCode.A then pcControls.L = -1
+    elseif input.KeyCode == Enum.KeyCode.D then pcControls.R = 1
+    elseif input.KeyCode == Enum.KeyCode.E then pcControls.U = 1
+    elseif input.KeyCode == Enum.KeyCode.Q then pcControls.D = -1 end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.W then pcControls.F = 0
+    elseif input.KeyCode == Enum.KeyCode.S then pcControls.B = 0
+    elseif input.KeyCode == Enum.KeyCode.A then pcControls.L = 0
+    elseif input.KeyCode == Enum.KeyCode.D then pcControls.R = 0
+    elseif input.KeyCode == Enum.KeyCode.E then pcControls.U = 0
+    elseif input.KeyCode == Enum.KeyCode.Q then pcControls.D = 0 end
+end)
+
+-- Auto Catch Loop (Logic from Source)
+task.spawn(function()
+    while task.wait(0.05) do
+        if _G_DATA.autoCatch then
+            local func = ReplicatedStorage:FindFirstChild("Replication") and ReplicatedStorage.Replication:FindFirstChild("Functions") and ReplicatedStorage.Replication.Functions:FindFirstChild("Mom_Catch_Baby_Handler")
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if func and char and hrp then
+                for _, b in pairs(workspace:GetDescendants()) do
+                    if b:IsA("Model") and b:FindFirstChild("Catch_Handler") then
+                        local root = b:FindFirstChild("HumanoidRootPart") or b.PrimaryPart
+                        if root and (hrp.Position - root.Position).Magnitude <= 12 then 
+                            task.spawn(function() pcall(function() func:InvokeServer(b) end) end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ESP Loop
+task.spawn(function()
+    while task.wait(0.5) do
+        if _G_DATA.esp then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    pcall(function()
+                        local hl = plr.Character:FindFirstChild("KasenHighlight") or Instance.new("Highlight", plr.Character)
+                        hl.Name = "KasenHighlight"; hl.FillColor = Color3.fromRGB(120, 0, 255); hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                        
+                        local hrp = plr.Character.HumanoidRootPart
+                        if not hrp:FindFirstChild("KasenTag") then
+                            local tag = Instance.new("BillboardGui", hrp)
+                            tag.Name = "KasenTag"; tag.Size = UDim2.new(0, 200, 0, 50); tag.ExtentsOffset = Vector3.new(0, 3.5, 0); tag.AlwaysOnTop = true
+                            local tl = Instance.new("TextLabel", tag)
+                            tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.Text = plr.DisplayName; tl.TextColor3 = Color3.new(1,1,1); tl.Font = Enum.Font.GothamBlack; tl.TextSize = 14
+                        end
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+-- Main Render Loop (Movement/Attributes)
+RunService.RenderStepped:Connect(function()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = LocalPlayer.Character.HumanoidRootPart
+    local hum = LocalPlayer.Character.Humanoid
+    local char = LocalPlayer.Character
+
+    if _G_DATA.speed then hum.WalkSpeed = _G_DATA.walkSpeed end
+
+    if _G_DATA.noDiveCooldown then
+        local stamina = char:FindFirstChild("Dive_Stamina")
+        if stamina then stamina.Value = 10 end
+        for name, value in pairs(char:GetAttributes()) do
+            if string.find(name, "Cooldown") or string.find(name, "Dive") then char:SetAttribute(name, 0) end
+        end
+    end
+
+    if _G_DATA.flyMobile then
+        hum.PlatformStand = true
+        local mv = GetMobileMoveVector()
+        if mv.Magnitude > 0 then hrp.Velocity = Camera.CFrame:VectorToWorldSpace(mv.Unit) * _G_DATA.flySpeedMobile else hrp.Velocity = Vector3.new(0, 0, 0) end
+    elseif _G_DATA.flyPC then
+        hum.PlatformStand = true
+        local mv = Vector3.new(pcControls.L + pcControls.R, pcControls.U + pcControls.D, pcControls.F + pcControls.B)
+        if mv.Magnitude > 0 then hrp.Velocity = Camera.CFrame:VectorToWorldSpace(mv.Unit) * _G_DATA.flySpeedPC else hrp.Velocity = Vector3.new(0, 0, 0) end
+    else
+        if not _G_DATA.flyMobile and not _G_DATA.flyPC then hum.PlatformStand = false end
+    end
+end)
+
+-- Collision/Jump
+RunService.Stepped:Connect(function()
+    if _G_DATA.noclip and LocalPlayer.Character then
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
+    end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if _G_DATA.infJump and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- Initialize
+Window:SetTheme("Midnight") -- Automatic Black (Night Mode)
+Window:SetTab("Game")
+Window:Notify({ Title = "Kasen Hub", Description = "System Ready", Type = "Success" })
