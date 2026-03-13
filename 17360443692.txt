@@ -1,0 +1,62 @@
+-- Race 2 Auto Spin GUI --
+local plr = game:GetService("Players").LocalPlayer
+local RS = game:GetService("ReplicatedStorage")
+local R = RS.Remotes
+pcall(function() plr.PlayerGui:FindFirstChild("R2GUI"):Destroy() end)
+
+local gui = Instance.new("ScreenGui"); gui.Name="R2GUI"; gui.ResetOnSpawn=false; gui.Parent=plr.PlayerGui
+local main = Instance.new("Frame"); main.Size=UDim2.new(0,200,0,70); main.Position=UDim2.new(0.5,-100,0,10)
+main.BackgroundColor3=Color3.fromRGB(20,20,30); main.BorderSizePixel=0; main.Parent=gui
+Instance.new("UICorner",main).CornerRadius=UDim.new(0,8)
+
+local dr,ds,sp
+main.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+        dr=true;ds=i.Position;sp=main.Position
+        i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dr=false end end)
+    end
+end)
+game:GetService("UserInputService").InputChanged:Connect(function(i)
+    if dr and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+        local d=i.Position-ds; main.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y)
+    end
+end)
+
+local t=Instance.new("TextLabel",main); t.Size=UDim2.new(1,-28,0,25); t.BackgroundColor3=Color3.fromRGB(60,30,120)
+t.BorderSizePixel=0; t.Text="  Animal Racing"; t.TextColor3=Color3.fromRGB(220,220,220); t.TextSize=13; t.Font=Enum.Font.GothamBold; t.TextXAlignment=Enum.TextXAlignment.Left
+Instance.new("UICorner",t).CornerRadius=UDim.new(0,8)
+local x=Instance.new("TextButton",main); x.Size=UDim2.new(0,25,0,25); x.Position=UDim2.new(1,-27,0,0)
+x.BackgroundColor3=Color3.fromRGB(180,50,50); x.Text="X"; x.TextColor3=Color3.new(1,1,1); x.TextSize=12; x.Font=Enum.Font.GothamBold; x.BorderSizePixel=0
+Instance.new("UICorner",x).CornerRadius=UDim.new(0,8)
+x.MouseButton1Click:Connect(function() running=false; gui:Destroy() end)
+
+local running = false
+local btn = Instance.new("TextButton",main); btn.Size=UDim2.new(1,-10,0,35); btn.Position=UDim2.new(0,5,0,30)
+btn.BackgroundColor3=Color3.fromRGB(40,40,55); btn.Text="Auto Spin: OFF"; btn.TextColor3=Color3.fromRGB(200,200,200)
+btn.TextSize=14; btn.Font=Enum.Font.GothamBold; btn.BorderSizePixel=0
+Instance.new("UICorner",btn).CornerRadius=UDim.new(0,8)
+
+btn.MouseButton1Click:Connect(function()
+    running = not running
+    if running then
+        btn.BackgroundColor3 = Color3.fromRGB(30,120,30)
+        btn.Text = "Auto Spin: ON"
+        spawn(function()
+            local spins = 0
+            while running do
+                pcall(function() R.Gifts.GiveReward:FireServer(math.huge) end)
+                for _ = 1, 50 do
+                    if not running then break end
+                    pcall(function() R.Gifts.GiveFreeSpin:FireServer() end)
+                    pcall(function() R.Gifts.RequestSpinReward:InvokeServer() end)
+                    spins = spins + 1
+                end
+                print("Spins: " .. spins)
+                task.wait(0.5)
+            end
+        end)
+    else
+        btn.BackgroundColor3 = Color3.fromRGB(40,40,55)
+        btn.Text = "Auto Spin: OFF"
+    end
+end)
