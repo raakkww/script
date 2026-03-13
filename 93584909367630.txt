@@ -1,0 +1,10 @@
+local RS = game:GetService("ReplicatedStorage")
+RS.AddMoneyRemote:FireServer(9.999e307)
+RS.AddRebirthRemote:FireServer(math.huge)
+RS.AddSpeedRemote:FireServer(1000)
+RS.AddWaveTokensRemote:FireServer(math.huge)
+RS.AddTradeTokensRemote:FireServer(math.huge)
+
+-- CHANGE THE NAME BELOW TO ANY BRAINROT YOU WANT:
+local brainrot = "Meta Technetta"
+RS.GiveBrainrotRemote:FireServer(brainrot)
