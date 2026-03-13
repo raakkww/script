@@ -1,0 +1,8 @@
+for i = 1, 5 do
+    task.spawn(function()
+        while true do
+            pcall(game.ReplicatedStorage.Remotes.Misc.Fart.FireServer, game.ReplicatedStorage.Remotes.Misc.Fart)
+            task.wait(0.001)
+        end
+    end)
+end
