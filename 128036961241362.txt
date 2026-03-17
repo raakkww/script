@@ -1,0 +1,7 @@
+while true do
+    local args = {
+        50
+    }
+    game:GetService("ReplicatedStorage"):WaitForChild("AddDieMoney"):FireServer(unpack(args))
+    task.wait(0.0001)
+end
