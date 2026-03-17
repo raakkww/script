@@ -1,0 +1,133 @@
+--[[
+    sh1tty script - PHYSICS DRIVE 2 (V227)
+    Update: Side-Spam Offset (Alternating Left/Right Impact)
+    Features: Target Lock, Car Fly, Chaos Physics
+--]]
+
+local LP = game:GetService("Players").LocalPlayer
+local RS = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+
+if CoreGui:FindFirstChild("sh1tty_physics_v227") then CoreGui.sh1tty_physics_v227:Destroy() end
+
+-- --- 1. SETTINGS ---
+local cfg = {
+    destroy_target = false,
+    currentTarget = nil,
+    car_fly = false,
+    fly_speed = 120,
+    side_toggle = false -- Used to alternate sides
+}
+
+-- --- 2. UI CONSTRUCTION ---
+local SherlockHub = Instance.new("ScreenGui", CoreGui)
+SherlockHub.Name = "sh1tty_physics_v227"
+
+local MainFrame = Instance.new("Frame", SherlockHub)
+MainFrame.Size = UDim2.new(0, 350, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 15) -- Purple Chaos Tint
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.BackgroundColor3 = Color3.fromRGB(60, 0, 60)
+Title.Text = ""
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.Code
+
+local Container = Instance.new("ScrollingFrame", MainFrame)
+Container.Size = UDim2.new(1, -20, 1, -60)
+Container.Position = UDim2.new(0, 10, 0, 55)
+Container.BackgroundTransparency = 1
+local UIList = Instance.new("UIListLayout", Container)
+UIList.Padding = UDim.new(0, 5)
+
+-- --- 3. THE SIDE-SPAM ENGINE ---
+
+local function GetMyCar()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("VehicleSeat") and v.Occupant and v.Occupant.Parent == LP.Character then
+            return v.Parent 
+        end
+    end
+    return nil
+end
+
+local function GetNextTarget()
+    local closest, dist = nil, math.huge
+    for _, p in pairs(game.Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("VehicleSeat") and v.Occupant and v.Occupant.Parent == p.Character then
+                    local d = (LP.Character.HumanoidRootPart.Position - v.Position).Magnitude
+                    if d < dist then
+                        dist = d
+                        closest = v.Parent
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function CreateToggle(name, callback)
+    local btn = Instance.new("TextButton", Container)
+    btn.Size = UDim2.new(1, 0, 0, 45)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    btn.Text = "[OFF] " .. name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.Code
+    
+    local state = false
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = (state and "[LOCKING] " or "[OFF] ") .. name
+        btn.TextColor3 = state and Color3.new(1, 0, 1) or Color3.new(1, 1, 1)
+        callback(state)
+    end)
+end
+
+RS.Heartbeat:Connect(function()
+    local myCar = GetMyCar()
+    if not myCar then return end
+    local myRoot = myCar:FindFirstChildWhichIsA("BasePart", true)
+    if not myRoot then return end
+
+    -- TARGET DESTRUCTION (SIDE SPAM)
+    if cfg.destroy_target then
+        if not cfg.currentTarget or not cfg.currentTarget.Parent then
+            cfg.currentTarget = GetNextTarget()
+        end
+
+        if cfg.currentTarget then
+            local targetRoot = cfg.currentTarget:FindFirstChildWhichIsA("BasePart", true)
+            if targetRoot then
+                -- Alternate side every frame
+                cfg.side_toggle = not cfg.side_toggle
+                local sideOffset = cfg.side_toggle and 4 or -4
+                
+                -- TP to the side of the target car
+                myRoot.CFrame = targetRoot.CFrame * CFrame.new(sideOffset, 0, 0)
+                myRoot.Velocity = Vector3.new(0, 700, 0) -- Vertical force for flinging
+            end
+        end
+    else
+        cfg.currentTarget = nil
+    end
+
+    -- CAR FLY
+    if cfg.car_fly then
+        local hum = LP.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            myRoot.Velocity = (hum.MoveDirection * cfg.fly_speed) + Vector3.new(0, 2, 0)
+            myRoot.RotVelocity = Vector3.zero
+        end
+    end
+end)
+
+-- --- 4. POPULATE ---
+CreateToggle("LOCK & SIDE SPAM", function(v) cfg.destroy_target = v end)
+CreateToggle("CAR FLY", function(v) cfg.car_fly = v end)
