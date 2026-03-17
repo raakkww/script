@@ -1,0 +1,114 @@
+---MESSY AHH CODE DONT LOOK
+
+
+local progress = game:GetService("Players").LocalPlayer.PlayerGui.MainGui.RobberyFrame.RobberyProgressLabel
+pfundpp = workspace.PoliceFundsModel.ColorGiver.Part2.ProximityPrompt
+bbpp = workspace.VaultDoorModel03.TriggerPart.ProximityPrompt
+pbopp = workspace.VaultDoorModel01.TriggerPart.ProximityPrompt
+bankopp = workspace.VaultDoorModel02.TriggerPart.ProximityPrompt
+
+local selectteam = game:GetService("ReplicatedStorage").SelectTeam
+
+local depo = CFrame.new(747, 4, 96)
+local bbin = CFrame.new(-100, 118, 49)
+local pfunds = CFrame.new(390, 285, -508)
+local pbin = CFrame.new(-164, 199, 53)
+local bankoin = CFrame.new(-172, 285, 47)
+local escape = CFrame.new(396, 4, -130)
+
+local plr = game.Players.LocalPlayer
+
+local function checkDone()
+    local message = progress.Text:split("/")[1].. " ?==? ".. progress.Text:split("/")[2]
+    if said ~= message then
+        print(message)
+        said = message
+    end
+    return progress.Text:split("/")[1] == progress.Text:split("/")[2]
+end
+
+local function isOpen(pp, name)
+    print("is "..name.." open? ".. tostring(pp.Enabled))
+    return pp.Enabled
+end
+
+for i, vault in workspace:GetDescendants() do
+    if vault.Name == "VaultDoor" then vault:Destroy() end
+    if vault.Name == "Intersection" then vault:Destroy() end
+end
+
+local robberytoRob = pfundpp
+local robname = "police funds"
+local said
+local function goRob()
+    task.wait()
+    if plr.Neutral then
+        selectteam:FireServer("Prisoner")
+    end
+
+    local char = plr.Character
+    local root = char.HumanoidRootPart
+    task.wait(3)
+    if plr.Team.Name ~= "Criminal" then
+        print("not crim, escaping...")
+        root.CFrame = escape
+        char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        task.wait(.2)
+        char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        task.wait(.2)
+        char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        goRob()
+        return
+    end
+    if isOpen(robberytoRob, robname) then
+        local robpos
+        if robberytoRob == pfundpp then
+            robpos = pfunds
+        elseif robberytoRob == bankopp then
+            robpos = bankoin
+        elseif robberytoRob == pbopp then
+            robpos = pbin
+        elseif robberytoRob == bbpp then
+            robpos = bbin
+        end
+        print(robpos)
+        root.CFrame = robpos
+        task.wait(.2)
+        print("triggering...")
+        robberytoRob:InputHoldBegin()
+        robberytoRob.Triggered:Once(function()
+            task.wait()
+            print("triggered")
+            progress.Text = "it is / not done"
+            said = progress.Text
+            while not checkDone() do
+                task.wait()
+                if robberytoRob == pfundpp then
+                    break
+                end
+            end
+            print("done?")
+            root.CFrame = depo
+            print("loopagain")
+            goRob()
+        end)
+    else
+        local random = math.random(1, 4)
+        if random == 1 then
+            robberytoRob = pfundpp
+            robname = "police funds"
+        elseif random == 2 then
+            robberytoRob = pbopp
+            robname = "pbo bank"
+        elseif random == 3 then
+            robberytoRob = bbpp
+            robname = "bbo bank"
+        else 
+            robberytoRob = bankopp
+            robname = "banko"
+        end
+        goRob()
+    end
+end
+
+goRob()
