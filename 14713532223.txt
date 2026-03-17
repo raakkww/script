@@ -1,0 +1,37 @@
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local Remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes")
+
+-- CONFIGURATION (Adjust for maximum chaos)
+_G.KillRange = 100 -- Set very long range
+_G.AttackSpeed = 0 -- 0 is maximum (No delay)
+_G.AuraEnabled = true
+
+local function KillLogic()
+    while _G.AuraEnabled do
+        local character = LP.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        local tool = character and character:FindFirstChildOfClass("Tool") or LP.Backpack:FindFirstChild("Fists")
+
+        if root and tool then
+            -- Finding targets in the entire workspace at high speed
+            for _, enemy in pairs(workspace:GetChildren()) do
+                local eHum = enemy:FindFirstChild("Humanoid")
+                local eRoot = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("Head")
+
+                if eHum and eHum.Health > 0 and eRoot and not Players:GetPlayerFromCharacter(enemy) then
+                    -- Long Range Distance Check
+                    if (root.Position - eRoot.Position).Magnitude <= _G.KillRange then
+                        -- SPAM REMOTES
+                        Remotes.MeleeAttacked:FireServer(tool, 1)
+                        Remotes.MeleeHit:FireServer(tool, eRoot)
+                    end
+                end
+            end
+        end
+        task.wait(_G.AttackSpeed) -- Loops as fast as possible
+    end
+end
+
+-- Run in background
+task.spawn(KillLogic)
