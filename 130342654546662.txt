@@ -1,0 +1,709 @@
+-- [ SAMBUNG KATA GUI - VERSI FINAL STABLE ]
+-- Database dari: kanzXhub (628+ kata authentic)
+-- Support: X, LY, CY, GY, ISME, EH, E, PT, FT, LT, IT, OT, KT, RT, DT
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local guiParent = pcall(function() return CoreGui.Name end) and CoreGui or Players.LocalPlayer:WaitForChild("PlayerGui")
+
+if guiParent:FindFirstChild("qiellHub") then
+	guiParent.qiellHub:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "qiellHub"
+ScreenGui.Parent = guiParent
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- [ TOGGLE BUTTON ]
+local ToggleButton = Instance.new("Frame")
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Size = UDim2.new(0, 90, 0, 90)
+ToggleButton.Position = UDim2.new(1, -110, 1, -110)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.BorderSizePixel = 0
+ToggleButton.ZIndex = 10
+ToggleButton.Parent = ScreenGui
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 12)
+ToggleCorner.Parent = ToggleButton
+
+local LogoImage = Instance.new("ImageLabel")
+LogoImage.Size = UDim2.new(1, -8, 1, -8)
+LogoImage.Position = UDim2.new(0, 4, 0, 4)
+LogoImage.BackgroundTransparency = 1
+LogoImage.Image = "rbxassetid://105687352673338"
+LogoImage.ScaleType = Enum.ScaleType.Fit
+LogoImage.Parent = ToggleButton
+
+local Shadow = Instance.new("Frame")
+Shadow.Size = UDim2.new(1, 4, 1, 4)
+Shadow.Position = UDim2.new(0, -2, 0, -2)
+Shadow.BackgroundColor3 = Color3.fromRGB(200, 150, 170)
+Shadow.BorderSizePixel = 0
+Shadow.ZIndex = 9
+Shadow.Parent = ToggleButton
+
+local ShadowCorner = Instance.new("UICorner")
+ShadowCorner.CornerRadius = UDim.new(0, 12)
+ShadowCorner.Parent = Shadow
+
+local uiVisible = true
+
+-- [ MAIN FRAME ]
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 500, 0, 520)
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -260)
+MainFrame.BackgroundColor3 = Color3.fromRGB(245, 235, 240)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = MainFrame
+
+-- Draggable
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = MainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+MainFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- [ HEADER ]
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 40)
+Header.BackgroundColor3 = Color3.fromRGB(200, 150, 170)
+Header.BorderSizePixel = 0
+Header.Active = true
+Header.Parent = MainFrame
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 12)
+HeaderCorner.Parent = Header
+
+local HeaderFix = Instance.new("Frame")
+HeaderFix.Size = UDim2.new(1, 0, 0, 10)
+HeaderFix.Position = UDim2.new(0, 0, 1, -10)
+HeaderFix.BackgroundColor3 = Color3.fromRGB(200, 150, 170)
+HeaderFix.BorderSizePixel = 0
+HeaderFix.Parent = Header
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "SAMBUNG KATA (628+ KATA)"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 16
+CloseBtn.Parent = Header
+
+CloseBtn.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy()
+end)
+
+-- [ TAB SYSTEM ]
+local TabFrame = Instance.new("Frame")
+TabFrame.Size = UDim2.new(0, 100, 1, -40)
+TabFrame.Position = UDim2.new(0, 0, 0, 40)
+TabFrame.BackgroundColor3 = Color3.fromRGB(230, 220, 225)
+TabFrame.BorderSizePixel = 0
+TabFrame.Parent = MainFrame
+
+local activeTab = "awalan"
+
+local TabAwalan = Instance.new("TextButton")
+TabAwalan.Size = UDim2.new(1, 0, 0, 50)
+TabAwalan.Position = UDim2.new(0, 0, 0, 0)
+TabAwalan.BackgroundColor3 = Color3.fromRGB(200, 150, 170)
+TabAwalan.TextColor3 = Color3.fromRGB(255, 255, 255)
+TabAwalan.Text = "Kata\nAwalan"
+TabAwalan.Font = Enum.Font.GothamBold
+TabAwalan.TextSize = 11
+TabAwalan.BorderSizePixel = 0
+TabAwalan.Parent = TabFrame
+
+local TabAwalanCorner = Instance.new("UICorner")
+TabAwalanCorner.CornerRadius = UDim.new(0, 6)
+TabAwalanCorner.Parent = TabAwalan
+
+local TabAkhiran = Instance.new("TextButton")
+TabAkhiran.Size = UDim2.new(1, 0, 0, 50)
+TabAkhiran.Position = UDim2.new(0, 0, 0, 50)
+TabAkhiran.BackgroundColor3 = Color3.fromRGB(180, 120, 150)
+TabAkhiran.TextColor3 = Color3.fromRGB(255, 255, 255)
+TabAkhiran.Text = "Akhiran"
+TabAkhiran.Font = Enum.Font.GothamBold
+TabAkhiran.TextSize = 11
+TabAkhiran.BorderSizePixel = 0
+TabAkhiran.Parent = TabFrame
+
+local TabAkhiranCorner = Instance.new("UICorner")
+TabAkhiranCorner.CornerRadius = UDim.new(0, 6)
+TabAkhiranCorner.Parent = TabAkhiran
+
+-- [ CONTENT FRAME ]
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, -100, 1, -40)
+ContentFrame.Position = UDim2.new(0, 100, 0, 40)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.BorderSizePixel = 0
+ContentFrame.Parent = MainFrame
+
+-- [ SEARCH BOX ]
+local SearchBox = Instance.new("TextBox")
+SearchBox.Size = UDim2.new(1, -30, 0, 35)
+SearchBox.Position = UDim2.new(0, 15, 0, 15)
+SearchBox.BackgroundColor3 = Color3.fromRGB(235, 220, 230)
+SearchBox.TextColor3 = Color3.fromRGB(30, 30, 50)
+SearchBox.PlaceholderText = "Cari huruf awal (A, B, C...)"
+SearchBox.Font = Enum.Font.Gotham
+SearchBox.TextSize = 12
+SearchBox.ClearTextOnFocus = false
+SearchBox.Parent = ContentFrame
+
+local SearchCorner = Instance.new("UICorner")
+SearchCorner.CornerRadius = UDim.new(0, 8)
+SearchCorner.Parent = SearchBox
+
+-- [ BUTTON FRAME ]
+local ButtonFrame = Instance.new("Frame")
+ButtonFrame.Size = UDim2.new(1, -30, 0, 35)
+ButtonFrame.Position = UDim2.new(0, 15, 0, 55)
+ButtonFrame.BackgroundTransparency = 1
+ButtonFrame.BorderSizePixel = 0
+ButtonFrame.Parent = ContentFrame
+
+local ButtonLayout = Instance.new("UIListLayout")
+ButtonLayout.FillDirection = Enum.FillDirection.Horizontal
+ButtonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ButtonLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+ButtonLayout.Padding = UDim.new(0, 8)
+ButtonLayout.Parent = ButtonFrame
+
+-- Auto Enter Toggle (DEFAULT ON seperti kanzXhub)
+local autoEnterEnabled = true
+local AutoEnterBtn = Instance.new("TextButton")
+AutoEnterBtn.Size = UDim2.new(0, 65, 0, 30)
+AutoEnterBtn.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+AutoEnterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoEnterBtn.Text = "Enter: ON"
+AutoEnterBtn.Font = Enum.Font.GothamBold
+AutoEnterBtn.TextSize = 11
+AutoEnterBtn.BorderSizePixel = 0
+AutoEnterBtn.Parent = ButtonFrame
+
+local AutoEnterCorner = Instance.new("UICorner")
+AutoEnterCorner.CornerRadius = UDim.new(0, 6)
+AutoEnterCorner.Parent = AutoEnterBtn
+
+AutoEnterBtn.MouseButton1Click:Connect(function()
+	autoEnterEnabled = not autoEnterEnabled
+	if autoEnterEnabled then
+		AutoEnterBtn.Text = "Enter: ON"
+		AutoEnterBtn.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+	else
+		AutoEnterBtn.Text = "Enter: OFF"
+		AutoEnterBtn.BackgroundColor3 = Color3.fromRGB(107, 114, 128)
+	end
+end)
+
+-- Rapid Backspace
+local RapidBtn = Instance.new("TextButton")
+RapidBtn.Size = UDim2.new(0, 70, 0, 30)
+RapidBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 130)
+RapidBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RapidBtn.Text = "Hapus Cepat"
+RapidBtn.Font = Enum.Font.GothamBold
+RapidBtn.TextSize = 8
+RapidBtn.BorderSizePixel = 0
+RapidBtn.Parent = ButtonFrame
+
+local RapidCorner = Instance.new("UICorner")
+RapidCorner.CornerRadius = UDim.new(0, 6)
+RapidCorner.Parent = RapidBtn
+
+local isHoldingBackspace = false
+RapidBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		isHoldingBackspace = true
+		RapidBtn.BackgroundColor3 = Color3.fromRGB(180, 80, 110)
+		
+		while isHoldingBackspace do
+			pcall(function()
+				VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Backspace, false, game)
+				task.wait(0.01)
+				VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Backspace, false, game)
+			end)
+			task.wait(0.05)
+		end
+	end
+end)
+
+RapidBtn.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		isHoldingBackspace = false
+		RapidBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 130)
+	end
+end)
+
+-- Reset Button
+local ResetBtn = Instance.new("TextButton")
+ResetBtn.Size = UDim2.new(0, 50, 0, 30)
+ResetBtn.BackgroundColor3 = Color3.fromRGB(180, 150, 170)
+ResetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ResetBtn.Text = "Reset"
+ResetBtn.Font = Enum.Font.GothamBold
+ResetBtn.TextSize = 9
+ResetBtn.BorderSizePixel = 0
+ResetBtn.Parent = ButtonFrame
+
+local ResetCorner = Instance.new("UICorner")
+ResetCorner.CornerRadius = UDim.new(0, 6)
+ResetCorner.Parent = ResetBtn
+
+ResetBtn.MouseButton1Click:Connect(function()
+	usedWords = {}
+	SearchBox.Text = ""
+	clearResults()
+	doSearch()
+end)
+
+-- [ STATUS LABEL ]
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -30, 0, 18)
+StatusLabel.Position = UDim2.new(0, 15, 0, 95)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Memuat kata..."
+StatusLabel.TextColor3 = Color3.fromRGB(80, 80, 100)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 11
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = ContentFrame
+
+-- [ RESULT LIST ]
+local ResultList = Instance.new("ScrollingFrame")
+ResultList.Size = UDim2.new(1, -30, 1, -125)
+ResultList.Position = UDim2.new(0, 15, 0, 120)
+ResultList.BackgroundTransparency = 1
+ResultList.ScrollBarThickness = 6
+ResultList.ScrollBarImageColor3 = Color3.fromRGB(200, 150, 170)
+ResultList.CanvasSize = UDim2.new(0, 0, 0, 0)
+ResultList.Parent = ContentFrame
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0, 5)
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Parent = ResultList
+
+-- [ DATABASE KATA - DARI KANZXHUB (628+ KATA) ]
+local wordsDatabase = {
+	-- AKHIRAN X (98 kata)
+	"bordeaux", "lex", "sphinx", "unisex", "bodrex", "komix", "gallierex", "addax", 
+	"aframax", "apterix", "bombyx", "caloperdrix", "caranx", "caronx", "chalcococyx", 
+	"chx", "cimex", "circumfix", "coix", "confix", "cyathocalyx", "donax", "echinosorex", 
+	"forex", "helix", "hystrix", "ilex", "index", "lux", "marx", "max", "melanoperdix", 
+	"meritrix", "microhierax", "molitrix", "murex", "mystax", "naiasptatrix", "natrix", 
+	"nephotettix", "nephottotix", "ninox", "nontax", "nothopanax", "nycticorax", "offax", 
+	"olfax", "ex", "prix", "annex", "croix", "deux", "complex", "ix", "hapax", "rex", 
+	"klux", "mantoux", "box", "vox",
+	"xacum", "xan", "xantat", "xantena", "xanthophyllum", "xanthorrhiza", "xanthosoma", 
+	"xantofil", "xe", "xenia", "xenial", "xenobiologi", "xenochrophia", "xenofil", 
+	"xenofobia", "xenolosia", "xenograf", "xenokrasi", "xenolit", "xenomania", "xenon", 
+	"xenopsylla", "xerofil", "xerofit", "xeroftalmia", "xerografi", "xerosis", "xi", 
+	"xifoid", "xii", "xiii", "xilan", "xilem", "xilena", "xilibium", "xilofag", "xilofon", 
+	"xilografi", "xiloid", "xiloidina", "xilol", "xilologi", "xilonit", "xilosa", "xiroderma", 
+	"xister", "xiv", "xix", "xvi", "xx", "xy", "xylocarpus", "xylopia", "xylotropes", "xystrocera",
+
+	-- AKHIRAN LY (16 kata)
+	"assertedly", "billy", "bily", "diddly", "disproportionally", "errorlessly", 
+	"expansively", "neighbourly", "overabundantly", "piddly", "resumply", "retailly", 
+	"sandfly", "secondly", "separably", "westwardly",
+
+	-- AKHIRAN CY (11 kata)
+	"arrogancy", "corpulency", "delegitmacy", "excellency", "incompetency", "nonlegitmacy", 
+	"supremacy", "prodemocracy", "recalcitracy", "insurgency", "verdancy",
+
+	-- AKHIRAN GY (8 kata)
+	"anaesthesiology", "buggy", "cosmology", "oceanology", "paleontropology", 
+	"pathology", "seismology", "otourology",
+
+	-- AKHIRAN ISME (400+ kata)
+	"isisme", "absenteisme", "absolutisme", "absurdisme", "aforisme", "agnostisisme", "aktivisme", 
+	"albinisme", "alkoholisme", "alomerisme", "altruisme", "amatirisme", "amensalisme", "amfibolisme", 
+	"anabolisme", "anakronisme", "anarkisme", "aneurisme", "animisme", "antagonisme", "antisemitisme", 
+	"antropomorfisme", "antroposentrisme", "antusiasme", "aheliotrpisime", "arkaisme", "asketisisme", 
+	"atavisme", "ateisme", "autisme", "banditisme", "bapakisme", "barbarisme", "bebekisme", 
+	"bilateralisme", "bilingualisme", "bipolisentriisme", "birokraitisme", "blabitisme", "botulisme", 
+	"bromisme", "brutalisme", "buddhisme", "dadaisme", "daerahisme", "daltonisme", "defaitisme", 
+	"deisme", "despotisme", "determinisme", "diamagnetisme", "dikroisme", "dimorfisme", "dinamisme", 
+	"dismembrasia", "dismenorea", "dogmatisme", "dualisme", "durnoisme", "eksotisme", "ekspansionisme", 
+	"ekspresionisme", "ekumenisme", "elektromagnetisme", "embolisme", "emosionalisme", "empirisme", 
+	"energi", "erosentriisme", "erotisisme", "erotisme", "eskapisme", "etatisme", "etnoseentriisme", 
+	"eudaemonisme", "eufemisme", "evolusionisme", "familisme", "fanatisme", "fasisme", "fatalisme", 
+	"favoritisme", "federalisme", "feminisme", "fenomenalisme", "feodalisime", "feromagnetisme", 
+	"fotoperiodisme", "fundamentalisme", "fungsionalisme", "futurisme", "gigantisme", "globalisme", 
+	"gradualisme", "hedonisme", "hegelianisme", "hegemonisme", "heliotropisme", "henoteisme", 
+	"hermafroditisme", "heroisme", "hinduisme", "hipnotisme", "hipopituitarisme", "hipotiroidisme", 
+	"hirsutisme", "historisisme", "holisme", "homoseksualisme", "humanisme", "idealisme", 
+	"ikhtiosarkotoksisme", "ikhtiotoksisme", "ikonoklasme", "imperialisme", "impresionisme", 
+	"indeterminisme", "individualisme", "infantilisme", "intelektualisme", "interventionisme", 
+	"islamisme", "isokronisme", "isolasionisme", "isomorfisme", "retreatisme", "romantisisme", 
+	"sadisme", "sarkasme", "sauviniisme", "sektarianisme", "sekularisme", "semitisme", 
+	"sensualisme", "separatisme", "silogisme", "simbolisme", "sindikalisme", "sinergisme", 
+	"sinisme", "sinkretisme", "sinkronisme", "skeptisisme", "skolastisisme", "smes", "snobisme", 
+	"sodomasosisme", "sofisme", "solipsisme", "somnambulisme", "sosialisme", "spiritisme", 
+	"spiritualisme", "stalinisme", "stereoisomerisme", "struktur", "strukturalisme", "subjektivisme", 
+	"subyektivisme", "sufisme", "sukuisme", "superlativisme", "surealisme", "syamanisme", "takisme", 
+	"tantrisme", "taoisme", "tarantisme", "tautomerisme", "teisme", "teknokratisme", "teori", 
+	"terrorisme", "totaliterisme", "totemisme", "tradisionalisme", "transvetisme", "trauma", 
+	"tropisme", "turisme", "unitarisme", "universalisme", "uranisme", "urbanisme", "utopisme", 
+	"vandalisme", "vegetarisme", "verbalisme", "veritism", "virilisme", "zionisme", "abstraksionisme", 
+	"alelomorfisme", "automorfisme", "biologisme", "buddhisme", "darwinisme", "disfenisme", 
+	"etotisisme", "faksionalisme", "fluksmeter", "fu torisme", "halokromisme", "histerospasme", 
+	"idealisme", "kemotropisme", "konfusianisme", "kosmetika", "kristianisme", "lamaran", 
+	"maltusianisme", "mesomorfisme", "metamerisme", "monolingualisme", "multiteisme", "mutamerisme", 
+	"mutatisme", "mutirasialisme", "narsisisme", "nazisme 1", "neoklasikisme", "polimetalisme", 
+	"polimorfisme", "postrukturalisme", "premanisme", "radiotropisme", "superorganisme", "vitalisme", 
+	"volunterisme", "vulkanisme",
+
+	-- AKHIRAN EH (150+ kata)
+	"baris", "batang", "beha", "behandel", "behena", "behina", "bengkung", "benih", "benteh", "bentes", 
+	"boleh", "bongmeh", "boreh", "bunga", "ceceh", "celekeh", "celoteh", "cemeeh", "cemeh", "cengeh", 
+	"cengkeh", "ceroteh", "cingkeh", "congeh", "daun", "deceh", "deh", "deham", "dehem", "dehidrasi", 
+	"dehidrat", "dehidrogenasi", "dehumanisasi", "didik", "dokoh", "doktor", "ehe", "ekeh", "enceh", 
+	"ereh", "fotografi", "gapura", "gelar", "gereh", "geryeh", "gonyeh", "greha", "grehon", "gunting", 
+	"habis", "hadap", "hadir", "haji", "hakim", "halal", "haluan", "halus", "hambar", "hamil", "hampa", 
+	"hampar", "hancur", "hangat", "hangus", "hari", "harmonis", "haru", "harum", "harus", "hasrat", 
+	"hasta", "hati", "haus", "hebat", "heboh", "helai", "hemat", "hendak", "hening", "heran", "heroik", 
+	"heterogen", "hewan", "hibuk", "hidang", "hidup", "hijau", "hilang", "hilir", "hina", "hiponim", 
+	"hitam", "homofon", "homogen", "homograf", "homomim", "hormat", "hujan", "hujung", "hukum", "humas", 
+	"hutan", "ilmu", "indehoi", "instalasi", "jamu", "jelajeh", "jurang", "kaidah", "kalang", "kambeh", 
+	"kancah", "kanceh", "karat", "kareseh", "kawal", "kayu", "kehel", "kekeh", "keleseh", "keloceh", 
+	"kepik", "keras", "ketua", "kokleh", "komprehensif", "kondisi", "kreseh", "kurun", "kutuk", "larut", "leceh",
+
+	-- AKHIRAN E DAN LAINNYA
+	"ex", "excavata", "excellency", "excelsa", "excelsum", "exclusivism", "excoecaria", "exelse", 
+	"eximia", "exocarpus", "exocecaria", "exocoetidae", "exodus", "exoecaria", "expansa", "expat", "expo",
+	"coapt", "dpt", "oapt", "adesuki", "adipsu", "adis", "adipose", "emdifia", "andrika",
+	"fr", "hiposaft", "oligoaft", "paradr", "skizoaft",
+	"liskopnault", "lt", "balt", "femtovolt", "killavolt", "kolaaft", "kolbaft", 
+	"komalt", "kolt", "kitrovolt", "kult", "walsbelt",
+	"triplit", "skizoft", "simpit", "sleript", "stipit",
+	"capit", "dpit", "oppi", "seipt", "sepit",
+	"bakpt", "kompt", "kusdrupt", "kuinrupt", "kupi",
+	"doppt", "mopt", "mpt", "seipt", "seipt",
+	"apopt", "dipuskompti", "diompi", "dupi", "gappi", "empt", "gapti", "inkompt", "isoppi", 
+	"kogpi", "kompt", "kuadirupi", "kuintupi", "kupi", "magpi", "melppi", "mppi", "multikomppi", 
+	"multiopi", "opi", "paraoppi", "pi", "saopi", "seloppi", "simppi", "stoppi", "suppi", "trippi"
+}
+
+table.sort(wordsDatabase, function(a, b) return #a > #b end)
+StatusLabel.Text = "Kamus Aktif: " .. tostring(#wordsDatabase) .. " kata."
+local usedWords = {}
+
+-- [ CLEAR RESULTS ]
+function clearResults()
+	for _, child in pairs(ResultList:GetChildren()) do
+		if child:IsA("Frame") or child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+end
+
+-- [ CREATE WORD ITEM ]
+function createWordItem(word)
+	local ItemFrame = Instance.new("Frame")
+	ItemFrame.Size = UDim2.new(1, -10, 0, 35)
+	ItemFrame.BackgroundColor3 = Color3.fromRGB(225, 200, 215)
+	ItemFrame.BorderSizePixel = 0
+	ItemFrame.Parent = ResultList
+
+	local ItemCorner = Instance.new("UICorner")
+	ItemCorner.CornerRadius = UDim.new(0, 6)
+	ItemCorner.Parent = ItemFrame
+
+	local MainBtn = Instance.new("TextButton")
+	MainBtn.Size = UDim2.new(1, -165, 1, 0)
+	MainBtn.BackgroundTransparency = 1
+	
+	if usedWords[word] then
+		MainBtn.Text = "  [TERPAKAI] " .. word
+		MainBtn.TextColor3 = Color3.fromRGB(100, 100, 120)
+		ItemFrame.BackgroundColor3 = Color3.fromRGB(200, 170, 190)
+	else
+		MainBtn.Text = "  " .. word
+		MainBtn.TextColor3 = Color3.fromRGB(30, 30, 60)
+	end
+	
+	MainBtn.Font = Enum.Font.GothamSemibold
+	MainBtn.TextSize = 14
+	MainBtn.TextXAlignment = Enum.TextXAlignment.Left
+	MainBtn.Parent = ItemFrame
+
+	local function markAsUsed()
+		usedWords[word] = true
+		MainBtn.Text = "  [TERPAKAI] " .. word
+		MainBtn.TextColor3 = Color3.fromRGB(100, 100, 120)
+		ItemFrame.BackgroundColor3 = Color3.fromRGB(200, 170, 190)
+	end
+
+	MainBtn.MouseButton1Click:Connect(function()
+		if usedWords[word] then return end 
+
+		MainBtn.Text = "  [Mengetik...] " .. word
+		MainBtn.TextColor3 = Color3.fromRGB(80, 100, 200)
+		
+		for i = 1, #word do
+			local char = string.upper(string.sub(word, i, i))
+			local success, keyCode = pcall(function() return Enum.KeyCode[char] end)
+			if success and keyCode then
+				pcall(function()
+					VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+					task.wait(0.01)
+					VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+				end)
+				task.wait(0.02)
+			end
+		end
+		
+		-- AUTO ENTER jika enabled
+		if autoEnterEnabled then
+			task.wait(0.2)
+			pcall(function()
+				VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+				task.wait(0.05)
+				VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+			end)
+		end
+		
+		task.wait(0.2)
+		if MainBtn then
+			markAsUsed()
+		end
+	end)
+
+	local ActionFrame = Instance.new("Frame")
+	ActionFrame.Size = UDim2.new(0, 155, 1, 0)
+	ActionFrame.Position = UDim2.new(1, -160, 0, 0)
+	ActionFrame.BackgroundTransparency = 1
+	ActionFrame.Parent = ItemFrame
+
+	local ActionLayout = Instance.new("UIListLayout")
+	ActionLayout.FillDirection = Enum.FillDirection.Horizontal
+	ActionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	ActionLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	ActionLayout.Padding = UDim.new(0, 4)
+	ActionLayout.Parent = ActionFrame
+
+	local function createCutButton(amount)
+		if #word <= amount then return end
+		
+		local CutBtn = Instance.new("TextButton")
+		CutBtn.Size = UDim2.new(0, 26, 0, 24)
+		CutBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 180)
+		CutBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		CutBtn.Text = "-"..amount
+		CutBtn.Font = Enum.Font.GothamBold
+		CutBtn.TextSize = 11
+		CutBtn.Parent = ActionFrame
+
+		local CutCorner = Instance.new("UICorner")
+		CutCorner.CornerRadius = UDim.new(0, 4)
+		CutCorner.Parent = CutBtn
+
+		CutBtn.MouseButton1Click:Connect(function()
+			if usedWords[word] then return end 
+
+			CutBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 150)
+			CutBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			
+			local cutWord = string.sub(word, amount + 1)
+			
+			for i = 1, #cutWord do
+				local char = string.upper(string.sub(cutWord, i, i))
+				local success, keyCode = pcall(function() return Enum.KeyCode[char] end)
+				if success and keyCode then
+					pcall(function()
+						VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+						task.wait(0.01)
+						VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+					end)
+					task.wait(0.02)
+				end
+			end
+			
+			-- AUTO ENTER jika enabled
+			if autoEnterEnabled then
+				task.wait(0.2)
+				pcall(function()
+					VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+					task.wait(0.05)
+					VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+				end)
+			end
+			
+			task.wait(0.2)
+			if CutBtn then
+				CutBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 180)
+				CutBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+				markAsUsed()
+			end
+		end)
+	end
+
+	createCutButton(1)
+	createCutButton(2)
+	createCutButton(3)
+	createCutButton(4)
+	createCutButton(5)
+end
+
+-- [ SEARCH FUNCTION ]
+function doSearch()
+	local query = string.lower(SearchBox.Text)
+	clearResults()
+	
+	if query == "" then
+		StatusLabel.Text = "Kamus Aktif: " .. tostring(#wordsDatabase) .. " kata."
+		ResultList.CanvasSize = UDim2.new(0, 0, 0, 0)
+		return
+	end
+
+	local count = 0
+	
+	if activeTab == "awalan" then
+		for _, word in ipairs(wordsDatabase) do
+			if string.sub(word, 1, #query) == query then
+				createWordItem(word)
+				count = count + 1
+				if count >= 100 then break end
+			end
+		end
+	else
+		for _, word in ipairs(wordsDatabase) do
+			if string.sub(word, -#query) == query then
+				createWordItem(word)
+				count = count + 1
+				if count >= 100 then break end
+			end
+		end
+	end
+
+	StatusLabel.Text = "Ditemukan: " .. tostring(count) .. (count >= 100 and "+ (Terbatas 100)" or " kata")
+	ResultList.CanvasSize = UDim2.new(0, 0, 0, count * 40)
+end
+
+SearchBox:GetPropertyChangedSignal("Text"):Connect(doSearch)
+
+-- [ TAB CLICK HANDLERS ]
+TabAwalan.MouseButton1Click:Connect(function()
+	activeTab = "awalan"
+	TabAwalan.BackgroundColor3 = Color3.fromRGB(200, 150, 170)
+	TabAkhiran.BackgroundColor3 = Color3.fromRGB(180, 120, 150)
+	SearchBox.PlaceholderText = "Cari huruf awal (A, B, C...)"
+	SearchBox.Text = ""
+	clearResults()
+	doSearch()
+end)
+
+TabAkhiran.MouseButton1Click:Connect(function()
+	activeTab = "akhiran"
+	TabAkhiran.BackgroundColor3 = Color3.fromRGB(200, 150, 170)
+	TabAwalan.BackgroundColor3 = Color3.fromRGB(180, 120, 150)
+	SearchBox.PlaceholderText = "Cari huruf akhir (X, ISME, EH...)"
+	SearchBox.Text = ""
+	clearResults()
+	doSearch()
+end)
+
+-- [ TOGGLE BUTTON EVENT ]
+local toggleDragThreshold = 5
+local toggleHasMoved = false
+local toggleDragging = false
+
+ToggleButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		toggleDragging = true
+		dragStart = input.Position
+		startPos = ToggleButton.Position
+		toggleHasMoved = false
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then 
+				toggleDragging = false 
+			end
+		end)
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		if toggleDragging and dragStart then
+			local delta = input.Position - dragStart
+			if math.abs(delta.X) > toggleDragThreshold or math.abs(delta.Y) > toggleDragThreshold then
+				toggleHasMoved = true
+				ToggleButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+				Shadow.Position = UDim2.new(0, -2, 0, 4)
+			end
+		end
+	end
+end)
+
+ToggleButton.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		Shadow.Position = UDim2.new(0, -2, 0, -2)
+		
+		if not toggleHasMoved then
+			uiVisible = not uiVisible
+			MainFrame.Visible = uiVisible
+			
+			if not uiVisible then
+				ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+				LogoImage.ImageTransparency = 0.5
+			else
+				ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				LogoImage.ImageTransparency = 0
+			end
+		end
+		
+		toggleDragging = false
+		toggleHasMoved = false
+	end
+end)
+
+doSearch()
