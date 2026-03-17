@@ -1,0 +1,330 @@
+-- add us in roblox vincentplayz9356
+local player = game:GetService("Players").LocalPlayer
+local workspace = game:GetService("Workspace")
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local proximityService = game:GetService("ProximityPromptService")
+local pathfindingService = game:GetService("PathfindingService")
+local runService = game:GetService("RunService")
+
+local CHECK_INTERVAL = 0.5
+local USE_EXECUTOR_FIRE = true
+local WALK_STOP_DISTANCE = 5
+local WALK_TIMEOUT = 60
+local BLACKLIST_DURATION = 30
+local STUCK_DETECTION_TIME = 5
+
+local USE_INTERVAL = 0.1
+local USE_CLICK_SIMULATION = true
+local USE_REMOTE_FALLBACK = true
+
+local COLLECT_ITEMS = true
+local ITEM_COLLECT_RADIUS = 5
+local ITEM_COOLDOWN = 10
+local ITEM_FAIL_COOLDOWN = 30
+
+local promptBlacklist = {}
+local itemCooldown = {}
+
+local function isPromptBlacklisted(prompt)
+    local untilTime = promptBlacklist[prompt]
+    return untilTime and untilTime > os.clock()
+end
+
+local function blacklistPrompt(prompt, duration)
+    promptBlacklist[prompt] = os.clock() + duration
+end
+
+local function isItemOnCooldown(item)
+    local untilTime = itemCooldown[item]
+    return untilTime and untilTime > os.clock()
+end
+
+local function cooldownItem(item, duration)
+    itemCooldown[item] = os.clock() + duration
+end
+
+local function computeSmoothPath(start, target)
+    local path
+    local success = pcall(function()
+        path = pathfindingService:CreatePath({
+            AgentRadius = 2,
+            AgentHeight = 5,
+            AgentCanJump = true,
+            Costs = { Water = 20 }
+        })
+        path:ComputeAsync(start, target)
+    end)
+    if not success or not path or path.Status == Enum.PathStatus.NoPath then
+        return nil
+    end
+
+    local waypoints = path:GetWaypoints()
+    if #waypoints == 0 then return nil end
+
+    local smoothed = { waypoints[1] }
+    local lastKeptIndex = 1
+    for i = 2, #waypoints - 1 do
+        local from = waypoints[lastKeptIndex].Position
+        local to = waypoints[i + 1].Position
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+        raycastParams.FilterDescendantsInstances = {player.Character, workspace:FindFirstChild("Drop")}
+        local result = workspace:Raycast(from, (to - from).Unit * (to - from).Magnitude, raycastParams)
+        if result then
+            table.insert(smoothed, waypoints[i])
+            lastKeptIndex = i
+        end
+    end
+    table.insert(smoothed, waypoints[#waypoints])
+    return smoothed
+end
+
+local function walkToTarget(targetPart, stopDistance, targetIdentifier)
+    if not targetPart or not targetPart:IsA("BasePart") then
+        return false
+    end
+
+    local character = player.Character
+    if not character then
+        character = player.CharacterAdded:Wait()
+    end
+    local humanoid = character:WaitForChild("Humanoid")
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+    if (rootPart.Position - targetPart.Position).Magnitude <= stopDistance then
+        return true
+    end
+
+    local startTime = os.clock()
+    local lastPosition = rootPart.Position
+    local stuckStart = nil
+
+    while os.clock() - startTime < WALK_TIMEOUT do
+        local currentPos = rootPart.Position
+        local distanceMoved = (currentPos - lastPosition).Magnitude
+        local isClimbing = humanoid:GetState() == Enum.HumanoidStateType.Climbing
+
+        if distanceMoved < 0.1 or isClimbing then
+            if not stuckStart then
+                stuckStart = os.clock()
+            elseif os.clock() - stuckStart >= STUCK_DETECTION_TIME then
+                warn("[Walk] Stuck (still/climbing) for", STUCK_DETECTION_TIME, "seconds, aborting to", targetIdentifier or targetPart:GetFullName())
+                return false
+            end
+        else
+            stuckStart = nil
+        end
+        lastPosition = currentPos
+
+        local waypoints = computeSmoothPath(rootPart.Position, targetPart.Position)
+        if not waypoints then
+            task.wait(1)
+            continue
+        end
+
+        for _, waypoint in ipairs(waypoints) do
+            humanoid:MoveTo(waypoint.Position)
+            local arrived = humanoid.MoveToFinished:Wait(2)
+            if not arrived then
+                break
+            end
+        end
+
+        if (rootPart.Position - targetPart.Position).Magnitude <= stopDistance then
+            return true
+        end
+
+        task.wait(0.1)
+    end
+
+    warn("[Walk] Timed out trying to reach", targetIdentifier or targetPart:GetFullName())
+    return false
+end
+
+local function firePrompt(prompt)
+    if not prompt or not prompt:IsA("ProximityPrompt") or not prompt.Enabled then
+        return false
+    end
+
+    if USE_EXECUTOR_FIRE and fireproximityprompt then
+        pcall(fireproximityprompt, prompt)
+    else
+        pcall(proximityService.FirePrompt, proximityService, prompt, player)
+    end
+    return true
+end
+
+local function getAllPrompt1s()
+    local prompts = {}
+    local drop = workspace:FindFirstChild("Drop")
+    if drop then
+        for _, crate in ipairs(drop:GetChildren()) do
+            local center = crate:FindFirstChild("Center")
+            if center then
+                local prompt = center:FindFirstChild("ProximityPrompt")
+                if prompt and prompt:IsA("ProximityPrompt") and prompt.Enabled then
+                    table.insert(prompts, prompt)
+                end
+            end
+        end
+    end
+    return prompts
+end
+
+local function getDroppedItems()
+    local items = {}
+    local droppedFolder = workspace:FindFirstChild("DroppedItems")
+    if droppedFolder then
+        for _, item in ipairs(droppedFolder:GetChildren()) do
+            if item:IsA("BasePart") and item.Transparency < 1 then
+                table.insert(items, item)
+            end
+        end
+    end
+    return items
+end
+
+task.spawn(function()
+    while true do
+        local prompts1 = getAllPrompt1s()
+        if #prompts1 > 0 then
+            local character = player.Character
+            local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local now = os.clock()
+                local validPrompts = {}
+                for _, p in ipairs(prompts1) do
+                    if not isPromptBlacklisted(p) then
+                        table.insert(validPrompts, p)
+                    end
+                end
+                table.sort(validPrompts, function(a, b)
+                    local distA = (a.Parent.Position - rootPart.Position).Magnitude
+                    local distB = (b.Parent.Position - rootPart.Position).Magnitude
+                    return distA < distB
+                end)
+
+                for _, prompt in ipairs(validPrompts) do
+                    if prompt and prompt.Enabled and not isPromptBlacklisted(prompt) then
+                        local targetPart = prompt.Parent
+                        if targetPart and targetPart:IsA("BasePart") then
+                            local success = walkToTarget(targetPart, WALK_STOP_DISTANCE, "crate prompt")
+                            if success then
+                                firePrompt(prompt)
+                                task.wait(0.2)
+                            else
+                                blacklistPrompt(prompt, BLACKLIST_DURATION)
+                            end
+                        end
+                    end
+                end
+            else
+                warn("[Proximity] No character root part, skipping crate prompts")
+            end
+        end
+
+        local prompt2 = workspace:FindFirstChild("Chest") and
+                        workspace.Chest:FindFirstChild("PositionA") and
+                        workspace.Chest.PositionA:FindFirstChild("Lock") and
+                        workspace.Chest.PositionA.Lock:FindFirstChild("ProximityPrompt")
+        if prompt2 and prompt2.Enabled and not isPromptBlacklisted(prompt2) then
+            firePrompt(prompt2)
+        end
+
+        task.wait(CHECK_INTERVAL)
+    end
+end)
+
+print("[Proximity] Enhanced autoâfire script started (blacklist, advanced pathfinding).")
+
+local potionTool = replicatedStorage:FindFirstChild("AirdropSystem") and
+                  replicatedStorage.AirdropSystem:FindFirstChild("Tools") and
+                  replicatedStorage.AirdropSystem.Tools:FindFirstChild("Luck_Potion")
+local useRemote = potionTool and potionTool:FindFirstChild("UsePotion")
+
+if not potionTool then
+    warn("[Potion] Luck_Potion tool not found in ReplicatedStorage.AirdropSystem.Tools")
+else
+    print("[Potion] Found Luck_Potion tool.")
+
+    local function usePotion()
+        local character = player.Character
+        if not character then
+            character = player.CharacterAdded:Wait()
+        end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+
+        local toolInCharacter = character:FindFirstChild("Luck_Potion")
+        if not toolInCharacter then
+            local backpack = player:FindFirstChild("Backpack")
+            if backpack then
+                local toolInBackpack = backpack:FindFirstChild("Luck_Potion")
+                if toolInBackpack then
+                    toolInBackpack.Parent = character
+                    toolInCharacter = character:WaitForChild("Luck_Potion", 1)
+                end
+            end
+        end
+
+        if not toolInCharacter then
+            warn("[Potion] Could not get Luck_Potion tool.")
+            return
+        end
+
+        if humanoid:FindFirstChildOfClass("Tool") ~= toolInCharacter then
+            humanoid:EquipTool(toolInCharacter)
+        end
+
+        if USE_CLICK_SIMULATION then
+            pcall(function()
+                toolInCharacter:Activate()
+                print("[Potion] Activated tool (click simulation).")
+            end)
+        end
+
+        if USE_REMOTE_FALLBACK and useRemote then
+            if useRemote:IsA("RemoteEvent") then
+                pcall(function()
+                    useRemote:FireServer()
+                    print("[Potion] Fired UsePotion RemoteEvent")
+                end)
+            elseif useRemote:IsA("RemoteFunction") then
+                pcall(function()
+                    local result = useRemote:InvokeServer()
+                    print("[Potion] Invoked UsePotion RemoteFunction, result:", result)
+                end)
+            end
+        end
+    end
+
+    task.spawn(function()
+        while true do
+            usePotion()
+            task.wait(USE_INTERVAL)
+        end
+    end)
+
+    print("[Potion] Autoâuse Luck Potion script started (rapid, clickâsimulated).")
+end
+
+if COLLECT_ITEMS then
+    task.spawn(function()
+        while true do
+            local items = getDroppedItems()
+            local now = os.clock()
+            for _, item in ipairs(items) do
+                if item and item.Parent and not isItemOnCooldown(item) then
+                    local success = walkToTarget(item, ITEM_COLLECT_RADIUS, "dropped item")
+                    if success then
+                        cooldownItem(item, ITEM_COOLDOWN)
+                    else
+                        cooldownItem(item, ITEM_FAIL_COOLDOWN)
+                    end
+                end
+            end
+            task.wait(CHECK_INTERVAL)
+        end
+    end)
+    print("[Items] Autoâcollect dropped items loop started.")
+end
