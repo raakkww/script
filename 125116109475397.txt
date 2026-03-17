@@ -1,0 +1,332 @@
+--------more messy code please dont look
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+local function makeDraggable(frame, dragHandle)
+	dragHandle = dragHandle or frame
+
+	local dragging = false
+	local dragInput = nil
+	local dragStart = nil
+	local startPos = nil
+
+	dragHandle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+
+	dragHandle.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	game:GetService("UserInputService").InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ScreenGui"
+screenGui.ResetOnSpawn = true
+screenGui.Enabled = true
+screenGui.IgnoreGuiInset = false
+screenGui.DisplayOrder = 0
+screenGui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+screenGui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.FullscreenExtension
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.AutoLocalize = true
+screenGui.Parent = game:GetService("CoreGui")
+
+local consoleFrame = Instance.new("Frame")
+consoleFrame.Name = "ConsoleFrame"
+consoleFrame.Size = UDim2.new(0, 400, 0, 100)
+consoleFrame.Position = UDim2.new(0.346, 0, 0.78, 0)
+consoleFrame.BackgroundTransparency = 1
+consoleFrame.BackgroundColor3 = Color3.new(1, 1, 1)
+consoleFrame.BorderSizePixel = 0
+consoleFrame.Parent = screenGui
+
+local dragHandle = Instance.new("TextButton")
+dragHandle.Name = "DragHandle"
+dragHandle.Size = UDim2.new(1, 0, 0, 15)
+dragHandle.Position = UDim2.new(0, 0, 0, 0)
+dragHandle.BackgroundTransparency = 1
+dragHandle.Text = ""
+dragHandle.ZIndex = 10
+dragHandle.Parent = consoleFrame
+
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Name = "ScrollingFrame"
+scrollingFrame.Size = UDim2.new(0, 400, 0, 100)
+scrollingFrame.Position = UDim2.new(-0.001, 0, -0.01, 0)
+scrollingFrame.BackgroundColor3 = Color3.fromRGB(84, 84, 84)
+scrollingFrame.BackgroundTransparency = 0
+scrollingFrame.BorderSizePixel = 0
+scrollingFrame.ScrollBarThickness = 6
+scrollingFrame.ScrollingDirection = Enum.ScrollingDirection.XY
+scrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollingFrame.ClipsDescendants = true
+scrollingFrame.Active = true
+scrollingFrame.Parent = consoleFrame
+
+local scrollingFrameCorner = Instance.new("UICorner")
+scrollingFrameCorner.Name = "UICorner"
+scrollingFrameCorner.CornerRadius = UDim.new(0, 8)
+scrollingFrameCorner.Parent = scrollingFrame
+
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.Name = "UIListLayout"
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 2)
+uiListLayout.FillDirection = Enum.FillDirection.Vertical
+uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+uiListLayout.Parent = scrollingFrame
+
+local consoleName = Instance.new("TextLabel")
+consoleName.Name = "ConsoleName"
+consoleName.Size = UDim2.new(0, 390, 0, 10)
+consoleName.Position = UDim2.new(0, 5, 0, 0)
+consoleName.BackgroundTransparency = 0.75
+consoleName.BackgroundColor3 = Color3.new(1, 1, 1)
+consoleName.BorderSizePixel = 0
+consoleName.Text = "CONSOLE"
+consoleName.TextColor3 = Color3.new(0, 0, 0)
+consoleName.TextScaled = true
+consoleName.TextWrapped = true
+consoleName.RichText = true
+consoleName.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json")
+consoleName.TextXAlignment = Enum.TextXAlignment.Center
+consoleName.TextYAlignment = Enum.TextYAlignment.Center
+consoleName.Parent = consoleFrame
+
+local consoleNameCorner = Instance.new("UICorner")
+consoleNameCorner.Name = "UICorner"
+consoleNameCorner.CornerRadius = UDim.new(0, 8)
+consoleNameCorner.Parent = consoleName
+
+makeDraggable(consoleFrame, dragHandle)
+
+local console = scrollingFrame
+local logCount = 0
+local maxLogs = 5000
+
+local function autoScroll()
+	console.CanvasPosition = Vector2.new(0, console.AbsoluteCanvasSize.Y)
+end
+
+local function clearLogs()
+	for _, child in ipairs(console:GetChildren()) do
+		if child:IsA("TextLabel") then
+			child:Destroy()
+		end
+	end
+	logCount = 0
+end
+
+function Log(message)
+	logCount += 1
+
+	if logCount > maxLogs then
+		clearLogs()
+	end
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1,0,0,20)
+	label.BackgroundTransparency = 1
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Font = Enum.Font.Code
+	label.TextSize = 14
+	label.TextColor3 = Color3.new(1,1,1)
+    label.TextScaled = true
+	label.Text = tostring(message)
+
+	label.Parent = console
+
+	task.defer(autoScroll)
+end
+
+
+
+local diamonds = workspace.Diamonds
+local plr = game.Players.LocalPlayer
+local cam = workspace.CurrentCamera
+
+Log("starting diamond farm, please wait...")
+for i, diamond in diamonds:GetChildren() do
+    if not diamond:FindFirstChild("TouchInterest") then continue end
+    local root = plr.Character.HumanoidRootPart
+    firetouchinterest(diamond, root)
+end
+
+workspace.ChildAdded:Connect(function(child)
+    for i, diamond in diamonds:GetChildren() do
+        if not diamond:FindFirstChild("TouchInterest") then continue end
+        local root = plr.Character.HumanoidRootPart
+        firetouchinterest(diamond, root)
+    end
+end)
+Log("diamond farm all set, going to prompt knife farm")
+task.wait(.2)
+
+local prompts = {}
+local alreadyprompting = false
+
+local idk = 1
+for i, prompt in workspace:GetDescendants() do
+    if prompt.Name == "StandProximity" and prompt.Parent.Parent.Name == "StealKnifeToolGiver" then
+        table.insert(prompts, prompt)
+        Log(prompts[idk])
+        idk += 1
+    end
+end
+Log("got all prompts!")
+
+local function activatePrompt(p, ppos, pn)
+    if alreadyprompting then Log("already prompting something") return end
+    Log("prompting:", pn)
+    alreadyprompting = true
+    plr.Character:PivotTo(ppos)
+    cam.CFrame = plr.Character.HumanoidRootPart.CFrame
+    task.wait(.2)
+    p:InputHoldBegin()
+    local triggering = true
+
+    p.Triggered:Once(function()
+        Log("done triggering?")
+        task.wait(.1)
+        p:InputHoldEnd()
+        triggering = false
+        alreadyprompting = false
+        task.wait()
+        if p.Enabled then
+            p:InputHoldBegin()
+            task.wait(p.HoldDuration + .1)
+        end
+        task.wait(.2)
+        loop()
+    end)
+
+    local debugnumber = 0
+
+    task.spawn(function()
+        while triggering do
+            task.wait(5)
+            if triggering then
+                if not p.Enabled then
+                    Log("triggering, but prompt disabled. ending trigger...")
+                    alreadyprompting = false
+                    triggering = false
+                    loop()
+                    break
+                end
+
+                Log("still not done? ")
+                if debugnumber >= 3 then
+                    Log("probably stuck, trigger canceled.")
+                    alreadyprompting = false
+                    triggering = false
+                    loop()
+                    break
+                end
+                plr.Character:PivotTo(ppos)
+                p:InputHoldEnd()
+                task.wait(.2)
+                p:InputHoldBegin()
+                debugnumber += 1
+            else
+                break
+            end
+        end
+    end)
+end
+
+local function promptisenabled(prompt)
+    local pn = prompt.Parent.Parent.Top.Attachment.BillboardGui.SIGN.Text
+    if prompt.Enabled == true then
+        task.wait(.1)
+        local ppos
+        if pn == "DARK EDGE" then
+            ppos = CFrame.new(-279, 69, -525)
+        elseif pn == "LIGHTING KNIFE" then
+            ppos = CFrame.new(-171, 93, -419)
+        elseif pn == "CANDY KNIFE" then
+            ppos = CFrame.new(-178, 57, -88)
+        elseif pn == "SLIME KNIFE" then
+            ppos = CFrame.new(-286, 5, -30)
+        elseif pn == "EPIC KNIFE BOX" then
+            ppos = CFrame.new(137, 4, -309)
+        elseif pn == "VOID KNIFE" then
+            ppos = CFrame.new(-230, 428, -295)
+        end
+
+        Log(pn.." is enabled! trying to prompt...")
+        activatePrompt(prompt, ppos, pn)
+        return true
+    else
+        Log(pn.." is disabled.")
+        return false
+    end
+end
+
+function loop()
+    Log("looping, please wait...")
+    local falseamnt = 0
+    for i, prompt in prompts do
+        local isfalse = promptisenabled(prompt)
+        if isfalse == false then
+            falseamnt += 1
+        end
+    end
+
+    if falseamnt >= 6 then
+        Log("all prompts disabled, please wait until a prompt is enabled...")
+    end
+end
+
+Log("script is ready, resetting to start prompting...")
+plr.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
+task.wait(5)
+Log("freezing character...")
+task.spawn(function()
+    while task.wait() do
+        local char = plr.Character or plr.CharacterAdded()
+        local root = plr.Character:FindFirstChild("HumanoidRootPart")
+
+        if char and root then
+            root.AssemblyLinearVelocity = Vector3.new(0,0,0)
+        end
+    end
+end)
+Log("setting up all prompts...")
+for i, prompt in prompts do
+    prompt.Changed:Connect(function()
+        promptisenabled(prompt)
+    end)
+    promptisenabled(prompt)
+end
