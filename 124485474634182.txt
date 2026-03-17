@@ -1,0 +1,25 @@
+local remote = game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("node_modules"):WaitForChild("@rbxts"):WaitForChild("remo"):WaitForChild("src"):WaitForChild("container"):WaitForChild("guess")
+
+local text = game:HttpGet("https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english.txt")
+
+local words = {}
+for word in string.gmatch(text,"[^\r\n]+") do
+	table.insert(words,word)
+end
+
+local function shuffle(t)
+	for i = #t,2,-1 do
+		local j = math.random(i)
+		t[i],t[j] = t[j],t[i]
+	end
+end
+
+while true do
+	shuffle(words)
+
+	for _,word in ipairs(words) do
+		pcall(function()
+			remote:InvokeServer(word)
+		end)
+	end
+end
