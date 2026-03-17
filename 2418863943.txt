@@ -1,0 +1,158 @@
+local P = game:GetService("Players")
+local R = game:GetService("RunService")
+local V = game:GetService("VirtualInputManager")
+local L = P.LocalPlayer
+
+-- GUI SETUP
+local pG = L:WaitForChild("PlayerGui")
+if pG:FindFirstChild("SmartFarmUI") then pG.SmartFarmUI:Destroy() end
+
+local sg = Instance.new("ScreenGui", pG); sg.Name = "SmartFarmUI"
+sg.ResetOnSpawn = false
+local f = Instance.new("Frame", sg)
+f.Size, f.Position = UDim2.new(0, 220, 0, 180), UDim2.new(0.5, -110, 0.1, 0)
+f.BackgroundColor3, f.BorderSizePixel = Color3.new(0,0,0), 2
+
+local function createBtn(text, pos, color, sizeY)
+    local b = Instance.new("TextButton", f)
+    b.Size, b.Position = UDim2.new(0.9, 0, 0, sizeY or 40), pos
+    b.Text, b.BackgroundColor3 = text, color
+    b.TextColor3, b.TextSize, b.TextScaled = Color3.new(1,1,1), 14, true
+    b.Font = Enum.Font.GothamBold
+    return b
+end
+
+local farmBtn = createBtn("START SMART FARM", UDim2.new(0.05, 0, 0.05, 0), Color3.fromRGB(150, 0, 0))
+local shieldBtn = createBtn("GOD SHIELD: OFF", UDim2.new(0.05, 0, 0.35, 0), Color3.fromRGB(50, 50, 50))
+
+local status = Instance.new("TextLabel", f)
+status.Size, status.Position = UDim2.new(0.9, 0, 0, 40), UDim2.new(0.05, 0, 0.65, 0)
+status.BackgroundColor3, status.TextColor3 = Color3.new(0.1, 0.1, 0.1), Color3.new(1, 1, 1)
+status.Text, status.TextScaled = "STATUS: IDLE", true
+
+-- Configuration
+local farming = false
+local shield = false
+local sellPos = CFrame.new(-4390, -6, -2332)
+local safePos = CFrame.new(-1009, -6, -4958) -- Your hiding spot
+local robLocations = {
+    {pos = CFrame.new(-8, -6, -4389), name = "Gas Station"},
+    {pos = CFrame.new(-31, -6, -2900), name = "McD / ATM"},
+    {pos = CFrame.new(-217, -6, -3514), name = "Hosp ATM"},
+    {pos = CFrame.new(-5569, 18, -717), name = "Out-town ATM"}
+}
+
+-- Teleport Function
+local function tp(cf)
+    local char = L.Character
+    if not char then return end
+    local vehicle = char.Humanoid.SeatPart and char.Humanoid.SeatPart.Parent
+    if vehicle and vehicle:IsA("Model") then
+        vehicle:PivotTo(cf)
+    else
+        char:PivotTo(cf)
+    end
+end
+
+-- Availability Check
+local function isAvailable(targetPos)
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            local parent = obj.Parent
+            if parent and parent:IsA("BasePart") then
+                if (parent.Position - targetPos.Position).Magnitude < 25 then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Robbery Sequence (12s Hold + Safe Wait)
+local function robSequence(loc)
+    status.Text = "ROBBING: " .. loc.name
+    tp(loc.pos)
+    task.wait(1.5)
+    V:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(12.5)
+    V:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    
+    -- Teleport to Safe Zone for the wait
+    status.Text = "HEADING TO SAFE ZONE..."
+    tp(safePos)
+    
+    for i = 90, 1, -1 do
+        if not farming then break end
+        status.Text = "SAFE - NEXT IN: " .. i .. "s"
+        task.wait(1)
+    end
+end
+
+-- Main Loop
+farmBtn.MouseButton1Click:Connect(function()
+    farming = not farming
+    farmBtn.Text = farming and "FARMING ACTIVE" or "START SMART FARM"
+    farmBtn.BackgroundColor3 = farming and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+    
+    if farming then
+        task.spawn(function()
+            while farming do
+                local foundAny = false
+                for _, loc in ipairs(robLocations) do
+                    if not farming then break end
+                    
+                    if isAvailable(loc.pos) then
+                        robSequence(loc)
+                        foundAny = true
+                        
+                        -- Go sell after the robbery cycle
+                        status.Text = "TP TO SELL..."
+                        tp(sellPos)
+                        task.wait(5)
+                        -- Return to safe spot after selling if still farming
+                        if farming then tp(safePos) end
+                    else
+                        status.Text = "SKIPPING: " .. loc.name
+                        task.wait(0.5)
+                    end
+                end
+                
+                if not foundAny and farming then
+                    status.Text = "RE-SCANNING SOON..."
+                    tp(safePos)
+                    task.wait(5)
+                end
+            end
+            status.Text = "STATUS: IDLE"
+        end)
+    end
+end)
+
+-- God Shield Toggle
+shieldBtn.MouseButton1Click:Connect(function()
+    shield = not shield
+    shieldBtn.Text = shield and "GOD SHIELD: ON" or "GOD SHIELD: OFF"
+    shieldBtn.BackgroundColor3 = shield and Color3.fromRGB(200, 150, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+-- Protection Loop
+R.Heartbeat:Connect(function()
+    if shield and L.Character and L.Character:FindFirstChild("HumanoidRootPart") then
+        local root = L.Character.HumanoidRootPart
+        for _, v in pairs(L.Character:GetDescendants()) do
+            if v.Name:lower():find("cuff") or v.Name:lower():find("frozen") or v.Name:lower():find("arrest") then v:Destroy() end
+        end
+        for _, p in pairs(P:GetPlayers()) do
+            if p ~= L and p.Team and p.Team.Name:lower():find("polic") then
+                if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local pRoot = p.Character.HumanoidRootPart
+                    if (root.Position - pRoot.Position).Magnitude < 30 then
+                        pRoot.AssemblyLinearVelocity = (pRoot.Position - root.Position).Unit * 250 + Vector3.new(0, 150, 0)
+                    end
+                end
+            end
+        end
+    end
+    if workspace:FindFirstChild("AITraffic") then workspace.AITraffic:ClearAllChildren() end
+end)
