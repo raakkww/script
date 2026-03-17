@@ -1,0 +1,98 @@
+--// Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+--// Required exploit function check
+if not firetouchinterest then
+	warn("Exploit missing firetouchinterest")
+	return
+end
+
+--// Variables
+local enabled = false
+local range = math.huge
+local targetName = "all" -- change to player name if desired
+local loopThread
+
+--// Helper functions
+local function getRoot(char)
+	return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getTargets()
+	if targetName == "all" then
+		return Players:GetPlayers()
+	else
+		local plr = Players:FindFirstChild(targetName)
+		return plr and {plr} or {}
+	end
+end
+
+--// Kill Loop
+local function startKillLoop()
+	if loopThread then return end
+
+	loopThread = task.spawn(function()
+		while enabled do
+			task.wait()
+
+			local char = LocalPlayer.Character
+			if not char then continue end
+
+			local tool = char:FindFirstChildWhichIsA("Tool")
+			local handle = tool and tool:FindFirstChild("Handle")
+			if not handle then continue end
+
+			for _, plr in ipairs(getTargets()) do
+				if plr ~= LocalPlayer and plr.Character then
+					local hum = plr.Character:FindFirstChildWhichIsA("Humanoid")
+					local root = hum and getRoot(plr.Character)
+
+					if hum and root and hum.Health > 0 then
+						if LocalPlayer:DistanceFromCharacter(root.Position) <= range then
+							firetouchinterest(handle, root, 1)
+							firetouchinterest(handle, root, 0)
+						end
+					end
+				end
+			end
+		end
+
+		loopThread = nil
+	end)
+end
+
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "HandleKillGUI"
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromOffset(160, 60)
+frame.Position = UDim2.fromScale(0.05, 0.4)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active = true
+frame.Draggable = true
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.fromScale(1, 1)
+button.Text = "HANDLE KILL: OFF"
+button.TextColor3 = Color3.new(1, 0, 0)
+button.BackgroundTransparency = 1
+button.Font = Enum.Font.SourceSansBold
+button.TextScaled = true
+
+--// Toggle Logic
+button.MouseButton1Click:Connect(function()
+	enabled = not enabled
+
+	if enabled then
+		button.Text = "HANDLE KILL: ON"
+		button.TextColor3 = Color3.new(0, 1, 0)
+		startKillLoop()
+	else
+		button.Text = "HANDLE KILL: OFF"
+		button.TextColor3 = Color3.new(1, 0, 0)
+	end
+end)
