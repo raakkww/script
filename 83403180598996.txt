@@ -1,0 +1,127 @@
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = game.Players.LocalPlayer
+local coreGui = game:GetService("CoreGui")
+
+-- 1. MULTI-WORLD GUI
+local screenGui = Instance.new("ScreenGui", coreGui)
+local main = Instance.new("Frame", screenGui)
+main.Size = UDim2.new(0, 250, 0, 420)
+main.Position = UDim2.new(0.5, -125, 0.5, -210)
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+main.Active = true
+main.Draggable = true 
+Instance.new("UICorner", main)
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 45)
+title.Text = "WORLD HOPPER"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundColor3 = Color3.fromRGB(60, 0, 120)
+Instance.new("UICorner", title)
+
+-- Button Helper
+local function createBtn(name, text, y, color)
+    local btn = Instance.new("TextButton", main)
+    btn.Name = name
+    btn.Size = UDim2.new(0.9, 0, 0, 50)
+    btn.Position = UDim2.new(0.05, 0, 0, y)
+    btn.Text = text
+    btn.BackgroundColor3 = color or Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.SourceSansBold
+    Instance.new("UICorner", btn)
+    return btn
+end
+
+local world4 = createBtn("W4", "WORLD 4 (33,623m)", 55, Color3.fromRGB(100, 20, 20))
+local world3 = createBtn("W3", "WORLD 3 (22,359m)", 115, Color3.fromRGB(100, 60, 20))
+local world2 = createBtn("W2", "WORLD 2 (11,268m)", 175, Color3.fromRGB(80, 80, 20))
+local world1 = createBtn("W1", "WORLD 1 (Ground)", 235, Color3.fromRGB(20, 80, 20))
+local stopBtn = createBtn("STOP", "EMERGENCY STOP", 310, Color3.fromRGB(180, 0, 0))
+
+-- 2. COORDINATES & ENGINE
+local active = false
+local upSpeed = 18
+local waiting = false
+local currentTarget = nil
+
+local worlds = {
+    W1 = CFrame.new(-1, 10, -30),
+    W2 = CFrame.new(5, 11268, -181),
+    W3 = CFrame.new(4, 22359, -332),
+    W4 = CFrame.new(3, 33623, -483)
+}
+
+local function startSequence(worldKey, btn)
+    if active or waiting then return end -- Prevent double-clicking
+    
+    currentTarget = worlds[worldKey]
+    local originalText = btn.Text
+    
+    -- 1. Teleport
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = currentTarget
+    end
+    
+    -- 2. Countdown
+    waiting = true
+    for i = 4, 1, -1 do
+        if not waiting then break end
+        btn.Text = "IGNITION: " .. i
+        task.wait(1)
+    end
+    
+    -- 3. Launch
+    if waiting then
+        waiting = false
+        active = true
+        btn.Text = "ASCENDING..."
+        btn.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
+    end
+    
+    -- Reset button after a delay if stopped
+    task.spawn(function()
+        repeat task.wait() until not active
+        btn.Text = originalText
+        btn.BackgroundColor3 = worlds[worldKey] == currentTarget and Color3.fromRGB(40, 40, 40) -- Placeholder reset
+    end)
+end
+
+-- Button Listeners
+world1.MouseButton1Click:Connect(function() startSequence("W1", world1) end)
+world2.MouseButton1Click:Connect(function() startSequence("W2", world2) end)
+world3.MouseButton1Click:Connect(function() startSequence("W3", world3) end)
+world4.MouseButton1Click:Connect(function() startSequence("W4", world4) end)
+
+stopBtn.MouseButton1Click:Connect(function()
+    active = false
+    waiting = false
+    print("All Systems Stopped.")
+end)
+
+-- 3. THE HEARTBEAT (Movement)
+RunService.Heartbeat:Connect(function()
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = player.Character.HumanoidRootPart
+    
+    if waiting and currentTarget then
+        hrp.CFrame = currentTarget
+        hrp.Velocity = Vector3.new(0,0,0)
+    end
+    
+    if active then
+        hrp.Velocity = Vector3.new(0,0,0)
+        hrp.CFrame = hrp.CFrame * CFrame.new(0, upSpeed, 0)
+    end
+end)
+
+-- Brake (Space)
+UIS.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Space then
+        active = false
+        waiting = false
+    end
+end)
+
+print("V22 World Hopper Loaded. All coordinates synced.")
