@@ -1,0 +1,76 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   LoadingTitle = "loading",
+   LoadingSubtitle = "",
+   ConfigurationSaving = { Enabled = false }
+})
+
+local RS = game:GetService("ReplicatedStorage")
+local LP = game:GetService("Players").LocalPlayer
+local Char = LP.Character or LP.CharacterAdded:Wait()
+local Root = Char:WaitForChild("HumanoidRootPart")
+
+_G.RemoteSpeed = 200
+_G.TPSpeed = 150
+_G.RemoteRunning = false
+_G.TPRunning = false
+
+local remote = RS:WaitForChild("rbxts_include"):WaitForChild("node_modules"):WaitForChild("@rbxts"):WaitForChild("remo"):WaitForChild("src"):WaitForChild("container"):WaitForChild("terrain.clientRemovedTerrain")
+local targetPos = Vector3.new(72.16389465332031, -207.03369140625, -227.34695434570312)
+
+local MainTab = Window:CreateTab("Main Systems", 4483362458)
+
+MainTab:CreateToggle({
+   Name = "Auto Collect",
+   CurrentValue = false,
+   Flag = "TP_Toggle_Unique",
+   Callback = function(Value)
+      _G.TPRunning = Value
+      if _G.TPRunning then
+         task.spawn(function()
+            while _G.TPRunning do
+               local tools = {}
+               for _, v in ipairs(workspace:GetDescendants()) do
+                  if v:IsA("Tool") then table.insert(tools, v) end
+               end
+               
+               for _, tool in ipairs(tools) do
+                  if not _G.TPRunning then break end
+                  local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
+                  if handle then
+                     Root.CFrame = handle.CFrame + Vector3.new(0, 3, 0)
+                     task.wait(1 / math.max(_G.TPSpeed, 0.1))
+                  end
+               end
+            end
+         end)
+      end
+   end,
+})
+
+
+MainTab:CreateDivider()
+
+MainTab:CreateToggle({
+   Name = "Auto Sell Artifacts",
+   CurrentValue = false,
+   Flag = "Remote_Toggle_Unique",
+   Callback = function(Value)
+      _G.RemoteRunning = Value
+      if _G.RemoteRunning then
+         task.spawn(function()
+            local sellRemote = game:GetService("ReplicatedStorage"):WaitForChild("rbxts_include"):WaitForChild("node_modules"):WaitForChild("@rbxts"):WaitForChild("remo"):WaitForChild("src"):WaitForChild("container"):WaitForChild("inventory.sellAllArtifacts")
+            
+            while _G.RemoteRunning do
+               pcall(function()
+                  sellRemote:InvokeServer()
+               end)
+               
+               task.wait(1 / math.max(_G.RemoteSpeed, 1))
+            end
+         end)
+      end
+   end,
+})
