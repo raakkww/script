@@ -1,0 +1,75 @@
+-- Services
+local TweenService = game:GetService("TweenService")
+
+-- ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+
+-- Toggle Button
+local Toggle = Instance.new("TextButton")
+Toggle.Parent = ScreenGui
+Toggle.Size = UDim2.new(0, 100, 0, 40)
+Toggle.Position = UDim2.new(0, 10, 0.5, -20)
+Toggle.Text = "OPEN"
+Toggle.BackgroundColor3 = Color3.fromRGB(30, 30, 60)
+Toggle.TextColor3 = Color3.fromRGB(255,255,255)
+Toggle.TextScaled = true
+Toggle.BorderSizePixel = 0
+
+-- Main Frame
+local Frame = Instance.new("Frame")
+Frame.Parent = ScreenGui
+Frame.Size = UDim2.new(0, 250, 0, 150)
+Frame.Position = UDim2.new(0.5, -125, 0.5, -75)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+Frame.BorderSizePixel = 0
+Frame.Visible = false
+Frame.Active = true
+Frame.Draggable = true
+
+-- Galaxy Gradient 🌌
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Parent = Frame
+UIGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 0, 120)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 0, 80)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 0, 200))
+}
+UIGradient.Rotation = 45
+
+-- Animate Gradient (Moving Effect)
+task.spawn(function()
+    while true do
+        local tween = TweenService:Create(
+            UIGradient,
+            TweenInfo.new(6, Enum.EasingStyle.Linear),
+            {Offset = Vector2.new(1, 0)}
+        )
+        tween:Play()
+        tween.Completed:Wait()
+
+        UIGradient.Offset = Vector2.new(-1, 0)
+    end
+end)
+
+-- Button
+local Button = Instance.new("TextButton")
+Button.Parent = Frame
+Button.Size = UDim2.new(0, 200, 0, 50)
+Button.Position = UDim2.new(0.5, -100, 0.5, -25)
+Button.Text = "Inf Money"
+Button.BackgroundColor3 = Color3.fromRGB(10, 10, 30)
+Button.TextColor3 = Color3.fromRGB(255,255,255)
+Button.TextScaled = true
+Button.BorderSizePixel = 0
+
+-- Toggle Function
+Toggle.MouseButton1Click:Connect(function()
+    Frame.Visible = not Frame.Visible
+    Toggle.Text = Frame.Visible and "CLOSE" or "OPEN"
+end)
+
+-- Run Script
+Button.MouseButton1Click:Connect(function()
+    loadstring(game:HttpGet("https://pastebin.com/raw/D9fbgXpy"))()
+end)
