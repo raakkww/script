@@ -1,0 +1,198 @@
+local RM = game:GetService("ReplicatedStorage").GameManager.RemoteManager
+local plr = game:GetService("Players").LocalPlayer
+local E = {farm=false}
+
+pcall(function() plr.PlayerGui:FindFirstChild("FarmGUI"):Destroy() end)
+local gui = Instance.new("ScreenGui"); gui.Name="FarmGUI"; gui.ResetOnSpawn=false; gui.Parent=plr.PlayerGui
+
+local E2 = {atkonly=false,speed=false,map=2}
+
+local main = Instance.new("Frame"); main.Size=UDim2.new(0,220,0,290); main.Position=UDim2.new(0.5,-110,0,20)
+main.BackgroundColor3=Color3.fromRGB(15,15,25); main.BorderSizePixel=0; main.Parent=gui
+
+local dr,ds,sp
+main.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+        dr=true;ds=i.Position;sp=main.Position
+        i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dr=false end end)
+    end
+end)
+game:GetService("UserInputService").InputChanged:Connect(function(i)
+    if dr and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+        local d=i.Position-ds; main.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y)
+    end
+end)
+
+local t=Instance.new("TextLabel",main); t.Size=UDim2.new(1,-30,0,25); t.BackgroundColor3=Color3.fromRGB(60,30,120)
+t.BorderSizePixel=0; t.Text=" Auto Farm"; t.TextColor3=Color3.fromRGB(220,220,220); t.TextSize=13; t.Font=Enum.Font.GothamBold; t.TextXAlignment=Enum.TextXAlignment.Left
+local x=Instance.new("TextButton",main); x.Size=UDim2.new(0,25,0,25); x.Position=UDim2.new(1,-27,0,0)
+x.BackgroundColor3=Color3.fromRGB(180,50,50); x.Text="X"; x.TextColor3=Color3.fromRGB(255,255,255); x.TextSize=12; x.Font=Enum.Font.GothamBold; x.BorderSizePixel=0
+x.MouseButton1Click:Connect(function() E.farm=false; gui:Destroy() end)
+
+local cf=Instance.new("Frame",main); cf.Size=UDim2.new(1,-10,1,-30); cf.Position=UDim2.new(0,5,0,28); cf.BackgroundTransparency=1
+Instance.new("UIListLayout",cf).Padding=UDim.new(0,4)
+
+local b=Instance.new("TextButton",cf); b.Size=UDim2.new(1,0,0,28)
+b.BackgroundColor3=Color3.fromRGB(40,40,55); b.Text="Auto Farm: OFF"
+b.TextColor3=Color3.fromRGB(200,200,200); b.TextSize=13; b.Font=Enum.Font.GothamBold; b.BorderSizePixel=0
+b.MouseButton1Click:Connect(function()
+    E.farm=not E.farm
+    b.BackgroundColor3=E.farm and Color3.fromRGB(60,30,120) or Color3.fromRGB(40,40,55)
+    b.Text="Auto Farm: "..(E.farm and "ON" or "OFF")
+end)
+
+-- Find alive monster models from workspace root (have Health attribute)
+local function getAliveMonsters()
+    local targets = {}
+    for _, child in ipairs(workspace:GetChildren()) do
+        if child:IsA("Model") and child:GetAttribute("Health") then
+            local hp = child:GetAttribute("Health")
+            if hp > 0 then
+                local part = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChildWhichIsA("BasePart")
+                if part then
+                    table.insert(targets, {part = part, hp = hp, maxHp = child:GetAttribute("MaxHealth") or hp})
+                end
+            end
+        end
+    end
+    return targets
+end
+
+local b2=Instance.new("TextButton",cf); b2.Size=UDim2.new(1,0,0,28)
+b2.BackgroundColor3=Color3.fromRGB(40,40,55); b2.Text="Auto Attack: OFF"
+b2.TextColor3=Color3.fromRGB(200,200,200); b2.TextSize=13; b2.Font=Enum.Font.GothamBold; b2.BorderSizePixel=0
+b2.MouseButton1Click:Connect(function()
+    E2.atkonly=not E2.atkonly
+    b2.BackgroundColor3=E2.atkonly and Color3.fromRGB(60,30,120) or Color3.fromRGB(40,40,55)
+    b2.Text="Auto Attack: "..(E2.atkonly and "ON" or "OFF")
+end)
+
+local b3=Instance.new("TextButton",cf); b3.Size=UDim2.new(1,0,0,28)
+b3.BackgroundColor3=Color3.fromRGB(40,40,55); b3.Text="Speed x50: OFF"
+b3.TextColor3=Color3.fromRGB(200,200,200); b3.TextSize=13; b3.Font=Enum.Font.GothamBold; b3.BorderSizePixel=0
+b3.MouseButton1Click:Connect(function()
+    E2.speed=not E2.speed
+    b3.BackgroundColor3=E2.speed and Color3.fromRGB(60,30,120) or Color3.fromRGB(40,40,55)
+    b3.Text="Speed x50: "..(E2.speed and "ON" or "OFF")
+end)
+
+-- Teleport buttons row
+local tpFrame=Instance.new("Frame",cf); tpFrame.Size=UDim2.new(1,0,0,28); tpFrame.BackgroundTransparency=1
+local tpLayout=Instance.new("UIListLayout",tpFrame); tpLayout.FillDirection=Enum.FillDirection.Horizontal; tpLayout.Padding=UDim.new(0,3)
+for i=1,6 do
+    local tb=Instance.new("TextButton",tpFrame); tb.Size=UDim2.new(0,33,1,0)
+    tb.BackgroundColor3=Color3.fromRGB(40,40,55); tb.Text="M"..i; tb.TextColor3=Color3.fromRGB(200,200,200)
+    tb.TextSize=11; tb.Font=Enum.Font.GothamBold; tb.BorderSizePixel=0
+    tb.MouseButton1Click:Connect(function()
+        pcall(function() RM["1007"]:FireServer(10000+i) end)
+    end)
+end
+
+E2.buyPot=false; E2.usePot=false
+
+local b4=Instance.new("TextButton",cf); b4.Size=UDim2.new(1,0,0,28)
+b4.BackgroundColor3=Color3.fromRGB(40,40,55); b4.Text="Auto Buy Potion: OFF"
+b4.TextColor3=Color3.fromRGB(200,200,200); b4.TextSize=13; b4.Font=Enum.Font.GothamBold; b4.BorderSizePixel=0
+b4.MouseButton1Click:Connect(function()
+    E2.buyPot=not E2.buyPot
+    b4.BackgroundColor3=E2.buyPot and Color3.fromRGB(60,30,120) or Color3.fromRGB(40,40,55)
+    b4.Text="Auto Buy Potion: "..(E2.buyPot and "ON" or "OFF")
+end)
+
+local b5=Instance.new("TextButton",cf); b5.Size=UDim2.new(1,0,0,28)
+b5.BackgroundColor3=Color3.fromRGB(40,40,55); b5.Text="Auto Use Potion: OFF"
+b5.TextColor3=Color3.fromRGB(200,200,200); b5.TextSize=13; b5.Font=Enum.Font.GothamBold; b5.BorderSizePixel=0
+b5.MouseButton1Click:Connect(function()
+    E2.usePot=not E2.usePot
+    b5.BackgroundColor3=E2.usePot and Color3.fromRGB(60,30,120) or Color3.fromRGB(40,40,55)
+    b5.Text="Auto Use Potion: "..(E2.usePot and "ON" or "OFF")
+end)
+
+-- Speed boost loop
+game:GetService("RunService").Heartbeat:Connect(function()
+    if E2.speed then
+        local char = plr.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = 50 end
+        end
+    end
+end)
+
+-- Auto buy potions loop
+task.spawn(function()
+    while gui.Parent do
+        if E2.buyPot then
+            for _ = 1, 5 do
+                if not E2.buyPot then break end
+                pcall(function() RM["30013"]:FireServer(1) end)
+                pcall(function() RM["30013"]:FireServer(2) end)
+                pcall(function() RM["30013"]:FireServer(4) end)
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- Auto use potions loop
+task.spawn(function()
+    while gui.Parent do
+        if E2.usePot then
+            for i = 50001, 50006 do
+                pcall(function() RM["30003"]:FireServer(i) end)
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- Auto attack only loop (no TP)
+task.spawn(function()
+    while gui.Parent do
+        if E2.atkonly and not E.farm then
+            for _ = 1, 50 do
+                if not E2.atkonly then break end
+                pcall(function() RM["2001"]:FireServer() end)
+            end
+        end
+        task.wait(0.3)
+    end
+end)
+
+-- Farm loop: TP to each monster, attack, move to next
+task.spawn(function()
+    while gui.Parent do
+        if E.farm then
+            local char = plr.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                local monsters = getAliveMonsters()
+                -- Only target monsters within 500 studs
+                local nearby = {}
+                for _, m in ipairs(monsters) do
+                    if m.part and m.part.Parent then
+                        local dist = (m.part.Position - hrp.Position).Magnitude
+                        if dist < 250 then
+                            table.insert(nearby, m)
+                        end
+                    end
+                end
+                for _, m in ipairs(nearby) do
+                    if not E.farm then break end
+                    local model = m.part.Parent
+                    -- Stay on this monster until dead
+                    while E.farm and model and model.Parent and (model:GetAttribute("Health") or 0) > 0 do
+                        hrp.CFrame = CFrame.new(m.part.Position + Vector3.new(0, 5, 0))
+                        for _ = 1, 100 do
+                            pcall(function() RM["2001"]:FireServer() end)
+                        end
+                        task.wait(0.2)
+                    end
+                end
+            end
+            task.wait(0.1)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
