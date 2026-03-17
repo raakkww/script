@@ -1,0 +1,122 @@
+-- NPC ESP + GOD MODE + NPC BRINGER FOR CLEAR
+
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+
+-- CONFIG
+
+local MAX_DISTANCE = 500
+local GOD_MODE = true
+
+local State = {
+	Root = nil,
+	Humanoid = nil,
+	ESPObjects = {}
+}
+local function BindCharacter(char)
+	State.Root = char:WaitForChild("HumanoidRootPart",5)
+	State.Humanoid = char:WaitForChild("Humanoid",5)
+	if GOD_MODE then
+		State.Humanoid.HealthChanged:Connect(function()
+			if State.Humanoid.Health < State.Humanoid.MaxHealth then
+				State.Humanoid.Health = State.Humanoid.MaxHealth
+			end
+		end)
+	end
+end
+if LocalPlayer.Character then
+	BindCharacter(LocalPlayer.Character)
+end
+LocalPlayer.CharacterAdded:Connect(BindCharacter)
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "DevPanel"
+Gui.IgnoreGuiInset = true
+Gui.ResetOnSpawn = false
+Gui.DisplayOrder = 999999
+Gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local SpawnButton = Instance.new("TextButton")
+SpawnButton.Size = UDim2.new(0,200,0,50)
+SpawnButton.Position = UDim2.new(0,20,0,20)
+SpawnButton.Text = "Bring NPCs (B)"
+SpawnButton.TextScaled = true
+SpawnButton.BackgroundColor3 = Color3.fromRGB(50,120,255)
+SpawnButton.TextColor3 = Color3.new(1,1,1)
+SpawnButton.Parent = Gui
+Instance.new("UICorner",SpawnButton)
+local function BringNPCs()
+	if not State.Root then return end
+	local pos = State.Root.Position
+	for _, obj in pairs(Workspace:GetDescendants()) do
+		if obj:IsA("Model") then
+			local hum = obj:FindFirstChildOfClass("Humanoid")
+			local hrp = obj:FindFirstChild("HumanoidRootPart")
+			if hum and hrp and obj ~= LocalPlayer.Character then
+				hrp.CFrame = CFrame.new(
+					pos + Vector3.new(math.random(-5,5),0,math.random(-5,5))
+				)
+			end
+		end
+	end
+end
+SpawnButton.MouseButton1Click:Connect(BringNPCs)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.B then
+		BringNPCs()
+	end
+end)
+local function CreateESP(model)
+	if State.ESPObjects[model] then return end
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	local hrp = model:FindFirstChild("HumanoidRootPart")
+	if not humanoid or not hrp then return end
+	if model == LocalPlayer.Character then return end
+	local highlight = Instance.new("Highlight")
+	highlight.FillColor = Color3.fromRGB(255,80,80)
+	highlight.FillTransparency = 0.6
+	highlight.OutlineColor = Color3.new(1,1,1)
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Adornee = model
+	highlight.Parent = Gui
+	local tag = Instance.new("BillboardGui")
+	tag.Size = UDim2.fromOffset(120,30)
+	tag.StudsOffset = Vector3.new(0,3,0)
+	tag.AlwaysOnTop = true
+	tag.Adornee = hrp
+	tag.Parent = Gui
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.fromScale(1,1)
+	text.BackgroundTransparency = 1
+	text.TextScaled = true
+	text.Font = Enum.Font.SourceSansBold
+	text.TextColor3 = Color3.new(1,1,1)
+	text.TextStrokeTransparency = 0
+	text.Parent = tag
+	State.ESPObjects[model] = {highlight, tag, text}
+end
+local function UpdateESP()
+	for _, obj in pairs(Workspace:GetDescendants()) do
+		if obj:IsA("Model") then
+			CreateESP(obj)	end
+	end
+	for model,data in pairs(State.ESPObjects) do
+		if model.Parent and State.Root then
+			local hrp = model:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				local dist = (State.Root.Position - hrp.Position).Magnitude
+				data[3].Text = model.Name.." ["..math.floor(dist).."m]"
+				local visible = dist <= MAX_DISTANCE
+				data[1].Enabled = visible
+				data[2].Enabled = visible
+			end
+		end
+	end
+end
+RunService.RenderStepped:Connect(UpdateESP)
