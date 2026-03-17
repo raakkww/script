@@ -1,0 +1,47 @@
+-- God Mode
+local RS = game:GetService("ReplicatedStorage")
+local hitEvent = RS.Remotes.HitEvent
+
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local oldNamecall = mt.__namecall
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if (self.Name == "HitEvent" or self.Name == "SniperHitEvent") and method == "FireServer" then
+        if args[1] == game.Players.LocalPlayer.Character or args[1] == game.Players.LocalPlayer then
+            return nil 
+        end
+    end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+
+-- Kill Others
+local RS = game:GetService("ReplicatedStorage")
+local sniperEvent = RS:WaitForChild("SniperHitEvent")
+local players = game:GetService("Players")
+
+local function  kill()
+    for _, target in pairs(players:GetPlayers()) do
+        if target ~= players.LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local targetChar = target.Character
+            local pos = targetChar.HumanoidRootPart.Position
+            
+            for i = 1, 4 do
+                local args = {
+                    targetChar,
+                    pos,                
+                    pos + Vector3.new(0, 10, 0), 
+                    true
+                }
+                sniperEvent:FireServer(unpack(args))
+            end
+        end
+    end
+end
+
+kill()
