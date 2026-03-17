@@ -1,0 +1,332 @@
+--[[
+    Frontlines: Pacific ESP
+    by NIKI
+]]
+
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- ===== НАСТРОЙКИ =====
+local settings = {
+    espEnabled = true,
+    boxColor = Color3.fromRGB(255, 0, 0),  -- красный по умолчанию
+    menuKey = Enum.KeyCode.Insert,
+    isSettingMenuKey = false
+}
+
+-- ===== ПАПКА С ИГРОКАМИ =====
+local characterFolder = Workspace:FindFirstChild("Characters")
+if not characterFolder then
+    warn("Папка 'Characters' не найдена! ESP не будет работать.")
+end
+
+-- ===== ХРАНИЛИЩЕ ESP =====
+local espCache = {}
+
+-- Функция поиска центральной части (Torso/LowerTorso)
+local function findTorso(model)
+    if not model then return nil end
+    local torso = model:FindFirstChild("Torso") or model:FindFirstChild("LowerTorso")
+    if torso and torso:IsA("BasePart") then
+        return torso
+    end
+    -- Если не нашли, ищем любую BasePart
+    for _, child in pairs(model:GetChildren()) do
+        if child:IsA("BasePart") then
+            return child
+        end
+    end
+    return nil
+end
+
+-- Создание ESP для модели игрока
+local function createESP(model)
+    if model == LocalPlayer.Character then return end
+    local part = findTorso(model)
+    if not part then return end
+
+    if espCache[model] then
+        for _, line in pairs(espCache[model].lines) do
+            line:Remove()
+        end
+        espCache[model] = nil
+    end
+
+    local lines = {}
+    for i = 1, 4 do
+        lines[i] = Drawing.new("Line")
+        lines[i].Thickness = 2
+        lines[i].Color = settings.boxColor
+        lines[i].Visible = false
+    end
+    espCache[model] = {lines = lines, part = part}
+end
+
+-- Обработка уже существующих игроков
+if characterFolder then
+    for _, model in pairs(characterFolder:GetChildren()) do
+        if model:IsA("Model") then
+            createESP(model)
+        end
+    end
+
+    -- Отслеживание новых игроков
+    characterFolder.ChildAdded:Connect(function(model)
+        task.wait(1)
+        if model:IsA("Model") then
+            createESP(model)
+        end
+    end)
+end
+
+-- Удаление ESP при исчезновении модели
+characterFolder.ChildRemoved:Connect(function(model)
+    if espCache[model] then
+        for _, line in pairs(espCache[model].lines) do
+            line:Remove()
+        end
+        espCache[model] = nil
+    end
+end)
+
+-- ===== ГЛАВНЫЙ ЦИКЛ ОТРИСОВКИ =====
+RunService.RenderStepped:Connect(function()
+    if not settings.espEnabled then
+        for _, data in pairs(espCache) do
+            for _, line in pairs(data.lines) do
+                line.Visible = false
+            end
+        end
+        return
+    end
+
+    for model, data in pairs(espCache) do
+        if not model or not model.Parent or not data.part or not data.part.Parent then
+            for _, line in pairs(data.lines) do line:Remove() end
+            espCache[model] = nil
+        else
+            local part = data.part
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                local dist = (Camera.CFrame.Position - part.Position).Magnitude
+                local size = 1000 / dist  -- размер бокса
+                local left = pos.X - size/2
+                local right = pos.X + size/2
+                local top = pos.Y - size/2
+                local bottom = pos.Y + size/2
+
+                local lines = data.lines
+                lines[1].From = Vector2.new(left, top)
+                lines[1].To = Vector2.new(right, top)
+                lines[2].From = Vector2.new(right, top)
+                lines[2].To = Vector2.new(right, bottom)
+                lines[3].From = Vector2.new(right, bottom)
+                lines[3].To = Vector2.new(left, bottom)
+                lines[4].From = Vector2.new(left, bottom)
+                lines[4].To = Vector2.new(left, top)
+
+                for _, line in pairs(lines) do
+                    line.Color = settings.boxColor
+                    line.Visible = true
+                end
+            else
+                for _, line in pairs(data.lines) do
+                    line.Visible = false
+                end
+            end
+        end
+    end
+end)
+
+-- ===== GUI =====
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = game.CoreGui
+screenGui.ResetOnSpawn = false
+screenGui.Name = "Frontlines_Pacific_ESP"
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 280, 0, 200)
+mainFrame.Position = UDim2.new(0.5, -140, 0.5, -100)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.Active = true
+mainFrame.Draggable = true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+
+-- Заголовок
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+title.Text = "Frontlines: Pacific"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 10)
+
+-- Подпись "by NIKI" внизу
+local credit = Instance.new("TextLabel", mainFrame)
+credit.Size = UDim2.new(1, 0, 0, 20)
+credit.Position = UDim2.new(0, 0, 1, -20)
+credit.BackgroundTransparency = 1
+credit.Text = ""
+credit.Font = Enum.Font.Gotham
+credit.TextSize = 12
+credit.TextColor3 = Color3.fromRGB(170, 170, 170)
+
+-- Панель вкладок
+local tabPanel = Instance.new("Frame", mainFrame)
+tabPanel.Size = UDim2.new(1, -20, 0, 25)
+tabPanel.Position = UDim2.new(0, 10, 0, 35)
+tabPanel.BackgroundTransparency = 1
+
+local tabs = {"ESP", "Settings"}
+local tabButtons = {}
+local tabWidth = 115
+for idx, name in ipairs(tabs) do
+    local btn = Instance.new("TextButton", tabPanel)
+    btn.Size = UDim2.new(0, tabWidth, 1, 0)
+    btn.Position = UDim2.new(0, (idx-1)*(tabWidth+5), 0, 0)
+    btn.Text = name
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+    tabButtons[idx] = btn
+end
+
+-- Контейнеры содержимого
+local contentFrame = Instance.new("Frame", mainFrame)
+contentFrame.Size = UDim2.new(1, -20, 1, -90)
+contentFrame.Position = UDim2.new(0, 10, 0, 70)
+contentFrame.BackgroundTransparency = 1
+
+local espTab = Instance.new("Frame", contentFrame)
+espTab.Size = UDim2.new(1, 0, 1, 0)
+espTab.BackgroundTransparency = 1
+
+local settingsTab = Instance.new("Frame", contentFrame)
+settingsTab.Size = UDim2.new(1, 0, 1, 0)
+settingsTab.BackgroundTransparency = 1
+settingsTab.Visible = false
+
+-- Переключение вкладок
+for i, btn in ipairs(tabButtons) do
+    btn.MouseButton1Click:Connect(function()
+        espTab.Visible = (i == 1)
+        settingsTab.Visible = (i == 2)
+    end)
+end
+
+-- === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ===
+local function createToggle(parent, text, yPos, getter, setter)
+    local label = Instance.new("TextLabel", parent)
+    label.Size = UDim2.new(0, 150, 0, 25)
+    label.Position = UDim2.new(0, 10, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextColor3 = Color3.new(1, 1, 1)
+
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(0, 60, 0, 25)
+    btn.Position = UDim2.new(1, -70, 0, yPos)
+    btn.Text = getter() and "ON" or "OFF"
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.BackgroundColor3 = getter() and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(170, 0, 0)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+    btn.MouseButton1Click:Connect(function()
+        setter(not getter())
+        btn.Text = getter() and "ON" or "OFF"
+        btn.BackgroundColor3 = getter() and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(170, 0, 0)
+    end)
+    return btn
+end
+
+-- === ВКЛАДКА ESP ===
+createToggle(espTab, "ESP", 10, function() return settings.espEnabled end, function(v) settings.espEnabled = v end)
+
+-- Кнопки выбора цвета
+local colors = {
+    {color = Color3.fromRGB(255, 0, 0), name = "Red"},
+    {color = Color3.fromRGB(0, 255, 0), name = "Green"},
+    {color = Color3.fromRGB(0, 100, 255), name = "Blue"},
+    {color = Color3.fromRGB(255, 255, 0), name = "Yellow"},
+}
+
+local yPos = 50
+for i, data in ipairs(colors) do
+    local btn = Instance.new("TextButton", espTab)
+    btn.Size = UDim2.new(0, 70, 0, 25)
+    btn.Position = UDim2.new(0, 15 + ((i-1) % 2) * 85, 0, yPos + math.floor((i-1)/2) * 35)
+    btn.Text = data.name
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 12
+    btn.BackgroundColor3 = data.color
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+    btn.MouseButton1Click:Connect(function()
+        settings.boxColor = data.color
+    end)
+end
+
+-- === ВКЛАДКА SETTINGS ===
+local menuKeyBtn = Instance.new("TextButton", settingsTab)
+menuKeyBtn.Size = UDim2.new(0, 160, 0, 30)
+menuKeyBtn.Position = UDim2.new(0.5, -80, 0, 20)
+menuKeyBtn.Text = "Menu Key: Insert"
+menuKeyBtn.Font = Enum.Font.Gotham
+menuKeyBtn.TextSize = 14
+menuKeyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+menuKeyBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", menuKeyBtn).CornerRadius = UDim.new(0, 5)
+menuKeyBtn.MouseButton1Click:Connect(function()
+    settings.isSettingMenuKey = true
+    menuKeyBtn.Text = "Press any key..."
+end)
+
+local closeBtn = Instance.new("TextButton", settingsTab)
+closeBtn.Size = UDim2.new(0, 160, 0, 30)
+closeBtn.Position = UDim2.new(0.5, -80, 0, 70)
+closeBtn.Text = "Close Menu"
+closeBtn.Font = Enum.Font.Gotham
+closeBtn.TextSize = 14
+closeBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 5)
+closeBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+end)
+
+-- ===== ОБРАБОТКА КЛАВИШ =====
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if settings.isSettingMenuKey then
+        if input.KeyCode ~= Enum.KeyCode.Unknown then
+            settings.menuKey = input.KeyCode
+            menuKeyBtn.Text = "Menu Key: " .. input.KeyCode.Name
+            settings.isSettingMenuKey = false
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
+            settings.menuKey = input.UserInputType
+            menuKeyBtn.Text = "Menu Key: " .. tostring(input.UserInputType):gsub("Enum.UserInputType.", "")
+            settings.isSettingMenuKey = false
+        end
+        return
+    end
+
+    if input.KeyCode == settings.menuKey or input.UserInputType == settings.menuKey then
+        mainFrame.Visible = not mainFrame.Visible
+    end
+end)
+
+print("=== Frontlines: Pacific ESP loaded ===")
+print("Press Insert to open menu.")
