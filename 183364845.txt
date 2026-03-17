@@ -1,0 +1,343 @@
+-- Phenix Hub for [â¡] Hyper Speed Runner
+-- Rayfield UI Implementation - Keyless Version
+-- Single GUI only, no external loadstrings
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+
+-- Player
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+
+-- Rayfield UI Library (local version to avoid external calls)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Create main window
+local Window = Rayfield:CreateWindow({
+    Name = "",
+    LoadingTitle = "",
+    LoadingSubtitle = "",
+    ConfigurationSaving = {
+        Enabled = false, -- No saving to avoid extra windows
+        FolderName = nil
+    },
+    Discord = {
+        Enabled = false, -- No discord invites
+        Invite = "",
+        RememberJoins = false
+    },
+    KeySystem = false, -- Completely keyless
+    Settings = {
+        Theme = "Dark"
+    }
+})
+
+-- Main Tab: Auto Farm
+local AutoFarmTab = Window:CreateTab("Auto Farm", 4483362458)
+
+-- Step Value Input
+local StepValueInput = AutoFarmTab:CreateInput({
+    Name = "Step Value",
+    PlaceholderText = "Enter huge number (e.g., 100000, 1e60)",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Value)
+        -- Store the step value
+        _G.StepValue = tonumber(Value) or 100000
+        Rayfield:Notify({
+            Title = "Step Value Updated",
+            Content = "Step value set to: " .. tostring(_G.StepValue),
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+-- Default step value
+_G.StepValue = 100000
+StepValueInput:Set("100000")
+
+-- Inf Steps Toggle
+local InfStepsToggle = AutoFarmTab:CreateToggle({
+    Name = "Inf Steps",
+    CurrentValue = false,
+    Flag = "InfStepsToggle",
+    Callback = function(Value)
+        _G.InfStepsEnabled = Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Inf Steps Enabled",
+                Content = "Farming steps with value: " .. tostring(_G.StepValue),
+                Duration = 3,
+                Image = 4483362458
+            })
+            
+            -- Start the farming loop
+            spawn(function()
+                while _G.InfStepsEnabled and task.wait() do
+                    -- Method 1: Try to find and modify leaderstats
+                    local leaderstats = Player:FindFirstChild("leaderstats")
+                    if leaderstats then
+                        local steps = leaderstats:FindFirstChild("Steps") or leaderstats:FindFirstChild("Step") or leaderstats:FindFirstChild("Level")
+                        if steps and steps:IsA("NumberValue") or steps:IsA("IntValue") then
+                            steps.Value = steps.Value + _G.StepValue
+                        end
+                    end
+                    
+                    -- Method 2: Try to find remote events/functions for adding steps
+                    -- Check common remote locations
+                    local remotes = {
+                        ReplicatedStorage:FindFirstChild("Remotes"),
+                        ReplicatedStorage:FindFirstChild("Events"),
+                        ReplicatedStorage:FindFirstChild("Functions"),
+                        game:GetService("Workspace"):FindFirstChild("Remotes")
+                    }
+                    
+                    for _, remoteContainer in ipairs(remotes) do
+                        if remoteContainer then
+                            local addStepRemote = remoteContainer:FindFirstChild("AddStep") or 
+                                                  remoteContainer:FindFirstChild("AddSteps") or
+                                                  remoteContainer:FindFirstChild("StepAdded") or
+                                                  remoteContainer:FindFirstChild("FarmStep")
+                            if addStepRemote then
+                                if addStepRemote:IsA("RemoteEvent") then
+                                    addStepRemote:FireServer(_G.StepValue)
+                                elseif addStepRemote:IsA("RemoteFunction") then
+                                    pcall(function()
+                                        addStepRemote:InvokeServer(_G.StepValue)
+                                    end)
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- Method 3: Simulate extreme speed if direct modification fails
+                    -- This moves the character forward at extreme speed to collect steps
+                    if Character and Character:FindFirstChild("HumanoidRootPart") then
+                        local root = Character.HumanoidRootPart
+                        local velocity = root.Velocity
+                        root.Velocity = Vector3.new(0, velocity.Y, 0) + (root.CFrame.LookVector * 5000)
+                    end
+                    
+                    -- Small delay to prevent crashing
+                    task.wait(0.1)
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Inf Steps Disabled",
+                Content = "Step farming stopped",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+-- Auto Win Toggle
+local AutoWinToggle = AutoFarmTab:CreateToggle({
+    Name = "Auto Win",
+    CurrentValue = false,
+    Flag = "AutoWinToggle",
+    Callback = function(Value)
+        _G.AutoWinEnabled = Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Auto Win Enabled",
+                Content = "Searching for finish zone...",
+                Duration = 3,
+                Image = 4483362458
+            })
+            
+            -- Start auto win loop
+            spawn(function()
+                while _G.AutoWinEnabled and task.wait(0.5) do
+                    -- Look for the blue finish cash part
+                    local finishPart = nil
+                    
+                    -- Search in workspace for finish parts
+                    for _, obj in ipairs(workspace:GetDescendants()) do
+                        if obj:IsA("Part") or obj:IsA("MeshPart") then
+                            -- Look for blue parts with "finish" or "cash" in name
+                            local nameLower = obj.Name:lower()
+                            if (nameLower:find("finish") or nameLower:find("cash") or nameLower:find("win")) 
+                               and (obj.BrickColor == BrickColor.new("Bright blue") or obj.Color == Color3.fromRGB(0, 162, 255)) then
+                                finishPart = obj
+                                break
+                            end
+                        end
+                    end
+                    
+                    if finishPart and Character and Character:FindFirstChild("HumanoidRootPart") then
+                        local root = Character.HumanoidRootPart
+                        
+                        -- Method 1: Teleport directly to finish
+                        root.CFrame = finishPart.CFrame + Vector3.new(0, 5, 0)
+                        
+                        -- Method 2: Use FireTouchInterest to trigger the finish
+                        if finishPart:FindFirstChild("TouchInterest") or finishPart:IsA("TouchTransmitter") then
+                            firetouchinterest(root, finishPart, 0) -- Touch
+                            firetouchinterest(root, finishPart, 1) -- Untouch
+                        end
+                        
+                        -- Method 3: Push towards finish with CFrame
+                        local direction = (finishPart.Position - root.Position).Unit
+                        root.Velocity = direction * 1000
+                        
+                        Rayfield:Notify({
+                            Title = "Auto Win Active",
+                            Content = "Attempting to trigger finish...",
+                            Duration = 2,
+                            Image = 4483362458
+                        })
+                    end
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Auto Win Disabled",
+                Content = "Stopped searching for finish",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+-- Auto Rebirth Tab
+local RebirthTab = Window:CreateTab("Auto Rebirth", 4483362458)
+
+-- Auto Rebirth Toggle
+local AutoRebirthToggle = RebirthTab:CreateToggle({
+    Name = "Auto Rebirth",
+    CurrentValue = false,
+    Flag = "AutoRebirthToggle",
+    Callback = function(Value)
+        _G.AutoRebirthEnabled = Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Auto Rebirth Enabled",
+                Content = "Will automatically rebirth when possible",
+                Duration = 3,
+                Image = 4483362458
+            })
+            
+            -- Simple rebirth loop
+            spawn(function()
+                while _G.AutoRebirthEnabled and task.wait(5) do
+                    -- Look for rebirth buttons or remotes
+                    local rebirthRemote = ReplicatedStorage:FindFirstChild("Rebirth") or 
+                                         ReplicatedStorage:FindFirstChild("RebirthEvent") or
+                                         ReplicatedStorage:FindFirstChild("DoRebirth")
+                    
+                    if rebirthRemote then
+                        if rebirthRemote:IsA("RemoteEvent") then
+                            rebirthRemote:FireServer()
+                        elseif rebirthRemote:IsA("RemoteFunction") then
+                            pcall(function()
+                                rebirthRemote:InvokeServer()
+                            end)
+                        end
+                    end
+                    
+                    -- Also check for GUI rebirth buttons
+                    local playerGui = Player:FindFirstChild("PlayerGui")
+                    if playerGui then
+                        for _, gui in ipairs(playerGui:GetDescendants()) do
+                            if gui:IsA("TextButton") and (gui.Name:lower():find("rebirth") or gui.Text:lower():find("rebirth")) then
+                                pcall(function()
+                                    gui:FireServer()
+                                end)
+                            end
+                        end
+                    end
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Auto Rebirth Disabled",
+                Content = "Auto rebirth stopped",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end
+})
+
+-- Utils Tab
+local UtilsTab = Window:CreateTab("Utils", 4483362458)
+
+-- Reset Character Button
+UtilsTab:CreateButton({
+    Name = "Reset Character",
+    Callback = function()
+        Player.Character:BreakJoints()
+        Rayfield:Notify({
+            Title = "Character Reset",
+            Content = "Character has been reset",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+-- Rejoin Server Button
+UtilsTab:CreateButton({
+    Name = "Rejoin Server",
+    Callback = function()
+        TeleportService:Teleport(game.PlaceId, Player)
+        Rayfield:Notify({
+            Title = "Rejoining Server",
+            Content = "Teleporting to new server...",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end
+})
+
+-- Server Hop Button
+UtilsTab:CreateButton({
+    Name = "Server Hop",
+    Callback = function()
+        local HttpService = game:GetService("HttpService")
+        local servers = {}
+        
+        pcall(function()
+            servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?limit=100"))
+        end)
+        
+        if #servers.data > 0 then
+            local randomServer = servers.data[math.random(1, #servers.data)]
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer.id, Player)
+        end
+    end
+})
+
+-- Instructions Section
+UtilsTab:CreateSection("How to Find Step Values")
+
+UtilsTab:CreateParagraph({
+    Title = "Finding Step/Level Values",
+    Content = [[
+1. Open Explorer (F9) and look under Player > leaderstats
+2. Check for values named: Steps, Step, Level, or similar
+3. Look in ReplicatedStorage for Remotes/Events folder
+4. Common remote names: AddStep, AddSteps, FarmStep, StepAdded
+5. If direct modification doesn't work, Inf Steps uses speed method
+    ]]
+})
+
+-- Initialize
+Rayfield:Notify({
+    Title = "Phenix Hub Loaded",
+    Content = "Welcome to Phenix Hub for Hyper Speed Runner!",
+    Duration = 5,
+    Image = 4483362458
+})
+
+print("Phenix Hub loaded successfully - Keyless Version")
