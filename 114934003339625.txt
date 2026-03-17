@@ -1,0 +1,18 @@
+local lp = game:GetService("Players")["LocalPlayer"]
+
+local pbases = {}
+for _, base in ipairs(workspace.Bases:GetChildren()) do
+    local owner = base["Configuration"]["Player"].Value
+    if owner == lp.Name then continue end
+
+    table.insert(pbases, {instance = base, owner = owner})
+    
+    for _, floor in ipairs(base["Floors"]:GetDescendants()) do
+        --local hitbox = floor:FindFirstChildWhichIsA("Folder"):FindFirstChildWhichIsA("Model"):FindFirstChildWhichIsA("Part")
+        --hitbox.CanCollide = false
+
+        if floor:IsA("BasePart") and not floor:IsA("TrussPart") then
+            floor.CanCollide = false
+        end
+    end
+end
