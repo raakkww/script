@@ -1,0 +1,158 @@
+--// Validate GameID
+if game.GameId ~= 9720026659 then return end
+
+--// Import RayField Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+--// RayField Window Initialization
+local Window = Rayfield:CreateWindow({
+	Name = "",
+   	Icon = "scan",
+   	LoadingTitle = "",
+   	LoadingSubtitle = "",
+   	ShowText = "Mog",
+   	Theme = "Ocean",
+
+   	ToggleUIKeybind = Enum.KeyCode.RightControl,
+
+   	DisableRayfieldPrompts = false,
+   	DisableBuildWarnings = false,
+
+   	ConfigurationSaving = {
+      	Enabled = true,
+      	FolderName = nil,
+      	FileName = "Frame Mog"
+   	},
+
+   	Discord = {
+      	Enabled = false, 
+      	Invite = "noinvitelink",
+      	RememberJoins = false
+   	},
+
+   	KeySystem = false,
+   	KeySettings = {
+      	Title = "",
+      	Subtitle = "",
+      	Note = "",
+      	FileName = "",
+      	SaveKey = false,
+      	GrabKeyFromSite = false,
+      	Key = {""}
+   }
+})
+
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--// Player + Remote References
+local LocalPlayer = Players.LocalPlayer
+local WorkoutRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("WorkoutPerformed")
+
+--// UI Tabs
+local AutoFarmTab = Window:CreateTab("Auto Farm", "flame")
+local MiscTab = Window:CreateTab("Misc", "flask-conical")
+
+--// Automation State Variables
+local EnTrain = false
+local EnMog = false
+local MogDelay = 0.5
+
+--// Game Object References
+local MogFolder = workspace:WaitForChild("MogNPCs")
+
+--// Auto Farm Tab
+--// Auto Train Toggle
+AutoFarmTab:CreateToggle({
+	Name = "Toggle Auto Train",
+	CurrentValue = false,
+	Flag = "train_flag",
+	Callback = function(v)
+		EnTrain = v
+
+		if v then
+			task.spawn(function()
+				while EnTrain do
+					WorkoutRemote:FireServer(1)
+					task.wait(0.2)
+				end
+			end)
+		end
+	end,
+})
+
+--// Auto Mog Toggle
+AutoFarmTab:CreateToggle({
+	Name = "Toggle Auto Mog",
+	CurrentValue = false,
+	Flag = "mog_flag",
+	Callback = function(v)
+		EnMog = v
+
+		if v then
+			task.spawn(function()
+				while EnMog do
+					local Char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+					local RootPart = Char:FindFirstChild("HumanoidRootPart") or Char:WaitForChild("HumanoidRootPart")
+
+					for _, npc in ipairs(MogFolder:GetChildren()) do
+						if not EnMog then break end
+						if not RootPart or not RootPart.Parent then break end
+
+						local Root = npc:FindFirstChild("HumanoidRootPart")
+						local Prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true)
+
+						if npc.Name:find("_npc_") and Root and Prompt then
+							local pos = Root.Position
+							RootPart.CFrame = Root.CFrame + Vector3.new(0, 3, 0)
+							task.wait(MogDelay)
+
+							local p = RootPart.Position
+							if (Vector3.new(p.X, 0, p.Z) - Vector3.new(pos.X, 0, pos.Z)).Magnitude > 12 then
+								Rayfield:Notify({
+									Title = "Rollback Detected",
+									Content = "Looks like you haven't unlocked all NPCs yet, cooling down!",
+									Duration = 4,
+									Image = "rewind",
+								})
+								break
+							end
+
+							fireproximityprompt(Prompt)
+						end
+					end
+
+					local t = 0
+					while EnMog and t < 65 do
+						t += task.wait(0.5)
+					end
+				end
+			end)
+		end
+	end,
+})
+
+--// Mog Interaction Delay Slider
+AutoFarmTab:CreateSlider({
+	Name = "Mog Delay",
+	Range = {300, 1000},
+	Increment = 50,
+	Suffix = "ms",
+	CurrentValue = 500,
+	Flag = "mog_delay",
+	Callback = function(v)
+		MogDelay = v / 1000
+	end,
+})
+
+--// Miscellaneous Tab
+--// Destroy GUI Button
+MiscTab:CreateButton({
+	Name = "Destroy GUI",
+	Callback = function()
+		Rayfield:Destroy()
+	end,
+})
+
+Rayfield:LoadConfiguration()
