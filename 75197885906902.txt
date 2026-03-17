@@ -1,0 +1,409 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   LoadingTitle = "",
+   ConfigurationSaving = { Enabled = false }
+})
+
+-- Tabs
+local TabESP = Window:CreateTab("Egg ESP", 4483362458)
+local TabTP = Window:CreateTab("Egg Teleport", 4483362458)
+
+-- Variables
+local espEnabled = false
+local selectedEgg = nil
+local lastEggCount = -1 
+
+-- ESP Colors
+local eggColors = {
+    ["Diamond Egg"] = Color3.fromRGB(0, 255, 255),
+    ["Mystery Egg"] = Color3.fromRGB(20, 20, 20),
+    ["Obsidian Egg"] = Color3.fromRGB(138, 43, 226),
+    ["Ruby Egg"] = Color3.fromRGB(255, 20, 147),
+    ["Lava Egg"] = Color3.fromRGB(255, 140, 0),
+    ["Gold Egg"] = Color3.fromRGB(255, 255, 0),
+    ["Galaxy Egg"] = Color3.fromRGB(75, 0, 130),
+    ["Emerald Egg"] = Color3.fromRGB(0, 255, 0),
+    ["Silver Egg"] = Color3.fromRGB(192, 192, 192)
+}
+
+-- Function to clean up ESP
+local function CleanESP()
+    for _, folder in pairs({workspace:FindFirstChild("EggsToGrab"), workspace:FindFirstChild("MineBlocks")}) do
+        if folder then
+            for _, child in pairs(folder:GetChildren()) do
+                if child:FindFirstChild("GeminiESP") then child.GeminiESP:Destroy() end
+                if child:FindFirstChild("EggLabel") then child.EggLabel:Destroy() end
+            end
+        end
+    end
+end
+
+-- 1. ESP SECTION
+TabESP:CreateToggle({
+   Name = "Enable ESP",
+   CurrentValue = false,
+   Callback = function(Value) 
+      espEnabled = Value 
+      if not Value then
+          CleanESP() -- Clean up immediately when turned off
+      end
+   end,
+})
+
+-- 2. TELEPORT SECTION
+local eggDropdown = TabTP:CreateDropdown({
+   Name = "Select EGG",
+   Options = {"No Eggs Found"},
+   CurrentOption = {"No Eggs Found"},
+   MultipleOptions = false,
+   Callback = function(Option)
+      if type(Option) == "table" then selectedEgg = Option[1] else selectedEgg = Option end
+   end,
+})
+
+TabTP:CreateButton({
+   Name = "Teleport (CFrame)",
+   Callback = function()
+      if selectedEgg and selectedEgg ~= "No Eggs Found" then
+         local found = false
+         for _, folder in pairs({workspace:FindFirstChild("EggsToGrab"), workspace:FindFirstChild("MineBlocks")}) do
+            if folder then
+               for _, child in pairs(folder:GetChildren()) do
+                  if child:GetAttribute("EggType") == selectedEgg then
+                     local target = child:IsA("Model") and (child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart")) or child
+                     if target then
+                        game.Players.LocalPlayer.Character:SetPrimaryPartCFrame(target.CFrame * CFrame.new(0, 3, 0))
+                        found = true
+                        break
+                     end
+                  end
+               end
+            end
+            if found then break end
+         end
+         if not found then
+            Rayfield:Notify({Title = "Error", Content = "Egg is no longer on the map!", Duration = 2})
+         end
+      end
+   end,
+})
+
+-- WORLD HANDLER LOOP
+task.spawn(function()
+    while true do
+        local currentEggs = {}
+        
+        for _, folder in pairs({workspace:FindFirstChild("EggsToGrab"), workspace:FindFirstChild("MineBlocks")}) do
+            if folder then
+                for _, child in pairs(folder:GetChildren()) do
+                    local name = child:GetAttribute("EggType")
+                    if name then
+                        -- Render ESP only if enabled
+                        if espEnabled then
+                            if not child:FindFirstChild("GeminiESP") then
+                                local c = eggColors[name] or Color3.new(1,1,1)
+                                local h = Instance.new("Highlight", child)
+                                h.Name = "GeminiESP"; h.FillTransparency = 1; h.OutlineColor = c
+                                
+                                local b = Instance.new("BillboardGui", child)
+                                b.Name = "EggLabel"; b.AlwaysOnTop = true; b.Size = UDim2.new(0,100,0,20); b.Parent = child
+                                local l = Instance.new("TextLabel", b)
+                                l.Size = UDim2.new(1,0,1,0); l.Text = name; l.TextColor3 = c
+                                l.BackgroundTransparency = 1; l.Font = Enum.Font.GothamBold; l.TextSize = 12
+                            end
+                        end
+                        
+                        if not table.find(currentEggs, name) then
+                            table.insert(currentEggs, name)
+                        end
+                    end
+                end
+            end
+        end
+
+        if #currentEggs ~= lastEggCount then
+            lastEggCount = #currentEggs
+            if #currentEggs > 0 then
+                eggDropdown:Refresh(currentEggs)
+            else
+                eggDropdown:Refresh({"No Eggs Found"})
+            end
+        end
+        
+        task.wait(3)
+    end
+end)local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Ultimate Win",
+   LoadingTitle = "Winning Easier...",
+   ConfigurationSaving = { Enabled = false }
+})
+
+-- Tabs
+local TabESP = Window:CreateTab("Egg ESP", 4483362458)
+local TabTP = Window:CreateTab("Egg Teleport", 4483362458)
+
+-- Variables
+local espEnabled = false
+local selectedEgg = nil
+local lastEggCount = -1 
+
+-- ESP Colors
+local eggColors = {
+    ["Diamond Egg"] = Color3.fromRGB(0, 255, 255),
+    ["Mystery Egg"] = Color3.fromRGB(20, 20, 20),
+    ["Obsidian Egg"] = Color3.fromRGB(138, 43, 226),
+    ["Ruby Egg"] = Color3.fromRGB(255, 20, 147),
+    ["Lava Egg"] = Color3.fromRGB(255, 140, 0),
+    ["Gold Egg"] = Color3.fromRGB(255, 255, 0),
+    ["Galaxy Egg"] = Color3.fromRGB(75, 0, 130),
+    ["Emerald Egg"] = Color3.fromRGB(0, 255, 0),
+    ["Silver Egg"] = Color3.fromRGB(192, 192, 192)
+}
+
+-- Function to clean up ESP
+local function CleanESP()
+    for _, folder in pairs({workspace:FindFirstChild("EggsToGrab"), workspace:FindFirstChild("MineBlocks")}) do
+        if folder then
+            for _, child in pairs(folder:GetChildren()) do
+                if child:FindFirstChild("GeminiESP") then child.GeminiESP:Destroy() end
+                if child:FindFirstChild("EggLabel") then child.EggLabel:Destroy() end
+            end
+        end
+    end
+end
+
+-- 1. ESP SECTION
+TabESP:CreateToggle({
+   Name = "Enable ESP",
+   CurrentValue = false,
+   Callback = function(Value) 
+      espEnabled = Value 
+      if not Value then
+          CleanESP() -- Clean up immediately when turned off
+      end
+   end,
+})
+
+-- 2. TELEPORT SECTION
+local eggDropdown = TabTP:CreateDropdown({
+   Name = "Select EGG",
+   Options = {"No Eggs Found"},
+   CurrentOption = {"No Eggs Found"},
+   MultipleOptions = false,
+   Callback = function(Option)
+      if type(Option) == "table" then selectedEgg = Option[1] else selectedEgg = Option end
+   end,
+})
+
+TabTP:CreateButton({
+   Name = "Teleport (CFrame)",
+   Callback = function()
+      if selectedEgg and selectedEgg ~= "No Eggs Found" then
+         local found = false
+         for _, folder in pairs({workspace:FindFirstChild("EggsToGrab"), workspace:FindFirstChild("MineBlocks")}) do
+            if folder then
+               for _, child in pairs(folder:GetChildren()) do
+                  if child:GetAttribute("EggType") == selectedEgg then
+                     local target = child:IsA("Model") and (child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart")) or child
+                     if target then
+                        game.Players.LocalPlayer.Character:SetPrimaryPartCFrame(target.CFrame * CFrame.new(0, 3, 0))
+                        found = true
+                        break
+                     end
+                  end
+               end
+            end
+            if found then break end
+         end
+         if not found then
+            Rayfield:Notify({Title = "Error", Content = "Egg is no longer on the map!", Duration = 2})
+         end
+      end
+   end,
+})
+
+-- WORLD HANDLER LOOP
+task.spawn(function()
+    while true do
+        local currentEggs = {}
+        
+        for _, folder in pairs({workspace:FindFirstChild("EggsToGrab"), workspace:FindFirstChild("MineBlocks")}) do
+            if folder then
+                for _, child in pairs(folder:GetChildren()) do
+                    local name = child:GetAttribute("EggType")
+                    if name then
+                        -- Render ESP only if enabled
+                        if espEnabled then
+                            if not child:FindFirstChild("GeminiESP") then
+                                local c = eggColors[name] or Color3.new(1,1,1)
+                                local h = Instance.new("Highlight", child)
+                                h.Name = "GeminiESP"; h.FillTransparency = 1; h.OutlineColor = c
+                                
+                                local b = Instance.new("BillboardGui", child)
+                                b.Name = "EggLabel"; b.AlwaysOnTop = true; b.Size = UDim2.new(0,100,0,20); b.Parent = child
+                                local l = Instance.new("TextLabel", b)
+                                l.Size = UDim2.new(1,0,1,0); l.Text = name; l.TextColor3 = c
+                                l.BackgroundTransparency = 1; l.Font = Enum.Font.GothamBold; l.TextSize = 12
+                            end
+                        end
+                        
+                        if not table.find(currentEggs, name) then
+                            table.insert(currentEggs, name)
+                        end
+                    end
+                end
+            end
+        end
+
+        if #currentEggs ~= lastEggCount then
+            lastEggCount = #currentEggs
+            if #currentEggs > 0 then
+                eggDropdown:Refresh(currentEggs)
+            else
+                eggDropdown:Refresh({"No Eggs Found"})
+            end
+        end
+        
+        task.wait(3)
+    end
+end)local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Ultimate Win",
+   LoadingTitle = "Winning Easier...",
+   ConfigurationSaving = { Enabled = false }
+})
+
+-- Tabs
+local TabESP = Window:CreateTab("Egg ESP", 4483362458)
+local TabTP = Window:CreateTab("Egg Teleport", 4483362458)
+
+-- Variables
+local espEnabled = false
+local selectedEgg = nil
+local lastEggCount = -1 
+
+-- ESP Colors
+local eggColors = {
+    ["Diamond Egg"] = Color3.fromRGB(0, 255, 255),
+    ["Mystery Egg"] = Color3.fromRGB(20, 20, 20),
+    ["Obsidian Egg"] = Color3.fromRGB(138, 43, 226),
+    ["Ruby Egg"] = Color3.fromRGB(255, 20, 147),
+    ["Lava Egg"] = Color3.fromRGB(255, 140, 0),
+    ["Gold Egg"] = Color3.fromRGB(255, 255, 0),
+    ["Galaxy Egg"] = Color3.fromRGB(75, 0, 130),
+    ["Emerald Egg"] = Color3.fromRGB(0, 255, 0),
+    ["Silver Egg"] = Color3.fromRGB(192, 192, 192)
+}
+
+-- Function to clean up ESP
+local function CleanESP()
+    for _, folder in pairs({workspace:FindFirstChild("EggsToGrab"), workspace:FindFirstChild("MineBlocks")}) do
+        if folder then
+            for _, child in pairs(folder:GetChildren()) do
+                if child:FindFirstChild("GeminiESP") then child.GeminiESP:Destroy() end
+                if child:FindFirstChild("EggLabel") then child.EggLabel:Destroy() end
+            end
+        end
+    end
+end
+
+-- 1. ESP SECTION
+TabESP:CreateToggle({
+   Name = "Enable ESP",
+   CurrentValue = false,
+   Callback = function(Value) 
+      espEnabled = Value 
+      if not Value then
+          CleanESP() -- Clean up immediately when turned off
+      end
+   end,
+})
+
+-- 2. TELEPORT SECTION
+local eggDropdown = TabTP:CreateDropdown({
+   Name = "Select EGG",
+   Options = {"No Eggs Found"},
+   CurrentOption = {"No Eggs Found"},
+   MultipleOptions = false,
+   Callback = function(Option)
+      if type(Option) == "table" then selectedEgg = Option[1] else selectedEgg = Option end
+   end,
+})
+
+TabTP:CreateButton({
+   Name = "Teleport (CFrame)",
+   Callback = function()
+      if selectedEgg and selectedEgg ~= "No Eggs Found" then
+         local found = false
+         for _, folder in pairs({workspace:FindFirstChild("EggsToGrab"), workspace:FindFirstChild("MineBlocks")}) do
+            if folder then
+               for _, child in pairs(folder:GetChildren()) do
+                  if child:GetAttribute("EggType") == selectedEgg then
+                     local target = child:IsA("Model") and (child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart")) or child
+                     if target then
+                        game.Players.LocalPlayer.Character:SetPrimaryPartCFrame(target.CFrame * CFrame.new(0, 3, 0))
+                        found = true
+                        break
+                     end
+                  end
+               end
+            end
+            if found then break end
+         end
+         if not found then
+            Rayfield:Notify({Title = "Error", Content = "Egg is no longer on the map!", Duration = 2})
+         end
+      end
+   end,
+})
+
+-- WORLD HANDLER LOOP
+task.spawn(function()
+    while true do
+        local currentEggs = {}
+        
+        for _, folder in pairs({workspace:FindFirstChild("EggsToGrab"), workspace:FindFirstChild("MineBlocks")}) do
+            if folder then
+                for _, child in pairs(folder:GetChildren()) do
+                    local name = child:GetAttribute("EggType")
+                    if name then
+                        -- Render ESP only if enabled
+                        if espEnabled then
+                            if not child:FindFirstChild("GeminiESP") then
+                                local c = eggColors[name] or Color3.new(1,1,1)
+                                local h = Instance.new("Highlight", child)
+                                h.Name = "GeminiESP"; h.FillTransparency = 1; h.OutlineColor = c
+                                
+                                local b = Instance.new("BillboardGui", child)
+                                b.Name = "EggLabel"; b.AlwaysOnTop = true; b.Size = UDim2.new(0,100,0,20); b.Parent = child
+                                local l = Instance.new("TextLabel", b)
+                                l.Size = UDim2.new(1,0,1,0); l.Text = name; l.TextColor3 = c
+                                l.BackgroundTransparency = 1; l.Font = Enum.Font.GothamBold; l.TextSize = 12
+                            end
+                        end
+                        
+                        if not table.find(currentEggs, name) then
+                            table.insert(currentEggs, name)
+                        end
+                    end
+                end
+            end
+        end
+
+        if #currentEggs ~= lastEggCount then
+            lastEggCount = #currentEggs
+            if #currentEggs > 0 then
+                eggDropdown:Refresh(currentEggs)
+            else
+                eggDropdown:Refresh({"No Eggs Found"})
+            end
+        end
+        
+        task.wait(3)
+    end
+end)
