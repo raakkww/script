@@ -1,0 +1,47 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Root = Character:WaitForChild("HumanoidRootPart")
+
+local ActiveCoins = game:GetService("Workspace"):WaitForChild("ActiveCoins")
+
+local AutoCoins = false
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "coin farm",
+    LoadingTitle = "coin farm",
+    LoadingSubtitle = ""
+})
+
+local Tab = Window:CreateTab("main", 4483362458)
+
+Tab:CreateToggle({
+    Name = "auto coins",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoCoins = Value
+
+        if AutoCoins then
+            task.spawn(function()
+                while AutoCoins do
+                    for _,coin in pairs(ActiveCoins:GetChildren()) do
+                        if not AutoCoins then break end
+                        if coin:IsA("BasePart") then
+                            local tween = TweenService:Create(
+                                Root,
+                                TweenInfo.new(0.05, Enum.EasingStyle.Linear),
+                                {CFrame = coin.CFrame}
+                            )
+                            tween:Play()
+                            tween.Completed:Wait()
+                        end
+                    end
+                    task.wait()
+                end
+            end)
+        end
+    end
+})
