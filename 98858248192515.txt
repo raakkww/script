@@ -1,0 +1,125 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+local running = false
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "WallBuilderV2"
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0,200,0,120)
+frame.Position = UDim2.new(0.5,-100,0.5,-60)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.Parent = gui
+frame.Active = true
+frame.Draggable = true
+
+local startBtn = Instance.new("TextButton")
+startBtn.Size = UDim2.new(1,-20,0,30)
+startBtn.Position = UDim2.new(0,10,0,10)
+startBtn.Text = "Start"
+startBtn.Parent = frame
+
+local stopBtn = Instance.new("TextButton")
+stopBtn.Size = UDim2.new(1,-20,0,30)
+stopBtn.Position = UDim2.new(0,10,0,45)
+stopBtn.Text = "Stop"
+stopBtn.Parent = frame
+
+local unloadBtn = Instance.new("TextButton")
+unloadBtn.Size = UDim2.new(1,-20,0,30)
+unloadBtn.Position = UDim2.new(0,10,0,80)
+unloadBtn.Text = "Unload"
+unloadBtn.Parent = frame
+
+
+-- fire closest proximity prompt
+local function fireClosestPrompt()
+    local closest
+    local dist = math.huge
+
+    for _,v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ProximityPrompt") and v.Parent:IsA("BasePart") then
+            local d = (hrp.Position - v.Parent.Position).Magnitude
+            if d < dist then
+                dist = d
+                closest = v
+            end
+        end
+    end
+
+    if closest then
+        fireproximityprompt(closest,1)
+    end
+end
+
+
+local function run()
+    while running do
+
+        -- step 1
+        char:PivotTo(CFrame.new(-255,6,-139))
+        task.wait(0.15)
+
+        -- step 2
+        fireClosestPrompt()
+        task.wait(0.15)
+
+        -- step 3 equip brick
+        local tool = player.Backpack:FindFirstChild("Brick")
+        if tool then
+            tool.Parent = char
+        end
+
+        task.wait(0.15)
+
+        -- step 4 scan bricks
+        local bricks = {}
+        for _,v in ipairs(workspace:GetChildren()) do
+            if v:IsA("BasePart") and v.Name:match("^Brick%d+$") then
+                table.insert(bricks,v)
+            end
+        end
+
+        if #bricks > 0 then
+            local brick = bricks[math.random(1,#bricks)]
+
+            local prompt = brick:FindFirstChild("PickupPrompt")
+            if prompt then
+                fireproximityprompt(prompt,1)
+            end
+
+            task.wait(0.15)
+
+            -- tp to brick
+            char:PivotTo(brick.CFrame + Vector3.new(0,3,0))
+            task.wait(0.15)
+
+            -- fire again
+            fireClosestPrompt()
+        end
+
+        task.wait(0.1)
+    end
+end
+
+
+startBtn.MouseButton1Click:Connect(function()
+    if not running then
+        running = true
+        task.spawn(run)
+    end
+end)
+
+stopBtn.MouseButton1Click:Connect(function()
+    running = false
+end)
+
+unloadBtn.MouseButton1Click:Connect(function()
+    running = false
+    gui:Destroy()
+end)
