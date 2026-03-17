@@ -1,0 +1,594 @@
+--!strict
+-- // variables
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local string_lower = string.lower
+local table_insert = table.insert
+
+-- // cleanup old gui
+if getgenv().CrapwarsGUI then
+    pcall(function() getgenv().CrapwarsGUI:Destroy() end)
+end
+
+-- // global state
+getgenv().CrapwarsVars = getgenv().CrapwarsVars or {}
+local G = getgenv().CrapwarsVars
+
+G.godmodeEnabled = G.godmodeEnabled or false
+G.godmodeTarget = G.godmodeTarget or "self"
+G.godmodeHealth = G.godmodeHealth or 99999999
+G.godmodeInterval = G.godmodeInterval or 1
+G.godmodeTargetPlayer = G.godmodeTargetPlayer or ""
+
+G.enabled = G.enabled or false
+G.meteorLoopRunning = G.meteorLoopRunning or false
+
+G.noCooldownEnabled = G.noCooldownEnabled or false
+
+G.autoMineEnabled = G.autoMineEnabled or false
+G.autoMineTool = G.autoMineTool or "auto"
+G.autoMineLocation = G.autoMineLocation or "all"
+G.autoMineOre = G.autoMineOre or ""
+G.autoMineDamage = G.autoMineDamage or 99999999
+G.autoMineInterval = G.autoMineInterval or 0.1
+G.autoMineLoopRunning = G.autoMineLoopRunning or false
+
+G.targetOption = G.targetOption or "Head"
+G.acBypassEnabled = G.acBypassEnabled or true
+
+-- // caching
+local MINE_LOCATIONS = {"Mine", "Mine2", "Mine3", "SpaceMine"}
+local cachedPickaxeRF = nil
+local cachedGodmodeRF = nil
+local currentRF = nil
+
+-- // functions
+local function findRemoteFunction(parent, namePattern)
+    if not parent then return nil end
+    for _, item in ipairs(parent:GetChildren()) do
+        if item:IsA("Tool") then
+            local name = string_lower(item.Name)
+            if not namePattern or name:find(namePattern) then
+                local rf = item:FindFirstChildOfClass("RemoteFunction")
+                if rf then return rf end
+            end
+        end
+    end
+    return nil
+end
+
+local function findRemoteInContainer(container, namePattern)
+    if not container then return nil end
+    for _, item in ipairs(container:GetChildren()) do
+        if item:IsA("Tool") then
+            local name = string_lower(item.Name)
+            if not namePattern or name:find(namePattern) then
+                local rf = item:FindFirstChildOfClass("RemoteFunction")
+                if rf then return rf end
+            end
+        end
+    end
+    return nil
+end
+
+local function GetGodmodeEvent()
+    if cachedGodmodeRF and cachedGodmodeRF.Parent then
+        return cachedGodmodeRF
+    end
+    
+    local character = LocalPlayer.Character
+    if not character then return nil end
+
+    -- check character and backpack for armour
+    for _, container in ipairs { character, LocalPlayer.Backpack } do
+        local rf = findRemoteFunction(container, "armour")
+        if rf then cachedGodmodeRF = rf; return rf end
+    end
+
+    -- check workspace models for armour
+    for _, model in ipairs(workspace:GetChildren()) do
+        if model:IsA("Model") then
+            local rf = findRemoteFunction(model, "armour")
+            if rf then cachedGodmodeRF = rf; return rf end
+        end
+    end
+
+    return nil
+end
+
+local function ApplyGodmode()
+    local Event = GetGodmodeEvent()
+    if not Event then return end
+
+    local function ProtectTarget(targetModel)
+        if not targetModel then return end
+        local humanoid = targetModel:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            pcall(function()
+                Event:InvokeServer("protect", {targetModel, humanoid, G.godmodeHealth or 99999999})
+            end)
+        end
+    end
+
+    if G.godmodeTarget == "self" then
+        ProtectTarget(LocalPlayer.Character)
+    elseif G.godmodeTarget == "all players" then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.Character then
+                ProtectTarget(player.Character)
+            end
+        end
+    elseif G.godmodeTarget == "specific player" and G.godmodeTargetPlayer then
+        local targetPlayer = Players:FindFirstChild(G.godmodeTargetPlayer)
+        if targetPlayer and targetPlayer.Character then
+            ProtectTarget(targetPlayer.Character)
+        end
+    end
+end
+
+local function GodmodeLoop()
+    while G.godmodeEnabled do
+        ApplyGodmode()
+        task.wait(G.godmodeInterval or 1)
+    end
+end
+
+local function enableNoCooldown()
+    local old
+    old = hookfunction(wait, newcclosure(function(...)
+        return old(0)
+    end))
+end
+
+local function getPickaxeTool()
+    if cachedPickaxeRF and cachedPickaxeRF.Parent then
+        return cachedPickaxeRF
+    end
+
+    local character = LocalPlayer.Character
+    if not character then return nil end
+
+    -- manual: get any equipped tool
+    if autoMineTool == "manual (equipped tool)" then
+        for _, item in ipairs(character:GetChildren()) do
+            if item:IsA("Tool") then
+                local rf = item:FindFirstChildOfClass("RemoteFunction")
+                if rf then cachedPickaxeRF = rf; return rf end
+            end
+        end
+    end
+
+    -- auto: search for tools with "pickaxe" in the name in character and backpack
+    for _, container in ipairs { character, LocalPlayer.Backpack } do
+        local rf = findRemoteFunction(container, "pickaxe")
+        if rf then cachedPickaxeRF = rf; return rf end
+    end
+
+    return nil
+end
+
+local function getAvailableOres()
+    local ores = {}
+    for _, mineName in ipairs(MINE_LOCATIONS) do
+        if G.autoMineLocation == "all" or G.autoMineLocation == mineName then
+            local mine = workspace:FindFirstChild(mineName)
+            if mine then
+                for _, oreType in ipairs(mine:GetChildren()) do
+                    if oreType:IsA("Model") or oreType:IsA("Folder") then
+                        for _, ore in ipairs(oreType:GetChildren()) do
+                            if string_lower(ore.Name) == "ore" then
+                                table_insert(ores, mineName .. "." .. oreType.Name .. "." .. ore.Name)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return ores
+end
+
+local function getOreFromPath(orePath)
+    if not orePath or orePath == "" then return nil end
+    local parts = string.split(orePath, ".")
+    if #parts < 3 then return nil end
+
+    local mine = workspace:FindFirstChild(parts[1])
+    if not mine then return nil end
+    local oreFolder = mine:FindFirstChild(parts[2])
+    if not oreFolder then return nil end
+    return oreFolder:FindFirstChild(parts[3])
+end
+
+local function mineAllOres()
+    local rf = getPickaxeTool()
+    if not rf then return end
+
+    for _, mineName in ipairs(MINE_LOCATIONS) do
+        local mine = workspace:FindFirstChild(mineName)
+        if mine then
+            for _, oreType in ipairs(mine:GetChildren()) do
+                if oreType:IsA("Model") or oreType:IsA("Folder") then
+                    for _, ore in ipairs(oreType:GetChildren()) do
+                        if string_lower(ore.Name) == "ore" then
+                            pcall(function() rf:InvokeServer("hit", {ore, G.autoMineDamage}) end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function AutoMineLoop()
+    local rf = getPickaxeTool()
+    if not rf then G.autoMineLoopRunning = false; return end
+
+    while G.autoMineEnabled and rf and rf.Parent do
+        for _, mineName in ipairs(MINE_LOCATIONS) do
+            local mine = workspace:FindFirstChild(mineName)
+            if mine then
+                for _, oreType in ipairs(mine:GetChildren()) do
+                    if oreType:IsA("Model") or oreType:IsA("Folder") then
+                        for _, ore in ipairs(oreType:GetChildren()) do
+                            if string_lower(ore.Name) == "ore" then
+                                pcall(function() rf:InvokeServer("hit", {ore, G.autoMineDamage or 99999999}) end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(G.autoMineInterval or 0.5)
+    end
+    G.autoMineLoopRunning = false
+end
+
+local function getToolRemote()
+    if currentRF and currentRF.Parent then
+        return currentRF
+    end
+    currentRF = nil
+
+    for _, container in ipairs { LocalPlayer.Backpack, LocalPlayer.Character } do
+        if not container then continue end
+        for _, item in ipairs(container:GetChildren()) do
+            if item:IsA("Tool") then
+                local rf = item:FindFirstChildOfClass("RemoteFunction")
+                if rf then currentRF = rf; return rf end
+            end
+        end
+    end
+end
+
+local function getAliveEnemies()
+    local enemies = {}
+    for _, model in ipairs(workspace:GetChildren()) do
+        if not model:IsA("Model") then continue end
+        local head = model:FindFirstChild("Head")
+        if not head then continue end
+        local humanoid = model:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then continue end
+        if model:FindFirstChild("EnemyMain") then
+            table_insert(enemies, head)
+        end
+    end
+    return enemies
+end
+
+local function scanTool(tool)
+    if not tool:IsA("Tool") then return end
+    local rf = tool:FindFirstChildOfClass("RemoteFunction")
+    if rf then currentRF = rf end
+end
+
+local function initCharacter(char)
+    currentRF = nil
+    for _, container in ipairs { char, LocalPlayer.Backpack } do
+        if not container then continue end
+        for _, item in ipairs(container:GetChildren()) do
+            scanTool(item)
+        end
+    end
+    char.ChildAdded:Connect(scanTool)
+end
+
+local function init()
+    LocalPlayer.Backpack.ChildAdded:Connect(scanTool)
+    if LocalPlayer.Character then
+        initCharacter(LocalPlayer.Character)
+    end
+    LocalPlayer.CharacterAdded:Connect(initCharacter)
+    currentRF = nil
+    for _, container in ipairs { LocalPlayer.Character, LocalPlayer.Backpack } do
+        if not container then continue end
+        for _, item in ipairs(container:GetChildren()) do
+            scanTool(item)
+        end
+    end
+end
+
+local function MeteorLoop()
+    while G.enabled do
+        local rf = getToolRemote()
+        if rf then
+            for _, head in ipairs(getAliveEnemies()) do
+                pcall(rf.InvokeServer, rf, "meteor", { math.huge, head })
+            end
+        end
+        RunService.Heartbeat:wait()
+    end
+    G.meteorLoopRunning = false
+end
+
+local function Hook_Adonis(metadefs)
+    for _, tbl in metadefs do
+        for _, func in tbl do
+            if type(func) == "function" and islclosure(func) then
+                hookfunction(func, function() return pcall(coroutine.close, coroutine.running()) end)
+            end
+        end
+    end
+end
+
+local function Init_Bypass()
+    for _, v in getgc(true) do
+        if typeof(v) == "table"
+            and rawget(v, "indexInstance")
+            and rawget(v, "newindexInstance")
+            and rawget(v, "namecallInstance")
+            and type(rawget(v, "newindexInstance")) == "table"
+            and v["newindexInstance"][1] == "kick" 
+        then
+            Hook_Adonis(v)
+        end
+    end
+end
+
+-- // ui stuff
+local RayfieldLibrary = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = RayfieldLibrary:CreateWindow({
+    Name = "",
+    LoadingTitle = "",
+    LoadingSubtitle = "",
+    Icon = 0,
+    ConfigurationSaving = {
+        Enabled = true,
+        FileName = "crapwars_redux_config"
+    },
+    Discord = { Enabled = false, Invite = "", RememberJoins = false },
+    KeySystem = false
+})
+
+-- combat tab
+local CombatTab = Window:CreateTab("combat", 0)
+CombatTab:CreateSection("settings")
+
+CombatTab:CreateToggle({
+    Name = "no cooldown",
+    CurrentValue = false,
+    Flag = "no_cooldown_toggle",
+    Callback = function(Value)
+        G.noCooldownEnabled = Value
+        if Value then enableNoCooldown() end
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "auto meteor (insta-kill) (NEEDS COMPATIBLE TOOL)",
+    CurrentValue = false,
+    Flag = "auto_meteor_toggle",
+    Callback = function(Value)
+        G.enabled = Value
+        if Value and not G.meteorLoopRunning then
+            G.meteorLoopRunning = true
+            task.spawn(MeteorLoop)
+        end
+    end,
+})
+
+CombatTab:CreateDropdown({
+    Name = "target part",
+    Options = {"Head", "HumanoidRootPart", "Torso"},
+    CurrentOption = {"Head"},
+    MultipleOptions = false,
+    Flag = "target_dropdown",
+    Callback = function(Options) G.targetOption = Options[1] end,
+})
+
+CombatTab:CreateButton({
+    Name = "kill all enemies (uses meteors)",
+    Callback = function()
+        local rf = getToolRemote()
+        if rf then
+            for _, head in ipairs(getAliveEnemies()) do
+                pcall(rf.InvokeServer, rf, "meteor", { math.huge, head })
+            end
+        end
+    end,
+})
+
+-- godmode tab
+local GodmodeTab = Window:CreateTab("godmode", 0)
+GodmodeTab:CreateSection("settings")
+
+GodmodeTab:CreateButton({
+    Name = "apply once",
+    Callback = function() ApplyGodmode() end,
+})
+
+GodmodeTab:CreateToggle({
+    Name = "loop apply",
+    CurrentValue = false,
+    Flag = "godmode_toggle",
+    Callback = function(Value)
+        G.godmodeEnabled = Value
+        if Value then task.spawn(GodmodeLoop) end
+    end,
+})
+
+GodmodeTab:CreateDropdown({
+    Name = "target type",
+    Options = {"self", "all players", "specific player"},
+    CurrentOption = {"self"},
+    MultipleOptions = false,
+    Flag = "godmode_target_dropdown",
+    Callback = function(Options) G.godmodeTarget = Options[1] end,
+})
+
+GodmodeTab:CreateInput({
+    Name = "target name",
+    CurrentValue = "",
+    PlaceholderText = "Enter player name",
+    Flag = "godmode_player_input",
+    Callback = function(Value) G.godmodeTargetPlayer = Value end,
+})
+
+GodmodeTab:CreateSlider({
+    Name = "health",
+    Range = {0, 99999999},
+    Increment = 1,
+    CurrentValue = 99999999,
+    Flag = "godmode_health_slider",
+    Callback = function(Value) G.godmodeHealth = Value end,
+})
+
+GodmodeTab:CreateSlider({
+    Name = "loop interval (s)",
+    Range = {1, 10},
+    Increment = 1,
+    CurrentValue = 1,
+    Flag = "godmode_interval_slider",
+    Callback = function(Value) G.godmodeInterval = Value end,
+})
+
+-- mining tab
+local AutoMineTab = Window:CreateTab("mining", 0)
+AutoMineTab:CreateSection("settings")
+
+AutoMineTab:CreateToggle({
+    Name = "auto mine all ores",
+    CurrentValue = false,
+    Flag = "auto_mine_toggle",
+    Callback = function(Value)
+        G.autoMineEnabled = Value
+        if Value and not G.autoMineLoopRunning then
+            G.autoMineLoopRunning = true
+            task.spawn(AutoMineLoop)
+        end
+    end,
+})
+
+AutoMineTab:CreateButton({
+    Name = "mine selected ore",
+    Callback = function()
+        local rf = getPickaxeTool()
+        if rf and G.autoMineOre ~= "" then
+            local ore = getOreFromPath(G.autoMineOre)
+            if ore then pcall(function() rf:InvokeServer("hit", {ore, G.autoMineDamage}) end) end
+        end
+    end,
+})
+
+AutoMineTab:CreateDropdown({
+    Name = "pickaxe tool",
+    Options = {"auto", "manual (equipped tool)"},
+    CurrentOption = {"auto"},
+    MultipleOptions = false,
+    Flag = "auto_mine_tool_dropdown",
+    Callback = function(Options)
+        G.autoMineTool = Options[1]
+        cachedPickaxeRF = nil
+    end,
+})
+
+AutoMineTab:CreateDropdown({
+    Name = "mine location",
+    Options = {"all", "Mine", "Mine2", "Mine3", "SpaceMine"},
+    CurrentOption = {"all"},
+    MultipleOptions = false,
+    Flag = "auto_mine_location_dropdown",
+    Callback = function(Options)
+        G.autoMineLocation = Options[1]
+        if oreDropdown then
+            local newOres = getAvailableOres()
+            oreDropdown.Options = newOres
+            oreDropdown.CurrentOption = {newOres[1] or ""}
+            oreDropdown:Set(oreDropdown.CurrentOption)
+        end
+    end,
+})
+
+local oreDropdown = AutoMineTab:CreateDropdown({
+    Name = "select ore (auto updates)",
+    Options = getAvailableOres(),
+    CurrentOption = {""},
+    MultipleOptions = false,
+    Flag = "auto_mine_ore_dropdown",
+    Callback = function(Options) G.autoMineOre = Options[1] end,
+})
+
+-- auto update ore list
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if oreDropdown then
+            local newOres = getAvailableOres()
+            if #newOres > 0 then
+                oreDropdown.Options = newOres
+                if not table.find(oreDropdown.Options, oreDropdown.CurrentOption[1]) then
+                    oreDropdown.CurrentOption = {newOres[1]}
+                    oreDropdown:Set(oreDropdown.CurrentOption)
+                end
+            end
+        end
+    end
+end)
+
+AutoMineTab:CreateSlider({
+    Name = "mine damage",
+    Range = {1, 99999999},
+    Increment = 1,
+    CurrentValue = 99999999,
+    Flag = "auto_mine_damage_slider",
+    Callback = function(Value) autoMineDamage = Value end,
+})
+
+AutoMineTab:CreateSlider({
+    Name = "mine interval (s)",
+    Range = {0, 5},
+    Increment = 0.1,
+    CurrentValue = 0.1,
+    Flag = "auto_mine_interval_slider",
+    Callback = function(Value) G.autoMineInterval = Value end,
+})
+
+-- settings tab
+local SettingsTab = Window:CreateTab("settings", 0)
+SettingsTab:CreateSection("general")
+
+SettingsTab:CreateToggle({
+    Name = "anticheat bypass",
+    CurrentValue = true,
+    Flag = "ac_bypass_toggle",
+    Callback = function(Value)
+        G.acBypassEnabled = Value
+        if Value then task.spawn(Init_Bypass) end
+    end,
+})
+
+-- // init
+if G.acBypassEnabled then task.spawn(Init_Bypass) end
+init()
+
+-- start loops if enabled
+if G.enabled then
+    G.meteorLoopRunning = true
+    task.spawn(MeteorLoop)
+end
+if G.autoMineEnabled then
+    G.autoMineLoopRunning = true
+    task.spawn(AutoMineLoop)
+end
