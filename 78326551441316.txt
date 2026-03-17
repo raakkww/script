@@ -1,0 +1,31 @@
+-- [[ SPS PROJECT 👑 - SILENT AUTO REMOVE ]] --
+-- Menghapus folder Crushers & KillCrushers secara otomatis tanpa GUI
+
+local Workspace = game:GetService("Workspace")
+
+-- Fungsi utama penghapus
+local function CleanCrushers()
+    local count = 0
+    -- Mencari dan menghapus folder berdasarkan nama di Dex kamu (Crushers & KillCrushers)
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v.Name == "Crushers" or v.Name == "KillCrushers" then
+            v:Destroy()
+            count = count + 1
+        end
+    end
+    if count > 0 then
+        print("SPS PROJECT: Berhasil menghapus " .. count .. " folder bahaya.")
+    end
+end
+
+-- 1. Jalankan langsung saat execute
+CleanCrushers()
+
+-- 2. Jalankan otomatis setiap kali ada folder baru yang muncul (Anti-Respawn)
+Workspace.DescendantAdded:Connect(function(descendant)
+    if descendant.Name == "Crushers" or descendant.Name == "KillCrushers" then
+        task.wait(0.1) -- Tunggu sebentar agar tidak glitch
+        descendant:Destroy()
+        print("SPS PROJECT: Folder baru terdeteksi dan langsung dihapus!")
+    end
+end)
