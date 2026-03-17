@@ -1,0 +1,620 @@
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local Workspace        = game:GetService("Workspace")
+local Camera           = Workspace.CurrentCamera
+local VIM              = game:GetService("VirtualInputManager")
+
+local LP   = Players.LocalPlayer
+local Char = LP.Character or LP.CharacterAdded:Wait()
+local Hum  = Char:WaitForChild("Humanoid")
+local Root = Char:WaitForChild("HumanoidRootPart")
+
+local CFG = {
+BallMag=false, MagRadius=60, MagSmooth=0.2,
+AutoCatch=false, CatchRange=55,
+QBAimbot=false, AimbotSmooth=8, CameraNudge=false,
+AutoPass=false, PassDelay=0.3, PassOnlyOpen=true, PassScoreThreshold=30,
+TackleReach=false, TackleRange=20,
+AutoFollow=false, AntiBlock=false,
+JukeMove=false, JukeRange=8,
+SpeedEnabled=false, WalkSpeed=28,
+JumpEnabled=false, JumpPower=80,
+FlyEnabled=false, FlySpeed=80,
+BoostPad=false, BoostStrength=80,
+DiveBoost=false,
+HighUnc=false, LowUnc=false,
+ESP=false, ESPTeam=false,
+DefenderRadar=false, StatsHUD=false,
+}
+
+local ball,carrier,playerCache = nil,nil,{}
+local espObjs,trailParts = {},{}
+local flyActive,bv,bg = false,nil,nil
+local throwIndicator = nil
+local bestTarget,bestScore,throwVec = nil,-math.huge,Vector3.zero
+local tBall,tPlayer,tCarrier = 0,0,0
+local stats = {yards=0}
+local lastPos = Vector3.zero
+local radarGui,statsGui = nil,nil
+local radarDots = {}
+local passState = "IDLE"
+local lastPassTime = 0
+local passCooldown = 0
+local throwRemote = nil
+
+local function lerp(a,b,t) return a+(b-a)*t end
+local function tw(o,i,p) TweenService:Create(o,i,p):Play() end
+local TI = TweenInfo.new
+
+-- âââââââââââââââââââââââââââââââââââââââ
+-- GAME LOGIC
+-- âââââââââââââââââââââââââââââââââââââââ
+RunService.Heartbeat:Connect(function(dt)
+if not Root or not Hum then return end
+tBall+=dt tPlayer+=dt tCarrier+=dt
+
+if tBall>0.5 then tBall=0 ball=nil  
+    for _,v in ipairs(Workspace:GetDescendants()) do  
+        if v:IsA("BasePart") and not v.Anchored then  
+            local n=v.Name:lower()  
+            if n=="football" or n=="ball" or n:find("football") then ball=v break end  
+        end  
+    end  
+end  
+
+if tPlayer>2 then tPlayer=0 playerCache=Players:GetPlayers() end  
+
+if tCarrier>0.25 then tCarrier=0 carrier=nil  
+    if ball then  
+        for _,p in ipairs(playerCache) do  
+            if p~=LP and p.Character then  
+                local r=p.Character:FindFirstChild("HumanoidRootPart")  
+                if r and (r.Position-ball.Position).Magnitude<5 then carrier=p break end  
+            end  
+        end  
+    end  
+end  
+
+pcall(function()  
+    Hum.WalkSpeed=CFG.SpeedEnabled and CFG.WalkSpeed or 16  
+    Hum.JumpPower=CFG.JumpEnabled and CFG.JumpPower or 50  
+end)  
+
+if CFG.HighUnc then pcall(function()  
+    for _,n in ipairs({"Stamina","Energy","Sprint","Endurance"}) do  
+        local v=Char:FindFirstChild(n)  
+        if v and (v:IsA("NumberValue") or v:IsA("IntValue")) then v.Value=100 end  
+    end  
+    Char:SetAttribute("Stamina",100) Char:SetAttribute("Energy",100)  
+end) end  
+
+if CFG.LowUnc and not CFG.HighUnc then pcall(function()  
+    for _,n in ipairs({"Stamina","Energy","Sprint"}) do  
+        local v=Char:FindFirstChild(n)  
+        if v and (v:IsA("NumberValue") or v:IsA("IntValue")) then  
+            if v.Value<85 then v.Value=v.Value+2 end  
+        end  
+    end  
+end) end  
+
+if CFG.BallMag and ball then  
+    local dist=(ball.Position-Root.Position).Magnitude  
+    if dist<CFG.MagRadius then  
+        local p=ball.Position+ball.AssemblyLinearVelocity*0.1  
+        Root.CFrame=CFrame.new(Root.Position:Lerp(Vector3.new(p.X,Root.Position.Y,p.Z),CFG.MagSmooth))*Root.CFrame.Rotation  
+    end  
+end  
+
+if CFG.AutoCatch and ball then  
+    local vel=ball.AssemblyLinearVelocity  
+    local dist=(ball.Position-Root.Position).Magnitude  
+    if dist<CFG.CatchRange and vel.Y<5 then  
+        local p=ball.Position+vel*0.3  
+        Root.CFrame=CFrame.new(Root.Position:Lerp(Vector3.new(p.X,Root.Position.Y,p.Z),0.25))*Root.CFrame.Rotation  
+    end  
+end  
+
+if CFG.TackleReach and carrier and carrier.Character then  
+    local cr=carrier.Character:FindFirstChild("HumanoidRootPart")  
+    if cr then  
+        local d=(cr.Position-Root.Position).Magnitude  
+        if d<CFG.TackleRange then Root.CFrame=Root.CFrame+(cr.Position-Root.Position).Unit*math.min(d*0.15,2) end  
+    end  
+end  
+
+if CFG.AutoFollow and carrier and carrier.Character then  
+    local cr=carrier.Character:FindFirstChild("HumanoidRootPart")  
+    if cr then  
+        local d=(cr.Position-Root.Position).Magnitude  
+        if d>8 then  
+            local g=cr.Position-(cr.Position-Root.Position).Unit*6  
+            Root.CFrame=CFrame.new(Root.Position:Lerp(Vector3.new(g.X,Root.Position.Y,g.Z),0.2))*Root.CFrame.Rotation  
+        end  
+    end  
+end  
+
+if CFG.AntiBlock then  
+    for _,p in ipairs(playerCache) do  
+        if p~=LP and p.Team~=LP.Team and p.Character then  
+            local r=p.Character:FindFirstChild("HumanoidRootPart")  
+            if r and (r.Position-Root.Position).Magnitude<5 then  
+                Root.CFrame=Root.CFrame+(Root.Position-r.Position).Unit*3 break  
+            end  
+        end  
+    end  
+end  
+
+if CFG.JukeMove then  
+    for _,p in ipairs(playerCache) do  
+        if p~=LP and p.Team~=LP.Team and p.Character then  
+            local r=p.Character:FindFirstChild("HumanoidRootPart")  
+            if r and (r.Position-Root.Position).Magnitude<CFG.JukeRange then  
+                tw(Root,TI(0.15,Enum.EasingStyle.Quad),{CFrame=Root.CFrame+Root.CFrame.RightVector*(math.random(2)==1 and 1 or -1)*10})  
+                break  
+            end  
+        end  
+    end  
+end  
+
+if CFG.DiveBoost and Hum:GetState()==Enum.HumanoidStateType.Jumping then  
+    local v=Root.AssemblyLinearVelocity  
+    if v.Magnitude>5 then Root.AssemblyLinearVelocity=Vector3.new(v.X*1.8,v.Y,v.Z*1.8) end  
+end  
+
+if CFG.StatsHUD then  
+    local d=(Root.Position-lastPos).Magnitude  
+    if d>0.5 and d<10 then stats.yards+=d*0.1 end  
+    lastPos=Root.Position  
+end
+
+end)
+
+-- âââââââââââââââââââââââââââââââââââââââ
+-- AI PREDICTOR
+-- âââââââââââââââââââââââââââââââââââââââ
+local function scoreReceiver(p)
+if not p.Character then return 0,nil end
+local r=p.Character:FindFirstChild("HumanoidRootPart")
+local h=p.Character:FindFirstChildOfClass("Humanoid")
+if not r or not h or h.Health<=0 then return 0,nil end
+local s=0
+local minDef=math.huge
+for _,d in ipairs(playerCache) do
+if d~=LP and d.Team~=LP.Team and d.Character then
+local dr=d.Character:FindFirstChild("HumanoidRootPart")
+if dr then local dd=(dr.Position-r.Position).Magnitude if dd<minDef then minDef=dd end end
+end
+end
+s+=math.min(minDef,30)2
+s+=math.max(0,50-math.abs(200-math.abs(r.Position.Z)))1.5
+local vel=r.AssemblyLinearVelocity
+local dot=vel:Dot((Vector3.new(0,0,200)-r.Position).Unit)
+if dot>0 then s+=dot0.5 end
+local dist=(r.Position-Root.Position).Magnitude
+if dist>10 and dist<80 then s+=15
+elseif dist<=10 then s-=20
+elseif dist>80 then s-=10 end
+local td=(r.Position-Root.Position).Unit
+for _,d in ipairs(playerCache) do
+if d~=LP and d.Team~=LP.Team and d.Character then
+local dr=d.Character:FindFirstChild("HumanoidRootPart")
+if dr then
+local tod=dr.Position-Root.Position
+local proj=tod:Dot(td)
+if proj>0 and proj<dist and (tod-tdproj).Magnitude<4 then s-=25 break end
+end
+end
+end
+return s, r.Position+vel*(dist/60)
+end
+
+task.spawn(function()
+while true do task.wait(0.1)
+if CFG.QBAimbot or CFG.AutoPass then
+bestTarget=nil bestScore=-math.huge throwVec=Vector3.zero
+for _,p in ipairs(playerCache) do
+if p~=LP and p.Team==LP.Team then
+local s,pred=scoreReceiver(p)
+if s>bestScore and pred then bestScore=s bestTarget=p throwVec=pred end
+end
+end
+end
+end
+end)
+
+-- Find throw remote
+task.spawn(function()
+task.wait(3)
+for _,v in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+if v:IsA("RemoteEvent") then
+local n=v.Name:lower()
+if n:find("throw") or n:find("pass") or n:find("release")
+or n:find("football") or n:find("launch") then
+throwRemote=v print("[AutoPass] Remote: "..v.Name) break
+end
+end
+end
+end)
+
+-- Simulate throw click
+local function simulateThrow()
+pcall(function()
+VIM:SendMouseButtonEvent(0,0,0,true,game,1)
+task.wait(0.05)
+VIM:SendMouseButtonEvent(0,0,0,false,game,1)
+end)
+if throwRemote then
+pcall(function() throwRemote:FireServer(throwVec) end)
+pcall(function() throwRemote:FireServer(throwVec,(throwVec-Root.Position).Unit*60) end)
+end
+pcall(function()
+local ie=Instance.new("InputObject")
+ie.UserInputType=Enum.UserInputType.MouseButton1
+ie.UserInputState=Enum.UserInputState.Begin
+UserInputService:InputBegan(ie,false)
+task.wait(0.04)
+ie.UserInputState=Enum.UserInputState.End
+UserInputService:InputEnded(ie,false)
+end)
+end
+
+-- Throw arc + indicator
+local function makeIndicator()
+if throwIndicator then return end
+throwIndicator=Instance.new("Part")
+throwIndicator.Size=Vector3.new(1,1,1) throwIndicator.Shape=Enum.PartType.Ball
+throwIndicator.Anchored=true throwIndicator.CanCollide=false
+throwIndicator.Material=Enum.Material.Neon throwIndicator.CastShadow=false
+throwIndicator.Transparency=1 throwIndicator.Parent=Workspace
+local pl=Instance.new("PointLight",throwIndicator) pl.Range=20 pl.Brightness=5
+end
+
+local function clearArc()
+for _,p in ipairs(trailParts) do pcall(function() p:Destroy() end) end trailParts={}
+end
+
+local function drawArc(from,to,score)
+clearArc()
+local norm=math.clamp(score/100,0,1)
+for i=0,12 do
+local t=i/12
+local pos=from:Lerp(to,tt(3-2t))+Vector3.new(0,math.sin(tmath.pi)*10,0)
+local dot=Instance.new("Part")
+dot.Size=Vector3.new(0.4,0.4,0.4) dot.Shape=Enum.PartType.Ball
+dot.Anchored=true dot.CanCollide=false dot.CastShadow=false dot.Material=Enum.Material.Neon
+dot.Color=Color3.fromRGB(math.floor(lerp(255,0,norm)),math.floor(lerp(0,255,norm)),0)
+dot.Transparency=lerp(0.1,0.85,t) dot.Position=pos dot.Parent=Workspace
+table.insert(trailParts,dot)
+end
+end
+
+-- RenderStepped â aimbot + auto pass state machine
+RunService.RenderStepped:Connect(function()
+local showArc = CFG.QBAimbot or CFG.AutoPass
+
+if not showArc then  
+    if throwIndicator then throwIndicator.Transparency=1 end  
+    clearArc() passState="IDLE" return  
+end  
+if not throwIndicator then makeIndicator() end  
+
+if bestTarget and bestTarget.Character and throwVec~=Vector3.zero then  
+    throwIndicator.Position=throwVec+Vector3.new(0,4,0)  
+    throwIndicator.Transparency=0.1  
+    local norm=math.clamp(bestScore/100,0,1)  
+    throwIndicator.Color=Color3.fromRGB(math.floor(lerp(255,0,norm)),math.floor(lerp(0,255,norm)),0)  
+    throwIndicator.PointLight.Color=throwIndicator.Color  
+    drawArc(Root.Position+Vector3.new(0,5,0),throwVec,bestScore)  
+
+    -- Gentle nudge only (when aimbot on, autopass off)  
+    if CFG.CameraNudge and not CFG.AutoPass then  
+        local dir=(throwVec-Camera.CFrame.Position).Unit  
+        Camera.CFrame=CFrame.new(Camera.CFrame.Position,Camera.CFrame.Position+Camera.CFrame.LookVector:Lerp(dir,0.05))  
+    end  
+else  
+    throwIndicator.Transparency=1 clearArc()  
+end  
+
+-- AUTO PASS STATE MACHINE  
+if CFG.AutoPass and Root and Hum then  
+    local hasBall=ball and (ball.Position-Root.Position).Magnitude<6  
+    if not hasBall then passState="IDLE" return end  
+    if not bestTarget or throwVec==Vector3.zero then return end  
+    if CFG.PassOnlyOpen and bestScore<CFG.PassScoreThreshold then return end  
+    if tick()-lastPassTime<1.5 then return end  
+
+    if passState=="IDLE" then  
+        passState="AIMING"  
+        passCooldown=tick()+CFG.PassDelay  
+
+    elseif passState=="AIMING" then  
+        -- Hard lock camera on predicted catch position  
+        local aimPos=throwVec+Vector3.new(0,3,0)  
+        local dir=(aimPos-Camera.CFrame.Position).Unit  
+        Camera.CFrame=CFrame.new(Camera.CFrame.Position,Camera.CFrame.Position+dir)  
+        if tick()>=passCooldown then passState="THROWING" end  
+
+    elseif passState=="THROWING" then  
+        passState="IDLE" lastPassTime=tick()  
+        task.spawn(function()  
+            task.wait(0.05)  
+            simulateThrow()  
+        end)  
+    end  
+end
+
+end)
+
+-- âââââââââââââââââââââââââââââââââââââââ
+-- FLY
+-- âââââââââââââââââââââââââââââââââââââââ
+local function startFly()
+if flyActive then return end flyActive=true
+pcall(function()
+bv=Instance.new("BodyVelocity",Root)
+bv.MaxForce=Vector3.new(1e9,1e9,1e9) bv.Velocity=Vector3.zero
+bg=Instance.new("BodyGyro",Root)
+bg.MaxTorque=Vector3.new(1e9,1e9,1e9) bg.P=1e6 bg.CFrame=Root.CFrame
+end)
+task.spawn(function()
+while flyActive do
+local d=Vector3.zero
+if UserInputService:IsKeyDown(Enum.KeyCode.W) then d+=Camera.CFrame.LookVector end
+if UserInputService:IsKeyDown(Enum.KeyCode.S) then d-=Camera.CFrame.LookVector end
+if UserInputService:IsKeyDown(Enum.KeyCode.A) then d-=Camera.CFrame.RightVector end
+if UserInputService:IsKeyDown(Enum.KeyCode.D) then d+=Camera.CFrame.RightVector end
+if UserInputService:IsKeyDown(Enum.KeyCode.Space) then d+=Vector3.new(0,1,0) end
+if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then d-=Vector3.new(0,1,0) end
+if bv then bv.Velocity=d.Magnitude>0 and d.Unit*CFG.FlySpeed or Vector3.zero end
+if bg then bg.CFrame=CFrame.new(Root.Position,Root.Position+Camera.CFrame.LookVector) end
+task.wait()
+end
+end)
+end
+local function stopFly()
+flyActive=false
+if bv then bv:Destroy() bv=nil end
+if bg then bg:Destroy() bg=nil end
+end
+
+UserInputService.InputBegan:Connect(function(inp,gpe)
+if gpe then return end
+if inp.KeyCode==Enum.KeyCode.Q and CFG.BoostPad then
+local d=Camera.CFrame.LookVector
+Root.AssemblyLinearVelocity=Vector3.new(d.XCFG.BoostStrength,20,d.ZCFG.BoostStrength)
+end
+end)
+
+-- âââââââââââââââââââââââââââââââââââââââ
+-- TELEPORT
+-- âââââââââââââââââââââââââââââââââââââââ
+local EZ1,EZ2=Vector3.new(0,3,-200),Vector3.new(0,3,200)
+task.spawn(function()
+task.wait(3)
+for _,v in ipairs(Workspace:GetDescendants()) do
+if v:IsA("BasePart") then
+local n=v.Name:lower()
+if n:find("endzone") or n:find("touchdown") then
+if v.Position.Z<0 then EZ1=v.Position+Vector3.new(0,3,0)
+else EZ2=v.Position+Vector3.new(0,3,0) end
+end
+end
+end
+end)
+local function smoothTP(pos)
+local s=Root.Position
+for i=1,10 do task.wait(0.03)
+local a=i/10 local e=aa(3-2*a)
+Root.CFrame=CFrame.new(s:Lerp(pos,e))
+end
+end
+
+-- âââââââââââââââââââââââââââââââââââââââ
+-- RADAR
+-- âââââââââââââââââââââââââââââââââââââââ
+local function buildRadar()
+if radarGui then return end
+radarGui=Instance.new("ScreenGui",LP.PlayerGui)
+radarGui.Name="NFLRadar" radarGui.ResetOnSpawn=false
+local f=Instance.new("Frame",radarGui)
+f.Name="RF" f.Size=UDim2.new(0,130,0,130)
+f.Position=UDim2.new(1,-145,1,-145)
+f.BackgroundColor3=Color3.fromRGB(8,10,18)
+f.BackgroundTransparency=0.2 f.BorderSizePixel=0
+Instance.new("UICorner",f).CornerRadius=UDim.new(1,0)
+local s=Instance.new("UIStroke",f) s.Color=Color3.fromRGB(0,140,255) s.Thickness=1.2
+for _,r in ipairs({0.35,0.65,1.0}) do
+local ring=Instance.new("Frame",f)
+ring.Size=UDim2.new(r,0,r,0)
+ring.Position=UDim2.new((1-r)/2,0,(1-r)/2,0)
+ring.BackgroundTransparency=1 ring.BorderSizePixel=0
+local rs=Instance.new("UIStroke",ring) rs.Color=Color3.fromRGB(0,70,140) rs.Thickness=0.8
+Instance.new("UICorner",ring).CornerRadius=UDim.new(1,0)
+end
+local lbl=Instance.new("TextLabel",f)
+lbl.Size=UDim2.new(1,0,0,14) lbl.Position=UDim2.new(0,0,0,-18)
+lbl.BackgroundTransparency=1 lbl.Text=""
+lbl.TextSize=9 lbl.TextColor3=Color3.fromRGB(0,160,255) lbl.Font=Enum.Font.GothamBold
+local ctr=Instance.new("Frame",f)
+ctr.Size=UDim2.new(0,10,0,10) ctr.Position=UDim2.new(0.5,-5,0.5,-5)
+ctr.BackgroundColor3=Color3.fromRGB(0,200,255) ctr.BorderSizePixel=0
+Instance.new("UICorner",ctr).CornerRadius=UDim.new(1,0)
+task.spawn(function()
+while radarGui do task.wait(0.12)
+for _,d in ipairs(radarDots) do pcall(function() d:Destroy() end) end radarDots={}
+if not CFG.DefenderRadar then continue end
+local frame=radarGui:FindFirstChild("RF") if not frame then continue end
+for _,p in ipairs(playerCache) do
+if p~=LP and p.Character then
+local r=p.Character:FindFirstChild("HumanoidRootPart")
+if r then
+local rel=r.Position-Root.Position
+if rel.Magnitude<=80 then
+local dot2=Instance.new("Frame",frame)
+local isC=carrier==p local isE=p.Team~=LP.Team
+dot2.Size=UDim2.new(0,isC and 12 or 8,0,isC and 12 or 8)
+dot2.Position=UDim2.new(0.5+(rel.X/80)*0.45,-(isC and 6 or 4),0.5+(rel.Z/80)*0.45,-(isC and 6 or 4))
+dot2.BackgroundColor3=isC and Color3.fromRGB(255,200,0) or isE and Color3.fromRGB(255,60,60) or Color3.fromRGB(60,200,60)
+dot2.BorderSizePixel=0
+Instance.new("UICorner",dot2).CornerRadius=UDim.new(1,0)
+table.insert(radarDots,dot2)
+end
+end
+end
+end
+end
+end)
+end
+local function removeRadar()
+if radarGui then radarGui:Destroy() radarGui=nil end radarDots={}
+end
+
+-- âââââââââââââââââââââââââââââââââââââââ
+-- STATS HUD
+-- âââââââââââââââââââââââââââââââââââââââ
+local function buildStatsHUD()
+if statsGui then return end
+statsGui=Instance.new("ScreenGui",LP.PlayerGui)
+statsGui.Name="NFLStats" statsGui.ResetOnSpawn=false
+local f=Instance.new("Frame",statsGui)
+f.Size=UDim2.new(0,175,0,86) f.Position=UDim2.new(0,10,1,-102)
+f.BackgroundColor3=Color3.fromRGB(8,10,18) f.BackgroundTransparency=0.2 f.BorderSizePixel=0
+Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+local s=Instance.new("UIStroke",f) s.Color=Color3.fromRGB(0,140,255) s.Thickness=1.2
+local t=Instance.new("TextLabel",f)
+t.Size=UDim2.new(1,0,0,22) t.BackgroundTransparency=1
+t.Text="STATS" t.TextColor3=Color3.fromRGB(0,180,255)
+t.Font=Enum.Font.GothamBold t.TextSize=11
+local sl=Instance.new("TextLabel",f)
+sl.Name="SL" sl.Size=UDim2.new(1,-10,1,-26)
+sl.Position=UDim2.new(0,6,0,24) sl.BackgroundTransparency=1
+sl.TextColor3=Color3.fromRGB(190,210,255) sl.Font=Enum.Font.Gotham
+sl.TextSize=10 sl.TextXAlignment=Enum.TextXAlignment.Left sl.TextWrapped=true
+task.spawn(function()
+while statsGui do task.wait(0.2)
+local bd=ball and math.floor((ball.Position-Root.Position).Magnitude) or 999
+local cn=carrier and carrier.Name or "none"
+local bn=bestTarget and bestTarget.Name or "scanning"
+local ps=passState~="IDLE" and " ð"..passState or ""
+sl.Text=string.format("Yds:%.1f  Spd:%d\nBall:%dst  %s\nBest:%s%s",
+stats.yards,math.floor(Hum and Hum.WalkSpeed or 0),bd,cn,bn,ps)
+end
+end)
+end
+local function removeStatsHUD()
+if statsGui then statsGui:Destroy() statsGui=nil end
+end
+
+-- âââââââââââââââââââââââââââââââââââââââ
+-- ESP
+-- âââââââââââââââââââââââââââââââââââââââ
+local function removeESP(p)
+if espObjs[p] then espObjs[p]:Destroy() espObjs[p]=nil end
+end
+local function makeESP(p)
+if p==LP then return end
+if not CFG.ESPTeam and p.Team==LP.Team then return end
+removeESP(p)
+local char=p.Character if not char then return end
+local r=char:FindFirstChild("HumanoidRootPart")
+local h=char:FindFirstChildOfClass("Humanoid")
+if not r or not h then return end
+local enemy=p.Team~=LP.Team
+local bb=Instance.new("BillboardGui")
+bb.Size=UDim2.new(0,130,0,52) bb.StudsOffset=Vector3.new(0,4.5,0)
+bb.AlwaysOnTop=true bb.MaxDistance=300 bb.Adornee=r bb.Parent=r
+local nl=Instance.new("TextLabel",bb)
+nl.Size=UDim2.new(1,0,0.42,0) nl.BackgroundTransparency=1
+nl.Text=p.Name nl.Font=Enum.Font.GothamBold nl.TextSize=13
+nl.TextStrokeTransparency=0
+nl.TextColor3=enemy and Color3.fromRGB(255,60,60) or Color3.fromRGB(60,200,255)
+local sl=Instance.new("TextLabel",bb)
+sl.Size=UDim2.new(1,0,0.32,0) sl.Position=UDim2.new(0,0,0.42,0)
+sl.BackgroundTransparency=1 sl.Font=Enum.Font.GothamBold sl.TextSize=11 sl.TextStrokeTransparency=0
+local dl=Instance.new("TextLabel",bb)
+dl.Size=UDim2.new(1,0,0.26,0) dl.Position=UDim2.new(0,0,0.74,0)
+dl.BackgroundTransparency=1 dl.Font=Enum.Font.Gotham dl.TextSize=10
+dl.TextStrokeTransparency=0 dl.TextColor3=Color3.fromRGB(160,160,160)
+task.spawn(function()
+while espObjs[p] and CFG.ESP do task.wait(0.15)
+if r and r.Parent and h and h.Parent then
+local dist=math.floor((r.Position-Root.Position).Magnitude)
+sl.Text=(carrier==p and "ð " or "")..(bestTarget==p and "ð¯ " or "").."Dist:"..dist.."m"
+dl.Text="HP:"..math.floor(h.Health)
+
+else
+break
+end
+end
+end)
+
+espObjs[p]=bb
+end
+
+local function refreshESP()
+for _,p in ipairs(playerCache) do
+if CFG.ESP then
+makeESP(p)
+else
+removeESP(p)
+end
+end
+end
+
+Players.PlayerAdded:Connect(function(p)
+p.CharacterAdded:Connect(function()
+task.wait(1)
+if CFG.ESP then makeESP(p) end
+end)
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+removeESP(p)
+end)
+
+-- âââââââââââââââââââââââââââââââââââââââ
+-- TOGGLE WATCHER
+-- âââââââââââââââââââââââââââââââââââââââ
+RunService.Heartbeat:Connect(function()
+
+-- Radar
+if CFG.DefenderRadar then
+buildRadar()
+else
+removeRadar()
+end
+
+-- Stats HUD
+if CFG.StatsHUD then
+buildStatsHUD()
+else
+removeStatsHUD()
+end
+
+-- ESP refresh
+if CFG.ESP then
+refreshESP()
+else
+for p,_ in pairs(espObjs) do
+removeESP(p)
+end
+end
+
+-- Fly control
+if CFG.FlyEnabled and not flyActive then
+startFly()
+elseif not CFG.FlyEnabled and flyActive then
+stopFly()
+end
+
+end)
+
+-- Character refresh
+LP.CharacterAdded:Connect(function(c)
+Char=c
+Hum=c:WaitForChild("Humanoid")
+Root=c:WaitForChild("HumanoidRootPart")
+lastPos=Root.Position
+end)
