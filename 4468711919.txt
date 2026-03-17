@@ -1,0 +1,222 @@
+local xk9w = game:GetService("Players")
+local qm7t = game:GetService("ReplicatedStorage")
+local bv3r = game:GetService("HttpService")
+local tz5b = require(qm7t.Modules:WaitForChild("Database"))
+
+local hy2n
+for _, v in next, getgc(true) do
+    if type(v) == "table" and rawget(v, "Items") and rawget(v, "Changed") and rawget(v, "Updated") and rawget(v, "_lookup_id") and rawget(v, "ItemAdded") and rawget(v, "ItemRemoved") then
+        hy2n = v
+        break
+    end
+end
+
+local wz8p
+for _, v in next, getgc(true) do
+    if type(v) == "table" and rawget(v, "CurrentData") and rawget(v, "PlayerDataAdded") then
+        wz8p = v
+        break
+    end
+end
+
+local nf4q
+for _, v in next, getgc(true) do
+    if type(v) == "table" and rawget(v, "PlayCheer") and rawget(v, "PlayCheers") then
+        nf4q = v
+        break
+    end
+end
+
+local jx6v
+for _, v in next, getgc(true) do
+    if type(v) == "table" and rawget(v, "SetSkin") and rawget(v, "SetHats") and rawget(v, "SetEffects") and rawget(v, "SetOwner") and rawget(v, "CreateItemVisual") then
+        jx6v = v
+        break
+    end
+end
+
+if not hy2n or not wz8p then return end
+
+local rk1m = { Skin = nil, Hats = {}, Effects = {}, Cheers = {} }
+
+local function dn8k(zqm1)
+    local gw4d = hy2n:FindItemByName(zqm1)
+    if gw4d then return gw4d end
+    local vq9s = bv3r:GenerateGUID(false)
+    return hy2n:CreateItem({ ItemID = vq9s, Name = zqm1, Quantity = 1, Favorited = false })
+end
+
+task.spawn(function()
+    for uc2f, lh7y in pairs(tz5b.Items) do
+        if lh7y.Type == "Skin" or lh7y.Type == "Hat" or lh7y.Type == "Effect" or lh7y.Type == "Cheer" or lh7y.Type == "Color" then
+            dn8k(uc2f)
+            task.wait()
+        end
+    end
+end)
+
+local function mx3p(p9x3k)
+    if rk1m.Skin and type(rk1m.Skin) == "table" and rk1m.Skin.ItemID == p9x3k then return rk1m.Skin end
+    for _, v in pairs(rk1m.Hats) do if type(v) == "table" and v.ItemID == p9x3k then return v end end
+    for _, v in pairs(rk1m.Effects) do if type(v) == "table" and v.ItemID == p9x3k then return v end end
+    for _, v in pairs(rk1m.Cheers) do if type(v) == "table" and v.ItemID == p9x3k then return v end end
+    return false
+end
+
+local zqm1b = wz8p.CurrentData.Get
+wz8p.CurrentData.Get = function(self, key, ...)
+    if key == "EquippedSkin" then return rk1m.Skin
+    elseif key == "EquippedHats" then return rk1m.Hats
+    elseif key == "EquippedEffects" then return rk1m.Effects
+    elseif key == "EquippedCheers" then return rk1m.Cheers
+    end
+    return zqm1b(self, key, ...)
+end
+
+wz8p.IsEquipped = function(self, bq2n) return mx3p(bq2n) end
+
+local function hk7p(xf4k, wd3v)
+    wz8p.CurrentData.Data[xf4k] = wd3v
+    wz8p.CurrentData:Replicate(xf4k)
+end
+
+local function pf6r(nr4b)
+    local qn8r = hy2n:FindItem(nr4b.ItemID)
+    if not qn8r then return nil end
+    return { Name = qn8r.Data.Name, Color = nr4b.Color, SecondaryColor = nr4b.SecondaryColor }
+end
+
+if jx6v then
+    local dm5t = jx6v.SetSkin
+    jx6v.SetSkin = function(self, data, ...)
+        if self.Owner == xk9w.LocalPlayer and rk1m.Skin then
+            local ym1k = pf6r(rk1m.Skin)
+            if ym1k then return dm5t(self, ym1k, ...) end
+        end
+        return dm5t(self, data, ...)
+    end
+
+    local gt8z = jx6v.SetHats
+    jx6v.SetHats = function(self, data, ...)
+        if self.Owner == xk9w.LocalPlayer and #rk1m.Hats > 0 then
+            local fy8z = {}
+            for _, zp1q in pairs(rk1m.Hats) do
+                local ck4r = pf6r(zp1q)
+                if ck4r then table.insert(fy8z, ck4r) end
+            end
+            return gt8z(self, fy8z, ...)
+        end
+        return gt8z(self, data, ...)
+    end
+
+    local pj9v = jx6v.SetEffects
+    jx6v.SetEffects = function(self, data, ...)
+        if self.Owner == xk9w.LocalPlayer and #rk1m.Effects > 0 then
+            local zn6h = {}
+            for _, qw7f in pairs(rk1m.Effects) do
+                local ht8q = pf6r(qw7f)
+                if ht8q then table.insert(zn6h, ht8q) end
+            end
+            return pj9v(self, zn6h, ...)
+        end
+        return pj9v(self, data, ...)
+    end
+end
+
+-- if nf4q then
+--     local mz2w
+--     mz2w = hookfunction(nf4q.PlayCheer, function(self, data, part, ...)
+--         if #rk1m.Cheers > 0 then
+--             local vb3n = xk9w.LocalPlayer.Character
+--             if vb3n then
+--                 for _, v in pairs(vb3n:GetDescendants()) do
+--                     if v == part then
+--                         local xr5k = rk1m.Cheers[1]
+--                         local gf3z = pf6r(xr5k)
+--                         if gf3z then return mz2w(self, gf3z, part, ...) end
+--                         break
+--                     end
+--                 end
+--             end
+--         end
+--         return mz2w(self, data, part, ...)
+--     end)
+-- end
+
+local tn9w = qm7t:WaitForChild("Remotes"):WaitForChild("Data")
+local mb4k = tn9w:WaitForChild("EquipItem")
+local hz6p = tn9w:WaitForChild("RecolorItem")
+
+local wj2v
+wj2v = hookmetamethod(game, "__namecall", function(self, ...)
+    local yc8n = getnamecallmethod()
+
+    if self == hz6p and (yc8n == "FireServer" or yc8n == "InvokeServer") then
+        local xb3q, nk5r, rp5v = select(1, ...), select(2, ...), select(3, ...)
+        local wy3n = nk5r and hy2n:FindItem(nk5r)
+        if wy3n then
+            if rp5v == "Primary" then wy3n.Data.Color = xb3q
+            elseif rp5v == "Secondary" then wy3n.Data.SecondaryColor = xb3q end
+            local vf9z = mx3p(nk5r)
+            if type(vf9z) == "table" then
+                if rp5v == "Primary" then vf9z.Color = xb3q
+                elseif rp5v == "Secondary" then vf9z.SecondaryColor = xb3q end
+                local jh4b = tz5b.Items[wy3n.Data.Name]
+                if jh4b then
+                    if jh4b.Type == "Skin" then hk7p("EquippedSkin", rk1m.Skin)
+                    elseif jh4b.Type == "Hat" then hk7p("EquippedHats", rk1m.Hats)
+                    elseif jh4b.Type == "Effect" then hk7p("EquippedEffects", rk1m.Effects)
+                    elseif jh4b.Type == "Cheer" then hk7p("EquippedCheers", rk1m.Cheers)
+                    end
+                end
+            end
+        end
+        return wj2v(self, ...)
+    end
+
+    if self ~= mb4k or (yc8n ~= "FireServer" and yc8n ~= "InvokeServer") then
+        return wj2v(self, ...)
+    end
+
+    local qz7n = { ... }
+    local bt6w = qz7n[1]
+    if not bt6w then return wj2v(self, ...) end
+
+    local zc2x = hy2n:FindItem(bt6w)
+    if not zc2x then return wj2v(self, ...) end
+
+    local xj5m = tz5b.Items[zc2x.Data.Name]
+    if not xj5m then return wj2v(self, ...) end
+
+    local fp2v = xj5m.Type
+    local kn7r = { ItemID = bt6w, Color = zc2x.Data.Color, SecondaryColor = zc2x.Data.SecondaryColor }
+    local dw6t = mx3p(bt6w) ~= false
+
+    if fp2v == "Skin" then
+        rk1m.Skin = dw6t and nil or kn7r
+        hk7p("EquippedSkin", rk1m.Skin)
+    elseif fp2v == "Hat" then
+        if dw6t then
+            for i = #rk1m.Hats, 1, -1 do if rk1m.Hats[i].ItemID == bt6w then table.remove(rk1m.Hats, i) break end end
+        else
+            table.insert(rk1m.Hats, kn7r)
+        end
+        hk7p("EquippedHats", rk1m.Hats)
+    elseif fp2v == "Effect" then
+        if dw6t then
+            for i = #rk1m.Effects, 1, -1 do if rk1m.Effects[i].ItemID == bt6w then table.remove(rk1m.Effects, i) break end end
+        else
+            table.insert(rk1m.Effects, kn7r)
+        end
+        hk7p("EquippedEffects", rk1m.Effects)
+    elseif fp2v == "Cheer" then
+        if dw6t then
+            for i = #rk1m.Cheers, 1, -1 do if rk1m.Cheers[i].ItemID == bt6w then table.remove(rk1m.Cheers, i) break end end
+        else
+            table.insert(rk1m.Cheers, kn7r)
+        end
+        hk7p("EquippedCheers", rk1m.Cheers)
+    end
+
+    return wj2v(self, table.unpack(qz7n))
+end)
