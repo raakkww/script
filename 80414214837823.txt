@@ -15,7 +15,6 @@ _G.AutoTP = false
 local Window = Rayfield:CreateWindow({
    Name = "Admin Tower | End TP",
    LoadingTitle = "Focusing on the Goal...",
-   LoadingSubtitle = "by Gemini",
    ConfigurationSaving = { Enabled = false }
 })
 
