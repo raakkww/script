@@ -1,0 +1,176 @@
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Root = Character:WaitForChild("HumanoidRootPart")
+
+Player.CharacterAdded:Connect(function(char)
+    Character = char
+    Root = char:WaitForChild("HumanoidRootPart")
+end)
+
+local function GetOwnedTycoon()
+    for _, tycoon in pairs(workspace.Treehouses:GetChildren()) do
+        if tycoon:IsA("Model") then
+            
+            local owner = tycoon:FindFirstChild("Owner")
+            
+            if owner then
+                if owner:IsA("ObjectValue") and owner.Value == Player then
+                    return tycoon
+                end
+                if owner:IsA("StringValue") and owner.Value == Player.Name then
+                    return tycoon
+                end
+                if owner:IsA("IntValue") and owner.Value == Player.UserId then
+                    return tycoon
+                end
+            end
+        end
+    end
+end
+
+local function GetButtonPart()
+    local tycoon = GetOwnedTycoon()
+    if not tycoon then return nil end
+
+    local success, part = pcall(function()
+        return tycoon.Essentials.Giver.Button.Head
+    end)
+
+    if success then return part end
+    return nil
+end
+
+local Running = false
+local ButtonPart = nil
+local OriginalCFrame = nil
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame", ScreenGui)
+local Stroke = Instance.new("UIStroke", Frame)
+local Corner = Instance.new("UICorner", Frame)
+
+Frame.Size = UDim2.new(0, 300, 0, 210)
+Frame.Position = UDim2.new(0.4, 0, 0.4, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+Frame.Active = true
+Frame.Draggable = true
+
+Corner.CornerRadius = UDim.new(0,10)
+Stroke.Thickness = 2
+Stroke.Color = Color3.fromRGB(0,170,255)
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1,0,0,30)
+Title.Position = UDim2.new(0,0,0,5)
+Title.BackgroundTransparency = 1
+Title.Text = "✨ Made By ✨"
+Title.TextColor3 = Color3.fromRGB(0,170,255)
+Title.Font = Enum.Font.GothamBold
+Title.TextScaled = true
+
+local function CreateCopyLabel(Text, Value, YPos)
+    local Label = Instance.new("TextButton", Frame)
+    Label.Size = UDim2.new(1,-20,0,30)
+    Label.Position = UDim2.new(0,10,0,YPos)
+    Label.BackgroundTransparency = 1
+    Label.Font = Enum.Font.Code
+    Label.TextScaled = true
+    Label.RichText = true
+
+    local BaseText = '<font color="rgb(255,255,255)">'..Text..'</font> <font color="rgb(0,170,255)">'..Value..'</font>'
+    Label.Text = BaseText
+
+    Label.MouseEnter:Connect(function()
+        Label.Text = BaseText .. ' <font color="rgb(150,150,150)">(Click to Copy)</font>'
+    end)
+
+    Label.MouseLeave:Connect(function()
+        Label.Text = BaseText
+    end)
+
+    Label.MouseButton1Click:Connect(function()
+        if setclipboard then
+            setclipboard(Value)
+        end
+    end)
+end
+
+CreateCopyLabel("Discord User:", "verifiedconnections", 40)
+CreateCopyLabel("Discord ID:", "1452909447734231195", 70)
+
+local DiscordButton = Instance.new("TextButton", Frame)
+DiscordButton.Size = UDim2.new(1,-20,0,30)
+DiscordButton.Position = UDim2.new(0,10,0,105)
+DiscordButton.Text = "Join Discord"
+DiscordButton.BackgroundColor3 = Color3.fromRGB(40,40,40)
+DiscordButton.TextColor3 = Color3.new(1,1,1)
+DiscordButton.Font = Enum.Font.GothamBold
+DiscordButton.TextScaled = true
+
+Instance.new("UICorner", DiscordButton).CornerRadius = UDim.new(0,6)
+
+DiscordButton.MouseButton1Click:Connect(function()
+    local Link = "https://discord.gg/9fs5a48UJm"
+    if setclipboard then
+        setclipboard(Link)
+    end
+end)
+
+local Toggle = Instance.new("TextButton", Frame)
+Toggle.Size = UDim2.new(1,-20,0,40)
+Toggle.Position = UDim2.new(0,10,1,-50)
+Toggle.Text = "Auto Collect: OFF"
+Toggle.BackgroundColor3 = Color3.fromRGB(35,35,35)
+Toggle.TextColor3 = Color3.new(1,1,1)
+Toggle.Font = Enum.Font.GothamBold
+Toggle.TextScaled = true
+
+Instance.new("UICorner", Toggle).CornerRadius = UDim.new(0,8)
+
+Toggle.MouseButton1Click:Connect(function()
+    Running = not Running
+
+    if Running then
+        Toggle.Text = "Auto Collect: ON"
+        Stroke.Color = Color3.fromRGB(0,255,120)
+
+        ButtonPart = GetButtonPart()
+
+        if ButtonPart then
+            ButtonPart.CanCollide = false
+            OriginalCFrame = ButtonPart.CFrame
+        end
+
+    else
+        Toggle.Text = "Auto Collect: OFF"
+        Stroke.Color = Color3.fromRGB(0,170,255)
+
+        if ButtonPart and OriginalCFrame then
+            ButtonPart.CFrame = OriginalCFrame
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait()
+
+        if Running then
+            if not ButtonPart or not ButtonPart.Parent then
+                ButtonPart = GetButtonPart()
+                if ButtonPart then
+                    OriginalCFrame = ButtonPart.CFrame
+                end
+            end
+
+            if ButtonPart and Root then
+                ButtonPart.CFrame = Root.CFrame
+            end
+        end
+    end
+end)
