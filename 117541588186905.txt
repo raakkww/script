@@ -1,0 +1,242 @@
+--[=[
+ d888b  db    db d888888b      .d888b.      db      db    db  .d8b.  
+88' Y8b 88    88   `88'        VP  `8D      88      88    88 d8' `8b 
+88      88    88    88            odD'      88      88    88 88ooo88 
+88  ooo 88    88    88          .88'        88      88    88 88~~~88 
+88. ~8~ 88b  d88   .88.        j88.         88booo. 88b  d88 88   88    @uniquadev
+ Y888P  ~Y8888P' Y888888P      888888D      Y88888P ~Y8888P' YP   YP  CONVERTER
+
+designed using localmaze gui creator
+]=]
+
+local LMG2L = {}
+
+-- ScreenGui
+LMG2L["MoonUI_1"] = Instance.new("ScreenGui", game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"))
+LMG2L["MoonUI_1"].Name = "MoonUI"
+LMG2L["MoonUI_1"].ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Folder
+LMG2L["Moon_UI_2"] = Instance.new("Folder", LMG2L["MoonUI_1"])
+LMG2L["Moon_UI_2"].Name = "Moon_UI"
+
+-- Main Frame
+LMG2L["MoonUIFrame_3"] = Instance.new("Frame", LMG2L["Moon_UI_2"])
+LMG2L["MoonUIFrame_3"].BorderSizePixel = 0
+LMG2L["MoonUIFrame_3"].BackgroundColor3 = Color3.fromRGB(56, 56, 56)
+LMG2L["MoonUIFrame_3"].Size = UDim2.new(0, 668, 0, 374)
+LMG2L["MoonUIFrame_3"].Position = UDim2.new(0, 396, 0, 168)
+LMG2L["MoonUIFrame_3"].Name = "MoonUIFrame"
+
+Instance.new("UICorner", LMG2L["MoonUIFrame_3"])
+
+local outline = Instance.new("UIStroke", LMG2L["MoonUIFrame_3"])
+outline.Thickness = 10
+outline.Color = Color3.fromRGB(193, 8, 234)
+
+local gradient = Instance.new("UIGradient", LMG2L["MoonUIFrame_3"])
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 11, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(254, 13, 255))
+}
+
+-- Title
+LMG2L["MoonUIText_7"] = Instance.new("TextLabel", LMG2L["Moon_UI_2"])
+LMG2L["MoonUIText_7"].BorderSizePixel = 0
+LMG2L["MoonUIText_7"].TextSize = 36
+LMG2L["MoonUIText_7"].BackgroundTransparency = 1
+LMG2L["MoonUIText_7"].FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json")
+LMG2L["MoonUIText_7"].TextColor3 = Color3.fromRGB(255, 0, 197)
+LMG2L["MoonUIText_7"].Size = UDim2.new(0.2, 0, 0.3, 0)
+LMG2L["MoonUIText_7"].Text = ""
+LMG2L["MoonUIText_7"].Name = "MoonUIText"
+LMG2L["MoonUIText_7"].Position = UDim2.new(0, 320, 0, 78)
+
+-- Subtitle
+LMG2L["MoonUISubtitle_8"] = Instance.new("TextLabel", LMG2L["Moon_UI_2"])
+LMG2L["MoonUISubtitle_8"].BorderSizePixel = 0
+LMG2L["MoonUISubtitle_8"].TextSize = 36
+LMG2L["MoonUISubtitle_8"].BackgroundTransparency = 1
+LMG2L["MoonUISubtitle_8"].FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json")
+LMG2L["MoonUISubtitle_8"].TextColor3 = Color3.fromRGB(255, 0, 197)
+LMG2L["MoonUISubtitle_8"].Size = UDim2.new(0.2, 0, 0.3, 0)
+LMG2L["MoonUISubtitle_8"].Text = ""
+LMG2L["MoonUISubtitle_8"].Name = "MoonUISubtitle"
+LMG2L["MoonUISubtitle_8"].Position = UDim2.new(0, 578, 0, 398)
+
+-- Inner Frame
+LMG2L["Frame_9"] = Instance.new("Frame", LMG2L["Moon_UI_2"])
+LMG2L["Frame_9"].BorderSizePixel = 0
+LMG2L["Frame_9"].BackgroundColor3 = Color3.fromRGB(116, 7, 116)
+LMG2L["Frame_9"].Size = UDim2.new(0, 650, 0, 214)
+LMG2L["Frame_9"].Position = UDim2.new(0, 406, 0, 210)
+
+Instance.new("UICorner", LMG2L["Frame_9"])
+
+local innerGradient = Instance.new("UIGradient", LMG2L["Frame_9"])
+innerGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(133, 8, 150)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 9, 246))
+}
+
+-- Elements Folder (parented to main frame so dragging moves everything)
+LMG2L["MoonUIElements_c"] = Instance.new("Folder", LMG2L["MoonUIFrame_3"])
+LMG2L["MoonUIElements_c"].Name = "MoonUIElements"
+
+-- ESP Toggle Button
+LMG2L["ToggleESPButton_d"] = Instance.new("TextButton", LMG2L["MoonUIElements_c"])
+LMG2L["ToggleESPButton_d"].BorderSizePixel = 0
+LMG2L["ToggleESPButton_d"].TextSize = 24
+LMG2L["ToggleESPButton_d"].TextColor3 = Color3.fromRGB(175, 12, 169)
+LMG2L["ToggleESPButton_d"].BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+LMG2L["ToggleESPButton_d"].FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json")
+LMG2L["ToggleESPButton_d"].Size = UDim2.new(0, 336, 0, 42)
+LMG2L["ToggleESPButton_d"].Text = "ESP: OFF"
+LMG2L["ToggleESPButton_d"].Name = "ToggleESPButton"
+LMG2L["ToggleESPButton_d"].Position = UDim2.new(0, 148, 0, 276)
+
+Instance.new("UICorner", LMG2L["ToggleESPButton_d"])
+
+local btnGradient = Instance.new("UIGradient", LMG2L["ToggleESPButton_d"])
+btnGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(167, 32, 166)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(101, 22, 89))
+}
+
+-- Textbox
+LMG2L["MoonUITextbox_10"] = Instance.new("TextBox", LMG2L["MoonUIElements_c"])
+LMG2L["MoonUITextbox_10"].Name = "MoonUITextbox"
+LMG2L["MoonUITextbox_10"].BorderSizePixel = 0
+LMG2L["MoonUITextbox_10"].TextSize = 24
+LMG2L["MoonUITextbox_10"].TextColor3 = Color3.fromRGB(48, 3, 54)
+LMG2L["MoonUITextbox_10"].BackgroundTransparency = 1
+LMG2L["MoonUITextbox_10"].FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json")
+LMG2L["MoonUITextbox_10"].Size = UDim2.new(0, 244, 0, 22)
+LMG2L["MoonUITextbox_10"].Position = UDim2.new(0, 20, 0, 20)
+LMG2L["MoonUITextbox_10"].Text = "Enter your notes here"
+
+---------------------------------------------------------------------
+-- 🌙 ESP TOGGLE (UI‑ONLY)
+---------------------------------------------------------------------
+
+local espEnabled = false
+local button = LMG2L["ToggleESPButton_d"]
+
+button.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+
+    if espEnabled then
+        button.Text = "ESP: ON"
+        button.TextColor3 = Color3.fromRGB(255, 0, 197)
+    else
+        button.Text = "ESP: OFF"
+        button.TextColor3 = Color3.fromRGB(175, 12, 169)
+    end
+end)
+
+---------------------------------------------------------------------
+-- 🌙 CLOSE & MINIMIZE BUTTONS
+---------------------------------------------------------------------
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton", LMG2L["MoonUIFrame_3"])
+CloseBtn.Size = UDim2.new(0, 40, 0, 40)
+CloseBtn.Position = UDim2.new(1, -50, 0, 10)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 20
+Instance.new("UICorner", CloseBtn)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    LMG2L["MoonUI_1"]:Destroy()
+end)
+
+-- Minimize Button
+local MinBtn = Instance.new("TextButton", LMG2L["MoonUIFrame_3"])
+MinBtn.Size = UDim2.new(0, 40, 0, 40)
+MinBtn.Position = UDim2.new(1, -100, 0, 10)
+MinBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 30
+Instance.new("UICorner", MinBtn)
+
+local minimized = false
+
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    LMG2L["MoonUIElements_c"].Visible = not minimized
+    LMG2L["Frame_9"].Visible = not minimized
+end)
+
+---------------------------------------------------------------------
+-- 🌙 LOADING ANIMATION (Fade‑In + Pulse)
+---------------------------------------------------------------------
+
+LMG2L["MoonUIFrame_3"].BackgroundTransparency = 1
+LMG2L["MoonUIText_7"].TextTransparency = 1
+LMG2L["MoonUISubtitle_8"].TextTransparency = 1
+
+task.spawn(function()
+    for i = 1, 20 do
+        local t = i / 20
+        LMG2L["MoonUIFrame_3"].BackgroundTransparency = 1 - t
+        LMG2L["MoonUIText_7"].TextTransparency = 1 - t
+        LMG2L["MoonUISubtitle_8"].TextTransparency = 1 - t
+        task.wait(0.03)
+    end
+
+    -- Pulse effect
+    while true do
+        LMG2L["MoonUIText_7"].TextColor3 = Color3.fromRGB(255, 0, 197)
+        task.wait(0.5)
+        LMG2L["MoonUIText_7"].TextColor3 = Color3.fromRGB(200, 0, 150)
+        task.wait(0.5)
+    end
+end)
+
+---------------------------------------------------------------------
+-- 🌙 DRAGGABLE UI (Moves ALL Elements)
+---------------------------------------------------------------------
+
+local UserInputService = game:GetService("UserInputService")
+local gui = LMG2L["MoonUIFrame_3"]
+
+local dragging
+local dragStart
+local startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    gui.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+gui.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = gui.Position
+    end
+end)
+
+gui.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        update(input)
+    end
+end)
+
+return LMG2L["MoonUI_1"], require
