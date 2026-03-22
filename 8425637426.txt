@@ -1,0 +1,34 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local TARGET_POSITION = Vector3.new(-655, 31, 1157)
+
+local function pressF()
+    local VIM = game:GetService("VirtualInputManager")
+    VIM:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+    task.wait(0.1)
+    VIM:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+end
+
+local function run()
+    local originalCFrame = humanoidRootPart.CFrame
+
+    humanoidRootPart.CFrame = CFrame.new(TARGET_POSITION)
+
+    task.wait(0.2)
+    pressF()
+
+    task.wait(0.3)
+    humanoidRootPart.CFrame = originalCFrame
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        run()
+    end
+end)
