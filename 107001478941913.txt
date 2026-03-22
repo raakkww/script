@@ -1,0 +1,172 @@
+--// SERVICES
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+--// GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "ModernGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 240, 0, 260)
+frame.Position = UDim2.new(0.05, 0, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.Active = true
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+-- title
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Control Panel"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+
+-- button creator
+local function createButton(text, y)
+	local btn = Instance.new("TextButton", frame)
+	btn.Size = UDim2.new(1, -20, 0, 45)
+	btn.Position = UDim2.new(0, 10, 0, y)
+	btn.Text = text
+	btn.BackgroundColor3 = Color3.fromRGB(35,35,35)
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+	return btn
+end
+
+-- buttons
+local tpButton = createButton("TP: OFF", 40)
+local jumpButton = createButton("Jump: OFF", 90)
+local upgradeButton = createButton("Upgrade: OFF", 140)
+local rebirthButton = createButton("Rebirth: OFF", 190)
+
+-- states
+local tpEnabled = false
+local jumpEnabled = false
+local upgradeEnabled = false
+local rebirthEnabled = false
+
+--// DRAG SYSTEM
+local dragging, dragInput, dragStart, startPos
+
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+		
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+frame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+--// TP LOOP
+task.spawn(function()
+	while true do
+		if tpEnabled then
+			local pad = workspace:FindFirstChild("WinPad_25000")
+			if pad then
+				hrp.CFrame = pad.CFrame
+			end
+		end
+		RunService.Heartbeat:Wait()
+	end
+end)
+
+--// MULTI JUMP LOOP
+task.spawn(function()
+	while true do
+		if jumpEnabled then
+			local remote = ReplicatedStorage:FindFirstChild("Jump")
+			if remote then
+				for i = 1, 5 do
+					remote:FireServer()
+				end
+			end
+		end
+		RunService.Heartbeat:Wait()
+	end
+end)
+
+--// AUTO UPGRADE LOOP
+task.spawn(function()
+	while true do
+		if upgradeEnabled then
+			local remote = ReplicatedStorage:FindFirstChild("BuyJumpUpgrade")
+			if remote then
+				remote:InvokeServer()
+			end
+		end
+		task.wait(0.1) -- slight delay to prevent overload
+	end
+end)
+
+--// AUTO REBIRTH LOOP
+task.spawn(function()
+	while true do
+		if rebirthEnabled then
+			local remote = ReplicatedStorage:FindFirstChild("Rebirth")
+			if remote then
+				remote:InvokeServer()
+			end
+		end
+		task.wait(0.1)
+	end
+end)
+
+--// BUTTON TOGGLES
+tpButton.MouseButton1Click:Connect(function()
+	tpEnabled = not tpEnabled
+	tpButton.Text = "TP: " .. (tpEnabled and "ON" or "OFF")
+end)
+
+jumpButton.MouseButton1Click:Connect(function()
+	jumpEnabled = not jumpEnabled
+	jumpButton.Text = "Jump: " .. (jumpEnabled and "ON" or "OFF")
+end)
+
+upgradeButton.MouseButton1Click:Connect(function()
+	upgradeEnabled = not upgradeEnabled
+	upgradeButton.Text = "Upgrade: " .. (upgradeEnabled and "ON" or "OFF")
+end)
+
+rebirthButton.MouseButton1Click:Connect(function()
+	rebirthEnabled = not rebirthEnabled
+	rebirthButton.Text = "Rebirth: " .. (rebirthEnabled and "ON" or "OFF")
+end)
+
+--// RESPAWN FIX
+player.CharacterAdded:Connect(function(newChar)
+	char = newChar
+	hrp = char:WaitForChild("HumanoidRootPart")
+end)
