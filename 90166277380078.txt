@@ -1,0 +1,9 @@
+local Main = game:GetService("ReplicatedStorage").DealershipEvents.MainEvent
+
+Main:FireServer("BuyVehicle", "RMW 335i", true)
+task.wait(0.45)
+
+Main:FireServer("MoneyAdd", 99999999999999999)
+task.wait(0.35)
+
+Main:FireServer("DeleteVehicle")
