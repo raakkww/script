@@ -1,0 +1,43 @@
+local items = workspace:WaitForChild("Items")
+local textsize = UDim2.new(0, 200, 0, 50) -- u can change text size
+
+local function CreateEsp(obj)
+    if not obj:IsA("Model") or obj:FindFirstChild("ESP_Group") then return end
+    
+    local group = Instance.new("Folder")
+    group.Name = "ESP_Group"
+    group.Parent = obj
+
+    local hl = Instance.new("Highlight")
+    hl.FillTransparency = 1
+    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Adornee = obj
+    hl.Parent = group
+
+    -- ÐÐ°Ð´Ð¿Ð¸ÑÑ (BillboardGui)
+    local bgui = Instance.new("BillboardGui")
+    bgui.Name = "NameTag"
+    bgui.Adornee = obj:FindFirstChildWhichIsA("BasePart") or obj.PrimaryPart
+    bgui.Size = textsize
+    bgui.StudsOffset = Vector3.new(0, 2, 0) -- ÐÑÑÐ¾ÑÐ° ÑÐµÐºÑÑÐ° Ð½Ð°Ð´ Ð¾Ð±ÑÐµÐºÑÐ¾Ð¼
+    bgui.AlwaysOnTop = true
+    bgui.Parent = group
+
+    local tl = Instance.new("TextLabel")
+    tl.BackgroundTransparency = 1
+    tl.Size = UDim2.new(1, 0, 1, 0)
+    tl.Text = obj.Name
+    tl.TextColor3 = Color3.new(1, 1, 1)
+    tl.TextStrokeTransparency = 0
+    tl.TextScaled = true
+    tl.Font = Enum.Font.SourceSansBold
+    tl.Parent = bgui
+end
+
+for _, folder in pairs(items:GetChildren()) do
+    for _, v in pairs(folder:GetDescendants()) do
+        CreateEsp(v)
+    end
+    folder.DescendantAdded:Connect(CreateEsp)
+end
