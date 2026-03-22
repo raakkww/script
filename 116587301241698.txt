@@ -1,0 +1,93 @@
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
+local Title = Instance.new("TextLabel")
+local HeatBtn = Instance.new("TextButton")
+local DestroyBtn = Instance.new("TextButton")
+
+ScreenGui.Name = "4Jayyz_Heat_Hub"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.Position = UDim2.new(0.5, -80, 0.5, -60)
+MainFrame.Size = UDim2.new(0, 160, 0, 125)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+UIStroke.Thickness = 2
+UIStroke.Parent = MainFrame
+
+task.spawn(function()
+    while RunService.RenderStepped:Wait() do
+        local hue = tick() % 5 / 5
+        UIStroke.Color = Color3.fromHSV(hue, 1, 1)
+    end
+end)
+
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = ""
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 13
+
+HeatBtn.Parent = MainFrame
+HeatBtn.Text = "AUTO HEAT: OFF"
+HeatBtn.Size = UDim2.new(0.9, 0, 0, 35)
+HeatBtn.Position = UDim2.new(0.05, 0, 0.35, 0)
+HeatBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+HeatBtn.TextColor3 = Color3.new(1, 1, 1)
+HeatBtn.Font = Enum.Font.GothamBold
+HeatBtn.TextSize = 10
+Instance.new("UICorner", HeatBtn)
+
+DestroyBtn.Parent = MainFrame
+DestroyBtn.Text = "Destroy UI"
+DestroyBtn.Size = UDim2.new(0.9, 0, 0, 25)
+DestroyBtn.Position = UDim2.new(0.05, 0, 0.72, 0)
+DestroyBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+DestroyBtn.TextColor3 = Color3.new(1, 1, 1)
+DestroyBtn.Font = Enum.Font.GothamBold
+DestroyBtn.TextSize = 10
+Instance.new("UICorner", DestroyBtn)
+
+local heatEnabled = false
+
+HeatBtn.MouseButton1Click:Connect(function()
+    heatEnabled = not heatEnabled
+    HeatBtn.Text = "AUTO HEAT: " .. (heatEnabled and "ON" or "OFF")
+    HeatBtn.BackgroundColor3 = heatEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+    
+    if heatEnabled then
+        task.spawn(function()
+            local remote = ReplicatedStorage:WaitForChild("NetworkRemoteObjects"):WaitForChild("ClientEvent")
+            local args = {
+                {
+                    channel = "click",
+                    args = {}
+                }
+            }
+            while heatEnabled do
+                remote:FireServer(unpack(args))
+                task.wait()
+            end
+        end)
+    end
+end)
+
+DestroyBtn.MouseButton1Click:Connect(function()
+    heatEnabled = false
+    ScreenGui:Destroy()
+end)
