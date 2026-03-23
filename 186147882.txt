@@ -154,7 +154,7 @@ local function applyVisuals(char)
     local function ensureVisuals()  
         if not root:FindFirstChild("CursedText") then  
             local textGui = Instance.new("BillboardGui", root); textGui.Name = "CursedText"; textGui.Size = UDim2.new(10, 0, 3, 0); textGui.AlwaysOnTop = true  
-            local label = Instance.new("TextLabel", textGui); label.BackgroundTransparency = 1; label.Size = UDim2.new(1, 0, 1, 0); label.Text = "פרחים"  
+            local label = Instance.new("TextLabel", textGui); label.BackgroundTransparency = 1; label.Size = UDim2.new(1, 0, 1, 0); label.Text = ""  
             label.TextColor3 = Color3.fromRGB(255, 0, 0); label.TextScaled = true; label.Font = Enum.Font.Antique  
             RunService.RenderStepped:Connect(function() if label.Parent then label.Position = UDim2.new(math.random(-25, 25)/100, 0, math.random(-25, 25)/100, 0); textGui.StudsOffset = Vector3.new(0, 7 + (math.random(-10, 10)/20), 0) end end)  
         end  
