@@ -877,7 +877,7 @@ local function microTeleport(targetPos, statusLabel, options)
 
     if state.isTPing then
         if statusLabel then
-            statusLabel.Text = "TP deja en cours..."
+            statusLabel.Text = "Practical work already underway..."
         end
         return false
     end
@@ -885,7 +885,7 @@ local function microTeleport(targetPos, statusLabel, options)
     local vehicle = findVehicle()
     if not vehicle then
         if statusLabel then
-            statusLabel.Text = "Vehicule introuvable"
+            statusLabel.Text = "Vehicle not found"
         end
         return false
     end
@@ -893,7 +893,7 @@ local function microTeleport(targetPos, statusLabel, options)
     local root = getVehicleRoot(vehicle)
     if not root then
         if statusLabel then
-            statusLabel.Text = "Aucune BasePart vehicule"
+            statusLabel.Text = "No BasePart vehicle"
         end
         return false
     end
@@ -998,7 +998,7 @@ local function microTeleport(targetPos, statusLabel, options)
             vehicle = findVehicle()
             if not vehicle then
                 if statusLabel then
-                    statusLabel.Text = "Recherche vehicule..."
+                    statusLabel.Text = "Looking for a vehicle..."
                 end
                 RunService.Heartbeat:Wait()
                 continue
@@ -1018,7 +1018,7 @@ local function microTeleport(targetPos, statusLabel, options)
         root = getVehicleRoot(vehicle)
         if not root then
             if statusLabel then
-                statusLabel.Text = "Recherche base vehicule..."
+                statusLabel.Text = "Vehicle database search..."
             end
             RunService.Heartbeat:Wait()
             continue
@@ -1031,7 +1031,7 @@ local function microTeleport(targetPos, statusLabel, options)
                 disableWallPass()
             end
             if statusLabel then
-                statusLabel.Text = "TP annule: siege vide"
+                statusLabel.Text = "TP cancelled: empty seat"
             end
             break
         end
@@ -1098,7 +1098,7 @@ local function microTeleport(targetPos, statusLabel, options)
                 stuckTime = 0
                 lastPos = nil
                 if statusLabel then
-                    statusLabel.Text = "Anti sous-map: correction verticale"
+                    statusLabel.Text = "Anti-submap: vertical correction"
                 end
                 RunService.Heartbeat:Wait()
                 continue
@@ -1147,7 +1147,7 @@ local function microTeleport(targetPos, statusLabel, options)
                         stuckTime = 0
                         lastPos = nil
                         if statusLabel then
-                            statusLabel.Text = "Toit: sortie mur"
+                            statusLabel.Text = "Roof: wall exit"
                         end
                         RunService.Heartbeat:Wait()
                         continue
@@ -1183,7 +1183,7 @@ local function microTeleport(targetPos, statusLabel, options)
                 -- Reset le timer apres correction de hauteur
                 lastGroundTouch = os.clock()
                 if statusLabel then
-                    statusLabel.Text = "Securite hauteur: retour au sol"
+                    statusLabel.Text = "Height safety: return to the ground"
                 end
                 RunService.Heartbeat:Wait()
                 continue
@@ -1221,7 +1221,7 @@ local function microTeleport(targetPos, statusLabel, options)
                 lastPos = nil
                 jumpCruiseY = nil
                 if statusLabel then
-                    statusLabel.Text = "Anti-fly: retour au sol rapide"
+                    statusLabel.Text = "Anti-fly: quick return to the ground"
                 end
                 RunService.Heartbeat:Wait()
                 continue
@@ -1344,11 +1344,11 @@ local function microTeleport(targetPos, statusLabel, options)
                     -- Destination TP: snap instantane sur le toit
                     enforceVehicleAboveGround(vehicle, true)
                     if statusLabel then
-                        statusLabel.Text = "Securite: sortie mur"
+                        statusLabel.Text = "Security: wall exit"
                     end
                 else
                     if statusLabel then
-                        statusLabel.Text = "Phase: navigation interieur"
+                        statusLabel.Text = "Phase: Internal navigation"
                     end
                 end
             end
@@ -1397,7 +1397,7 @@ local function microTeleport(targetPos, statusLabel, options)
                 lastPos = nil
 
                 if statusLabel then
-                    statusLabel.Text = "Micro debloquage: +5 studs"
+                    statusLabel.Text = "Micro unlocking: +5 studs"
                 end
                 RunService.Heartbeat:Wait()
                 continue
@@ -1442,7 +1442,7 @@ local function microTeleport(targetPos, statusLabel, options)
                 stuckTime = 0
                 lastPos = nil
                 if statusLabel then
-                    statusLabel.Text = "Bloque 3s, montee forcee..."
+                    statusLabel.Text = "Stuck for 3 seconds, forced ascent..."
                 end
                 RunService.Heartbeat:Wait()
                 continue
@@ -1519,7 +1519,7 @@ local function microTeleport(targetPos, statusLabel, options)
                 climbedBudgetUsed = climbedBudgetUsed + climb
                 lastPos = nil
                 if statusLabel then
-                    statusLabel.Text = "Obstacle detecte, montee..."
+                    statusLabel.Text = "Obstacle detected, uphill..."
                 end
                 RunService.Heartbeat:Wait()
                 continue
@@ -1549,7 +1549,7 @@ local function microTeleport(targetPos, statusLabel, options)
             stuckTime = 0
             lastPos = nil
             if statusLabel then
-                statusLabel.Text = "Obstacle, contournement..."
+                statusLabel.Text = "Obstacle, bypass..."
             end
             RunService.Heartbeat:Wait()
             continue
@@ -1711,7 +1711,7 @@ local function microTeleport(targetPos, statusLabel, options)
 
     if statusLabel then
         if reached then
-            statusLabel.Text = "Arrive au sol"
+            statusLabel.Text = "Arrives on the ground"
         elseif blockedBy then
             statusLabel.Text = "Stop (mur): " .. blockedBy
         else
@@ -1959,7 +1959,7 @@ local function createSpeedSlider(parent, onChanged)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.TextSize = 14
     label.Font = Enum.Font.GothamBold
-    label.Text = "Vitesse"
+    label.Text = "Speed"
     label.Parent = row
 
     local valueLabel = Instance.new("TextLabel")
@@ -2152,7 +2152,7 @@ local function createMainUI()
     title.TextSize = 30
     title.Font = Enum.Font.GothamBold
     title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Text = "ELIX MOD MENU"
+    title.Text = ""
     title.Parent = header
 
     local closeBtn = Instance.new("TextButton")
@@ -2237,7 +2237,7 @@ local function createMainUI()
     selectedFollowLabel.TextXAlignment = Enum.TextXAlignment.Left
     selectedFollowLabel.TextSize = 13
     selectedFollowLabel.Font = Enum.Font.GothamBold
-    selectedFollowLabel.Text = "Cible orbit: aucune"
+    selectedFollowLabel.Text = "Target orbit: none"
     selectedFollowLabel.Parent = teleportScreen
 
     local categories = {
