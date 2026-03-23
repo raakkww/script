@@ -1,0 +1,336 @@
+-- MIJUSTICE | MOBILE FIXED | NO AUTO FIRE GILA
+-- Aimbot Lock Head | Triggerbot Hanya Saat Ada Musuh Di FOV
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local status = {
+    Active = true,
+    Hitbox = true,
+    ESP_Box = true,
+    Aimbot = true,
+    Triggerbot = true
+}
+
+local drawingObjects = {}
+local toggleButton = nil
+local fovRadius = 250
+local canShoot = true
+local lastShootTime = 0
+local shootDelay = 0.15
+
+local function clearDrawings()
+    for _, obj in pairs(drawingObjects) do
+        pcall(function() obj:Remove() end)
+    end
+    drawingObjects = {}
+end
+
+local function showNotification(msg)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "MijusticeNotify"
+    gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 260, 0, 45)
+    frame.Position = UDim2.new(0.5, -130, 0.2, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    frame.BackgroundTransparency = 0.2
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 0, 0)
+    stroke.Thickness = 1.5
+    stroke.Parent = frame
+    
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.Text = msg
+    text.TextColor3 = Color3.fromRGB(255, 0, 0)
+    text.TextSize = 12
+    text.Font = Enum.Font.GothamBold
+    text.Parent = frame
+    
+    wait(1.5)
+    frame:Destroy()
+end
+
+local function isEnemyInFOV()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local head = player.Character:FindFirstChild("Head")
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            
+            if head and humanoid and humanoid.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if dist <= fovRadius then
+                        return true, player, head
+                    end
+                end
+            end
+        end
+    end
+    return false, nil, nil
+end
+
+local function getClosestTarget()
+    local closest = nil
+    local bestDist = fovRadius
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local head = player.Character:FindFirstChild("Head")
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            
+            if head and humanoid and humanoid.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if dist < bestDist then
+                        bestDist = dist
+                        closest = player
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function aimbot()
+    if not status.Aimbot then return end
+    
+    local target = getClosestTarget()
+    if target and target.Character then
+        local head = target.Character:FindFirstChild("Head")
+        if head then
+            local headPos = head.Position
+            local cameraPos = Camera.CFrame.Position
+            local direction = (headPos - cameraPos).Unit
+            Camera.CFrame = CFrame.lookAt(cameraPos, cameraPos + direction)
+        end
+    end
+end
+
+local function triggerbot()
+    if not status.Triggerbot then return end
+    
+    local hasEnemy, target, head = isEnemyInFOV()
+    
+    if hasEnemy and target and head then
+        local now = tick()
+        if now - lastShootTime >= shootDelay then
+            lastShootTime = now
+            
+            pcall(function()
+                local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                if tool then
+                    local mouse = LocalPlayer:GetMouse()
+                    if mouse then
+                        mouse1click()
+                    end
+                    
+                    local remotes = game:GetService("ReplicatedStorage"):GetDescendants()
+                    for _, r in ipairs(remotes) do
+                        if r:IsA("RemoteEvent") then
+                            local name = string.lower(r.Name)
+                            if name:find("shoot") or name:find("fire") or name:find("attack") then
+                                r:FireServer()
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end
+
+local function weaponBypass()
+    pcall(function()
+        local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            for _, obj in ipairs(tool:GetDescendants()) do
+                if obj:IsA("NumberValue") then
+                    local name = string.lower(obj.Name)
+                    if name:find("recoil") or name:find("spread") or name:find("reload") then
+                        obj.Value = 0
+                    end
+                    if name:find("ammo") and not name:find("max") then
+                        obj.Value = 999
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function createToggleButton()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "MijusticeToggle"
+    gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    
+    local btn = Instance.new("ImageButton")
+    btn.Size = UDim2.new(0, 60, 0, 60)
+    btn.Position = UDim2.new(0.85, 0, 0.85, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    btn.BackgroundTransparency = 0.3
+    btn.BorderSizePixel = 0
+    btn.Parent = gui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = btn
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 0, 0)
+    stroke.Thickness = 2
+    stroke.Parent = btn
+    
+    local txt = Instance.new("TextLabel")
+    txt.Size = UDim2.new(1, 0, 1, 0)
+    txt.BackgroundTransparency = 1
+    txt.Text = "ON"
+    txt.TextColor3 = Color3.fromRGB(255, 0, 0)
+    txt.TextSize = 20
+    txt.Font = Enum.Font.GothamBold
+    txt.Parent = btn
+    
+    return gui, btn, txt
+end
+
+local function toggleAll(state)
+    status.Active = state
+    if state then
+        showNotification("MIJUSTICE | Aimbot + Triggerbot ON")
+        if toggleButton and toggleButton.txt then
+            toggleButton.txt.Text = "ON"
+            toggleButton.txt.TextColor3 = Color3.fromRGB(255, 0, 0)
+            if toggleButton.btn then
+                local stroke = toggleButton.btn:FindFirstChildOfClass("UIStroke")
+                if stroke then stroke.Color = Color3.fromRGB(255, 0, 0) end
+            end
+        end
+    else
+        showNotification("MIJUSTICE OFF")
+        clearDrawings()
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local h = p.Character:FindFirstChild("MijusticeESP")
+                if h then h:Destroy() end
+            end
+        end
+        if toggleButton and toggleButton.txt then
+            toggleButton.txt.Text = "OFF"
+            toggleButton.txt.TextColor3 = Color3.fromRGB(150, 150, 150)
+            if toggleButton.btn then
+                local stroke = toggleButton.btn:FindFirstChildOfClass("UIStroke")
+                if stroke then stroke.Color = Color3.fromRGB(150, 150, 150) end
+            end
+        end
+    end
+end
+
+local gui, btn, txt = createToggleButton()
+toggleButton = {gui = gui, btn = btn, txt = txt}
+
+btn.MouseButton1Click:Connect(function()
+    toggleAll(not status.Active)
+end)
+
+btn.TouchTap:Connect(function()
+    toggleAll(not status.Active)
+end)
+
+spawn(function()
+    while true do
+        if status.Active then
+            weaponBypass()
+        end
+        wait(0.1)
+    end
+end)
+
+spawn(function()
+    while true do
+        if status.Active and status.Aimbot then
+            aimbot()
+        end
+        wait(0.016)
+    end
+end)
+
+spawn(function()
+    while true do
+        if status.Active and status.Triggerbot then
+            triggerbot()
+        end
+        wait(0.05)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not status.Active then
+        clearDrawings()
+        return
+    end
+    
+    clearDrawings()
+    
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    local circle = Drawing.new("Circle")
+    circle.Visible = true
+    circle.Radius = fovRadius
+    circle.Thickness = 1.5
+    circle.Color = Color3.fromRGB(255, 0, 0)
+    circle.Filled = false
+    circle.Position = center
+    table.insert(drawingObjects, circle)
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local char = player.Character
+            local head = char:FindFirstChild("Head")
+            local humanoid = char:FindFirstChild("Humanoid")
+            
+            if head and humanoid and humanoid.Health > 0 then
+                if status.Hitbox then
+                    head.Size = Vector3.new(8, 8, 8)
+                    head.Transparency = 0.5
+                    head.CanCollide = false
+                end
+                
+                if status.ESP_Box then
+                    local esp = char:FindFirstChild("MijusticeESP")
+                    if not esp then
+                        esp = Instance.new("Highlight")
+                        esp.Name = "MijusticeESP"
+                        esp.FillColor = Color3.fromRGB(255, 0, 0)
+                        esp.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        esp.FillTransparency = 0.6
+                        esp.Adornee = char
+                        esp.Parent = char
+                    end
+                    esp.Enabled = true
+                end
+            end
+        end
+    end
+end)
+
+toggleAll(true)
+print("MIJUSTICE MOBILE FIXED LOADED")
