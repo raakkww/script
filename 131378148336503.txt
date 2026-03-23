@@ -1,0 +1,88 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local isWheeliePressed = false
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end 
+    if input.KeyCode == Enum.KeyCode.F then
+        isWheeliePressed = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.F then
+        isWheeliePressed = false
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.0667) do
+        pcall(function()
+            local interface = player.PlayerGui:FindFirstChild("Interface")
+            if not interface then return end
+            
+            local bikeValObj = interface:FindFirstChild("Bike")
+            if not bikeValObj or not bikeValObj.Value then return end
+            
+            local vehicle = bikeValObj.Value
+            local weight = vehicle:FindFirstChild("Body") and vehicle.Body:FindFirstChild("Weight")
+            if not weight then return end
+            
+            local originalGyro = weight:FindFirstChild("wheelie")
+            if originalGyro then
+                originalGyro:Destroy()
+            end
+            
+            local myGyro = weight:FindFirstChild("PC_Wheelie")
+            if not myGyro then
+                myGyro = Instance.new("BodyGyro")
+                myGyro.Name = "PC_Wheelie"
+                myGyro.Parent = weight
+            end
+            
+            local values = interface:FindFirstChild("Values")
+            if not values then return end
+            
+            local throttle = values:FindFirstChild("Throttle") and values.Throttle.Value or 0
+            local brake = values:FindFirstChild("Brake") and values.Brake.Value or 0
+            
+            local wheelieOutput = 0
+            if isWheeliePressed then
+                wheelieOutput = -1 * (throttle - brake)
+            else
+                wheelieOutput = 0
+            end
+            
+            local cfPos = weight.CFrame.Position
+            local cfLookY = weight.CFrame.LookVector.Y
+            local cfLook = weight.CFrame.LookVector
+            
+            if throttle > 0.1 then
+                myGyro.D = 2 * (-math.min(wheelieOutput, 0) * throttle)
+                myGyro.MaxTorque = Vector3.new(130 * (-math.min(wheelieOutput, 0) * throttle), 0, 0)
+                myGyro.P = 5 * (-math.min(wheelieOutput, 0) * throttle)
+                myGyro.CFrame = CFrame.new(cfPos, cfPos + cfLook) * CFrame.Angles(-(math.min(wheelieOutput, 0) * 1.5 / 2) * throttle - cfLookY, 0, 0)
+            
+            elseif brake > 0.1 then
+                myGyro.D = 0.5 * (math.min(-wheelieOutput, 0) * brake)
+                myGyro.MaxTorque = Vector3.new(35 * (math.min(-wheelieOutput, 0) * brake), 0, 0)
+                myGyro.P = 5 * (math.min(-wheelieOutput, 0) * brake)
+                myGyro.CFrame = CFrame.new(cfPos, cfPos + cfLook) * CFrame.Angles(math.min(-wheelieOutput, 0) * 0.5 / 1 * brake - cfLookY, 0, 0)
+                
+            else
+                myGyro.D = 0
+                myGyro.MaxTorque = Vector3.new(0, 0, 0)
+                myGyro.P = 0
+                myGyro.CFrame = CFrame.new(cfPos, cfPos + cfLook) * CFrame.Angles(0, 0, 0)
+            end
+        end)
+    end
+end)
+
+game.StarterGui:SetCore("SendNotification", {
+    Title = "",
+    Text = "",
+    Duration = 5
+}
