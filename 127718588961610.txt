@@ -1,0 +1,153 @@
+--// MODERN TOGGLE GUI - Made By _OpenSource_
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "OpenSourceUI"
+gui.Parent = PlayerGui
+
+-- Main Frame
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 320, 0, 260)
+main.Position = UDim2.new(0.5, -160, 0.5, -130)
+main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+main.BorderSizePixel = 0
+main.Parent = gui
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
+Instance.new("UIStroke", main).Color = Color3.fromRGB(60,60,60)
+
+-- Top Bar
+local top = Instance.new("Frame")
+top.Size = UDim2.new(1,0,0,40)
+top.BackgroundColor3 = Color3.fromRGB(30,30,30)
+top.BorderSizePixel = 0
+top.Parent = main
+Instance.new("UICorner", top).CornerRadius = UDim.new(0,14)
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,1,0)
+title.BackgroundTransparency = 1
+title.Text = ""
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Font = Enum.Font.GothamBold
+title.TextScaled = true
+title.Parent = top
+
+-- Layout
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 12)
+layout.Parent = main
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+top.LayoutOrder = 0
+
+-- Toggle Button Creator
+local function createToggle(name, callback)
+    local toggled = false
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 280, 0, 45)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    btn.Text = name .. " [OFF]"
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextScaled = true
+    btn.BorderSizePixel = 0
+    btn.Parent = main
+
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
+
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = Color3.fromRGB(70,70,70)
+
+    btn.MouseButton1Click:Connect(function()
+        toggled = not toggled
+
+        if toggled then
+            btn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+            btn.Text = name .. " [ON]"
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            btn.Text = name .. " [OFF]"
+        end
+
+        callback(function()
+            return toggled
+        end)
+    end)
+end
+
+-- Train Loop
+createToggle("Train", function(isOn)
+    task.spawn(function()
+        while isOn() do
+            local args = {999e9999}
+            game:GetService("ReplicatedStorage"):WaitForChild("Event"):WaitForChild("Train"):FireServer(unpack(args))
+            task.wait(0.1)
+        end
+    end)
+end)
+
+-- Win Gain Loop
+createToggle("Win Gain", function(isOn)
+    task.spawn(function()
+        while isOn() do
+            local args = {99e9999}
+            game:GetService("ReplicatedStorage"):WaitForChild("Event"):WaitForChild("WinGain"):FireServer(unpack(args))
+            task.wait(0.1)
+        end
+    end)
+end)
+
+-- Health Loop
+createToggle("Health Add", function(isOn)
+    task.spawn(function()
+        while isOn() do
+            local args = {100}
+            game:GetService("ReplicatedStorage"):WaitForChild("Event"):WaitForChild("HealthAdd"):FireServer(unpack(args))
+            task.wait(0.1)
+        end
+    end)
+end)
+
+-- DRAG SYSTEM
+local dragging, dragInput, dragStart, startPos
+
+top.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+top.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
