@@ -1,0 +1,48 @@
+for _, v in pairs(game:GetService("Workspace"):GetDescendants()) do
+    if v:IsA("Highlight") then v:Destroy() end
+end
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+-- CONFIG
+local KILLERS = {"gubby", "gub", "3rd monarch", "baldi", "pcx", "gr33nf4lla", "piggy", "unixity"}
+local LIGHT_BLUE = Color3.fromRGB(173, 216, 230)
+local BRIGHT_RED = Color3.fromRGB(255, 0, 0)
+
+local function applyLightESP(obj)
+    if not obj or obj:FindFirstChild("LowEndESP") then return end
+    
+    local name = obj.Name:lower()
+    local color = Color3.fromRGB(0, 255, 0) -- Default Green
+    
+    if name:find("crate") or name:find("special") then
+        color = LIGHT_BLUE
+    elseif name:find("gub") then
+        color = BRIGHT_RED
+    else
+        for _, k in pairs(KILLERS) do
+            if name:find(k) then color = BRIGHT_RED break end
+        end
+    end
+
+    local h = Instance.new("Highlight")
+    h.Name = "LowEndESP"
+    h.FillColor = color
+    h.OutlineColor = color
+    h.FillTransparency = 0.6 -- Lighter fill = Better FPS
+    h.OutlineTransparency = 0.2
+    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    h.Parent = obj
+end
+
+task.spawn(function()
+    while true do
+        for _, v in pairs(Workspace:GetChildren()) do
+            if v:IsA("Model") or v.Name:lower():find("crate") then applyLightESP(v) end
+        end
+        task.wait(5) -- Give the CPU 5 seconds of peace between scans
+    end
+end)
+
+print("--- HARDWARE-SAVER LOADED | NO LOOPS | NO RAINBOW ---")
