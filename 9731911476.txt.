@@ -1,0 +1,202 @@
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
+local Title = Instance.new("TextLabel")
+local StrengthBtn = Instance.new("TextButton")
+local SaleBtn = Instance.new("TextButton")
+local DelayLabel = Instance.new("TextLabel")
+local DelaySlider = Instance.new("Frame")
+local SliderButton = Instance.new("TextButton")
+local DestroyBtn = Instance.new("TextButton")
+
+ScreenGui.Name = "4Jayyz_Strength_Hub_V3"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.Position = UDim2.new(0.5, -90, 0.5, -135)
+MainFrame.Size = UDim2.new(0, 180, 0, 270)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+UIStroke.Thickness = 2
+UIStroke.Parent = MainFrame
+
+task.spawn(function()
+    while RunService.RenderStepped:Wait() do
+        local hue = tick() % 5 / 5
+        UIStroke.Color = Color3.fromHSV(hue, 1, 1)
+    end
+end)
+
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = ""
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 13
+
+local function StyleBtn(btn, text, pos)
+    btn.Parent = MainFrame
+    btn.Text = text .. ": OFF"
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 10
+    Instance.new("UICorner", btn)
+end
+
+StyleBtn(StrengthBtn, "AUTO STRENGTH", UDim2.new(0.05, 0, 0.15, 0))
+StyleBtn(SaleBtn, "AUTO SALE", UDim2.new(0.05, 0, 0.32, 0))
+
+DelayLabel.Parent = MainFrame
+DelayLabel.Size = UDim2.new(0.9, 0, 0, 20)
+DelayLabel.Position = UDim2.new(0.05, 0, 0.5, 0)
+DelayLabel.Text = "Sale Delay: 7s"
+DelayLabel.TextColor3 = Color3.new(1, 1, 1)
+DelayLabel.BackgroundTransparency = 1
+DelayLabel.Font = Enum.Font.GothamBold
+DelayLabel.TextSize = 10
+
+DelaySlider.Name = "Slider"
+DelaySlider.Parent = MainFrame
+DelaySlider.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+DelaySlider.Position = UDim2.new(0.05, 0, 0.6, 0)
+DelaySlider.Size = UDim2.new(0.9, 0, 0, 10)
+Instance.new("UICorner", DelaySlider)
+
+SliderButton.Name = "SliderBtn"
+SliderButton.Parent = DelaySlider
+SliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+SliderButton.Position = UDim2.new(0.06, 0, -0.5, 0)
+SliderButton.Size = UDim2.new(0, 15, 0, 20)
+SliderButton.Text = ""
+Instance.new("UICorner", SliderButton)
+
+DestroyBtn.Parent = MainFrame
+DestroyBtn.Text = "Destroy UI"
+DestroyBtn.Size = UDim2.new(0.9, 0, 0, 25)
+DestroyBtn.Position = UDim2.new(0.05, 0, 0.85, 0)
+DestroyBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+DestroyBtn.TextColor3 = Color3.new(1, 1, 1)
+DestroyBtn.Font = Enum.Font.GothamBold
+DestroyBtn.TextSize = 10
+Instance.new("UICorner", DestroyBtn)
+
+local strengthActive = false
+local saleActive = false
+local saleDelay = 7
+local dragging = false
+
+--// Slider Logic
+local function UpdateSlider()
+    local mousePos = UserInputService:GetMouseLocation()
+    local sliderPos = DelaySlider.AbsolutePosition
+    local sliderSize = DelaySlider.AbsoluteSize
+    local pos = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
+    SliderButton.Position = UDim2.new(pos, -7, -0.5, 0)
+    saleDelay = math.floor(pos * 99) + 1
+    DelayLabel.Text = "Sale Delay: " .. saleDelay .. "s"
+end
+
+SliderButton.MouseButton1Down:Connect(function() dragging = true end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        UpdateSlider()
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+--// Noclip Logic
+RunService.Stepped:Connect(function()
+    if saleActive and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+--// Strength Logic
+StrengthBtn.MouseButton1Click:Connect(function()
+    strengthActive = not strengthActive
+    StrengthBtn.Text = "STRENGTH: " .. (strengthActive and "ON" or "OFF")
+    StrengthBtn.BackgroundColor3 = strengthActive and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+    
+    if strengthActive then
+        task.spawn(function()
+            local remote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ToolActivation")
+            while strengthActive do
+                local char = LocalPlayer.Character
+                local tool = char and char:FindFirstChildOfClass("Tool")
+                if tool then
+                    pcall(function() remote:FireServer(tool.Name) end)
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+--// Sale & Auto Return Logic
+SaleBtn.MouseButton1Click:Connect(function()
+    saleActive = not saleActive
+    SaleBtn.Text = "SALE: " .. (saleActive and "ON" or "OFF")
+    SaleBtn.BackgroundColor3 = saleActive and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+    
+    if saleActive then
+        task.spawn(function()
+            local remote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("SellSize")
+            while saleActive do
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                
+                if hrp then
+                    -- 1. Last position save karo
+                    local lastPos = hrp.CFrame
+                    
+                    -- 2. Sale Area par teleport karo
+                    hrp.CFrame = CFrame.new(-110.0, -4.0, 2085.0)
+                    
+                    -- 3. Sale remote fire karo
+                    pcall(function() remote:FireServer() end)
+                    
+                    -- 4. 1 second wait karke wapas wahi bhejo jahan player pehle tha
+                    task.wait(1)
+                    if saleActive and hrp then
+                        hrp.CFrame = lastPos
+                    end
+                end
+                
+                -- Slider delay ke hisaab se wait karo (minus the 1 sec wait above)
+                task.wait(math.max(0.1, saleDelay - 1))
+            end
+        end)
+    end
+end)
+
+DestroyBtn.MouseButton1Click:Connect(function()
+    strengthActive = false
+    saleActive = false
+    ScreenGui:Destroy()
+end)
