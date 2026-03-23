@@ -1,0 +1,279 @@
+-- [[ SERVICES ]]
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
+local TweenService = game:GetService("TweenService")
+
+-- [[ CONFIGURATION ]]
+local player = Players.LocalPlayer
+local MUSIC_ID = "rbxassetid://112319970021423" 
+local EXECUTE_SOUND = "rbxassetid://17702493687"
+local ROAR_SOUND_ID = "rbxassetid://105211055606999" 
+local CLASS_OOF = "rbxassetid://139019913635357"
+local ATTACK_ANIM_ID = "rbxassetid://218504594"
+
+local KILL_DISTANCE = 8
+local BOOST_SPEED = 45 
+local DEFAULT_SPEED = 16
+local BOOST_DURATION = 10 
+local COOLDOWN_TIME = 10
+
+-- MUSIC DISTANCE SETTINGS
+local MAX_MUSIC_VOLUME = 5
+local DETECTION_RADIUS = 100 
+local FULL_VOLUME_RADIUS = 30 
+local FADE_SPEED = 0.05 -- Speed of volume transition (Smoothness)
+
+local IsOnCooldown = false
+local IsRoaring = false
+local Debounce = false
+
+-- [[ 1. HORROR ATMOSPHERE ]]
+local function applyHorrorAtmosphere()
+    for _, v in pairs(Lighting:GetChildren()) do
+        if v:IsA("Sky") or v:IsA("ColorCorrectionEffect") then v:Destroy() end
+    end
+    local s = Instance.new("Sky")  
+    s.Name = "VoidSky"  
+    local asset = "http://www.roblox.com/asset/?id=161748585"  
+    s.SkyboxBk = asset; s.SkyboxDn = asset; s.SkyboxFt = asset  
+    s.SkyboxLf = asset; s.SkyboxRt = asset; s.SkyboxUp = asset  
+    s.Parent = Lighting  
+    Lighting.TimeOfDay = "00:00:00"    
+    Lighting.Ambient = Color3.fromRGB(255, 0, 0)    
+    Lighting.OutdoorAmbient = Color3.fromRGB(150, 0, 0)    
+    Lighting.FogColor = Color3.fromRGB(255, 0, 0)    
+    Lighting.FogStart = 0; Lighting.FogEnd = 100; Lighting.Brightness = 1    
+    local cc = Instance.new("ColorCorrectionEffect", Lighting)    
+    cc.TintColor = Color3.fromRGB(255, 50, 50); cc.Saturation = -0.3; cc.Contrast = 0.5    
+    task.spawn(function()    
+        while true do Lighting.Brightness = 1; task.wait(0.1); Lighting.Brightness = 3; task.wait(0.1) end    
+    end)
+end
+
+-- [[ 2. CORE STABILITY ]]
+local function enableSelfStability()
+    local lastGroundPos = nil
+    RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if hum then  
+                hum.MaxHealth = 1e7; hum.Health = 1e7; hum.JumpPower = 60 
+                hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)  
+            end  
+            if root then  
+                if root.Velocity.Magnitude > 70 then root.Velocity = Vector3.new(0, 0, 0) end  
+                if root.Position.Y < -100 and lastGroundPos then 
+                    root.CFrame = lastGroundPos + Vector3.new(0, 5, 0) 
+                elseif hum and hum.FloorMaterial ~= Enum.Material.Air then
+                    lastGroundPos = root.CFrame
+                end  
+            end  
+        end  
+    end)
+end
+
+-- [[ 3. PROCEDURAL GLITCH ANIMATION ]]
+local function setupGlitchAnimation(char)
+    local hum = char:WaitForChild("Humanoid")
+    local torso = char:WaitForChild("Torso")
+    local neck = torso:WaitForChild("Neck")
+    local rootJoint = char:WaitForChild("HumanoidRootPart"):WaitForChild("RootJoint")
+    local rS, lS = torso:WaitForChild("Right Shoulder"), torso:WaitForChild("Left Shoulder")
+    
+    local nC0, rjC0 = neck.C0, rootJoint.C0
+    local rsC0, lsC0 = rS.C0, lS.C0
+    
+    RunService.RenderStepped:Connect(function()  
+        if not char.Parent or not hum or hum.Health <= 0 or IsRoaring then return end  
+        local t = tick()
+        
+        if hum.FloorMaterial == Enum.Material.Air then
+            local midAirShake = math.sin(t * 25) * 0.05
+            rootJoint.C0 = rootJoint.C0:Lerp(rjC0 * CFrame.new(0, 0, midAirShake) * CFrame.Angles(math.rad(-50), 0, math.rad(math.random(-10,10))), 0.2)
+            neck.C0 = neck.C0:Lerp(nC0 * CFrame.Angles(math.rad(60), 0, 0), 0.2)
+            rS.C0 = rS.C0:Lerp(rsC0 * CFrame.Angles(0, 0, math.rad(110 + math.random(-20,20))), 0.2)
+            lS.C0 = lS.C0:Lerp(lsC0 * CFrame.Angles(0, 0, math.rad(-110 - math.random(-20,20))), 0.2)
+            return 
+        end
+
+        local moveSpeed = hum.MoveDirection.Magnitude  
+        if moveSpeed > 0.1 then  
+            local sway = math.sin(t * 12) * 0.1  
+            rootJoint.C0 = rootJoint.C0:Lerp(rjC0 * CFrame.new(0, sway, 0) * CFrame.Angles(math.rad(30), 0, 0), 0.2)  
+            neck.C0 = neck.C0:Lerp(nC0 * CFrame.Angles(math.rad(-20), sway, 0), 0.2)  
+            rS.C0 = rS.C0:Lerp(rsC0, 0.2); lS.C0 = lS.C0:Lerp(lsC0, 0.2)
+        else  
+            local shake = math.sin(t * 12) * 0.015; local swayX = math.sin(t * 1.8) * 0.07   
+            rootJoint.C0 = rootJoint.C0:Lerp(rjC0 * CFrame.new(swayX, shake, 0) * CFrame.Angles(math.rad(8), swayX, shake), 0.1)  
+            neck.C0 = neck.C0:Lerp(nC0 * CFrame.Angles(math.rad(-12), 0, 0), 0.1)  
+            rS.C0 = rS.C0:Lerp(rsC0, 0.1); lS.C0 = lS.C0:Lerp(lsC0, 0.1)
+        end  
+    end)
+end
+
+-- [[ 4. KILL ENGINE ]]
+local function executeUltimateKill(targetModel)
+    if Debounce then return end
+    Debounce = true
+    local hum = targetModel:FindFirstChildOfClass("Humanoid")
+    local tRoot = targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChild("Torso")
+    if not hum or hum.Health <= 0 then Debounce = false; return end
+    
+    local myHum = player.Character:FindFirstChild("Humanoid")  
+    if myHum then  
+        local anim = Instance.new("Animation"); anim.AnimationId = ATTACK_ANIM_ID  
+        local track = myHum:LoadAnimation(anim); track:Play(); track:AdjustSpeed(2.5)  
+    end  
+    
+    local s = Instance.new("Sound", workspace); s.SoundId = EXECUTE_SOUND; s.Volume = 10; s:Play()    
+    local o = Instance.new("Sound", workspace); o.SoundId = CLASS_OOF; o.Volume = 8; o:Play()    
+    Debris:AddItem(s, 3); Debris:AddItem(o, 2)
+    hum.Health = 0; targetModel:BreakJoints()   
+    
+    for _, obj in pairs(targetModel:GetChildren()) do    
+        if obj:IsA("BasePart") then    
+            obj.CanCollide = true    
+            if obj.Name:find("Leg") or obj.Name:find("Foot") then    
+                obj.Transparency = 1; obj.CanCollide = false    
+                local bv = Instance.new("BodyVelocity", obj); bv.Velocity = Vector3.new(0, -150, 0); bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)    
+                Debris:AddItem(bv, 1)    
+            elseif obj.Name == "Head" then obj.Velocity = (obj.CFrame.LookVector * 20) + Vector3.new(0, 15, 0)    
+            else local dir = (obj.Position - (tRoot and tRoot.Position or obj.Position)).Unit; obj.Velocity = (dir * 60) + Vector3.new(0, 40, 0) end    
+        end    
+    end
+    task.wait(1.5); Debounce = false
+end
+
+-- [[ 5. VISUAL MAINTENANCE ]]
+local function applyVisuals(char)
+    local root = char:WaitForChild("HumanoidRootPart")
+    local function ensureVisuals()  
+        if not root:FindFirstChild("CursedText") then  
+            local textGui = Instance.new("BillboardGui", root); textGui.Name = "CursedText"; textGui.Size = UDim2.new(10, 0, 3, 0); textGui.AlwaysOnTop = true  
+            local label = Instance.new("TextLabel", textGui); label.BackgroundTransparency = 1; label.Size = UDim2.new(1, 0, 1, 0); label.Text = "פרחים"  
+            label.TextColor3 = Color3.fromRGB(255, 0, 0); label.TextScaled = true; label.Font = Enum.Font.Antique  
+            RunService.RenderStepped:Connect(function() if label.Parent then label.Position = UDim2.new(math.random(-25, 25)/100, 0, math.random(-25, 25)/100, 0); textGui.StudsOffset = Vector3.new(0, 7 + (math.random(-10, 10)/20), 0) end end)  
+        end  
+        if not char:FindFirstChild("RedBorder") then Instance.new("Highlight", char).Name = "RedBorder"; char.RedBorder.FillTransparency = 1; char.RedBorder.OutlineColor = Color3.new(1, 0, 0) end  
+    end  
+    RunService.RenderStepped:Connect(function()  
+        if not char.Parent then return end; ensureVisuals()
+        for _, v in pairs(char:GetChildren()) do  
+            if v:IsA("Clothing") or v:IsA("Accessory") or v:IsA("BodyColors") or v:IsA("ShirtGraphic") then v:Destroy()  
+            elseif v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then  
+                v.Color = Color3.new(0, 0, 0); v.Material = Enum.Material.Plastic  
+                if not v:FindFirstChild("S") then Instance.new("BoolValue", v).Name = "S"; v.Size = Vector3.new(v.Size.X, v.Size.Y * 2, v.Size.Z) end  
+            end  
+        end  
+    end)  
+    setupGlitchAnimation(char)
+end
+
+-- [[ 6. WHISTLE GUI ]]
+local function createWhistleGUI()
+    local sg = Instance.new("ScreenGui", player:WaitForChild("PlayerGui")); sg.Name = "WhistleGui"; sg.ResetOnSpawn = false
+    local flash = Instance.new("Frame", sg); flash.Size = UDim2.new(1, 0, 1, 0); flash.BackgroundColor3 = Color3.new(1, 0, 0); flash.BackgroundTransparency = 1; flash.ZIndex = 10
+    local btn = Instance.new("TextButton", sg); btn.Name = "whistle"; btn.Size = UDim2.new(0, 200, 0, 60); btn.Position = UDim2.new(0.5, -100, 0.8, 0)
+    btn.BackgroundColor3 = Color3.new(0, 0, 0); btn.Text = "whistle"; btn.TextColor3 = Color3.new(1, 0, 0); btn.Font = Enum.Font.Antique; btn.TextScaled = true; btn.BorderSizePixel = 0; Instance.new("UICorner", btn)
+
+    btn.MouseButton1Click:Connect(function()
+        local char = player.Character; local hum = char and char:FindFirstChildOfClass("Humanoid"); local torso = char and char:FindFirstChild("Torso")
+        if not hum or not torso or IsOnCooldown then return end
+        IsOnCooldown = true; IsRoaring = true
+        local neck = torso:FindFirstChild("Neck"); local rootJoint = char.HumanoidRootPart:FindFirstChild("RootJoint")
+        local rS, lS = torso:FindFirstChild("Right Shoulder"), torso:FindFirstChild("Left Shoulder")
+        local nC0, rjC0, rsC0, lsC0 = neck.C0, rootJoint.C0, rS.C0, lS.C0
+
+        hum.WalkSpeed = BOOST_SPEED
+        task.delay(BOOST_DURATION, function() if hum then hum.WalkSpeed = DEFAULT_SPEED end end)
+
+        local roarSound = Instance.new("Sound", char.Head); roarSound.SoundId = ROAR_SOUND_ID; roarSound.Volume = 15; roarSound.PlaybackSpeed = 0.2; roarSound:Play(); Debris:AddItem(roarSound, 5)
+        flash.BackgroundTransparency = 0.5; TweenService:Create(flash, TweenInfo.new(3), {BackgroundTransparency = 1}):Play()
+        
+        local start = tick()
+        local jitterConnection; jitterConnection = RunService.RenderStepped:Connect(function()
+            local elapsed = tick() - start
+            if elapsed < 3 then
+                local intensity = 1.2
+                local offX = math.random(-100, 100)/100 * intensity
+                local offY = math.random(-100, 100)/100 * intensity
+                neck.C0 = nC0 * CFrame.new(offX, offY, 0) * CFrame.Angles(math.rad(75 + math.random(-30, 30)), 0, 0)
+                rootJoint.C0 = rjC0 * CFrame.new(offX, offY, offX) * CFrame.Angles(math.rad(-30), 0, math.rad(math.random(-20, 20)))
+                rS.C0 = rsC0 * CFrame.Angles(0, 0, math.rad(130 + math.random(-40, 40)))
+                lS.C0 = lsC0 * CFrame.Angles(0, 0, math.rad(-130 + math.random(-40, 40)))
+                hum.CameraOffset = Vector3.new(offX, offY, offX)
+            else
+                jitterConnection:Disconnect(); IsRoaring = false; hum.CameraOffset = Vector3.new(0, 0, 0)
+                TweenService:Create(neck, TweenInfo.new(1), {C0 = nC0}):Play()
+                TweenService:Create(rootJoint, TweenInfo.new(1), {C0 = rjC0}):Play()
+                TweenService:Create(rS, TweenInfo.new(1), {C0 = rsC0}):Play()
+                TweenService:Create(lS, TweenInfo.new(1), {C0 = lsC0}):Play()
+            end
+        end)
+        task.spawn(function()
+            for i = COOLDOWN_TIME, 1, -1 do btn.Text = "Cooldown: "..i.."s"; btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50); task.wait(1) end
+            btn.Text = "whistle"; btn.BackgroundColor3 = Color3.new(0, 0, 0); IsOnCooldown = false
+        end)
+    end)
+end
+
+-- [[ 7. INITIALIZATION & DYNAMIC MUSIC FADE-OUT ]]
+applyHorrorAtmosphere(); enableSelfStability(); createWhistleGUI()
+
+local music = Instance.new("Sound", workspace)
+music.SoundId = MUSIC_ID
+music.Volume = 0
+music.PlaybackSpeed = 0.15 
+music.Looped = true
+music:Play()
+
+-- DYNAMIC MUSIC LOGIC WITH FADE-OUT
+RunService.Heartbeat:Connect(function()
+    local myChar = player.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return end
+    
+    local shortestDistance = DETECTION_RADIUS
+    local foundTarget = false
+    local targetVolume = 0 -- Default to zero (Fade out)
+    
+    -- Search for the nearest ALIVE player
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("Humanoid") and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            -- CHECK IF PLAYER IS ALIVE
+            if otherPlayer.Character.Humanoid.Health > 0 then
+                local dist = (myChar.HumanoidRootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if dist < shortestDistance then
+                    shortestDistance = dist
+                    foundTarget = true
+                end
+            end
+        end
+    end
+    
+    if foundTarget then
+        -- Calculate target volume based on distance
+        local factor = 1 - ((shortestDistance - FULL_VOLUME_RADIUS) / (DETECTION_RADIUS - FULL_VOLUME_RADIUS))
+        targetVolume = math.clamp(factor * MAX_MUSIC_VOLUME, 0, MAX_MUSIC_VOLUME)
+    end
+
+    -- Smooth Volume Transition (Fade In / Fade Out)
+    music.Volume = music.Volume + (targetVolume - music.Volume) * FADE_SPEED
+
+    -- KILL LOGIC
+    if not Debounce then
+        for _, obj in pairs(workspace:GetChildren()) do    
+            if obj:IsA("Model") and obj ~= myChar then    
+                local hum = obj:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 and (obj:FindFirstChild("HumanoidRootPart") and (obj.HumanoidRootPart.Position - myChar.HumanoidRootPart.Position).Magnitude < KILL_DISTANCE) then 
+                    executeUltimateKill(obj) 
+                end    
+            end    
+        end
+    end
+end)
+
+player.CharacterAdded:Connect(applyVisuals); if player.Character then applyVisuals(player.Character) end
