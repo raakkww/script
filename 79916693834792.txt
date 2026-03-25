@@ -1,0 +1,162 @@
+local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local Players = game:GetService("Players")
+local Remotes = ReplicatedStorage:WaitForChild("JJKRemotes", 9e9)
+
+-- ANTI-AFK
+local LP = Players.LocalPlayer
+if LP then
+    LP.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end
+
+if CoreGui:FindFirstChild("JJKI_Autofarm") then
+    CoreGui:FindFirstChild("JJKI_Autofarm"):Destroy()
+end
+
+local SelectedBoss = "Satoru Gojo"
+local Config = { Farm = false, Grade = false, Prestige = false }
+local BossList = {
+    "Yuta Okkotsu", "Ryu Ishigori", "Mahoraga", "Kenjaku",
+    "Toji Fushiguro", "Ryomen Sukuna", "Satoru Gojo", "Kinji Hakari",
+    "Hajime Kashimo", "Takako Uro", "Curse Naoya", "Hiromi Higuruma"
+}
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "JJKI_Autofarm"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 220, 0, 300) 
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.Active = true
+MainFrame.Draggable = true 
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Text = "JJKI Auto Farm"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.BackgroundTransparency = 1
+Title.Parent = MainFrame
+
+local DropdownBtn = Instance.new("TextButton")
+DropdownBtn.Size = UDim2.new(0, 190, 0, 30)
+DropdownBtn.Position = UDim2.new(0.5, -95, 0, 40)
+DropdownBtn.Text = "Boss: " .. SelectedBoss
+DropdownBtn.TextSize = 12
+DropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+DropdownBtn.TextColor3 = Color3.new(1, 1, 1)
+DropdownBtn.ZIndex = 5
+DropdownBtn.Parent = MainFrame
+Instance.new("UICorner", DropdownBtn)
+
+local DropdownFrame = Instance.new("ScrollingFrame")
+DropdownFrame.Size = UDim2.new(0, 190, 0, 150)
+DropdownFrame.Position = UDim2.new(0.5, -95, 0, 75)
+DropdownFrame.Visible = false
+DropdownFrame.CanvasSize = UDim2.new(0, 0, 0, #BossList * 32)
+DropdownFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+DropdownFrame.BorderSizePixel = 0
+DropdownFrame.ZIndex = 10
+DropdownFrame.Parent = MainFrame
+Instance.new("UICorner", DropdownFrame)
+
+local UIList = Instance.new("UIListLayout", DropdownFrame)
+
+for i, name in pairs(BossList) do
+    local B = Instance.new("TextButton")
+    B.Size = UDim2.new(1, 0, 0, 30)
+    B.Text = name
+    B.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    B.TextColor3 = Color3.new(1, 1, 1)
+    B.TextSize = 12
+    B.ZIndex = 11
+    B.Parent = DropdownFrame
+    
+    B.MouseButton1Click:Connect(function()
+        SelectedBoss = name
+        DropdownBtn.Text = "Boss: " .. name
+        DropdownFrame.Visible = false
+    end)
+end
+
+DropdownBtn.MouseButton1Click:Connect(function()
+    DropdownFrame.Visible = not DropdownFrame.Visible
+end)
+
+local function CreateToggle(name, prop, pos)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0, 190, 0, 35)
+    Btn.Position = UDim2.new(0.5, -95, 0, pos)
+    Btn.Text = name .. ": OFF"
+    Btn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+    Btn.TextColor3 = Color3.new(1, 1, 1)
+    Btn.Font = Enum.Font.GothamBold
+    Btn.TextSize = 14
+    Btn.ZIndex = 2
+    Btn.Parent = MainFrame
+    Instance.new("UICorner", Btn)
+
+    Btn.MouseButton1Click:Connect(function()
+        Config[prop] = not Config[prop]
+        Btn.Text = name .. (Config[prop] and ": ON" or ": OFF")
+        Btn.BackgroundColor3 = Config[prop] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+    end)
+end
+
+CreateToggle("Auto Farm", "Farm", 85)
+CreateToggle("Auto Grade", "Grade", 130)
+CreateToggle("Auto Prestige", "Prestige", 175)
+
+local Credit = Instance.new("TextLabel")
+Credit.Size = UDim2.new(0, 190, 0, 20)
+Credit.Position = UDim2.new(0.5, -95, 0, 220)
+Credit.Text = ""
+Credit.TextColor3 = Color3.fromRGB(150, 150, 150)
+Credit.TextTransparency = 0.5
+Credit.TextSize = 10
+Credit.BackgroundTransparency = 1
+Credit.ZIndex = 2
+Credit.Parent = MainFrame
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 190, 0, 30)
+CloseBtn.Position = UDim2.new(0.5, -95, 0, 255)
+CloseBtn.Text = "Unload Script"
+CloseBtn.TextSize = 10
+CloseBtn.BackgroundColor3 = Color3.fromRGB(70, 30, 30)
+CloseBtn.TextColor3 = Color3.new(1, 1, 1)
+CloseBtn.ZIndex = 2
+CloseBtn.Parent = MainFrame
+Instance.new("UICorner", CloseBtn)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    Config.Farm = false
+    Config.Grade = false
+    Config.Prestige = false
+    ScreenGui:Destroy()
+end)
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        if Config.Farm then
+            pcall(function() Remotes:WaitForChild("ResolveCombat", 9e9):InvokeServer("Raid Boss", SelectedBoss) end)
+        end
+        if Config.Grade then
+            pcall(function() Remotes:WaitForChild("GradeUp", 9e9):FireServer() end)
+        end
+        if Config.Prestige then
+            pcall(function() Remotes:WaitForChild("Prestige", 9e9):FireServer() end)
+        end
+        task.wait(0.7)
+    end
+end)
