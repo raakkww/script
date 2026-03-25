@@ -1,0 +1,151 @@
+-- [[ +1 HEALTH PER CLICK | STANDALONE VIP SCRIPT]] --
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+local autoRebirth = false
+local autoWins = false
+
+-- 1. СҮЙРЕУ ФУНКЦИЯСЫ
+local function MakeDraggable(uiFrame)
+    local dragging, dragInput, dragStart, startPos
+    uiFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = uiFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    uiFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            uiFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- 2. МИНИ ДИЗАЙН ЖАСАУ
+local MainGui = Instance.new("ScreenGui", CoreGui)
+MainGui.Name = "AlinurMiniScript"
+
+local Frame = Instance.new("Frame", MainGui)
+Frame.Size = UDim2.new(0, 220, 0, 190) -- 3 батырма сыюы үшін терезені сәл ұзарттық
+Frame.Position = UDim2.new(0.5, -110, 0.5, -95)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", Frame).Color = Color3.fromRGB(255, 0, 100)
+Instance.new("UIStroke", Frame).Thickness = 2
+MakeDraggable(Frame)
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = "+1 Health Per Click"
+Title.Font = Enum.Font.GothamBold
+Title.TextColor3 = Color3.fromRGB(255, 0, 100)
+Title.TextSize = 14
+
+local CloseBtn = Instance.new("TextButton", Frame)
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.TextSize = 14
+CloseBtn.MouseButton1Click:Connect(function() MainGui:Destroy() end)
+
+-- ТЕЛЕПОРТ БАТЫРМАСЫ
+local TpBtn = Instance.new("TextButton", Frame)
+TpBtn.Size = UDim2.new(0.9, 0, 0, 35)
+TpBtn.Position = UDim2.new(0.05, 0, 0.2, 0)
+TpBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+TpBtn.Text = "TELEPORT TO WIN"
+TpBtn.Font = Enum.Font.GothamBold
+TpBtn.TextColor3 = Color3.new(1, 1, 1)
+TpBtn.TextSize = 13
+Instance.new("UICorner", TpBtn).CornerRadius = UDim.new(0, 6)
+
+-- АВТО КУБОК (WINS) БАТЫРМАСЫ
+local AutoWinBtn = Instance.new("TextButton", Frame)
+AutoWinBtn.Size = UDim2.new(0.9, 0, 0, 35)
+AutoWinBtn.Position = UDim2.new(0.05, 0, 0.45, 0)
+AutoWinBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+AutoWinBtn.Text = "Auto Wins: OFF"
+AutoWinBtn.Font = Enum.Font.GothamBold
+AutoWinBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+AutoWinBtn.TextSize = 13
+Instance.new("UICorner", AutoWinBtn).CornerRadius = UDim.new(0, 6)
+
+-- АВТО ПЕРЕРОЖДЕНИЕ БАТЫРМАСЫ
+local RebirthBtn = Instance.new("TextButton", Frame)
+RebirthBtn.Size = UDim2.new(0.9, 0, 0, 35)
+RebirthBtn.Position = UDim2.new(0.05, 0, 0.7, 0)
+RebirthBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+RebirthBtn.Text = "Auto Rebirth: OFF"
+RebirthBtn.Font = Enum.Font.GothamBold
+RebirthBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+RebirthBtn.TextSize = 13
+Instance.new("UICorner", RebirthBtn).CornerRadius = UDim.new(0, 6)
+
+-- 3. ТЕЛЕПОРТ ЖАСАУ ФУНКЦИЯСЫ
+TpBtn.MouseButton1Click:Connect(function()
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(3477.099, 7.563, 23.813)
+    end
+end)
+
+-- 4. АВТО КУБОК (WINS) БАСҚАРУ ЖӘНЕ ЦИКЛ
+AutoWinBtn.MouseButton1Click:Connect(function()
+    autoWins = not autoWins
+    if autoWins then
+        AutoWinBtn.Text = "Auto Wins: ON"
+        AutoWinBtn.TextColor3 = Color3.fromRGB(50, 255, 50) -- Жасыл
+    else
+        AutoWinBtn.Text = "Auto Wins: OFF"
+        AutoWinBtn.TextColor3 = Color3.fromRGB(255, 50, 50) -- Қызыл
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.1) do -- Өте жылдам (0.1 секунд сайын) телепорт жасайды
+        if autoWins then
+            pcall(function()
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    player.Character.HumanoidRootPart.CFrame = CFrame.new(3477.099, 7.563, 23.813)
+                end
+            end)
+        end
+    end
+end)
+
+-- 5. АВТО ПЕРЕРОЖДЕНИЕ БАСҚАРУ ЖӘНЕ ЦИКЛ
+RebirthBtn.MouseButton1Click:Connect(function()
+    autoRebirth = not autoRebirth
+    if autoRebirth then
+        RebirthBtn.Text = "Auto Rebirth: ON"
+        RebirthBtn.TextColor3 = Color3.fromRGB(50, 255, 50)
+    else
+        RebirthBtn.Text = "Auto Rebirth: OFF"
+        RebirthBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if autoRebirth then
+            pcall(function()
+                local rebirthRemote = ReplicatedStorage:FindFirstChild("RebirthRemote")
+                if rebirthRemote then
+                    rebirthRemote:FireServer()
+                end
+            end)
+        end
+    end
+end)
