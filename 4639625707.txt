@@ -1,0 +1,337 @@
+--// SERVICES
+local player = game.Players.LocalPlayer
+local runService = game:GetService("RunService")
+local lighting = game:GetService("Lighting")
+local workspace = game:GetService("Workspace")
+local tweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+
+--// GUI
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.ResetOnSpawn = false
+
+--// SETTINGS
+local currentSpeed = 16
+local currentJump = 50
+
+local flying, fullBright, noclip, aimbotEnabled, freecam = false, false, false, false, false
+local bodyVelocity, savedCF
+
+local aimFOV = 100
+local aimSpeed = 0.2
+
+--// UTILS
+local function getChar() return player.Character or player.CharacterAdded:Wait() end
+local function getHRP() return getChar():WaitForChild("HumanoidRootPart") end
+local function getHumanoid() return getChar():WaitForChild("Humanoid") end
+
+--// DRAG HANDLE
+local function makeDragHandle(handle, frame)
+    local dragging, dragStart, startPos = false
+
+    handle.Active = true
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+end
+
+--// SMALL DRAG (speed label)
+local function makeDraggable(frame)
+    local dragging, dragStart, startPos = false
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
+        end
+    end)
+    UIS.InputEnded:Connect(function() dragging = false end)
+end
+
+--// TOGGLE COLORS
+local function setToggleColor(btn, state)
+    btn.BackgroundColor3 = state and Color3.fromRGB(0,150,0) or Color3.fromRGB(150,0,0)
+end
+
+--// FEATURES
+local function toggleFullBright(btn)
+    fullBright = not fullBright
+    lighting.Brightness = fullBright and 2 or 1
+    setToggleColor(btn, fullBright)
+end
+
+local function toggleFly(btn)
+    flying = not flying
+    if flying then
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+        bodyVelocity.Parent = getHRP()
+    else
+        if bodyVelocity then bodyVelocity:Destroy() end
+    end
+    setToggleColor(btn, flying)
+end
+
+runService.RenderStepped:Connect(function()
+    if flying and bodyVelocity then
+        bodyVelocity.Velocity = workspace.CurrentCamera.CFrame.LookVector * currentSpeed
+    end
+end)
+
+local function setSpeed(s) currentSpeed = s getHumanoid().WalkSpeed = s end
+local function setJump(j) currentJump = j getHumanoid().JumpPower = j end
+
+local function toggleNoclip(btn)
+    noclip = not noclip
+    setToggleColor(btn, noclip)
+    if not noclip and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = true end
+        end
+    end
+end
+
+runService.Stepped:Connect(function()
+    if noclip and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+end)
+
+player.CharacterAdded:Connect(function(char)
+    for _, v in pairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then v.CanCollide = true end
+    end
+end)
+
+--// ESP
+local espFolder = Instance.new("Folder", gui)
+
+runService.RenderStepped:Connect(function()
+    espFolder:ClearAllChildren()
+    for _, plr in pairs(game.Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("Head") then
+            local char = plr.Character
+            local color = plr.Team and plr.Team.TeamColor.Color or Color3.fromRGB(0,255,0)
+
+            local highlight = Instance.new("Highlight", espFolder)
+            highlight.Adornee = char
+            highlight.FillTransparency = 1
+            highlight.OutlineColor = color
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+            local bb = Instance.new("BillboardGui", espFolder)
+            bb.Size = UDim2.new(0,160,0,60)
+            bb.Adornee = char.Head
+            bb.AlwaysOnTop = true
+
+            local txt = Instance.new("TextLabel", bb)
+            txt.Size = UDim2.new(1,0,1,0)
+            txt.BackgroundTransparency = 1
+            txt.TextColor3 = color
+            txt.Font = Enum.Font.Code
+            txt.TextScaled = true
+
+            local dist = (char.HumanoidRootPart.Position - getHRP().Position).Magnitude
+            local hp = char:FindFirstChild("Humanoid") and char.Humanoid.Health or 0
+
+            txt.Text = plr.Name.."\nHP: "..math.floor(hp).."\nDist: "..math.floor(dist)
+        end
+    end
+end)
+
+--// AIMBOT
+local function toggleAimbot(btn)
+    aimbotEnabled = not aimbotEnabled
+    setToggleColor(btn, aimbotEnabled)
+end
+
+local function getTarget()
+    local cam = workspace.CurrentCamera
+    local closest, shortest = nil, aimFOV
+    for _, plr in pairs(game.Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("Head") then
+            local dir = (plr.Character.Head.Position - cam.CFrame.Position).Unit
+            local angle = math.deg(math.acos(cam.CFrame.LookVector:Dot(dir)))
+            if angle < shortest then shortest, closest = angle, plr end
+        end
+    end
+    return closest
+end
+
+runService.RenderStepped:Connect(function()
+    if aimbotEnabled then
+        local t = getTarget()
+        if t and t.Character then
+            workspace.CurrentCamera.CFrame =
+                workspace.CurrentCamera.CFrame:Lerp(
+                    CFrame.new(workspace.CurrentCamera.CFrame.Position, t.Character.Head.Position),
+                    aimSpeed
+                )
+        end
+    end
+end)
+
+--// FREECAM
+local function toggleFreecam(btn)
+    freecam = not freecam
+    setToggleColor(btn, freecam)
+
+    local cam = workspace.CurrentCamera
+    local hum = getHumanoid()
+    local hrp = getHRP()
+
+    if freecam then
+        savedCF = hrp.CFrame
+        hrp.Anchored = true
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+        cam.CameraSubject = nil
+    else
+        hrp.Anchored = false
+        hum.WalkSpeed = currentSpeed
+        hum.JumpPower = currentJump
+        cam.CameraSubject = hum
+        if savedCF then hrp.CFrame = savedCF end
+    end
+end
+
+--// SPEED COUNTER
+local speedLabel = Instance.new("TextLabel", gui)
+speedLabel.Size = UDim2.new(0,120,0,30)
+speedLabel.Position = UDim2.new(0,10,0,260)
+speedLabel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+speedLabel.TextColor3 = Color3.fromRGB(0,255,0)
+speedLabel.Font = Enum.Font.Code
+speedLabel.TextScaled = true
+makeDraggable(speedLabel)
+
+local lastPos, lastTime = getHRP().Position, tick()
+
+runService.RenderStepped:Connect(function()
+    local now = tick()
+    local dist = (getHRP().Position - lastPos).Magnitude
+    speedLabel.Text = "Speed: "..math.floor(dist/(now-lastTime))
+    lastPos, lastTime = getHRP().Position, now
+end)
+
+--// UI FRAME
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,180,0,300)
+frame.Position = UDim2.new(0.5,-90,1,0)
+frame.BackgroundColor3 = Color3.fromRGB(10,10,10)
+frame.BorderColor3 = Color3.fromRGB(0,255,0)
+frame.Visible = false
+
+-- TOP BAR
+local topBar = Instance.new("Frame", frame)
+topBar.Size = UDim2.new(1,0,0,25)
+topBar.BackgroundColor3 = Color3.fromRGB(20,20,20)
+
+-- SIDE DRAG
+local leftDrag = Instance.new("Frame", frame)
+leftDrag.Size = UDim2.new(0,10,1,0)
+leftDrag.BackgroundTransparency = 1
+
+local rightDrag = Instance.new("Frame", frame)
+rightDrag.Size = UDim2.new(0,10,1,0)
+rightDrag.Position = UDim2.new(1,-10,0,0)
+rightDrag.BackgroundTransparency = 1
+
+makeDragHandle(topBar, frame)
+makeDragHandle(leftDrag, frame)
+makeDragHandle(rightDrag, frame)
+
+-- PLAYER COUNT
+local playerCount = Instance.new("TextLabel", frame)
+playerCount.Size = UDim2.new(1,0,0,20)
+playerCount.Position = UDim2.new(0,0,1,-20)
+playerCount.BackgroundColor3 = Color3.fromRGB(10,10,10)
+playerCount.TextColor3 = Color3.fromRGB(0,255,0)
+playerCount.Font = Enum.Font.Code
+playerCount.TextScaled = true
+
+runService.RenderStepped:Connect(function()
+    playerCount.Text = "Players: "..#game.Players:GetPlayers()
+end)
+
+-- SCROLL
+local scroll = Instance.new("ScrollingFrame", frame)
+scroll.Size = UDim2.new(1,0,1,-45)
+scroll.Position = UDim2.new(0,0,0,25)
+scroll.CanvasSize = UDim2.new(0,0,0,500)
+scroll.Active = true
+
+-- BUTTONS
+local function makeBtn(text, order, func, toggle)
+    local b = Instance.new("TextButton", scroll)
+    b.Size = UDim2.new(1,-10,0,25)
+    b.Position = UDim2.new(0,5,0,order*30)
+    b.Text = text
+    b.TextColor3 = Color3.fromRGB(0,255,0)
+    b.BackgroundColor3 = toggle and Color3.fromRGB(150,0,0) or Color3.fromRGB(0,0,0)
+    b.MouseButton1Click:Connect(function() func(b) end)
+end
+
+makeBtn("Fly",0,toggleFly,true)
+makeBtn("FullBright",1,toggleFullBright,true)
+makeBtn("Speed +",2,function() setSpeed(currentSpeed+5) end,false)
+makeBtn("Speed -",3,function() setSpeed(currentSpeed-5) end,false)
+makeBtn("Jump +",4,function() setJump(currentJump+10) end,false)
+makeBtn("Jump -",5,function() setJump(currentJump-10) end,false)
+makeBtn("NoClip",6,toggleNoclip,true)
+makeBtn("Aimbot",7,toggleAimbot,true)
+makeBtn("Fake Lag (Enable While Moving)",8,toggleFreecam,true)
+
+-- OPEN BUTTON
+local uiOpen = false
+local openBtn = Instance.new("TextButton", gui)
+openBtn.Size = UDim2.new(0,80,0,30)
+openBtn.Position = UDim2.new(0,10,0,10)
+openBtn.Text = "OPEN"
+openBtn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+openBtn.TextColor3 = Color3.fromRGB(0,255,0)
+
+openBtn.MouseButton1Click:Connect(function()
+    uiOpen = not uiOpen
+    if uiOpen then
+        frame.Visible = true
+        tweenService:Create(frame,TweenInfo.new(0.3),{Position=UDim2.new(0.5,-90,0.5,-150)}):Play()
+    else
+        local t = tweenService:Create(frame,TweenInfo.new(0.3),{Position=UDim2.new(0.5,-90,1,0)})
+        t:Play()
+        t.Completed:Connect(function() frame.Visible = false end)
+    end
+end)
+
+print("FINAL STABLE BUILD 😴🔥")
