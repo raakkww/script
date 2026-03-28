@@ -1,0 +1,308 @@
+--// Services
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+--// Remove old GUI
+if CoreGui:FindFirstChild("ModernHub") then
+    CoreGui.ModernHub:Destroy()
+end
+
+--// GUI
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "ModernHub"
+
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 280, 0, 420)
+Main.Position = UDim2.new(0.5, -140, 0.5, -210)
+Main.BackgroundColor3 = Color3.fromRGB(15,15,15)
+Main.BorderSizePixel = 0
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0,14)
+
+local Gradient = Instance.new("UIGradient", Main)
+Gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(25,25,25)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10,10,10))
+}
+
+-- Title
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1,0,0,30)
+Title.BackgroundTransparency = 1
+Title.Text = ""
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 20
+
+-- Subtitle
+local Subtitle = Instance.new("TextLabel", Main)
+Subtitle.Size = UDim2.new(1,0,0,20)
+Subtitle.Position = UDim2.new(0,0,0.07,0)
+Subtitle.BackgroundTransparency = 1
+Subtitle.Text = ""
+Subtitle.TextColor3 = Color3.fromRGB(180,180,180)
+Subtitle.Font = Enum.Font.Gotham
+Subtitle.TextSize = 12
+
+-- Collapse Button
+local CollapseBtn = Instance.new("TextButton", Main)
+CollapseBtn.Size = UDim2.new(0,30,0,30)
+CollapseBtn.Position = UDim2.new(1,-35,0,5)
+CollapseBtn.Text = "-"
+CollapseBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+CollapseBtn.TextColor3 = Color3.new(1,1,1)
+CollapseBtn.Font = Enum.Font.GothamBold
+CollapseBtn.TextSize = 18
+Instance.new("UICorner", CollapseBtn)
+
+-- Button Creator
+local function createButton(text, y)
+    local btn = Instance.new("TextButton", Main)
+    btn.Size = UDim2.new(0.85,0,0,40)
+    btn.Position = UDim2.new(0.075,0,y,0)
+    btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 14
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
+    return btn
+end
+
+local AutoPowerBtn = createButton("Auto Power: OFF", 0.15)
+local AutoKillBtn  = createButton("Auto Kill NPCs: OFF", 0.28)
+local InfHPBtn     = createButton("Inf HP: OFF", 0.41)
+local RebirthBtn   = createButton("Auto Rebirth: OFF", 0.54)
+local AutoBuyBtn   = createButton("Auto Buy Gun: OFF", 0.67)
+local InfWinsBtn   = createButton("Inf Wins: OFF", 0.80)
+
+-- Dragging
+local dragging, dragInput, dragStart, startPos
+
+Main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Main.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Collapse Logic
+local Collapsed = false
+local OriginalSize = Main.Size
+
+CollapseBtn.MouseButton1Click:Connect(function()
+    Collapsed = not Collapsed
+
+    if Collapsed then
+        Main.Size = UDim2.new(0, 280, 0, 40)
+        CollapseBtn.Text = "+"
+
+        for _, v in pairs(Main:GetChildren()) do
+            if v:IsA("TextButton") and v ~= CollapseBtn then
+                v.Visible = false
+            end
+            if v:IsA("TextLabel") and v ~= Title then
+                v.Visible = false
+            end
+        end
+    else
+        Main.Size = OriginalSize
+        CollapseBtn.Text = "-"
+
+        for _, v in pairs(Main:GetChildren()) do
+            if v:IsA("TextButton") or v:IsA("TextLabel") then
+                v.Visible = true
+            end
+        end
+    end
+end)
+
+--// STATES
+local AutoPower, AutoKill, InfHP, AutoRebirth, AutoBuy, InfWins = false, false, false, false, false, false
+
+-- AUTO POWER
+AutoPowerBtn.MouseButton1Click:Connect(function()
+    AutoPower = not AutoPower
+    AutoPowerBtn.Text = "Auto Power: " .. (AutoPower and "ON" or "OFF")
+
+    if AutoPower then
+        task.spawn(function()
+            local remote = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("PowerClickFarmEvent")
+            while AutoPower do
+                for i = 1, 5 do
+                    task.spawn(function()
+                        remote:FireServer()
+                    end)
+                end
+                task.wait(0.05)
+            end
+        end)
+    end
+end)
+
+-- AUTO KILL
+AutoKillBtn.MouseButton1Click:Connect(function()
+    AutoKill = not AutoKill
+    AutoKillBtn.Text = "Auto Kill NPCs: " .. (AutoKill and "ON" or "OFF")
+
+    if AutoKill then
+        task.spawn(function()
+            local remote = ReplicatedStorage:WaitForChild("Packages")
+                :WaitForChild("_Index")
+                :WaitForChild("sleitnick_knit@1.7.0")
+                :WaitForChild("knit")
+                :WaitForChild("Services")
+                :WaitForChild("FightService")
+                :WaitForChild("RF")
+                :WaitForChild("KillEnemy")
+
+            while AutoKill do
+                remote:InvokeServer(true)
+                remote:InvokeServer(true)
+                task.wait(0.08)
+            end
+        end)
+    end
+end)
+
+-- INF HP
+InfHPBtn.MouseButton1Click:Connect(function()
+    InfHP = not InfHP
+    InfHPBtn.Text = "Inf HP: " .. (InfHP and "ON" or "OFF")
+
+    if InfHP then
+        task.spawn(function()
+            local remote = ReplicatedStorage:WaitForChild("Packages")
+                :WaitForChild("_Index")
+                :WaitForChild("sleitnick_knit@1.7.0")
+                :WaitForChild("knit")
+                :WaitForChild("Services")
+                :WaitForChild("PlayerHealthStateService")
+                :WaitForChild("RF")
+                :WaitForChild("ReduceHealth")
+
+            while InfHP do
+                remote:InvokeServer(-99e9999)
+                task.wait(0.25)
+            end
+        end)
+    end
+end)
+
+-- AUTO REBIRTH (FAST)
+RebirthBtn.MouseButton1Click:Connect(function()
+    AutoRebirth = not AutoRebirth
+    RebirthBtn.Text = "Auto Rebirth: " .. (AutoRebirth and "ON" or "OFF")
+
+    if AutoRebirth then
+        task.spawn(function()
+            local remote = ReplicatedStorage:WaitForChild("Packages")
+                :WaitForChild("_Index")
+                :WaitForChild("sleitnick_knit@1.7.0")
+                :WaitForChild("knit")
+                :WaitForChild("Services")
+                :WaitForChild("RebirthService")
+                :WaitForChild("RF")
+                :WaitForChild("Rebirth")
+
+            while AutoRebirth do
+                for i = 1, 3 do
+                    task.spawn(function()
+                        remote:InvokeServer(LocalPlayer)
+                    end)
+                end
+                task.wait(0.3)
+            end
+        end)
+    end
+end)
+
+-- AUTO BUY GUN
+AutoBuyBtn.MouseButton1Click:Connect(function()
+    AutoBuy = not AutoBuy
+    AutoBuyBtn.Text = "Auto Buy Gun: " .. (AutoBuy and "ON" or "OFF")
+
+    if AutoBuy then
+        task.spawn(function()
+            local remote = ReplicatedStorage:WaitForChild("Packages")
+                :WaitForChild("_Index")
+                :WaitForChild("sleitnick_knit@1.7.0")
+                :WaitForChild("knit")
+                :WaitForChild("Services")
+                :WaitForChild("SnipersService")
+                :WaitForChild("RF")
+                :WaitForChild("Buy")
+
+            for i = 1, 99 do
+                if not AutoBuy then break end
+                local bought = false
+
+                while not bought and AutoBuy do
+                    local success = pcall(function()
+                        remote:InvokeServer(i)
+                    end)
+
+                    if success then
+                        bought = true
+                    else
+                        task.wait(0.3)
+                    end
+                end
+
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+-- INF WINS
+InfWinsBtn.MouseButton1Click:Connect(function()
+    InfWins = not InfWins
+    InfWinsBtn.Text = "Inf Wins: " .. (InfWins and "ON" or "OFF")
+
+    if InfWins then
+        task.spawn(function()
+            local remote = ReplicatedStorage:WaitForChild("Packages")
+                :WaitForChild("_Index")
+                :WaitForChild("sleitnick_knit@1.7.0")
+                :WaitForChild("knit")
+                :WaitForChild("Services")
+                :WaitForChild("EggsService")
+                :WaitForChild("RF")
+                :WaitForChild("Hatch")
+
+            while InfWins do
+                remote:InvokeServer(-89e999, "CoconutEgg", {}, false)
+                task.wait(0.3)
+            end
+        end)
+    end
+end)
