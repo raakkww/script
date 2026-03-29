@@ -1,0 +1,100 @@
+local RS = game:GetService("ReplicatedStorage")
+local EquipSvc = RS.Packages.Knit.Services.EquipmentService
+local Players = game:GetService("Players")
+
+-- Items to dismantle
+local targetItems = {
+    "ShadowSteelGreaves",
+    "ShadowSteelChestplate",
+    "Your item"
+}
+
+local function isTarget(itemType)
+    for _, t in ipairs(targetItems) do
+        if itemType == t then return true end
+    end
+    return false
+end
+
+-- GUI
+local CoreGui = game:GetService("CoreGui")
+if CoreGui:FindFirstChild("AutoDismantle") then CoreGui.AutoDismantle:Destroy() end
+
+local gui = Instance.new("ScreenGui", CoreGui)
+gui.Name = "AutoDismantle"
+gui.ResetOnSpawn = false
+
+local btn = Instance.new("TextButton", gui)
+btn.Size = UDim2.new(0, 180, 0, 45)
+btn.Position = UDim2.new(0.5, -90, 0, 10)
+btn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 16
+btn.Text = "Auto Dismantle: OFF"
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+local statusLabel = Instance.new("TextLabel", gui)
+statusLabel.Size = UDim2.new(0, 180, 0, 25)
+statusLabel.Position = UDim2.new(0.5, -90, 0, 58)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 13
+statusLabel.Text = "Waiting..."
+
+local claimLabel = Instance.new("TextLabel", gui)
+claimLabel.Size = UDim2.new(0, 180, 0, 25)
+claimLabel.Position = UDim2.new(0.5, -90, 0, 83)
+claimLabel.BackgroundTransparency = 1
+claimLabel.TextColor3 = Color3.fromRGB(0, 200, 150)
+claimLabel.Font = Enum.Font.Gotham
+claimLabel.TextSize = 13
+claimLabel.Text = "Claim: Waiting..."
+
+-- Logic
+local enabled = false
+
+btn.MouseButton1Click:Connect(function()
+    enabled = not enabled
+    btn.Text = "Auto Dismantle: " .. (enabled and "ON" or "OFF")
+    btn.BackgroundColor3 = enabled and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(180, 50, 50)
+    if not enabled then statusLabel.Text = "Waiting..." claimLabel.Text = "Claim: Waiting..." end
+end)
+
+-- Dismantle loop (every 5 seconds)
+task.spawn(function()
+    while true do
+        task.wait(5)
+        if not enabled then continue end
+
+        local data = EquipSvc.RF.GetEquipmentData:InvokeServer()
+        local items = data.Items
+        local count = 0
+
+        for itemId, itemData in pairs(items) do
+            if type(itemData) ~= "table" then continue end
+            if not itemData.Type then continue end
+            if itemData.Equipped == true or itemData.Locked == true then continue end
+            if not isTarget(itemData.Type) then continue end
+
+            local result = EquipSvc.RF.Dismantle:InvokeServer({[itemId] = itemData})
+            if result then count += 1 end
+            task.wait(0.5)
+        end
+
+        statusLabel.Text = "Dismantled " .. count .. " | " .. os.date("%H:%M:%S")
+    end
+end)
+
+-- Claim loop (every 5 minutes)
+task.spawn(function()
+    while true do
+        task.wait(300)
+        if not enabled then continue end
+
+        local result = EquipSvc.RF.ClaimPendingDismantleRewards:InvokeServer()
+        claimLabel.Text = "Claimed: " .. os.date("%H:%M:%S")
+        print("Claim result: " .. tostring(result))
+    end
+end)
