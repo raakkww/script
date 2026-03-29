@@ -1,0 +1,365 @@
+local uiName  = ""
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local RS      = game:GetService("RunService")
+local UIS     = game:GetService("UserInputService")
+local lp      = Players.LocalPlayer
+
+-- Cleanup function to remove the script traces
+local function destroyScript()
+    if CoreGui:FindFirstChild(uiName) then CoreGui[uiName]:Destroy() end
+    -- Standard cleaning for Drawing objects would require tracking them, 
+    -- but for this logic, we will ensure the GUI and its connections stop.
+    scriptEnabled = false
+end
+
+if CoreGui:FindFirstChild(uiName) then CoreGui[uiName]:Destroy() end
+
+local camera = workspace.CurrentCamera
+local char   = lp.Character or lp.CharacterAdded:Wait()
+local hrp    = char:WaitForChild("HumanoidRootPart")
+
+lp.CharacterAdded:Connect(function(c)
+    char = c
+    hrp  = c:WaitForChild("HumanoidRootPart")
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- CONFIG
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local cfg = {
+    ProjectileSpeed  = 500, -- Defaulted but slider removed
+    PredictionValue  = 1.0,
+    FovRadius        = 250,
+    GuidanceEnabled  = true,
+    ESPEnabled       = true,
+}
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- VELOCITY TRACKER
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local velCache = {}
+
+local function getVel(part)
+    local now = tick()
+    local c   = velCache[part]
+    local pos = part.Position
+    if c then
+        local dt = now - c.t
+        if dt > 0 then
+            local raw = (pos - c.p) / dt
+            local v   = c.v:Lerp(raw, 0.3)
+            velCache[part] = {p=pos, v=v, t=now}
+            return v
+        end
+        return c.v
+    end
+    velCache[part] = {p=pos, v=Vector3.new(), t=now}
+    return Vector3.new()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- PREDICTION SOLVER
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local function getLead(targetPart)
+    local origin = camera.CFrame.Position
+    local tPos   = targetPart.Position
+    local vel    = getVel(targetPart)
+
+    if vel.Magnitude < 5 then
+        vel = targetPart.CFrame.LookVector * vel.Magnitude
+    end
+
+    local tt = (tPos - origin).Magnitude / cfg.ProjectileSpeed
+    for _ = 1, 4 do
+        local pred = tPos + vel * tt * cfg.PredictionValue
+        tt = (pred - origin).Magnitude / cfg.ProjectileSpeed
+    end
+
+    local leadWorld = tPos + vel * tt * cfg.PredictionValue
+    local sp, vis = camera:WorldToViewportPoint(leadWorld)
+    local leadScreen = Vector2.new(sp.X, sp.Y)
+
+    return leadWorld, leadScreen, vis
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- TARGET FINDER
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local function findClosestTarget()
+    local best, bestDist = nil, cfg.FovRadius
+    local cx = camera.ViewportSize.X / 2
+    local cy = camera.ViewportSize.Y / 2
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= lp and p.Character then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local sp, vis = camera:WorldToViewportPoint(root.Position)
+                if vis then
+                    local d = math.sqrt((sp.X-cx)^2 + (sp.Y-cy)^2)
+                    if d < bestDist then best = root; bestDist = d end
+                end
+            end
+        end
+    end
+    return best
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- MOUSE MOVER
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local function moveMouse(screenPos)
+    if mousemoveabs then
+        mousemoveabs(screenPos.X, screenPos.Y)
+    elseif mousemoverel then
+        local cur = UIS:GetMouseLocation()
+        local dx  = screenPos.X - cur.X
+        local dy  = screenPos.Y - cur.Y
+        dx = math.clamp(dx, -800, 800)
+        dy = math.clamp(dy, -800, 800)
+        mousemoverel(dx, dy)
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- DRAWING HELPER
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local function newD(kind, props)
+    local d = Drawing.new(kind)
+    for k,v in pairs(props) do d[k]=v end
+    return d
+end
+
+local fovCircle = newD("Circle", {Visible=true, Thickness=1.5, Color=Color3.fromRGB(0,255,0), Filled=false, Transparency=0.7})
+local leadDot = newD("Circle", {Visible=false, Thickness=2, Color=Color3.fromRGB(255,80,0), Filled=false, Transparency=1, Radius=10})
+local leadDotInner = newD("Circle", {Visible=false, Thickness=1, Color=Color3.fromRGB(255,200,0), Filled=true, Transparency=1, Radius=3})
+local leadLine = newD("Line", {Visible=false, Thickness=1, Color=Color3.fromRGB(255,80,0), Transparency=0.5})
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- ESP
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local espObjs = {}
+
+local function makeESP(player)
+    espObjs[player] = {
+        outerCircle = newD("Circle", {Visible=false, Thickness=2, Color=Color3.fromRGB(0,255,0), Filled=false, Radius=28}),
+        innerCircle = newD("Circle", {Visible=false, Thickness=1.5, Color=Color3.fromRGB(255,220,0), Filled=false, Radius=18}),
+        nameLabel   = newD("Text",   {Visible=false, Size=13, Color=Color3.fromRGB(255,255,255), Outline=true, OutlineColor=Color3.new(0,0,0), Font=Drawing.Fonts.Monospace, Center=false}),
+        distLabel   = newD("Text",   {Visible=false, Size=12, Color=Color3.fromRGB(255,60,60), Outline=true, OutlineColor=Color3.new(0,0,0), Font=Drawing.Fonts.Monospace, Center=false}),
+        predDot     = newD("Circle", {Visible=false, Thickness=1, Color=Color3.fromRGB(0,220,255), Filled=true, Radius=5}),
+        predLine    = newD("Line",   {Visible=false, Thickness=1, Color=Color3.fromRGB(0,220,255), Transparency=0.5}),
+    }
+end
+
+local function removeESP(player)
+    local e = espObjs[player]
+    if not e then return end
+    for _,d in pairs(e) do pcall(function() d:Remove() end) end
+    espObjs[player] = nil
+end
+
+local function hideESP(e)
+    for _,d in pairs(e) do d.Visible=false end
+end
+
+for _,p in pairs(Players:GetPlayers()) do if p~=lp then makeESP(p) end end
+Players.PlayerAdded:Connect(function(p) if p~=lp then makeESP(p) end end)
+Players.PlayerRemoving:Connect(removeESP)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- GUI
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local sg = Instance.new("ScreenGui", CoreGui)
+sg.Name = uiName; sg.ResetOnSpawn = false
+
+local main = Instance.new("Frame", sg)
+main.Size             = UDim2.new(0, 240, 0, 380) -- Adjusted height
+main.Position         = UDim2.new(0.02, 0, 0.3, 0)
+main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+main.BorderSizePixel  = 0; main.Active = true
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 7)
+
+local accentBar = Instance.new("Frame", main)
+accentBar.Size=UDim2.new(1,0,0,3); accentBar.BackgroundColor3=Color3.fromRGB(0,255,80); accentBar.BorderSizePixel=0
+
+local titleL = Instance.new("TextLabel", main)
+titleL.Size=UDim2.new(1,0,0,30); titleL.Position=UDim2.new(0,0,0,5)
+titleL.Text="Made by tradelinkv1"
+titleL.TextColor3=Color3.fromRGB(0,255,80)
+titleL.BackgroundTransparency=1; titleL.Font=Enum.Font.Code; titleL.TextSize=13
+titleL.TextXAlignment=Enum.TextXAlignment.Center
+
+local statusL = Instance.new("TextLabel", main)
+statusL.Size=UDim2.new(1,0,0,18); statusL.Position=UDim2.new(0,0,0,33)
+statusL.Text="RIGHT CLICK TO LOCK TARGET"
+statusL.TextColor3=Color3.fromRGB(80,80,80)
+statusL.BackgroundTransparency=1; statusL.Font=Enum.Font.Code; statusL.TextSize=10
+statusL.TextXAlignment=Enum.TextXAlignment.Center
+
+local div=Instance.new("Frame",main)
+div.Size=UDim2.new(0.9,0,0,1); div.Position=UDim2.new(0.05,0,0,53)
+div.BackgroundColor3=Color3.fromRGB(25,25,25); div.BorderSizePixel=0
+
+-- Drag Logic
+local dA,dS,fS
+main.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dA=true;dS=i.Position;fS=main.Position end end)
+main.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dA=false end end)
+UIS.InputChanged:Connect(function(i) if dA and i.UserInputType==Enum.UserInputType.MouseMovement then local d=i.Position-dS; main.Position=UDim2.new(fS.X.Scale,fS.X.Offset+d.X,fS.Y.Scale,fS.Y.Offset+d.Y) end end)
+
+local function makeToggle(label, yOff, init, onChange)
+    local row=Instance.new("Frame",main)
+    row.Size=UDim2.new(0.9,0,0,34); row.Position=UDim2.new(0.05,0,0,yOff)
+    row.BackgroundColor3=Color3.fromRGB(12,12,12); row.BorderSizePixel=0
+    Instance.new("UICorner",row).CornerRadius=UDim.new(0,5)
+    local lbl=Instance.new("TextLabel",row)
+    lbl.Size=UDim2.new(0.65,0,1,0); lbl.Position=UDim2.new(0.04,0,0,0)
+    lbl.Text=label; lbl.TextColor3=Color3.fromRGB(200,200,200); lbl.BackgroundTransparency=1; lbl.Font=Enum.Font.Code; lbl.TextSize=12; lbl.TextXAlignment=Enum.TextXAlignment.Left
+    local pill=Instance.new("TextButton",row)
+    pill.Size=UDim2.new(0,44,0,22); pill.Position=UDim2.new(1,-52,0.5,-11); pill.Text=""; pill.BorderSizePixel=0
+    Instance.new("UICorner",pill).CornerRadius=UDim.new(1,0)
+    local knob=Instance.new("Frame",pill); knob.Size=UDim2.new(0,18,0,18); knob.BackgroundColor3=Color3.new(1,1,1); knob.BorderSizePixel=0
+    Instance.new("UICorner",knob).CornerRadius=UDim.new(1,0)
+    local st=init
+    local function ref() pill.BackgroundColor3=st and Color3.fromRGB(0,200,80) or Color3.fromRGB(50,50,50); knob.Position=st and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9) end
+    ref()
+    pill.MouseButton1Click:Connect(function() st=not st; ref(); onChange(st) end)
+end
+
+local function makeSlider(label, yOff, minV, maxV, initV, step, onChange)
+    local row=Instance.new("Frame",main)
+    row.Size=UDim2.new(0.9,0,0,44); row.Position=UDim2.new(0.05,0,0,yOff)
+    row.BackgroundColor3=Color3.fromRGB(12,12,12); row.BorderSizePixel=0
+    Instance.new("UICorner",row).CornerRadius=UDim.new(0,5)
+    local lbl=Instance.new("TextLabel",row)
+    lbl.Size=UDim2.new(1,-8,0,18); lbl.Position=UDim2.new(0,8,0,2); lbl.BackgroundTransparency=1; lbl.Font=Enum.Font.Code; lbl.TextSize=11; lbl.TextColor3=Color3.fromRGB(160,160,160); lbl.TextXAlignment=Enum.TextXAlignment.Left
+    lbl.Text=label..": "..string.format("%.1f",initV)
+    local track=Instance.new("Frame",row); track.Size=UDim2.new(1,-16,0,6); track.Position=UDim2.new(0,8,0,28); track.BackgroundColor3=Color3.fromRGB(35,35,35); track.BorderSizePixel=0
+    Instance.new("UICorner",track).CornerRadius=UDim.new(1,0)
+    local fill=Instance.new("Frame",track); fill.Size=UDim2.new((initV-minV)/(maxV-minV),0,1,0); fill.BackgroundColor3=Color3.fromRGB(0,255,80); fill.BorderSizePixel=0
+    Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
+    local sliding=false
+    local function upd(ax)
+        local rel=math.clamp((ax-track.AbsolutePosition.X)/track.AbsoluteSize.X,0,1)
+        local val=math.round((minV+rel*(maxV-minV))/step)*step
+        fill.Size=UDim2.new((val-minV)/(maxV-minV),0,1,0); lbl.Text=label..": "..string.format("%.1f",val); onChange(val)
+    end
+    track.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then sliding=true;upd(i.Position.X) end end)
+    UIS.InputChanged:Connect(function(i) if sliding and i.UserInputType==Enum.UserInputType.MouseMovement then upd(i.Position.X) end end)
+    UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then sliding=false end end)
+end
+
+makeToggle("AUTO GUIDANCE",  62,  cfg.GuidanceEnabled, function(v) cfg.GuidanceEnabled=v end)
+makeToggle("ESP",            104, cfg.ESPEnabled,      function(v) cfg.ESPEnabled=v; if not v then for _,e in pairs(espObjs) do hideESP(e) end end end)
+makeSlider("PREDICTION",     150, 0,    5,    cfg.PredictionValue, 0.1,  function(v) cfg.PredictionValue=v end)
+makeSlider("FOV RADIUS",     200, 50,   600,  cfg.FovRadius,       10,   function(v) cfg.FovRadius=v end)
+
+-- Discord Button
+local discBtn = Instance.new("TextButton", main)
+discBtn.Size = UDim2.new(0.9, 0, 0, 34)
+discBtn.Position = UDim2.new(0.05, 0, 0, 260)
+discBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+discBtn.Text = "JOIN DISCORD"
+discBtn.Font = Enum.Font.Code
+discBtn.TextColor3 = Color3.new(1,1,1)
+discBtn.TextSize = 13
+Instance.new("UICorner", discBtn).CornerRadius = UDim.new(0, 5)
+
+discBtn.MouseButton1Click:Connect(function()
+    if setclipboard then
+        setclipboard("")
+        statusL.Text = "DISCORD LINK COPIED"
+        statusL.TextColor3 = Color3.fromRGB(88, 101, 242)
+    end
+end)
+
+-- Destroy Button
+local destBtn = Instance.new("TextButton", main)
+destBtn.Size = UDim2.new(0.9, 0, 0, 34)
+destBtn.Position = UDim2.new(0.05, 0, 0, 305)
+destBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+destBtn.Text = "DESTROY SCRIPT"
+destBtn.Font = Enum.Font.Code
+destBtn.TextColor3 = Color3.new(1,1,1)
+destBtn.TextSize = 13
+Instance.new("UICorner", destBtn).CornerRadius = UDim.new(0, 5)
+
+destBtn.MouseButton1Click:Connect(function()
+    destroyScript()
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- LOGIC & LOOP
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local lockTarget = nil
+
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType ~= Enum.UserInputType.MouseButton2 then return end
+    if lockTarget then
+        lockTarget = nil
+        statusL.Text = "UNLOCKED"; statusL.TextColor3 = Color3.fromRGB(80,80,80)
+        leadDot.Visible = false; leadDotInner.Visible = false; leadLine.Visible = false
+    else
+        local found = findClosestTarget()
+        if found then
+            lockTarget = found
+            local owner = Players:GetPlayerFromCharacter(found.Parent)
+            statusL.Text = "🔒 " .. (owner and owner.Name or "???") .. " [RMB to unlock]"
+            statusL.TextColor3 = Color3.fromRGB(0,255,80)
+        else
+            statusL.Text = "NO TARGET IN FOV"; statusL.TextColor3 = Color3.fromRGB(255,80,80)
+        end
+    end
+end)
+
+RS.RenderStepped:Connect(function()
+    -- Stop the loop if the script is destroyed
+    if not sg.Parent then return end
+
+    local cx, cy = camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2
+    fovCircle.Position = Vector2.new(cx, cy); fovCircle.Radius = cfg.FovRadius
+
+    if lockTarget and not lockTarget.Parent then lockTarget = nil end
+
+    if cfg.GuidanceEnabled and lockTarget then
+        local leadW, leadS, vis = getLead(lockTarget)
+        if vis then
+            moveMouse(leadS)
+            leadDot.Position = leadS; leadDot.Visible = true
+            leadDotInner.Position = leadS; leadDotInner.Visible = true
+            leadLine.From = Vector2.new(cx, cy); leadLine.To = leadS; leadLine.Visible = (leadS - Vector2.new(cx,cy)).Magnitude > 15
+        else
+            moveMouse(Vector2.new(cx, cy))
+            leadDot.Visible=false; leadDotInner.Visible=false; leadLine.Visible=false
+        end
+    else
+        leadDot.Visible=false; leadDotInner.Visible=false; leadLine.Visible=false
+    end
+
+    -- ESP Rendering
+    for _,p in pairs(Players:GetPlayers()) do
+        if p==lp then continue end
+        local e=espObjs[p]
+        if not e then continue end
+        if not cfg.ESPEnabled or not p.Character or not p.Character:FindFirstChild("HumanoidRootPart") then hideESP(e); continue end
+        
+        local root = p.Character.HumanoidRootPart
+        local sp, vis = camera:WorldToViewportPoint(root.Position)
+        if not vis then hideESP(e); continue end
+
+        local sv = Vector2.new(sp.X, sp.Y)
+        local studs = math.floor((hrp.Position - root.Position).Magnitude + 0.5)
+        local r = math.clamp(1200 / math.max(sp.Z, 1), 14, 50)
+        local isLocked = (lockTarget == root)
+
+        e.outerCircle.Color = isLocked and Color3.fromRGB(255,80,0) or Color3.fromRGB(0,255,0)
+        e.outerCircle.Position = sv; e.outerCircle.Radius=r+6; e.outerCircle.Visible=true
+        e.innerCircle.Position = sv; e.innerCircle.Radius=r-2; e.innerCircle.Visible=true
+        e.nameLabel.Position = Vector2.new(sv.X-r-2, sv.Y-r-16); e.nameLabel.Text = (isLocked and "[LOCKED] " or "") .. p.Name; e.nameLabel.Visible = true
+        e.distLabel.Position = Vector2.new(sv.X-r-2, sv.Y+r+2); e.distLabel.Text = string.format("%.1f", studs/1000) .. " km"; e.distLabel.Visible=true
+        
+        local _, leadS = getLead(root)
+        e.predDot.Position = leadS; e.predDot.Visible=true
+        e.predLine.From = sv; e.predLine.To=leadS; e.predLine.Visible = (leadS-sv).Magnitude > 8
+    end
+end)
