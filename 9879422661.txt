@@ -1,0 +1,500 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+    Name = "Simple Random Tool GUI",
+    Icon = 0,
+    LoadingTitle = "Simple Random Tool GUI",
+    LoadingSubtitle = "",
+    Theme = "Default",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = false,
+        FolderName = nil,
+        FileName = "SimpleRandomToolGUI"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "",
+        RememberJoins = true
+    },
+    KeySystem = false
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local AutoGambleEnabled = false
+local FlyEnabled = false
+local FlySpeed = 50
+local SpeedEnabled = false
+local SpeedValue = 16
+local JumpPowerEnabled = false
+local JumpPowerValue = 50
+local NoclipEnabled = false
+local SpecEnabled = false
+local SpecTarget = nil
+local SelectedPlayer = nil
+local SelectedLocation = nil
+local SelectedSpecPlayer = nil
+
+local MainTab = Window:CreateTab("Main", 4483362458)
+local MovementTab = Window:CreateTab("Movement", 4483345998)
+local TeleportTab = Window:CreateTab("Teleport", 4483345998)
+
+MainTab:CreateToggle({
+    Name = "Auto-Gamble",
+    CurrentValue = false,
+    Flag = "AutoGamble",
+    Callback = function(Value)
+        AutoGambleEnabled = Value
+        if Value then
+            task.spawn(function()
+                while AutoGambleEnabled do
+                    pcall(function()
+                        local character = LocalPlayer.Character
+                        if character then
+                            local hrp = character:FindFirstChild("HumanoidRootPart")
+                            local humanoid = character:FindFirstChild("Humanoid")
+                            if hrp then
+                                local savedCFrame = hrp.CFrame
+                                local isSitting = false
+                                if humanoid then
+                                    isSitting = humanoid.Sit
+                                end
+                                if isSitting then
+                                    hrp.CFrame = CFrame.new(-2135.1, 3.0, -297.4)
+                                else
+                                    hrp.CFrame = CFrame.new(-2135.1, 4.0, -297.4)
+                                end
+                                task.wait(0.1)
+                                if AutoGambleEnabled then
+                                    hrp.CFrame = savedCFrame
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(1.25)
+                end
+            end)
+        end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Flag = "Fly",
+    Callback = function(Value)
+        FlyEnabled = Value
+        pcall(function()
+            local character = LocalPlayer.Character
+            if not character then return end
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+            if Value then
+                local bp = Instance.new("BodyPosition")
+                bp.Name = "FlyBodyPosition"
+                bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bp.Position = hrp.Position
+                bp.Parent = hrp
+                local bg = Instance.new("BodyGyro")
+                bg.Name = "FlyBodyGyro"
+                bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bg.CFrame = hrp.CFrame
+                bg.Parent = hrp
+            else
+                local bp = hrp:FindFirstChild("FlyBodyPosition")
+                local bg = hrp:FindFirstChild("FlyBodyGyro")
+                if bp then bp:Destroy() end
+                if bg then bg:Destroy() end
+            end
+        end)
+    end
+})
+
+MovementTab:CreateInput({
+    Name = "Fly Speed",
+    CurrentValue = "50",
+    PlaceholderText = "Enter fly speed",
+    RemoveTextAfterFocusLost = false,
+    Flag = "FlySpeedInput",
+    Callback = function(Text)
+        local num = tonumber(Text)
+        if num then
+            FlySpeed = num
+        end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "Speed",
+    CurrentValue = false,
+    Flag = "Speed",
+    Callback = function(Value)
+        SpeedEnabled = Value
+    end
+})
+
+MovementTab:CreateInput({
+    Name = "Speed Value",
+    CurrentValue = "16",
+    PlaceholderText = "Enter speed value",
+    RemoveTextAfterFocusLost = false,
+    Flag = "SpeedValueInput",
+    Callback = function(Text)
+        local num = tonumber(Text)
+        if num then
+            SpeedValue = num
+        end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "JumpPower",
+    CurrentValue = false,
+    Flag = "JumpPower",
+    Callback = function(Value)
+        JumpPowerEnabled = Value
+        if not Value then
+            pcall(function()
+                local character = LocalPlayer.Character
+                if character then
+                    local humanoid = character:FindFirstChild("Humanoid")
+                    if humanoid then
+                        humanoid.JumpPower = 50
+                    end
+                end
+            end)
+        end
+    end
+})
+
+MovementTab:CreateInput({
+    Name = "JumpPower Value",
+    CurrentValue = "50",
+    PlaceholderText = "Enter jump power",
+    RemoveTextAfterFocusLost = false,
+    Flag = "JumpPowerInput",
+    Callback = function(Text)
+        local num = tonumber(Text)
+        if num then
+            JumpPowerValue = num
+        end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(Value)
+        NoclipEnabled = Value
+    end
+})
+
+local function GetPlayerList()
+    local list = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(list, p.Name)
+        end
+    end
+    if #list == 0 then
+        table.insert(list, "Nobody")
+    end
+    return list
+end
+
+local function GetLocationList()
+    local list = {}
+    pcall(function()
+        local main = workspace:FindFirstChild("Main")
+        if main then
+            local islands = main:FindFirstChild("Islands")
+            if islands then
+                for _, child in pairs(islands:GetChildren()) do
+                    table.insert(list, "Islands/" .. child.Name)
+                end
+            end
+        end
+        local house = workspace:FindFirstChild("House")
+        if house then
+            table.insert(list, "House")
+            for _, child in pairs(house:GetChildren()) do
+                if child:IsA("Model") then
+                    table.insert(list, "House/" .. child.Name)
+                end
+            end
+        end
+    end)
+    if #list == 0 then
+        table.insert(list, "Nobody")
+    end
+    return list
+end
+
+local function TeleportTo(cf)
+    local character = LocalPlayer.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    hrp.CFrame = cf
+end
+
+local PlayerDropdown = TeleportTab:CreateDropdown({
+    Name = "Select Player",
+    Options = GetPlayerList(),
+    CurrentOption = {},
+    MultipleOptions = false,
+    Flag = "SelectPlayer",
+    Callback = function(Value)
+        if type(Value) == "table" then
+            SelectedPlayer = Value[1]
+        else
+            SelectedPlayer = Value
+        end
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Teleport Player",
+    Callback = function()
+        if not SelectedPlayer or SelectedPlayer == "Nobody" then return end
+        pcall(function()
+            local target = Players:FindFirstChild(SelectedPlayer)
+            if target and target.Character then
+                local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
+                if tHRP then
+                    TeleportTo(tHRP.CFrame * CFrame.new(0, 3, 0))
+                end
+            end
+        end)
+    end
+})
+
+local LocationDropdown = TeleportTab:CreateDropdown({
+    Name = "Select Location",
+    Options = GetLocationList(),
+    CurrentOption = {},
+    MultipleOptions = false,
+    Flag = "SelectLocation",
+    Callback = function(Value)
+        if type(Value) == "table" then
+            SelectedLocation = Value[1]
+        else
+            SelectedLocation = Value
+        end
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Teleport Location",
+    Callback = function()
+        if not SelectedLocation or SelectedLocation == "Nobody" then return end
+        pcall(function()
+            local targetModel = nil
+            if string.find(SelectedLocation, "Islands/") then
+                local name = string.gsub(SelectedLocation, "Islands/", "")
+                local main = workspace:FindFirstChild("Main")
+                if main then
+                    local islands = main:FindFirstChild("Islands")
+                    if islands then
+                        targetModel = islands:FindFirstChild(name)
+                    end
+                end
+            elseif SelectedLocation == "House" then
+                targetModel = workspace:FindFirstChild("House")
+            elseif string.find(SelectedLocation, "House/") then
+                local name = string.gsub(SelectedLocation, "House/", "")
+                local house = workspace:FindFirstChild("House")
+                if house then
+                    targetModel = house:FindFirstChild(name)
+                end
+            end
+            if targetModel then
+                local targetPart = nil
+                if targetModel:IsA("Model") and targetModel.PrimaryPart then
+                    targetPart = targetModel.PrimaryPart
+                elseif targetModel:IsA("Model") then
+                    targetPart = targetModel:FindFirstChildWhichIsA("BasePart")
+                elseif targetModel:IsA("BasePart") then
+                    targetPart = targetModel
+                end
+                if targetPart then
+                    TeleportTo(targetPart.CFrame * CFrame.new(0, 5, 0))
+                end
+            end
+        end)
+    end
+})
+
+local SpecDropdown = TeleportTab:CreateDropdown({
+    Name = "Select Spectate Player",
+    Options = GetPlayerList(),
+    CurrentOption = {},
+    MultipleOptions = false,
+    Flag = "SelectSpecPlayer",
+    Callback = function(Value)
+        if type(Value) == "table" then
+            SelectedSpecPlayer = Value[1]
+        else
+            SelectedSpecPlayer = Value
+        end
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Start Spectate",
+    Callback = function()
+        if not SelectedSpecPlayer or SelectedSpecPlayer == "Nobody" then return end
+        pcall(function()
+            local target = Players:FindFirstChild(SelectedSpecPlayer)
+            if target and target.Character then
+                local targetHumanoid = target.Character:FindFirstChild("Humanoid")
+                if targetHumanoid then
+                    SpecTarget = target
+                    SpecEnabled = true
+                    workspace.CurrentCamera.CameraSubject = targetHumanoid
+                end
+            end
+        end)
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Stop Spectate",
+    Callback = function()
+        pcall(function()
+            SpecEnabled = false
+            SpecTarget = nil
+            local character = LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoid then
+                    workspace.CurrentCamera.CameraSubject = humanoid
+                end
+            end
+        end)
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Refresh Lists",
+    Callback = function()
+        pcall(function()
+            PlayerDropdown:Set(GetPlayerList())
+            LocationDropdown:Set(GetLocationList())
+            SpecDropdown:Set(GetPlayerList())
+        end)
+    end
+})
+
+RunService.Heartbeat:Connect(function(dt)
+    pcall(function()
+        local character = LocalPlayer.Character
+        if not character then return end
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character:FindFirstChild("Humanoid")
+        if not hrp or not humanoid then return end
+
+        if NoclipEnabled then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+
+        if JumpPowerEnabled then
+            humanoid.JumpPower = JumpPowerValue
+        end
+
+        if FlyEnabled then
+            local bp = hrp:FindFirstChild("FlyBodyPosition")
+            local bg = hrp:FindFirstChild("FlyBodyGyro")
+            if bp and bg then
+                local camera = workspace.CurrentCamera
+                local direction = Vector3.new()
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                    direction = direction + camera.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                    direction = direction - camera.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                    direction = direction - camera.CFrame.RightVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                    direction = direction + camera.CFrame.RightVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                    direction = direction + Vector3.new(0, 1, 0)
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+                    direction = direction - Vector3.new(0, 1, 0)
+                end
+                if direction.Magnitude > 0 then
+                    direction = direction.Unit
+                    if not NoclipEnabled then
+                        local rayParams = RaycastParams.new()
+                        rayParams.FilterDescendantsInstances = {character}
+                        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        local rayResult = workspace:Raycast(hrp.Position, direction * FlySpeed * dt * 2, rayParams)
+                        if not rayResult then
+                            bp.Position = bp.Position + (direction * FlySpeed * dt)
+                        end
+                    else
+                        bp.Position = bp.Position + (direction * FlySpeed * dt)
+                    end
+                end
+                bg.CFrame = CFrame.new(hrp.Position, hrp.Position + camera.CFrame.LookVector * Vector3.new(1, 0, 1))
+            end
+        end
+
+        if SpeedEnabled and not FlyEnabled then
+            if humanoid.MoveDirection.Magnitude > 0 then
+                local moveDir = humanoid.MoveDirection
+                local newCFrame = hrp.CFrame + (moveDir * SpeedValue * dt)
+                if not NoclipEnabled then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = {character}
+                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                    local rayResult = workspace:Raycast(hrp.Position, moveDir * SpeedValue * dt * 1.5, rayParams)
+                    if not rayResult then
+                        hrp.CFrame = newCFrame
+                    end
+                else
+                    hrp.CFrame = newCFrame
+                end
+            end
+        end
+
+        if SpecEnabled and SpecTarget then
+            local targetChar = SpecTarget.Character
+            if targetChar then
+                local targetHumanoid = targetChar:FindFirstChild("Humanoid")
+                if targetHumanoid then
+                    workspace.CurrentCamera.CameraSubject = targetHumanoid
+                end
+            end
+        end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    pcall(function()
+        if SpecTarget == player then
+            SpecEnabled = false
+            SpecTarget = nil
+            local character = LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoid then
+                    workspace.CurrentCamera.CameraSubject = humanoid
+                end
+            end
+        end
+    end)
+end)
