@@ -1,0 +1,399 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local Config = {
+    Prefix = ";",           -- Command prefix character
+    AdminColor = Color3.fromRGB(255, 80, 80),
+    UIColor = Color3.fromRGB(20, 20, 30),
+    AccentColor = Color3.fromRGB(100, 180, 255),
+    WalkSpeed = 16,
+    JumpPower = 50,
+}
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DeltaAdmin"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
+
+-- Notification Frame
+local NotifFrame = Instance.new("Frame")
+NotifFrame.Name = "NotifFrame"
+NotifFrame.Size = UDim2.new(0, 300, 0, 50)
+NotifFrame.Position = UDim2.new(0.5, -150, 0, -60)
+NotifFrame.BackgroundColor3 = Config.UIColor
+NotifFrame.BorderSizePixel = 0
+NotifFrame.Parent = ScreenGui
+
+local NotifCorner = Instance.new("UICorner")
+NotifCorner.CornerRadius = UDim.new(0, 8)
+NotifCorner.Parent = NotifFrame
+
+local NotifLabel = Instance.new("TextLabel")
+NotifLabel.Size = UDim2.new(1, -20, 1, 0)
+NotifLabel.Position = UDim2.new(0, 10, 0, 0)
+NotifLabel.BackgroundTransparency = 1
+NotifLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+NotifLabel.TextScaled = true
+NotifLabel.Font = Enum.Font.GothamBold
+NotifLabel.Text = ""
+NotifLabel.Parent = NotifFrame
+
+local NotifBar = Instance.new("Frame")
+NotifBar.Name = "Bar"
+NotifBar.Size = UDim2.new(0, 4, 1, 0)
+NotifBar.Position = UDim2.new(0, 0, 0, 0)
+NotifBar.BackgroundColor3 = Config.AccentColor
+NotifBar.BorderSizePixel = 0
+NotifBar.Parent = NotifFrame
+
+local NotifBarCorner = Instance.new("UICorner")
+NotifBarCorner.CornerRadius = UDim.new(0, 8)
+NotifBarCorner.Parent = NotifBar
+
+-- Command Bar
+local CmdBarFrame = Instance.new("Frame")
+CmdBarFrame.Name = "CmdBar"
+CmdBarFrame.Size = UDim2.new(0, 400, 0, 40)
+CmdBarFrame.Position = UDim2.new(0.5, -200, 1, -60)
+CmdBarFrame.BackgroundColor3 = Config.UIColor
+CmdBarFrame.BorderSizePixel = 0
+CmdBarFrame.Visible = false
+CmdBarFrame.Parent = ScreenGui
+
+local CmdBarCorner = Instance.new("UICorner")
+CmdBarCorner.CornerRadius = UDim.new(0, 8)
+CmdBarCorner.Parent = CmdBarFrame
+
+local CmdBarInput = Instance.new("TextBox")
+CmdBarInput.Size = UDim2.new(1, -20, 1, 0)
+CmdBarInput.Position = UDim2.new(0, 10, 0, 0)
+CmdBarInput.BackgroundTransparency = 1
+CmdBarInput.TextColor3 = Config.AccentColor
+CmdBarInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+CmdBarInput.PlaceholderText = "Type a command... (e.g. ;speed 50)"
+CmdBarInput.TextScaled = true
+CmdBarInput.Font = Enum.Font.Gotham
+CmdBarInput.ClearTextOnFocus = false
+CmdBarInput.Text = ""
+CmdBarInput.Parent = CmdBarFrame
+
+local CmdBarStroke = Instance.new("UIStroke")
+CmdBarStroke.Color = Config.AccentColor
+CmdBarStroke.Thickness = 1.5
+CmdBarStroke.Parent = CmdBarFrame
+
+local function Notify(msg, color)
+    NotifLabel.Text = msg
+    NotifBar.BackgroundColor3 = color or Config.AccentColor
+
+    local showTween = TweenService:Create(NotifFrame,
+        TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Position = UDim2.new(0.5, -150, 0, 10)}
+    )
+    showTween:Play()
+
+    task.delay(3, function()
+        local hideTween = TweenService:Create(NotifFrame,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+            {Position = UDim2.new(0.5, -150, 0, -60)}
+        )
+        hideTween:Play()
+    end)
+end
+
+local function GetCharacter()
+    return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+end
+
+local function GetHumanoid()
+    local char = GetCharacter()
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local function GetRootPart()
+    local char = GetCharacter()
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function FindPlayer(name)
+    name = name:lower()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Name:lower():find(name) or p.DisplayName:lower():find(name) then
+            return p
+        end
+    end
+    return nil
+end
+
+-- ============================================
+-- ADMIN COMMANDS
+-- ============================================
+local Commands = {}
+
+-- Speed
+Commands["speed"] = function(args)
+    local spd = tonumber(args[1])
+    if not spd then Notify("Usage: speed [number]", Color3.fromRGB(255,100,100)) return end
+    local hum = GetHumanoid()
+    if hum then
+        hum.WalkSpeed = spd
+        Notify("Speed set to " .. spd, Config.AccentColor)
+    end
+end
+
+-- Jump
+Commands["jump"] = function(args)
+    local power = tonumber(args[1])
+    if not power then Notify("Usage: jump [number]", Color3.fromRGB(255,100,100)) return end
+    local hum = GetHumanoid()
+    if hum then
+        hum.JumpPower = power
+        Notify("Jump power set to " .. power, Config.AccentColor)
+    end
+end
+
+-- Fly
+local flying = false
+local flyBodyVelocity, flyBodyGyro
+Commands["fly"] = function()
+    local char = GetCharacter()
+    local root = GetRootPart()
+    if not char or not root then return end
+
+    if flying then
+        flying = false
+        if flyBodyVelocity then flyBodyVelocity:Destroy() end
+        if flyBodyGyro then flyBodyGyro:Destroy() end
+        Notify("Fly disabled", Color3.fromRGB(255,160,60))
+        return
+    end
+
+    flying = true
+    flyBodyVelocity = Instance.new("BodyVelocity")
+    flyBodyVelocity.Velocity = Vector3.zero
+    flyBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    flyBodyVelocity.Parent = root
+
+    flyBodyGyro = Instance.new("BodyGyro")
+    flyBodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    flyBodyGyro.P = 1e4
+    flyBodyGyro.Parent = root
+
+    Notify("Fly enabled — WASD + Space/Ctrl", Color3.fromRGB(100,255,160))
+
+    local flySpeed = 50
+    RunService.Heartbeat:Connect(function()
+        if not flying then return end
+        if not root or not root.Parent then flying = false return end
+
+        local cam = workspace.CurrentCamera
+        local dir = Vector3.zero
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.new(0,1,0) end
+
+        flyBodyVelocity.Velocity = dir * flySpeed
+        if dir.Magnitude > 0 then
+            flyBodyGyro.CFrame = CFrame.new(Vector3.zero, dir)
+        end
+    end)
+end
+
+-- NoClip
+local noclip = false
+Commands["noclip"] = function()
+    noclip = not noclip
+    if noclip then
+        Notify("NoClip ON", Color3.fromRGB(100,255,160))
+        RunService.Stepped:Connect(function()
+            if not noclip then return end
+            local char = LocalPlayer.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    else
+        Notify("NoClip OFF", Color3.fromRGB(255,160,60))
+    end
+end
+
+-- God Mode (infinite health)
+local godActive = false
+Commands["god"] = function()
+    godActive = not godActive
+    local hum = GetHumanoid()
+    if hum then
+        if godActive then
+            hum.MaxHealth = math.huge
+            hum.Health = math.huge
+            Notify("God Mode ON", Color3.fromRGB(255,220,50))
+        else
+            hum.MaxHealth = 100
+            hum.Health = 100
+            Notify("God Mode OFF", Color3.fromRGB(200,200,200))
+        end
+    end
+end
+
+-- Teleport to player
+Commands["tp"] = function(args)
+    local target = args[1]
+    if not target then Notify("Usage: tp [player]", Color3.fromRGB(255,100,100)) return end
+    local player = FindPlayer(target)
+    if not player then Notify("Player not found: " .. target, Color3.fromRGB(255,100,100)) return end
+    local root = GetRootPart()
+    local targetChar = player.Character
+    local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+    if root and targetRoot then
+        root.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)
+        Notify("Teleported to " .. player.Name, Config.AccentColor)
+    end
+end
+
+-- Bring player to you
+Commands["bring"] = function(args)
+    local target = args[1]
+    if not target then Notify("Usage: bring [player]", Color3.fromRGB(255,100,100)) return end
+    local player = FindPlayer(target)
+    if not player then Notify("Player not found: " .. target, Color3.fromRGB(255,100,100)) return end
+    local root = GetRootPart()
+    local targetChar = player.Character
+    local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+    if root and targetRoot then
+        targetRoot.CFrame = root.CFrame + Vector3.new(2, 0, 0)
+        Notify("Brought " .. player.Name, Config.AccentColor)
+    end
+end
+
+-- Reset character
+Commands["reset"] = function()
+    local hum = GetHumanoid()
+    if hum then
+        hum.Health = 0
+        Notify("Character reset", Color3.fromRGB(255,160,60))
+    end
+end
+
+-- Reset speed/jump to defaults
+Commands["normalize"] = function()
+    local hum = GetHumanoid()
+    if hum then
+        hum.WalkSpeed = Config.WalkSpeed
+        hum.JumpPower = Config.JumpPower
+        Notify("Stats normalized", Config.AccentColor)
+    end
+end
+
+-- Invisible (transparency trick)
+Commands["invisible"] = function()
+    local char = GetCharacter()
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            part.Transparency = 1
+        elseif part:IsA("Decal") then
+            part.Transparency = 1
+        end
+    end
+    Notify("Invisible ON", Color3.fromRGB(160,160,255))
+end
+
+Commands["visible"] = function()
+    local char = GetCharacter()
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            part.Transparency = 0
+        elseif part:IsA("Decal") then
+            part.Transparency = 0
+        end
+    end
+    Notify("Visible ON", Config.AccentColor)
+end
+
+-- List all commands
+Commands["cmds"] = function()
+    local list = {}
+    for k in pairs(Commands) do table.insert(list, k) end
+    table.sort(list)
+    Notify("Commands: " .. table.concat(list, ", "), Config.AccentColor)
+    print("\n=== DELTA ADMIN COMMANDS ===")
+    for _, cmd in ipairs(list) do
+        print(Config.Prefix .. cmd)
+    end
+    print("============================\n")
+end
+
+
+local function ParseCommand(input)
+    input = input:gsub("^%s+", ""):gsub("%s+$", "")
+    if input:sub(1, 1) ~= Config.Prefix then return end
+
+    input = input:sub(2) -- remove prefix
+    local parts = {}
+    for word in input:gmatch("%S+") do
+        table.insert(parts, word)
+    end
+
+    if #parts == 0 then return end
+
+    local cmd = parts[1]:lower()
+    local args = {}
+    for i = 2, #parts do
+        table.insert(args, parts[i])
+    end
+
+    if Commands[cmd] then
+        Commands[cmd](args)
+    else
+        Notify("Unknown command: " .. cmd, Color3.fromRGB(255,100,100))
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        CmdBarFrame.Visible = not CmdBarFrame.Visible
+        if CmdBarFrame.Visible then
+            CmdBarInput:CaptureFocus()
+            CmdBarInput.Text = Config.Prefix
+            CmdBarInput.CursorPosition = #CmdBarInput.Text + 1
+        end
+    end
+end)
+
+CmdBarInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local text = CmdBarInput.Text
+        CmdBarInput.Text = ""
+        CmdBarFrame.Visible = false
+        ParseCommand(text)
+    else
+        CmdBarFrame.Visible = false
+    end
+end)
+
+-- Also listen to in-game chat
+LocalPlayer.Chatted:Connect(function(msg)
+    ParseCommand(msg)
+end)
+
+task.wait(1)
+Notify("Delta Admin Loaded! Press RShift or chat " .. Config.Prefix .. "cmds", Color3.fromRGB(100,255,160))
+print("=== Delta Admin v1.0 loaded ===")
+print("Prefix: " .. Config.Prefix)
+print("Press Right Shift to open command bar")
+print("Or use chat with the prefix")
+print("Type ;cmds for full command list")
