@@ -1,0 +1,195 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
+local Title = Instance.new("TextLabel")
+local PlayerList = Instance.new("ScrollingFrame")
+local CopyBtn = Instance.new("TextButton")
+local DestroyBtn = Instance.new("TextButton")
+local SelectedLabel = Instance.new("TextLabel")
+
+ScreenGui.Name = "Sigma_SkidMaster Cracked"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.Position = UDim2.new(0.5, -90, 0.5, -125)
+MainFrame.Size = UDim2.new(0, 180, 0, 250)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+UIStroke.Thickness = 2
+UIStroke.Parent = MainFrame
+
+task.spawn(function()
+    while RunService.RenderStepped:Wait() do
+        local hue = tick() % 5 / 5
+        UIStroke.Color = Color3.fromHSV(hue, 1, 1)
+    end
+end)
+
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = ""
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 13
+
+SelectedLabel.Parent = MainFrame
+SelectedLabel.Size = UDim2.new(0.9, 0, 0, 20)
+SelectedLabel.Position = UDim2.new(0.05, 0, 0.12, 0)
+SelectedLabel.Text = "Selected: None"
+SelectedLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+SelectedLabel.Font = Enum.Font.Gotham
+SelectedLabel.TextSize = 10
+SelectedLabel.BackgroundTransparency = 1
+
+PlayerList.Parent = MainFrame
+PlayerList.Size = UDim2.new(0.9, 0, 0, 100)
+PlayerList.Position = UDim2.new(0.05, 0, 0.22, 0)
+PlayerList.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+PlayerList.BorderSizePixel = 0
+PlayerList.ScrollBarThickness = 2
+local Layout = Instance.new("UIListLayout", PlayerList)
+
+local targetPlayer = nil
+
+local function updateList()
+    for _, v in pairs(PlayerList:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local pBtn = Instance.new("TextButton", PlayerList)
+            pBtn.Size = UDim2.new(1, 0, 0, 25)
+            pBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            pBtn.Text = p.DisplayName .. " (@" .. p.Name .. ")"
+            pBtn.TextColor3 = Color3.new(1, 1, 1)
+            pBtn.Font = Enum.Font.Gotham
+            pBtn.TextSize = 8
+            pBtn.TextWrapped = true
+            Instance.new("UICorner", pBtn)
+            
+            pBtn.MouseButton1Click:Connect(function()
+                targetPlayer = p
+                SelectedLabel.Text = "Selected: " .. p.DisplayName
+            end)
+        end
+    end
+    PlayerList.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y)
+end
+
+task.spawn(function()
+    while task.wait(3) do
+        updateList()
+    end
+end)
+updateList()
+
+local function CopyInGameAvatar()
+    if not targetPlayer then return end
+
+    -- Dev Protection Logic
+    if targetPlayer.Name == "Sigma_SkidMaster" or targetPlayer.Name == "Roblox" then
+        LocalPlayer:Kick("Cannot Copy Avatar From Devloper")
+        return
+    end
+
+    if not targetPlayer.Character then return end
+    
+    local hum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    
+    local desc = hum:GetAppliedDescription()
+    
+    local function toRGB(color)
+        return {["r"] = color.r*255, ["g"] = color.g*255, ["b"] = color.b*255, ["IsRGBTable"] = true}
+    end
+
+    local args = {
+        [1] = {
+            ["Properties"] = {
+                ["WalkAnimation"] = desc.WalkAnimation,
+                ["MoodAnimation"] = desc.MoodAnimation,
+                ["Face"] = desc.Face,
+                ["ProportionScale"] = desc.ProportionScale,
+                ["ClimbAnimation"] = desc.ClimbAnimation,
+                ["Shirt"] = desc.Shirt,
+                ["FaceAccessory"] = desc.FaceAccessory,
+                ["RightArmColor"] = toRGB(desc.RightArmColor),
+                ["HairAccessory"] = desc.HairAccessory,
+                ["RightArm"] = desc.RightArm,
+                ["Head"] = desc.Head,
+                ["FallAnimation"] = desc.FallAnimation,
+                ["TorsoColor"] = toRGB(desc.TorsoColor),
+                ["DepthScale"] = desc.DepthScale,
+                ["LeftArm"] = desc.LeftArm,
+                ["HeightScale"] = desc.HeightScale,
+                ["LeftLeg"] = desc.LeftLeg,
+                ["RightLegColor"] = toRGB(desc.RightLegColor),
+                ["LeftLegColor"] = toRGB(desc.LeftLegColor),
+                ["WidthScale"] = desc.WidthScale,
+                ["BodyTypeScale"] = desc.BodyTypeScale,
+                ["RunAnimation"] = desc.RunAnimation,
+                ["LeftArmColor"] = toRGB(desc.LeftArmColor),
+                ["Pants"] = desc.Pants,
+                ["WaistAccessory"] = desc.WaistAccessory,
+                ["LayeredAccessories"] = {},
+                ["AccessoryRefinements"] = {},
+                ["ShouldersAccessory"] = desc.ShouldersAccessory,
+                ["NeckAccessory"] = desc.NeckAccessory,
+                ["HatAccessory"] = desc.HatAccessory,
+                ["FrontAccessory"] = desc.FrontAccessory,
+                ["SwimAnimation"] = desc.SwimAnimation,
+                ["HeadColor"] = toRGB(desc.HeadColor),
+                ["BackAccessory"] = desc.BackAccessory,
+                ["IdleAnimation"] = desc.IdleAnimation,
+                ["Torso"] = desc.Torso,
+                ["HeadScale"] = desc.HeadScale,
+                ["JumpAnimation"] = desc.JumpAnimation,
+                ["GraphicTShirt"] = desc.GraphicTShirt,
+                ["RightLeg"] = desc.RightLeg
+            },
+            ["Action"] = "CreateAndWearHumanoidDescription",
+            ["RigType"] = Enum.HumanoidRigType.R15
+        }
+    }
+    
+    ReplicatedStorage.CatalogGuiRemote:InvokeServer(unpack(args))
+end
+
+CopyBtn.Parent = MainFrame
+CopyBtn.Text = "COPY AVATAR"
+CopyBtn.Size = UDim2.new(0.9, 0, 0, 35)
+CopyBtn.Position = UDim2.new(0.05, 0, 0.65, 0)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+CopyBtn.TextColor3 = Color3.new(1, 1, 1)
+CopyBtn.Font = Enum.Font.GothamBold
+CopyBtn.TextSize = 11
+Instance.new("UICorner", CopyBtn)
+
+CopyBtn.MouseButton1Click:Connect(CopyInGameAvatar)
+
+DestroyBtn.Parent = MainFrame
+DestroyBtn.Text = "Destroy UI"
+DestroyBtn.Size = UDim2.new(0.9, 0, 0, 25)
+DestroyBtn.Position = UDim2.new(0.05, 0, 0.85, 0)
+DestroyBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+DestroyBtn.TextColor3 = Color3.new(1, 1, 1)
+DestroyBtn.Font = Enum.Font.GothamBold
+DestroyBtn.TextSize = 11
+Instance.new("UICorner", DestroyBtn)
+
+DestroyBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Cracked: Sigma_SkidMaster", Text = "This script cannot copy 3D items or accessories", Duration = 6})
