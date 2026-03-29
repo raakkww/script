@@ -1,0 +1,662 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- GENERAL SETTINGS 
+local COUNTDOWN_TIME = 5
+local SKIP_KEY = Enum.KeyCode.X
+local TOTAL_TELEPORTS = 42
+
+-- TELEPORT POSITIONS !DONT TOUCH!
+local teleportSpots = {
+   Vector3.new(243.75, 3.48, -128.52),
+   Vector3.new(207.73, 3.48, 150.16),
+   Vector3.new(101.48, 3.48, 91.23),
+   Vector3.new(150.90, 3.48, 42.78),
+   Vector3.new(224.41, 3.48, 9.14),
+   Vector3.new(90.33, 3.48, 5.46),
+   Vector3.new(155.34, 3.48, -65.89),
+   Vector3.new(148.90, 3.48, -66.39),
+   Vector3.new(246.44, 3.48, 149.96), 
+   Vector3.new(221.38, 3.48, 161.02),
+   Vector3.new(221.00, 3.48, 163.63), 
+   Vector3.new(282.16, 3.48, -144.76),
+   Vector3.new(282.08, 6.51, -164.99),
+   Vector3.new(83.34, 3.48, 29.68),
+   Vector3.new(811.91, 404.76, 1265.62),
+   Vector3.new(811.05, 405.36, 1250.66),
+   Vector3.new(335.28, 3.48, 126.77),
+   Vector3.new(-1862.99, 1012.01, 2337.73),
+   Vector3.new(131.18, 3.48, -64.84),
+   Vector3.new(124.05, 6.60, -68.69),
+   Vector3.new(123.93, 6.60, -64.16),
+   Vector3.new(149.88, 3.48, 113.83),
+   Vector3.new(149.74, 6.60, 99.78),
+   Vector3.new(384.84, 3.48, -54.56),
+   Vector3.new(403.90, 3.48, -52.00),
+   Vector3.new(402.56, 3.48, -56.65),
+   Vector3.new(820.11, 288.34, 1429.09),
+   Vector3.new(832.68, 288.20, 1425.63),
+   Vector3.new(271.27, 3.48, 30.37),
+   Vector3.new(268.08, 3.48, 41.99),
+   Vector3.new(272.01, 3.48, 41.51),
+   Vector3.new(-1845.46, 994.01, 2338.33),
+   Vector3.new(-1863.59, 994.01, 2338.04),
+   Vector3.new(197.54, 3.48, -137.98),
+   Vector3.new(199.80, 6.51, -175.81),
+   Vector3.new(196.69, 6.51, -175.66),
+   Vector3.new(384.89, 3.48, 54.43),
+   Vector3.new(390.42, 3.48, 40.83),
+   Vector3.new(27.13, 3.48, -89.41),
+   Vector3.new(18.23, 3.48, -89.85),
+   Vector3.new(3127.97, -71.29, 403.74),
+   Vector3.new(-23.18, 3.51, 23.19)
+}
+
+-- TELEPORT NAMES EDIT TO YOUR LIKING
+local teleportNames = {
+    "BRUSH1","BRUSH2","BRUSH3","BRUSH4","BRUSH5","BRUSH6","REDOOR","PUZZLEPEICE","PUZZLEDOOR",
+    "BRUSH7","ORANGEBUCKET","ORANGEDOOR","YELLOWBUCKET","YELLOWDOOR","BRUSH8","GREENBUCKET","GREENDOOR","TEALBUCKET",
+    "TEALDOOR","BRUSH9","CODE","CODEDOOR","BLUEBUCKET","BLUEDOOR","BRUSH10","DOORKNOB",
+    "ROOM4","GEAR","GRANDMECHANISM","BRUSH11","PURPLEBUCKET","PURPLEDOOR","STAFFPASS","STAFFROOM",
+    "BRUSH12","PINKBUCKET","PINKDOOR","BOOK","FAKEBOOKSHELF","BRUSH13","WHITEBUCKET","WHITEDOOR"
+}
+
+-- COLORS
+local colors = {
+    outline = Color3.fromRGB(150,150,150),
+    background = Color3.fromRGB(30,30,30),
+    incomplete = Color3.fromRGB(255,0,0),
+    stripeCycle = {
+        Color3.fromRGB(255,0,0),
+        Color3.fromRGB(0,0,255),
+        Color3.fromRGB(255,165,0),
+        Color3.fromRGB(0,255,0),
+        Color3.fromRGB(255,255,0)
+    },
+    percentText = Color3.fromRGB(0,255,255),
+    globalText = Color3.fromRGB(0,255,0)
+}
+
+-- STATE
+local skip = false
+local stopped = false
+local running = false
+local paused = false
+local currentIndex = 1
+local lastProgressPercent = -1
+
+-- GOD MODE state
+local godMode = false
+local godConnection = nil
+local originalMaxHealth = nil
+
+-- HELPERS
+local function getCharacter()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid")
+    return char, hrp, hum
+end
+
+local function enableGod(hum)
+    if not hum then return end
+    if not originalMaxHealth then originalMaxHealth = hum.MaxHealth or 100 end
+    pcall(function()
+        hum.MaxHealth = 1e9
+        hum.Health = hum.MaxHealth
+    end)
+    if godConnection then pcall(function() godConnection:Disconnect() end) end
+    godConnection = hum.HealthChanged:Connect(function(newHealth)
+        if godMode and hum and hum.Parent then
+            if newHealth < hum.MaxHealth then
+                pcall(function() hum.Health = hum.MaxHealth end)
+            end
+        end
+    end)
+end
+
+local function disableGod(hum)
+    if not hum then return end
+    if godConnection then pcall(function() godConnection:Disconnect() end) end
+    if originalMaxHealth then
+        pcall(function()
+            hum.MaxHealth = originalMaxHealth
+            if hum.Health > originalMaxHealth then hum.Health = originalMaxHealth end
+        end)
+        originalMaxHealth = nil
+    else
+        pcall(function()
+            hum.MaxHealth = 100
+            if hum.Health > 100 then hum.Health = 100 end
+        end)
+    end
+end
+
+-- useless 
+player.CharacterAdded:Connect(function(char)
+    task.wait(0.1)
+    if godMode then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then enableGod(hum) end
+    end
+end)
+
+-- GUI SPAWN
+local playerGui = player:WaitForChild("PlayerGui")
+local gui = Instance.new("ScreenGui")
+gui.Name = "TeleportUI"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
+
+-- PROGRESS BAR GUI
+local progressContainer = Instance.new("Frame", gui)
+progressContainer.Name = "ProgressContainer"
+progressContainer.AnchorPoint = Vector2.new(0.5,0)
+progressContainer.Position = UDim2.new(0.5,0,0,12) 
+progressContainer.Size = UDim2.new(0,520,0,36)
+progressContainer.BackgroundTransparency = 1
+
+local progressOutline = Instance.new("Frame", progressContainer)
+progressOutline.Name = "ProgressOutline"
+progressOutline.Size = UDim2.new(1,0,1,0)
+progressOutline.BackgroundColor3 = colors.outline
+progressOutline.BorderSizePixel = 0
+
+local progressBackground = Instance.new("Frame", progressOutline)
+progressBackground.Name = "ProgressBackground"
+progressBackground.Size = UDim2.new(1,-6,1,-6)
+progressBackground.Position = UDim2.new(0,3,0,3)
+progressBackground.BackgroundColor3 = colors.background
+progressBackground.BorderSizePixel = 0
+
+local completedFrame = Instance.new("Frame", progressBackground)
+completedFrame.Name = "Completed"
+completedFrame.Size = UDim2.new(0,0,1,0)
+completedFrame.Position = UDim2.new(0,0,0,0)
+completedFrame.BackgroundTransparency = 1
+
+local stripeFrames = {}
+for i = 1, 5 do
+    local s = Instance.new("Frame", completedFrame)
+    s.Name = "Stripe"..i
+    s.Size = UDim2.new(0.2,0,1,0)
+    s.Position = UDim2.new((i-1)*0.2,0,0,0)
+    s.BorderSizePixel = 0
+    s.BackgroundColor3 = colors.stripeCycle[((i-1) % #colors.stripeCycle) + 1]
+    stripeFrames[i] = s
+end
+
+local incompleteFrame = Instance.new("Frame", progressBackground)
+incompleteFrame.Name = "Incomplete"
+incompleteFrame.Size = UDim2.new(1,0,1,0)
+incompleteFrame.Position = UDim2.new(0,0,0,0)
+incompleteFrame.BackgroundColor3 = colors.incomplete
+incompleteFrame.BorderSizePixel = 0
+
+local percentLabel = Instance.new("TextLabel", progressBackground)
+percentLabel.Size = UDim2.new(0,120,1,0)
+percentLabel.Position = UDim2.new(0.5,-60,0,0)
+percentLabel.BackgroundTransparency = 1
+percentLabel.Font = Enum.Font.SourceSansBold
+percentLabel.TextSize = 16
+percentLabel.TextColor3 = colors.percentText
+percentLabel.Text = "0%"
+percentLabel.TextXAlignment = Enum.TextXAlignment.Center
+percentLabel.TextYAlignment = Enum.TextYAlignment.Center
+
+local fractionLabel = Instance.new("TextLabel", progressBackground)
+fractionLabel.Size = UDim2.new(0,80,1,0)
+fractionLabel.Position = UDim2.new(1,-84,0,0)
+fractionLabel.BackgroundTransparency = 1
+fractionLabel.Font = Enum.Font.SourceSans
+fractionLabel.TextSize = 14
+fractionLabel.TextColor3 = Color3.fromRGB(255,255,255)
+fractionLabel.Text = "0/" .. tostring(TOTAL_TELEPORTS)
+fractionLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+-- MAIN GUI
+local panel = Instance.new("Frame", gui)
+panel.Name = "ControlPanel"
+panel.BackgroundColor3 = Color3.fromRGB(255,0,0)
+panel.AnchorPoint = Vector2.new(0.5,1)
+panel.Position = UDim2.new(0.5,0,1,-80)
+panel.Size = UDim2.new(0,520,0,140)
+
+local title = Instance.new("TextLabel", panel)
+title.Size = UDim2.new(1,0,0,28)
+title.Position = UDim2.new(0,0,0,6)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 20
+title.Text = "COLOR OR DIE AUTO WIN"
+title.TextColor3 = Color3.fromRGB(0,0,0)
+title.TextXAlignment = Enum.TextXAlignment.Center
+
+local bigNum = Instance.new("TextLabel", panel)
+bigNum.Name = "BigNum"
+bigNum.Size = UDim2.new(0,80,0,60)
+bigNum.Position = UDim2.new(0,12,0,36)
+bigNum.BackgroundTransparency = 1
+bigNum.Font = Enum.Font.SourceSansBold
+bigNum.TextSize = 44
+bigNum.TextColor3 = Color3.fromRGB(0,0,0)
+bigNum.Text = "0"
+bigNum.TextXAlignment = Enum.TextXAlignment.Center
+bigNum.TextYAlignment = Enum.TextYAlignment.Center
+
+local milliLabel = Instance.new("TextLabel", panel)
+milliLabel.Name = "MilliLabel"
+milliLabel.Size = UDim2.new(0,100,0,20)
+milliLabel.Position = UDim2.new(0,12,0,98)
+milliLabel.BackgroundTransparency = 1
+milliLabel.Font = Enum.Font.SourceSansBold
+milliLabel.TextSize = 18
+milliLabel.TextColor3 = Color3.fromRGB(0,170,255)
+milliLabel.Text = ".000"
+milliLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+local indexLabel = Instance.new("TextLabel", panel)
+indexLabel.Name = "IndexLabel"
+indexLabel.BackgroundTransparency = 1
+indexLabel.Size = UDim2.new(0,160,0,24)
+indexLabel.Position = UDim2.new(0,110,0,40)
+indexLabel.Font = Enum.Font.SourceSansBold
+indexLabel.TextSize = 18
+indexLabel.TextColor3 = Color3.fromRGB(255,255,0)
+indexLabel.TextXAlignment = Enum.TextXAlignment.Left
+indexLabel.Text = "Teleport: 1"
+
+local nameLabel = Instance.new("TextLabel", panel)
+nameLabel.Name = "NameLabel"
+nameLabel.BackgroundTransparency = 1
+nameLabel.Size = UDim2.new(0,260,0,24)
+nameLabel.Position = UDim2.new(0,110,0,68)
+nameLabel.Font = Enum.Font.SourceSansBold
+nameLabel.TextSize = 18
+nameLabel.TextColor3 = colors.globalText
+nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+nameLabel.Text = teleportNames[1] or ""
+
+local credit = Instance.new("TextLabel", panel)
+credit.Size = UDim2.new(0,180,0,18)
+credit.Position = UDim2.new(1,-200,1,-22)
+credit.BackgroundTransparency = 1
+credit.Font = Enum.Font.SourceSans
+credit.TextSize = 12
+credit.TextColor3 = Color3.fromRGB(0,0,0)
+credit.Text = ""
+
+-- Button stuff 
+local function makeButton(parent, text, pos, size, bg, fg)
+    local b = Instance.new("TextButton", parent)
+    b.Size = size or UDim2.new(0,110,0,28)
+    b.Position = pos
+    b.Font = Enum.Font.SourceSansBold
+    b.TextSize = 14
+    b.Text = text
+    b.TextColor3 = fg or Color3.fromRGB(0,0,0)
+    b.BackgroundColor3 = bg or Color3.fromRGB(255,255,255)
+    b.AutoButtonColor = true
+    return b
+end
+
+-- button list #1
+local resetBtn = makeButton(panel, "RESET", UDim2.new(0,12,0,96), UDim2.new(0,90,0,28), Color3.fromRGB(255,80,80))
+local pauseBtn = makeButton(panel, "PAUSE", UDim2.new(0,112,0,96), UDim2.new(0,90,0,28), Color3.fromRGB(200,200,200))
+local unpauseBtn = makeButton(panel, "UNPAUSE", UDim2.new(0,212,0,96), UDim2.new(0,90,0,28), Color3.fromRGB(200,200,200))
+local stopBtn = makeButton(panel, "STOP", UDim2.new(0,312,0,96), UDim2.new(0,90,0,28), Color3.fromRGB(255,140,0))
+
+-- button list #2
+local startBtn = makeButton(panel, "START/RESTART", UDim2.new(0,12,0,126), UDim2.new(0,150,0,28), Color3.fromRGB(120,255,120))
+local killBtn = makeButton(panel, "KILL SCRIPT", UDim2.new(0,172,0,126), UDim2.new(0,130,0,28), Color3.fromRGB(40,40,40), Color3.fromRGB(255,255,255))
+local toggleBtn = makeButton(panel, "Open/Close", UDim2.new(0,312,0,126), UDim2.new(0,130,0,28), Color3.fromRGB(200,200,200))
+
+-- GOD MODEBUTTON
+local godBtn = Instance.new("TextButton", gui)
+godBtn.Name = "GodModeButton"
+godBtn.Size = UDim2.new(0,100,0,40)
+godBtn.AnchorPoint = Vector2.new(0,1)
+godBtn.Position = UDim2.new(0,8,1,-80)
+godBtn.Font = Enum.Font.SourceSansBold
+godBtn.TextSize = 16
+godBtn.Text = "GOD MODE: OFF"
+godBtn.TextColor3 = Color3.fromRGB(0,0,0)
+godBtn.BackgroundColor3 = Color3.fromRGB(255,230,0)
+
+-- GOD MODE NOTE #1
+local godWarning = Instance.new("TextLabel", gui)
+godWarning.Name = "GodWarning"
+godWarning.Size = UDim2.new(0,300,0,18)
+godWarning.AnchorPoint = Vector2.new(0,1)
+godWarning.Position = UDim2.new(0,8,1,-124)
+godWarning.BackgroundTransparency = 1
+godWarning.Font = Enum.Font.SourceSansBold
+godWarning.TextSize = 14
+godWarning.TextColor3 = Color3.fromRGB(0,0,0)
+godWarning.Text = "Reset will not work if God Mode is On"
+godWarning.TextXAlignment = Enum.TextXAlignment.Left
+
+-- GOD MODE NOTE #2
+local godNote = Instance.new("TextLabel", gui)
+godNote.Name = "GodNote"
+godNote.Size = UDim2.new(0,300,0,18)
+godNote.AnchorPoint = Vector2.new(0,1)
+godNote.Position = UDim2.new(0,8,1,-56) -- 
+godNote.BackgroundTransparency = 1
+godNote.Font = Enum.Font.SourceSansBold
+godNote.TextSize = 14
+godNote.TextColor3 = Color3.fromRGB(0,0,0)
+godNote.Text = "if you go invisible when monster kills you its fine"
+godNote.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Hint text and chapter text
+local hint = Instance.new("TextLabel", gui)
+hint.Name = "HintText"
+hint.Size = UDim2.new(0,520,0,22)
+hint.AnchorPoint = Vector2.new(0.5,0)
+hint.Position = UDim2.new(0.5,0,1,-40) 
+hint.BackgroundTransparency = 1
+hint.Font = Enum.Font.SourceSans
+hint.TextSize = 16
+hint.TextColor3 = Color3.fromRGB(0,0,0)
+hint.Text = "Click X to skip countdown (teleport index and name shown)."
+hint.TextXAlignment = Enum.TextXAlignment.Center
+
+local chapter = Instance.new("TextLabel", gui)
+chapter.Name = "ChapterLabel"
+chapter.Size = UDim2.new(0,160,0,22)
+chapter.AnchorPoint = Vector2.new(0.5,0)
+chapter.Position = UDim2.new(0.5,0,1,-18) 
+chapter.BackgroundTransparency = 1
+chapter.Font = Enum.Font.SourceSansBold
+chapter.TextSize = 16
+chapter.TextColor3 = Color3.fromRGB(0,0,0)
+chapter.Text = "CHAPTER 4"
+chapter.TextXAlignment = Enum.TextXAlignment.Center
+
+-- PROGRESS BAR GUI COMPLETED LOAD
+for i=1,5 do
+    stripeFrames[i].BackgroundColor3 = colors.stripeCycle[((i-1) % #colors.stripeCycle) + 1]
+end
+
+-- SKIP KEY
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == SKIP_KEY then
+        skip = true
+    end
+end)
+
+-- BUTTON ACTIONS
+
+-- RESET BUTTON 
+resetBtn.MouseButton1Click:Connect(function()
+    local ok, char, hrp, hum = pcall(function() return getCharacter() end)
+    if godMode then
+        local notice = Instance.new("TextLabel", panel)
+        notice.Size = UDim2.new(0,260,0,18)
+        notice.Position = UDim2.new(0,12,0,70)
+        notice.BackgroundTransparency = 1
+        notice.Font = Enum.Font.SourceSansBold
+        notice.TextSize = 14
+        notice.TextColor3 = Color3.fromRGB(255,255,255)
+        notice.Text = "Reset blocked: disable God Mode first"
+        notice.TextXAlignment = Enum.TextXAlignment.Left
+        task.delay(2, function()
+            if notice and notice.Parent then notice:Destroy() end
+        end)
+        return
+    end
+    if ok and char and hum then
+        pcall(function() hum.Health = 0 end)
+    else
+        pcall(function() player:LoadCharacter() end)
+    end
+end)
+
+-- PAUSE / UNPAUSE BUTTONS
+pauseBtn.MouseButton1Click:Connect(function() paused = true end)
+unpauseBtn.MouseButton1Click:Connect(function() paused = false end)
+
+-- STOP: reset the script state
+stopBtn.MouseButton1Click:Connect(function()
+    stopped = true
+    running = false
+    paused = false
+    currentIndex = 1
+    lastProgressPercent = -1
+    indexLabel.Text = "Teleport: 1"
+    nameLabel.Text = teleportNames[1] or ""
+    percentLabel.Text = "0%"
+    completedFrame.Size = UDim2.new(0,0,1,0)
+    incompleteFrame.Size = UDim2.new(1,0,1,0)
+    bigNum.Text = "0"
+    milliLabel.Text = ".000"
+end)
+
+-- START/RESTART BUTTONS 
+startBtn.MouseButton1Click:Connect(function()
+    if running then
+        stopped = true
+        running = false
+        paused = false
+        task.wait(0.06)
+        currentIndex = 1
+        lastProgressPercent = -1
+        indexLabel.Text = "Teleport: 1"
+        nameLabel.Text = teleportNames[1] or ""
+        percentLabel.Text = "0%"
+        completedFrame.Size = UDim2.new(0,0,1,0)
+        incompleteFrame.Size = UDim2.new(1,0,1,0)
+        bigNum.Text = "0"
+        milliLabel.Text = ".000"
+        task.wait(0.06)
+        stopped = false
+        StartSequence()
+    else
+        stopped = false
+        paused = false
+        currentIndex = 1
+        lastProgressPercent = -1
+        StartSequence()
+    end
+end)
+
+-- DELETE SCRIPT BUTTON
+killBtn.MouseButton1Click:Connect(function()
+    stopped = true
+    running = false
+    paused = false
+    if godMode then
+        local ok, char, hrp, hum = pcall(function() return getCharacter() end)
+        if ok and hum then pcall(function() disableGod(hum) end) end
+        godMode = false
+    end
+    pcall(function() gui:Destroy() end)
+end)
+
+-- Open/Close BUTTON
+local guiHidden = false
+toggleBtn.MouseButton1Click:Connect(function()
+    guiHidden = not guiHidden
+    panel.Visible = not guiHidden
+    progressContainer.Visible = not guiHidden
+    godBtn.Visible = not guiHidden
+    godWarning.Visible = not guiHidden
+    godNote.Visible = not guiHidden
+    hint.Visible = not guiHidden
+    chapter.Visible = not guiHidden
+    if guiHidden then
+        local reopen = Instance.new("TextButton", gui)
+        reopen.Name = "ReopenButton"
+        reopen.Size = UDim2.new(0,100,0,30)
+        reopen.Position = UDim2.new(1,-110,1,-40)
+        reopen.AnchorPoint = Vector2.new(0,0)
+        reopen.Font = Enum.Font.SourceSansBold
+        reopen.TextSize = 14
+        reopen.Text = "Open GUI"
+        reopen.Parent = gui
+        reopen.MouseButton1Click:Connect(function()
+            if reopen and reopen.Parent then reopen:Destroy() end
+            panel.Visible = true
+            progressContainer.Visible = true
+            godBtn.Visible = true
+            godWarning.Visible = true
+            godNote.Visible = true
+            hint.Visible = true
+            chapter.Visible = true
+            guiHidden = false
+        end)
+    else
+        local existing = gui:FindFirstChild("ReopenButton")
+        if existing then existing:Destroy() end
+    end
+end)
+
+-- GOD MODE toggle
+godBtn.MouseButton1Click:Connect(function()
+    godMode = not godMode
+    local ok, char, hrp, hum = pcall(function() return getCharacter() end)
+    if godMode then
+        godBtn.Text = "GOD MODE: ON"
+        godBtn.BackgroundColor3 = Color3.fromRGB(255,200,0)
+        if ok and hum then enableGod(hum) end
+    else
+        godBtn.Text = "GOD MODE: OFF"
+        godBtn.BackgroundColor3 = Color3.fromRGB(255,230,0)
+        if ok and hum then disableGod(hum) end
+    end
+end)
+
+-- PROGRESS BAR
+local function rotateStripeCycle()
+    local sc = colors.stripeCycle
+    if #sc == 0 then return end
+    local first = table.remove(sc,1)
+    table.insert(sc, first)
+    for i=1,5 do stripeFrames[i].BackgroundColor3 = sc[((i-1) % #sc) + 1] end
+end
+
+local function updateProgress(index)
+    local totalWidth = progressBackground.AbsoluteSize.X
+    if totalWidth <= 0 then
+        task.wait()
+        totalWidth = progressBackground.AbsoluteSize.X
+        if totalWidth <= 0 then totalWidth = 520 end
+    end
+
+    local frac = math.clamp(index / TOTAL_TELEPORTS, 0, 1)
+    local percent = math.floor(frac * 100)
+    percentLabel.Text = tostring(percent) .. "%"
+    fractionLabel.Text = tostring(index) .. "/" .. tostring(TOTAL_TELEPORTS)
+
+    local completedWidth = math.floor(totalWidth * frac)
+    completedFrame.Size = UDim2.new(0, completedWidth, 1, 0)
+
+    local incompleteWidth = totalWidth - completedWidth
+    incompleteFrame.Size = UDim2.new(0, incompleteWidth, 1, 0)
+    incompleteFrame.Position = UDim2.new(0, completedWidth, 0, 0)
+    incompleteFrame.BackgroundColor3 = colors.incomplete
+
+    if percent > lastProgressPercent then rotateStripeCycle() end
+    lastProgressPercent = percent
+end
+
+-- MAIN SEQUENCE
+function StartSequence()
+    if running then return end
+    stopped = false
+    running = true
+
+    task.spawn(function()
+        local char, hrp, hum = getCharacter()
+
+        if godMode and hum then enableGod(hum) end
+
+        for i = currentIndex, TOTAL_TELEPORTS do
+            if stopped then break end
+            currentIndex = i
+
+            indexLabel.Text = "Teleport: " .. i
+            nameLabel.Text = teleportNames[i] or ""
+
+            updateProgress(i)
+
+            skip = false
+            local start = tick()
+            local pauseAccum = 0
+            local pauseStart = nil
+
+            while true do
+                if stopped then break end
+                if paused then
+                    if not pauseStart then pauseStart = tick() end
+                    task.wait(0.1)
+                    continue
+                else
+                    if pauseStart then
+                        pauseAccum = pauseAccum + (tick() - pauseStart)
+                        pauseStart = nil
+                    end
+                end
+                if skip then break end
+
+                local elapsed = tick() - start - pauseAccum
+                local remaining = COUNTDOWN_TIME - elapsed
+                if remaining <= 0 then remaining = 0 end
+
+                local sec = math.floor(remaining)
+                local ms = math.floor((remaining - sec) * 1000) -- milliseconds
+                if ms < 0 then ms = 0 end
+
+                pcall(function() bigNum.Text = tostring(sec) end)
+                pcall(function() milliLabel.Text = "." .. string.format("%03d", ms) end)
+
+                if remaining <= 0 then break end
+                task.wait(0.01)
+            end
+
+            if stopped then break end
+
+            pcall(function()
+                if hrp and hrp.Parent then
+                    hrp.CFrame = CFrame.new(teleportSpots[i])
+                else
+                    local _, newHrp = getCharacter()
+                    if newHrp then newHrp.CFrame = CFrame.new(teleportSpots[i]) end
+                end
+            end)
+
+            local postWait = 1
+            local elapsed = 0
+            while elapsed < postWait do
+                if stopped then break end
+                if paused then task.wait(0.1) else task.wait(0.1); elapsed = elapsed + 0.1 end
+            end
+        end
+
+        running = false
+
+        if not stopped then
+            task.wait(5)
+            stopped = true
+            running = false
+            paused = false
+            currentIndex = 1
+            lastProgressPercent = -1
+            indexLabel.Text = "Teleport: 1"
+            nameLabel.Text = teleportNames[1] or ""
+            percentLabel.Text = "0%"
+            completedFrame.Size = UDim2.new(0,0,1,0)
+            incompleteFrame.Size = UDim2.new(1,0,1,0)
+            bigNum.Text = "0"
+            milliLabel.Text = ".000"
+            pcall(function() player:LoadCharacter() end)
+        end
+    end)
+end
+
+-- AUTO-START
+StartSequence()
