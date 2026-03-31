@@ -1,0 +1,140 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   LoadingTitle = "loading(plssupportme)",
+   LoadingSubtitle = "",
+   ConfigurationSaving = {Enabled = true, FolderName = "SquidGameUltra"}
+})
+
+local MainTab = Window:CreateTab("Main & Movement", 4483362458)
+local ItemTab = Window:CreateTab("Item Giver", 4483362458)
+
+local player = game.Players.LocalPlayer
+local mapRemote = game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("mapManagerRemote")
+
+-- --- LOOP SETTINGS (0.1s) ---
+local walkSpeedValue = 16
+local jumpPowerValue = 50
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = walkSpeedValue
+            player.Character.Humanoid.UseJumpPower = true
+            player.Character.Humanoid.JumpPower = jumpPowerValue
+        end
+    end
+end)
+
+-- --- ITEM GIVER TAB ---
+
+ItemTab:CreateSection("Free Items")
+local freeItems = {
+    ["Gold Carpet (Free)"] = "Gold Carpet",
+    ["Claw Slap"] = "Claw Slap"
+}
+
+for label, itemName in pairs(freeItems) do
+    ItemTab:CreateButton({
+        Name = label,
+        Callback = function()
+            mapRemote:FireServer("claimTool", itemName)
+            Rayfield:Notify({Title = "Success", Content = itemName .. " claimed!", Duration = 2})
+        end
+    })
+end
+
+ItemTab:CreateSection("Paid Items")
+local paidItems = {
+    {Name = "Hyper Laser Gun", Price = "15k", ID = "Hyper Laser Gun"},
+    {Name = "Back In Time", Price = "5k", ID = "Back In Time"},
+    {Name = "Slime Slap", Price = "20k", ID = "Slime Slap"},
+    {Name = "Invisibility Cloak", Price = "15k", ID = "Invisibility Cloak"},
+    {Name = "Rainbow Carpet", Price = "25k", ID = "Rainbow Carpet"},
+    {Name = "Purple Slap", Price = "15k", ID = "Purple Slap"},
+    {Name = "Body Swap Potion", Price = "10k", ID = "Body Swap Potion"},
+    {Name = "Gravity Coil", Price = "10k", ID = "Gravity Coil"},
+    {Name = "Speed Coil", Price = "10k", ID = "Speed Coil"}
+}
+
+for _, item in pairs(paidItems) do
+    local confirmed = false
+    ItemTab:CreateButton({
+        Name = item.Name .. " (" .. item.Price .. ")",
+        Callback = function()
+            if not confirmed then
+                confirmed = true
+                Rayfield:Notify({
+                    Title = "Confirm Purchase",
+                    Content = "Are you sure to buy " .. item.Name .. "? Click again.",
+                    Duration = 4
+                })
+                task.delay(5, function() confirmed = false end)
+            else
+                mapRemote:FireServer("claimTool", item.ID)
+                confirmed = false
+                Rayfield:Notify({Title = "Purchased", Content = item.Name .. " request sent!", Duration = 2})
+            end
+        end
+    })
+end
+
+-- --- MAIN & MOVEMENT TAB ---
+
+MainTab:CreateSection("Teleports")
+MainTab:CreateButton({
+   Name = "Win TP",
+   Callback = function()
+      if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+         player.Character.HumanoidRootPart.CFrame = CFrame.new(1, 76, 156)
+         Rayfield:Notify({Title = "Success", Content = "Teleported to Win!", Duration = 2})
+      end
+   end,
+})
+
+MainTab:CreateSection("Economy")
+local lastClaimTime = 0
+local cooldownDuration = 90
+local coinGivers = {"1.5kCoinsGiver", "2kCoinsGiver", "2.5kCoinsGiver", "8kCoinsGiver"}
+
+MainTab:CreateButton({
+   Name = "Auto Cash Farm (All Coins)",
+   Callback = function()
+      local currentTime = tick()
+      if currentTime - lastClaimTime >= cooldownDuration then
+         for _, coin in pairs(coinGivers) do
+            mapRemote:FireServer("claimCoins", coin)
+            task.wait(0.1)
+         end
+         lastClaimTime = currentTime
+         Rayfield:Notify({Title = "Success", Content = "All coins claimed!", Duration = 3})
+      else
+         local remaining = math.ceil(cooldownDuration - (currentTime - lastClaimTime))
+         Rayfield:Notify({
+            Title = "Wait!",
+            Content = "You have **" .. tostring(remaining) .. "** seconds to take the coin!",
+            Duration = 3
+         })
+      end
+   end,
+})
+
+MainTab:CreateSection("Movement (Auto-Loop)")
+MainTab:CreateSlider({
+   Name = "WalkSpeed",
+   Range = {16, 300},
+   Increment = 1,
+   CurrentValue = 16,
+   Callback = function(Value) walkSpeedValue = Value end,
+})
+
+MainTab:CreateSlider({
+   Name = "JumpPower",
+   Range = {50, 500},
+   Increment = 1,
+   CurrentValue = 50,
+   Callback = function(Value) jumpPowerValue = Value end,
+})
+
+Rayfield:LoadConfiguration()
