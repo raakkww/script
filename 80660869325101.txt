@@ -1,0 +1,130 @@
+local Player = game.Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Root = Character:WaitForChild("HumanoidRootPart")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local LOCATIONS = {
+    ["Common"]    = Vector3.new(52.51, 6.51, -134.28),
+    ["Uncommon"]  = Vector3.new(-50.59, 6.51, -230.54),
+    ["Rare"]      = Vector3.new(46.53, 6.51, -363.98),
+    ["Epic"]      = Vector3.new(-46.71, 7.54, -560.46),
+    ["Legendary"] = Vector3.new(52.48, 6.51, -783.73),
+    ["Mythic"]    = Vector3.new(-52.23, 6.97, -1053.35),
+    ["Secret"]    = Vector3.new(41.05, 6.51, -1443.81),
+    ["Cosmic"]    = Vector3.new(-49.66, 6.63, -1859.76),
+    ["Divine"]    = Vector3.new(47.86, 6.51, -2344.42)
+}
+
+local P1 = Vector3.new(0.13, 5.84, -80.90)
+local TP2 = Vector3.new(-1.84, 5.67, -2412.55)
+local SPEED = 40
+
+local function startTravel(targetName)
+    local targetPos = LOCATIONS[targetName]
+    if not targetPos then return end
+    Root.CFrame = CFrame.new(P1)
+    task.wait(0.1)
+    local lineDir = (TP2 - P1).Unit
+    local vectorToTarget = targetPos - P1
+    local dotProduct = math.clamp(vectorToTarget:Dot(lineDir), 0, (TP2 - P1).Magnitude)
+    local closestPoint = P1 + (lineDir * dotProduct)
+    local dist1 = (closestPoint - P1).Magnitude
+    if dist1 > 1 then
+        local t1 = TweenService:Create(Root, TweenInfo.new(dist1/SPEED, Enum.EasingStyle.Linear), {CFrame = CFrame.new(closestPoint, closestPoint + lineDir)})
+        t1:Play()
+        t1.Completed:Wait()
+    end
+    local dist2 = (targetPos - closestPoint).Magnitude
+    if dist2 > 1 then
+        local t2 = TweenService:Create(Root, TweenInfo.new(dist2/SPEED, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos, targetPos + (targetPos - closestPoint).Unit)})
+        t2:Play()
+        t2.Completed:Wait()
+    end
+end
+
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+
+local Holder = Instance.new("Frame", ScreenGui)
+Holder.Size = UDim2.new(0, 150, 0, 250)
+Holder.Position = UDim2.new(0.05, 0, 0.3, 0)
+Holder.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Holder.BorderSizePixel = 0
+Holder.Active = true
+Holder.Draggable = true
+
+local MainFrame = Instance.new("ScrollingFrame", Holder)
+MainFrame.Size = UDim2.new(1, 0, 0, 200)
+MainFrame.BackgroundTransparency = 1
+MainFrame.BorderSizePixel = 0
+MainFrame.CanvasSize = UDim2.new(0, 0, 2, 0)
+MainFrame.ScrollBarThickness = 3
+
+local UIList = Instance.new("UIListLayout", MainFrame)
+UIList.Padding = UDim.new(0, 4)
+
+local SpeedFrame = Instance.new("Frame", Holder)
+SpeedFrame.Size = UDim2.new(1, 0, 0, 50)
+SpeedFrame.Position = UDim2.new(0, 0, 0, 200)
+SpeedFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SpeedFrame.BorderSizePixel = 0
+
+local SpeedTitle = Instance.new("TextLabel", SpeedFrame)
+SpeedTitle.Size = UDim2.new(1, 0, 0, 20)
+SpeedTitle.Text = "SPEED: " .. SPEED
+SpeedTitle.TextColor3 = Color3.new(1, 1, 1)
+SpeedTitle.BackgroundTransparency = 1
+SpeedTitle.TextSize = 14
+
+local MinusBtn = Instance.new("TextButton", SpeedFrame)
+MinusBtn.Size = UDim2.new(0, 45, 0, 25)
+MinusBtn.Position = UDim2.new(0.05, 0, 0.4, 0)
+MinusBtn.Text = "-10"
+MinusBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+MinusBtn.TextColor3 = Color3.new(1, 1, 1)
+MinusBtn.BorderSizePixel = 0
+
+local PlusBtn = Instance.new("TextButton", SpeedFrame)
+PlusBtn.Size = UDim2.new(0, 45, 0, 25)
+PlusBtn.Position = UDim2.new(0.65, 0, 0.4, 0)
+PlusBtn.Text = "+10"
+PlusBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+PlusBtn.TextColor3 = Color3.new(1, 1, 1)
+PlusBtn.BorderSizePixel = 0
+
+MinusBtn.MouseButton1Click:Connect(function()
+    if SPEED > 10 then SPEED = SPEED - 10 SpeedTitle.Text = "SPEED: " .. SPEED end
+end)
+
+PlusBtn.MouseButton1Click:Connect(function()
+    SPEED = SPEED + 10 SpeedTitle.Text = "SPEED: " .. SPEED
+end)
+
+local order = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret", "Cosmic", "Divine"}
+for _, tier in ipairs(order) do
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(1, -10, 0, 25)
+    btn.Text = tier
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.BorderSizePixel = 0
+    btn.MouseButton1Click:Connect(function() startTravel(tier) end)
+end
+
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+    local delta = input.Position - dragStart
+    Holder.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+Holder.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true dragStart = input.Position startPos = Holder.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+    end
+end)
+Holder.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then update(input) end
+end)
