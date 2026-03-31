@@ -1,0 +1,297 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Keyless Hub v1.1",
+   LoadingTitle = "Loading...",
+   LoadingSubtitle = "",
+   ConfigurationSaving = {Enabled = true, FolderName = "DaleyHubKaizen"}
+})
+
+local MainTab = Window:CreateTab("Combat & XP", 4483362458)
+local MoveTab = Window:CreateTab("Movement", 4483345906)
+local LootTab = Window:CreateTab("Looting", 4483362458)
+
+-- =========================================================
+-- Combat Section
+-- =========================================================
+MainTab:CreateSection("Hardened Hitbox & Shadow")
+
+_G.HitboxSize = 25
+_G.HitboxToggled = false
+MainTab:CreateToggle({
+   Name = "Functional Hitbox Expander",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.HitboxToggled = Value
+      task.spawn(function()
+          while _G.HitboxToggled do
+              for _, v in pairs(workspace:GetDescendants()) do
+                  if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") then
+                      if not game.Players:GetPlayerFromCharacter(v) then
+                          v.HumanoidRootPart.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+                          v.HumanoidRootPart.Transparency = 0.5 
+                          v.HumanoidRootPart.CanCollide = false 
+                          v.HumanoidRootPart.CanTouch = true
+                          v.HumanoidRootPart.Massless = true
+                      end
+                  end
+              end
+              task.wait(1)
+          end
+      end)
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "Hitbox Range",
+   Range = {2, 100},
+   Increment = 1,
+   CurrentValue = 25,
+   Callback = function(Value) _G.HitboxSize = Value end,
+})
+
+_G.ShadowStep = false
+_G.ShadowOffset = 12 
+MainTab:CreateToggle({
+   Name = "Shadow Step (Safe Distance)",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.ShadowStep = Value
+      task.spawn(function()
+          while _G.ShadowStep do
+              local target = nil
+              local dist = math.huge
+              for _, v in pairs(workspace:GetDescendants()) do
+                  if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") then
+                      if not game.Players:GetPlayerFromCharacter(v) and v.Humanoid.Health > 0 then
+                          local d = (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - v.HumanoidRootPart.Position).Magnitude
+                          if d < dist then dist = d; target = v end
+                      end
+                  end
+              end
+              if target then
+                  game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, _G.ShadowOffset)
+              end
+              task.wait()
+          end
+      end)
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "Shadow Step Distance",
+   Range = {4, 25},
+   Increment = 1,
+   CurrentValue = 12,
+   Callback = function(Value) _G.ShadowOffset = Value end,
+})
+
+_G.AutoM1 = false
+MainTab:CreateToggle({
+   Name = "Auto-Click (M1)",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.AutoM1 = Value
+      task.spawn(function()
+          while _G.AutoM1 do
+              local VirtualInputManager = game:GetService("VirtualInputManager")
+              VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+              task.wait(0.05)
+              VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+              task.wait(0.1)
+          end
+      end)
+   end,
+})
+
+-- =========================================================
+-- Movement Section
+-- =========================================================
+MoveTab:CreateSection("Movement Utilities")
+
+MoveTab:CreateSlider({
+   Name = "WalkSpeed",
+   Range = {16, 250},
+   Increment = 1,
+   CurrentValue = 16,
+   Callback = function(Value) game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value end,
+})
+
+local noclip = false
+MoveTab:CreateToggle({
+   Name = "Noclip",
+   CurrentValue = false,
+   Callback = function(Value)
+       noclip = Value
+       game:GetService("RunService").Stepped:Connect(function()
+           if noclip and game.Players.LocalPlayer.Character then
+               for _, v in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                   if v:IsA("BasePart") then v.CanCollide = false end
+               end
+           end
+       end)
+   end,
+})
+
+local flying = false
+local flySpeed = 50
+local bv, bg
+MoveTab:CreateToggle({
+   Name = "Fly Mode (Q/E)",
+   CurrentValue = false,
+   Callback = function(Value)
+      flying = Value
+      local char = game.Players.LocalPlayer.Character
+      local root = char:WaitForChild("HumanoidRootPart")
+      if flying then
+          bv = Instance.new("BodyVelocity", root)
+          bg = Instance.new("BodyGyro", root)
+          bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+          bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+          task.spawn(function()
+              while flying do
+                  local camera = workspace.CurrentCamera
+                  local direction = Vector3.new(0,0,0)
+                  local UIS = game:GetService("UserInputService")
+                  if UIS:IsKeyDown(Enum.KeyCode.W) then direction = direction + camera.CFrame.LookVector end
+                  if UIS:IsKeyDown(Enum.KeyCode.S) then direction = direction - camera.CFrame.LookVector end
+                  if UIS:IsKeyDown(Enum.KeyCode.A) then direction = direction - camera.CFrame.RightVector end
+                  if UIS:IsKeyDown(Enum.KeyCode.D) then direction = direction + camera.CFrame.RightVector end
+                  if UIS:IsKeyDown(Enum.KeyCode.Q) then direction = direction + Vector3.new(0, -1, 0) end
+                  if UIS:IsKeyDown(Enum.KeyCode.E) then direction = direction + Vector3.new(0, 1, 0) end
+                  bv.Velocity = (direction.Magnitude > 0) and (direction.Unit * flySpeed) or Vector3.new(0,0.1,0)
+                  bg.CFrame = camera.CFrame
+                  task.wait()
+              end
+          end)
+      else
+          if bv then bv:Destroy() end
+          if bg then bg:Destroy() end
+      end
+   end,
+})
+
+MoveTab:CreateSlider({
+   Name = "Flight Speed",
+   Range = {10, 500},
+   Increment = 5,
+   CurrentValue = 50,
+   Callback = function(Value) flySpeed = Value end,
+})
+
+-- =========================================================
+-- Looting & Server Utilities
+-- =========================================================
+LootTab:CreateSection("Server Utilities")
+
+LootTab:CreateButton({
+   Name = "Server Hop (Farm Refresh)",
+   Callback = function()
+      local HttpService = game:GetService("HttpService")
+      local TeleportService = game:GetService("TeleportService")
+      local Servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+      for _, s in pairs(Servers.data) do
+         if s.playing < s.maxPlayers and s.id ~= game.JobId then
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, game.Players.LocalPlayer)
+            break
+         end
+      end
+   end,
+})
+
+LootTab:CreateSection("Visuals (ESP)")
+
+local function createESP(part, name, color)
+    if part:FindFirstChild("DaleyESP") then return end
+    local bgui = Instance.new("BillboardGui", part)
+    bgui.Name = "DaleyESP"
+    bgui.AlwaysOnTop = true
+    bgui.ExtentsOffset = Vector3.new(0, 3, 0)
+    bgui.Size = UDim2.new(0, 200, 0, 50)
+    local tl = Instance.new("TextLabel", bgui)
+    tl.BackgroundTransparency = 1
+    tl.Size = UDim2.new(1, 0, 1, 0)
+    tl.Text = name
+    tl.TextColor3 = color
+    tl.TextStrokeTransparency = 0
+    tl.TextScaled = true
+end
+
+_G.ESPEnabled = false
+LootTab:CreateToggle({
+   Name = "Enable ESP (Players/Mobs/Chests)",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.ESPEnabled = Value
+      task.spawn(function()
+          while _G.ESPEnabled do
+              for _, v in pairs(workspace:GetDescendants()) do
+                  if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") then
+                      local color = game.Players:GetPlayerFromCharacter(v) and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                      createESP(v.HumanoidRootPart, v.Name, color)
+                  elseif string.match(v.Name, "Chest") and (v:IsA("BasePart") or v:IsA("Model")) then
+                      local part = v:IsA("Model") and (v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")) or v
+                      if part then createESP(part, v.Name, Color3.fromRGB(255, 255, 0)) end
+                  end
+              end
+              task.wait(5)
+          end
+      end)
+   end,
+})
+
+LootTab:CreateSection("Chest Farming")
+
+_G.LoopNormal = false
+LootTab:CreateToggle({
+   Name = "Auto-Farm NormalChest",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.LoopNormal = Value
+      task.spawn(function()
+          while _G.LoopNormal do
+              for _, v in pairs(workspace:GetDescendants()) do
+                  if string.match(v.Name, "NormalChest") then
+                      local part = v:IsA("Model") and (v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")) or v
+                      if part then
+                          game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+                          task.wait(0.5)
+                          for _, p in pairs(part:GetDescendants()) do
+                              if p:IsA("ProximityPrompt") then fireproximityprompt(p) end
+                          end
+                      end
+                  end
+              end
+              task.wait(2)
+          end
+      end)
+   end,
+})
+
+_G.LoopLegendary = false
+LootTab:CreateToggle({
+   Name = "Auto-Farm LegendaryChest",
+   CurrentValue = false,
+   Callback = function(Value)
+      _G.LoopLegendary = Value
+      task.spawn(function()
+          while _G.LoopLegendary do
+              for _, v in pairs(workspace:GetDescendants()) do
+                  if string.match(v.Name, "LegendaryChest") then
+                      local part = v:IsA("Model") and (v.PrimaryPart or v:FindFirstChildWhichIsA("BasePart")) or v
+                      if part then
+                          game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+                          task.wait(0.5)
+                          for _, p in pairs(part:GetDescendants()) do
+                              if p:IsA("ProximityPrompt") then fireproximityprompt(p) end
+                          end
+                      end
+                  end
+              end
+              task.wait(2)
+          end
+      end)
+   end,
+})
+
+Rayfield:LoadConfiguration()
