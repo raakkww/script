@@ -1,0 +1,134 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "ARSENAL V1",
+   LoadingTitle = "sedang dimuat...",
+   LoadingSubtitle = "",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false 
+})
+
+_G.MasterSwitch = true
+_G.Aimbot = false
+_G.InfAmmo = false
+_G.Wallhack = false
+_G.InfJump = false
+_G.Speed = 16
+_G.Jump = 50
+_G.TeamCheck = true
+
+local MainTab = Window:CreateTab("👤 Karakter")
+MainTab:CreateSection(Gerakan dan kekuatan")
+
+MainTab:CreateSlider({
+   Name = "kecepatan jalan",
+   Range = {16, 500},
+   Increment = 1,
+   CurrentValue = 16,
+   Callback = function(Value) _G.Speed = Value end,
+})
+
+MainTab:CreateSlider({
+   Name = "Kekuatan lompatan",
+   Range = {50, 500},
+   Increment = 1,
+   CurrentValue = 50,
+   Callback = function(Value) _G.Jump = Value end,
+})
+
+MainTab:CreateToggle({
+   Name = "InfJump",
+   CurrentValue = false,
+   Callback = function(Value) _G.InfJump = Value end,
+})
+
+MainTab:CreateToggle({
+   Name = "inf Ammo",
+   CurrentValue = false,
+   Callback = function(Value) _G.InfAmmo = Value end,
+})
+
+local CombatTab = Window:CreateTab("🎯 Saldırı")
+CombatTab:CreateSection("Aimbot Sistemi")
+
+CombatTab:CreateToggle({
+   Name = "Aimbot",
+   CurrentValue = false,
+   Callback = function(Value) _G.Aimbot = Value end,
+})
+
+CombatTab:CreateToggle({
+   Name = "Kontrol tim",
+   CurrentValue = true,
+   Callback = function(Value) _G.TeamCheck = Value end,
+})
+
+local VisualTab = Window:CreateTab("👁️ Görsel")
+VisualTab:CreateSection("Mor Kedi ESP")
+
+VisualTab:CreateToggle({
+   Name = "ESP",
+   CurrentValue = false,
+   Callback = function(Value) _G.Wallhack = Value end,
+})
+
+local LP = game.Players.LocalPlayer
+local Cam = workspace.CurrentCamera
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+UIS.JumpRequest:Connect(function()
+    if _G.InfJump and _G.MasterSwitch then
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not _G.MasterSwitch then return end
+
+    pcall(function()
+        if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+            LP.Character.Humanoid.WalkSpeed = _G.Speed
+            LP.Character.Humanoid.JumpPower = _G.Jump
+        end
+    end)
+
+    if _G.Aimbot and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local target = nil
+        local dist = 1000
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v ~= LP and v.Character and v.Character:FindFirstChild("Head") then
+                if _G.TeamCheck and v.Team == LP.Team then continue end
+                local pos, on = Cam:WorldToScreenPoint(v.Character.Head.Position)
+                if on then
+                    local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(Cam.ViewportSize.X/2, Cam.ViewportSize.Y/2)).Magnitude
+                    if mag < dist then
+                        target = v.Character.Head
+                        dist = mag
+                    end
+                end
+            end
+        end
+        if target then Cam.CFrame = CFrame.new(Cam.CFrame.Position, target.Position) end
+    end
+
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v ~= LP and v.Character then
+            local hl = v.Character:FindFirstChild("KediWH")
+            if _G.Wallhack then
+                if not hl then
+                    hl = Instance.new("Highlight", v.Character)
+                    hl.Name = "Wallhack"
+                    hl.FillColor = Color3.fromRGB(170, 0, 255)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.FillTransparency = 0.5
+                end
+            elseif hl then hl:Destroy() end
+        end
+    end
+end)
