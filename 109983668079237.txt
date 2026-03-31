@@ -1,0 +1,92 @@
+
+local Players = game:GetService("Players")
+local ContextActionService = game:GetService("ContextActionService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "InstaStealerGui"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 180)
+frame.Position = UDim2.new(0, 50, 0.5, -90)
+frame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true 
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Text = ""
+title.TextScaled = true 
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+title.Parent = frame
+
+local function createButton(name, text, pos, color)
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.Text = text
+	btn.Size = UDim2.new(0.9, 0, 0, 45)
+	btn.Position = pos
+	btn.BackgroundColor3 = color
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextSize = 18
+	btn.Parent = frame
+	return btn
+end
+
+
+local noAnimBtn = createButton("NoAnimBtn", "Unwalk", UDim2.new(0.05, 0, 0, 50), Color3.fromRGB(70, 70, 70))
+local tpSpawnBtn = createButton("TpBtn", "TP (equip magic carpet)", UDim2.new(0.05, 0, 0, 110), Color3.fromRGB(0, 120, 200))
+
+
+
+-- 1. No Animation Logic
+local animsDisabled = false
+noAnimBtn.MouseButton1Click:Connect(function()
+	animsDisabled = not animsDisabled
+	local character = player.Character
+	if character then
+		local animate = character:FindFirstChild("Animate")
+		if animate then 
+            animate.Disabled = animsDisabled 
+        end
+		
+		if animsDisabled then
+			noAnimBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+			for _, t in pairs(character.Humanoid:GetPlayingAnimationTracks()) do 
+                t:Stop() 
+            end
+		else
+			noAnimBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+		end
+	end
+end)
+
+-- 2. Teleport to Spawn Logic
+tpSpawnBtn.MouseButton1Click:Connect(function()
+	local character = player.Character
+	if character and character:FindFirstChild("HumanoidRootPart") then
+		local spawns = {}
+		for _, v in pairs(workspace:GetDescendants()) do
+			if v:IsA("SpawnLocation") and v.Enabled then 
+                table.insert(spawns, v) 
+            end
+		end
+		
+		if #spawns > 0 then
+			character:MoveTo(spawns[math.random(1, #spawns)].Position + Vector3.new(0, 3, 0))
+		else
+            -- Fallback if no SpawnLocation is found
+            character:MoveTo(Vector3.new(0, 10, 0))
+		end
+	end
+end)
