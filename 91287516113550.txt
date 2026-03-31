@@ -1,0 +1,244 @@
+-- Create GUI elements
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ResourceGUI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Create main frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 200)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Add corner rounding
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainFrame
+
+-- Title bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = titleBar
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 1, 0)
+title.BackgroundTransparency = 1
+title.Text = "Resource Manager"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 18
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Center
+title.Parent = titleBar
+
+-- Close button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 1, 0)
+closeBtn.Position = UDim2.new(1, -30, 0, 0)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 18
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.BorderSizePixel = 0
+closeBtn.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 10)
+closeCorner.Parent = closeBtn
+
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- Coins Section
+local coinsFrame = Instance.new("Frame")
+coinsFrame.Size = UDim2.new(1, -20, 0, 70)
+coinsFrame.Position = UDim2.new(0, 10, 0, 40)
+coinsFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+coinsFrame.BackgroundTransparency = 0.3
+coinsFrame.BorderSizePixel = 0
+coinsFrame.Parent = mainFrame
+
+local coinsCorner = Instance.new("UICorner")
+coinsCorner.CornerRadius = UDim.new(0, 8)
+coinsCorner.Parent = coinsFrame
+
+local coinsLabel = Instance.new("TextLabel")
+coinsLabel.Size = UDim2.new(1, 0, 0, 25)
+coinsLabel.Position = UDim2.new(0, 10, 0, 5)
+coinsLabel.BackgroundTransparency = 1
+coinsLabel.Text = "Coins (Max: 99,999)"
+coinsLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+coinsLabel.TextSize = 14
+coinsLabel.Font = Enum.Font.GothamSemibold
+coinsLabel.TextXAlignment = Enum.TextXAlignment.Left
+coinsLabel.Parent = coinsFrame
+
+local coinsInput = Instance.new("TextBox")
+coinsInput.Size = UDim2.new(0, 120, 0, 30)
+coinsInput.Position = UDim2.new(0, 10, 0, 35)
+coinsInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+coinsInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+coinsInput.TextSize = 14
+coinsInput.Font = Enum.Font.Gotham
+coinsInput.PlaceholderText = "Enter amount"
+coinsInput.Text = "99999"
+coinsInput.Parent = coinsFrame
+
+local coinsInputCorner = Instance.new("UICorner")
+coinsInputCorner.CornerRadius = UDim.new(0, 5)
+coinsInputCorner.Parent = coinsInput
+
+local coinsButton = Instance.new("TextButton")
+coinsButton.Size = UDim2.new(0, 100, 0, 30)
+coinsButton.Position = UDim2.new(0, 140, 0, 35)
+coinsButton.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+coinsButton.Text = "Give Coins"
+coinsButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+coinsButton.TextSize = 14
+coinsButton.Font = Enum.Font.GothamBold
+coinsButton.BorderSizePixel = 0
+coinsButton.Parent = coinsFrame
+
+local coinsButtonCorner = Instance.new("UICorner")
+coinsButtonCorner.CornerRadius = UDim.new(0, 5)
+coinsButtonCorner.Parent = coinsButton
+
+-- Wood Section
+local woodFrame = Instance.new("Frame")
+woodFrame.Size = UDim2.new(1, -20, 0, 70)
+woodFrame.Position = UDim2.new(0, 10, 0, 120)
+woodFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+woodFrame.BackgroundTransparency = 0.3
+woodFrame.BorderSizePixel = 0
+woodFrame.Parent = mainFrame
+
+local woodCorner = Instance.new("UICorner")
+woodCorner.CornerRadius = UDim.new(0, 8)
+woodCorner.Parent = woodFrame
+
+local woodLabel = Instance.new("TextLabel")
+woodLabel.Size = UDim2.new(1, 0, 0, 25)
+woodLabel.Position = UDim2.new(0, 10, 0, 5)
+woodLabel.BackgroundTransparency = 1
+woodLabel.Text = "Wood (No Limit)"
+woodLabel.TextColor3 = Color3.fromRGB(160, 120, 80)
+woodLabel.TextSize = 14
+woodLabel.Font = Enum.Font.GothamSemibold
+woodLabel.TextXAlignment = Enum.TextXAlignment.Left
+woodLabel.Parent = woodFrame
+
+local woodInput = Instance.new("TextBox")
+woodInput.Size = UDim2.new(0, 120, 0, 30)
+woodInput.Position = UDim2.new(0, 10, 0, 35)
+woodInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+woodInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+woodInput.TextSize = 14
+woodInput.Font = Enum.Font.Gotham
+woodInput.PlaceholderText = "Enter amount"
+woodInput.Text = "10000000"
+woodInput.Parent = woodFrame
+
+local woodInputCorner = Instance.new("UICorner")
+woodInputCorner.CornerRadius = UDim.new(0, 5)
+woodInputCorner.Parent = woodInput
+
+local woodButton = Instance.new("TextButton")
+woodButton.Size = UDim2.new(0, 100, 0, 30)
+woodButton.Position = UDim2.new(0, 140, 0, 35)
+woodButton.BackgroundColor3 = Color3.fromRGB(160, 120, 80)
+woodButton.Text = "Give Wood"
+woodButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+woodButton.TextSize = 14
+woodButton.Font = Enum.Font.GothamBold
+woodButton.BorderSizePixel = 0
+woodButton.Parent = woodFrame
+
+local woodButtonCorner = Instance.new("UICorner")
+woodButtonCorner.CornerRadius = UDim.new(0, 5)
+woodButtonCorner.Parent = woodButton
+
+-- Function to validate number input
+local function validateNumber(input)
+    local num = tonumber(input)
+    if not num or num < 0 then
+        return 0
+    end
+    return math.floor(num)
+end
+
+-- Coins button functionality
+coinsButton.MouseButton1Click:Connect(function()
+    local amount = validateNumber(coinsInput.Text)
+    if amount > 99999 then
+        amount = 99999
+        coinsInput.Text = "99999"
+    end
+    local remote = game:GetService("ReplicatedStorage"):WaitForChild("GiveCoinsEvent")
+    remote:FireServer(amount)
+end)
+
+-- Wood button functionality
+woodButton.MouseButton1Click:Connect(function()
+    local amount = validateNumber(woodInput.Text)
+    game:GetService("ReplicatedStorage").Remoteevents.WoodAddValueEvent:FireServer(amount)
+end)
+
+-- Enter key functionality
+coinsInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local amount = validateNumber(coinsInput.Text)
+        if amount > 99999 then
+            coinsInput.Text = "99999"
+        elseif amount < 0 then
+            coinsInput.Text = "0"
+        end
+    end
+end)
+
+woodInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local amount = validateNumber(woodInput.Text)
+        if amount < 0 then
+            woodInput.Text = "0"
+        end
+    end
+end)
+
+-- Optional: Add a toggle button to show/hide GUI
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 40, 0, 40)
+toggleButton.Position = UDim2.new(0, 10, 1, -50)
+toggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+toggleButton.Text = "R"
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.TextSize = 20
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.BorderSizePixel = 0
+toggleButton.Parent = screenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggleButton
+
+local guiVisible = true
+toggleButton.MouseButton1Click:Connect(function()
+    guiVisible = not guiVisible
+    mainFrame.Visible = guiVisible
+    toggleButton.Text = guiVisible and "R" or "S"
+    toggleButton.BackgroundColor3 = guiVisible and Color3.fromRGB(30, 30, 30) or Color3.fromRGB(50, 200, 50)
+end)
