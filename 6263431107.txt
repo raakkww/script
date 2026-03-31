@@ -1,0 +1,218 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+ 
+local espEnabled = true
+local esp = {}
+ 
+-- role palette
+local roleColors = {
+    Imposter = Color3.new(1, 0, 0),
+    Crewmate = Color3.new(0, 1, 0),
+    Unknown  = Color3.new(1, 1, 1),
+}
+ 
+-- UI
+local gui = Instance.new("ScreenGui")
+gui.Name = "RoleESP"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = (gethui and gethui()) or game:FindFirstChildOfClass("CoreGui")
+ 
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(300, 340)
+frame.Position = UDim2.new(1, -320, 0.5, -170)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = gui
+ 
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 28)
+header.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+header.BorderSizePixel = 0
+header.Parent = frame
+ 
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1
+title.Position = UDim2.new(0, 6, 0, 0)
+title.Size = UDim2.new(1, -90, 1, 0)
+title.Font = Enum.Font.GothamBold
+title.Text = "Role ESP (drag)"
+title.TextSize = 14
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Parent = header
+ 
+local button = Instance.new("TextButton")
+button.AnchorPoint = Vector2.new(1, 0)
+button.Position = UDim2.new(1, -6, 0.5, -12)
+button.Size = UDim2.fromOffset(80, 24)
+button.BackgroundColor3 = Color3.fromRGB(60, 180, 90)
+button.Text = "ESP: ON"
+button.TextColor3 = Color3.new(1, 1, 1)
+button.Font = Enum.Font.GothamSemibold
+button.TextSize = 13
+button.Parent = header
+ 
+local scrl = Instance.new("ScrollingFrame")
+scrl.Size = UDim2.new(1, -10, 1, -38)
+scrl.Position = UDim2.new(0, 5, 0, 33)
+scrl.BackgroundTransparency = 1
+scrl.BorderSizePixel = 0
+scrl.ScrollBarThickness = 6
+scrl.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrl.Parent = frame
+ 
+local lyt = Instance.new("UIListLayout")
+lyt.Padding = UDim.new(0, 5)
+lyt.Parent = scrl
+ 
+-- dragging
+do
+    local dragging, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        local vp = Camera and Camera.ViewportSize or Vector2.new(1920, 1080)
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            math.clamp(startPos.X.Offset + delta.X, -vp.X + 50, vp.X - 50),
+            startPos.Y.Scale,
+            math.clamp(startPos.Y.Offset + delta.Y, -vp.Y + 50, vp.Y - 50)
+        )
+    end
+ 
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+ 
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            update(input)
+        end
+    end)
+end
+ 
+-- toggle
+button.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    button.Text = espEnabled and "ESP: ON" or "ESP: OFF"
+    button.BackgroundColor3 = espEnabled and Color3.fromRGB(60, 180, 90) or Color3.fromRGB(120, 60, 60)
+    for _, slot in pairs(esp) do
+        if slot.draw then slot.draw.Visible = false end
+        if slot.label then slot.label.Visible = espEnabled end
+    end
+end)
+ 
+-- helpers
+local function nickname(plr)
+    local dn = plr.DisplayName
+    return (dn and dn ~= "" and dn) or plr.Name
+end
+ 
+local function makeDraw()
+    local d = Drawing.new("Text")
+    d.Size = 14
+    d.Center = true
+    d.Outline = true
+    d.Visible = false
+    d.Color = Color3.new(1, 1, 1)
+    return d
+end
+ 
+local function ensureEntry(plr)
+    local slot = esp[plr]
+    if not slot then
+        slot = {
+            draw = makeDraw(),
+            label = Instance.new("TextLabel")
+        }
+        esp[plr] = slot
+        local lbl = slot.label
+        lbl.Size = UDim2.new(1, 0, 0, 25)
+        lbl.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        lbl.BorderSizePixel = 0
+        lbl.TextColor3 = Color3.new(1, 1, 1)
+        lbl.TextSize = 14
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextWrapped = true
+        lbl.Parent = scrl
+    end
+    return slot
+end
+ 
+local function removeEntry(plr)
+    local slot = esp[plr]
+    if not slot then return end
+    if slot.draw then slot.draw:Remove() end
+    if slot.label then slot.label:Destroy() end
+    esp[plr] = nil
+end
+ 
+Players.PlayerRemoving:Connect(removeEntry)
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterRemoving:Connect(function()
+        local slot = esp[plr]
+        if slot and slot.draw then slot.draw.Visible = false end
+    end)
+end)
+ 
+-- main render
+RunService.RenderStepped:Connect(function()
+    if not espEnabled then return end
+ 
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local slot = ensureEntry(plr)
+            local char = plr.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+ 
+            if not (hrp and hrp:IsDescendantOf(workspace)) then
+                slot.draw.Visible = false
+                slot.label.Visible = false
+                continue
+            end
+ 
+            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 2.5, 0))
+            if not onScreen then
+                slot.draw.Visible = false
+                slot.label.Visible = true -- still show in list
+                continue
+            end
+ 
+            local states = plr:FindFirstChild("PublicStates")
+            local roleObj = states and states:FindFirstChild("Role")
+            local subObj = states and states:FindFirstChild("SubRole")
+            local aliveObj = states and states:FindFirstChild("Alive")
+ 
+            local role = (roleObj and roleObj.Value) or "Unknown"
+            local sub = subObj and subObj.Value
+            local alive = aliveObj and aliveObj.Value
+            local statusText = alive and "[Alive]" or "[Dead]"
+            local textLine = string.format("%s | %s%s %s",
+                nickname(plr),
+                role,
+                sub and (" [" .. sub .. "]") or "",
+                statusText)
+ 
+            slot.draw.Position = Vector2.new(pos.X, pos.Y)
+            slot.draw.Text = textLine
+            slot.draw.Color = roleColors[role] or roleColors.Unknown
+            slot.draw.Visible = true
+ 
+            slot.label.Text = plr.Name .. " - " .. textLine
+            slot.label.TextColor3 = slot.draw.Color
+            slot.label.BackgroundColor3 = alive and Color3.fromRGB(40, 80, 40) or Color3.fromRGB(80, 40, 40)
+            slot.label.Visible = true
+        end
+    end
+end)
