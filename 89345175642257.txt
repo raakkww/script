@@ -1,0 +1,104 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local MainCorner = Instance.new("UICorner")
+local MainStroke = Instance.new("UIStroke")
+local Branding = Instance.new("TextLabel")
+local InputField = Instance.new("TextBox")
+local InputCorner = Instance.new("UICorner")
+local ToggleBtn = Instance.new("TextButton")
+local ToggleCorner = Instance.new("UICorner")
+local ToggleStroke = Instance.new("UIStroke")
+
+local IsActive = false
+local ChatRemote = ReplicatedStorage:WaitForChild("SendChatMessage", 9)
+
+ScreenGui.Name = "Spammer"
+ScreenGui.Parent = game:GetService("CoreGui")
+
+MainFrame.Name = "Container"
+MainFrame.Size = UDim2.new(0, 240, 0, 150)
+MainFrame.Position = UDim2.new(0.5, -120, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+MainFrame.BackgroundTransparency = 0.1
+MainFrame.ClipsDescendants = true
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+MainStroke.Thickness = 2
+MainStroke.Color = Color3.fromRGB(160, 32, 240)
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MainStroke.Parent = MainFrame
+
+Branding.Size = UDim2.new(1, 0, 0, 30)
+Branding.BackgroundTransparency = 1
+Branding.Text = ""
+Branding.TextColor3 = Color3.fromRGB(255, 255, 255)
+Branding.Font = Enum.Font.GothamBold
+Branding.TextSize = 10
+Branding.TextTransparency = 0.5
+Branding.Parent = MainFrame
+
+InputField.Name = "MsgInput"
+InputField.Size = UDim2.new(0, 210, 0, 45)
+InputField.Position = UDim2.new(0.5, -105, 0, 40)
+InputField.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+InputField.BackgroundTransparency = 0.4
+InputField.Text = ""
+InputField.PlaceholderText = "Enter Message..."
+InputField.TextColor3 = Color3.fromRGB(255, 255, 255)
+InputField.Font = Enum.Font.GothamSemibold
+InputField.TextSize = 13
+InputField.TextWrapped = true
+InputField.ClearTextOnFocus = false
+InputField.Parent = MainFrame
+
+InputCorner.CornerRadius = UDim.new(0, 6)
+InputCorner.Parent = InputField
+
+ToggleBtn.Name = "Toggle"
+ToggleBtn.Size = UDim2.new(0, 210, 0, 40)
+ToggleBtn.Position = UDim2.new(0.5, -105, 0, 95)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ToggleBtn.Text = "START"
+ToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 14
+ToggleBtn.AutoButtonColor = false
+ToggleBtn.Parent = MainFrame
+
+ToggleCorner.CornerRadius = UDim.new(0, 6)
+ToggleCorner.Parent = ToggleBtn
+
+ToggleStroke.Thickness = 1.5
+ToggleStroke.Color = Color3.fromRGB(60, 60, 60)
+ToggleStroke.Parent = ToggleBtn
+
+task.spawn(function()
+    while task.wait(0.12) do
+        if IsActive and InputField.Text ~= "" then
+            ChatRemote:FireServer(InputField.Text)
+        end
+    end
+end)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    IsActive = not IsActive
+    
+    if IsActive then
+        ToggleBtn.Text = "STOP"
+        ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ToggleStroke.Color = Color3.fromRGB(0, 255, 150)
+    else
+        ToggleBtn.Text = "START"
+        ToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        ToggleStroke.Color = Color3.fromRGB(60, 60, 60)
+    end
+end)
