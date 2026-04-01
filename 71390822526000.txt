@@ -1,0 +1,193 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- --- INTERFACE ---
+local sg = Instance.new("ScreenGui", player.PlayerGui)
+sg.Name = ""
+sg.ResetOnSpawn = false
+
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 220, 0, 440)
+main.Position = UDim2.new(0.05, 0, 0.2, 0)
+main.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+main.Active = true
+main.Draggable = true
+Instance.new("UICorner", main)
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = ""
+title.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+Instance.new("UICorner", title)
+
+local function createBtn(name, y, color)
+	local b = Instance.new("TextButton", main)
+	b.Name = name
+	b.Text = name
+	b.Size = UDim2.new(0.9, 0, 0, 30)
+	b.Position = UDim2.new(0.05, 0, 0, y)
+	b.BackgroundColor3 = color
+	b.TextColor3 = Color3.new(1, 1, 1)
+	b.Font = Enum.Font.GothamSemibold
+    b.TextSize = 11
+	Instance.new("UICorner", b)
+	return b
+end
+
+-- --- LES BOUTONS ---
+local flyBtn = createBtn("FLY : OFF", 50, Color3.fromRGB(40, 40, 40))
+local flySpeedBtn = createBtn("FLY SPEED : 50", 85, Color3.fromRGB(60, 60, 60))
+local noclipBtn = createBtn("NOCLIP : OFF", 120, Color3.fromRGB(40, 40, 40))
+local wallBtn = createBtn("WALLHACK : OFF", 155, Color3.fromRGB(40, 40, 40))
+local hitboxBtn = createBtn("HITBOX : OFF", 190, Color3.fromRGB(40, 40, 40))
+local jumpBtn = createBtn("INF JUMP : OFF", 225, Color3.fromRGB(40, 40, 40))
+local speedBtn = createBtn("SUPER SPEED : OFF", 260, Color3.fromRGB(40, 40, 40))
+local tpBtn = createBtn("CLICK TP : OFF (CTRL+CLIC)", 295, Color3.fromRGB(40, 40, 40))
+
+-- --- BARRE INFINITE HELL (CMD) ---
+local cmdBox = Instance.new("TextBox", main)
+cmdBox.Size = UDim2.new(0.9, 0, 0, 35)
+cmdBox.Position = UDim2.new(0.05, 0, 0, 335)
+cmdBox.PlaceholderText = ""
+cmdBox.Text = ""
+cmdBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+cmdBox.TextColor3 = Color3.new(0, 0, 0)
+Instance.new("UICorner", cmdBox)
+
+local execBtn = createBtn("EXECUTER CMD", 380, Color3.fromRGB(200, 0, 0))
+
+-- --- LOGIQUE ---
+local noclip, flying, wallhack, hitboxActive, infJump, superSpeed, clickTP = false, false, false, false, false, false, false
+local flySpeed = 50
+
+-- 1. CLICK TP (Téléportation avec CTRL + Clic gauche)
+UserInputService.InputBegan:Connect(function(input)
+    if clickTP and input.UserInputType == Enum.UserInputType.MouseButton1 and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.p + Vector3.new(0, 3, 0))
+        end
+    end
+end)
+tpBtn.MouseButton1Click:Connect(function()
+    clickTP = not clickTP
+    tpBtn.Text = clickTP and "CLICK TP : ON" or "CLICK TP : OFF"
+    tpBtn.BackgroundColor3 = clickTP and Color3.fromRGB(0, 150, 150) or Color3.fromRGB(40, 40, 40)
+end)
+
+-- 2. INFINITE HELL (Logique des commandes personnalisées)
+execBtn.MouseButton1Click:Connect(function()
+    local cmd = cmdBox.Text:lower()
+    if cmd == "kill" then
+        player.Character:BreakJoints()
+    elseif cmd == "invisible" then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.Transparency = 1 end
+        end
+    elseif cmd == "visible" then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then part.Transparency = 0 end
+        end
+    elseif cmd == "btools" then
+        for i = 1, 4 do
+            local tool = Instance.new("HopperBin", player.Backpack)
+            tool.BinType = i
+        end
+    elseif cmd == "reset" then
+        player.Character.Humanoid.Health = 0
+    end
+    cmdBox.Text = ""
+end)
+
+-- 3. LOGIQUE GÉNÉRALE (RenderStepped & Stepped)
+RunService.RenderStepped:Connect(function()
+	if wallhack then
+		for _, p in pairs(Players:GetPlayers()) do
+			if p ~= player and p.Character then
+				if not p.Character:FindFirstChild("Highlight") then Instance.new("Highlight", p.Character) end
+			end
+		end
+	end
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = superSpeed and 100 or 16
+    end
+end)
+
+RunService.Stepped:Connect(function()
+	if noclip and player.Character then
+		for _, v in pairs(player.Character:GetDescendants()) do
+			if v:IsA("BasePart") then v.CanCollide = false end
+		end
+	end
+end)
+
+-- 4. AUTRES BOUTONS
+speedBtn.MouseButton1Click:Connect(function()
+	superSpeed = not superSpeed
+    speedBtn.Text = superSpeed and "SPEED : ON" or "SPEED : OFF"
+end)
+
+jumpBtn.MouseButton1Click:Connect(function()
+	infJump = not infJump
+    jumpBtn.Text = infJump and "INF JUMP : ON" or "INF JUMP : OFF"
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if infJump then player.Character.Humanoid:ChangeState("Jumping") end
+end)
+
+noclipBtn.MouseButton1Click:Connect(function()
+	noclip = not noclip
+    noclipBtn.Text = noclip and "NOCLIP : ON" or "NOCLIP : OFF"
+end)
+
+flySpeedBtn.MouseButton1Click:Connect(function()
+    flySpeed = (flySpeed >= 250) and 50 or flySpeed + 50
+    flySpeedBtn.Text = "FLY SPEED : " .. flySpeed
+end)
+
+flyBtn.MouseButton1Click:Connect(function()
+	flying = not flying
+    flyBtn.Text = flying and "FLY : ON" or "FLY : OFF"
+	local root = player.Character:WaitForChild("HumanoidRootPart")
+	if flying then
+		local bv = Instance.new("BodyVelocity", root)
+		local bg = Instance.new("BodyGyro", root)
+		bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+		bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+		task.spawn(function()
+			while flying do
+				bv.Velocity = workspace.CurrentCamera.CFrame.LookVector * flySpeed
+				bg.CFrame = workspace.CurrentCamera.CFrame
+				task.wait()
+			end
+			bv:Destroy() bg:Destroy()
+		end)
+	end
+end)
+
+wallBtn.MouseButton1Click:Connect(function()
+    wallhack = not wallhack
+    wallBtn.Text = wallhack and "WALLHACK : ON" or "WALLHACK : OFF"
+end)
+
+hitboxBtn.MouseButton1Click:Connect(function()
+	hitboxActive = not hitboxActive
+	hitboxBtn.Text = hitboxActive and "HITBOX : ON" or "HITBOX : OFF"
+	task.spawn(function()
+		while hitboxActive do
+			for _, p in pairs(Players:GetPlayers()) do
+				if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+					p.Character.HumanoidRootPart.Size = Vector3.new(10, 10, 10)
+					p.Character.HumanoidRootPart.Transparency = 0.8
+				end
+			end
+			task.wait(1)
+		end
+	end)
+end)
