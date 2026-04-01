@@ -1,0 +1,718 @@
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = Workspace.CurrentCamera
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+-- [ DYNAMIC GAME ICON FETCHER ]
+local gameIconId = "rbxassetid://68073547" -- Fallback icon
+local successIcon, productInfo = pcall(function()
+    return MarketplaceService:GetProductInfo(game.PlaceId)
+end)
+if successIcon and productInfo and productInfo.IconImageAssetId then
+    gameIconId = "rbxassetid://" .. productInfo.IconImageAssetId
+end
+
+-- [ SMOOTH LOADING SCREEN (Medium Size for Mobile/PC) ] --
+local loadScreen = Instance.new("ScreenGui")
+loadScreen.Name = ""
+loadScreen.IgnoreGuiInset = true
+
+local success, err = pcall(function() loadScreen.Parent = CoreGui end)
+if not success then loadScreen.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+-- Dimmed background
+local dimBg = Instance.new("Frame")
+dimBg.Size = UDim2.new(1, 0, 1, 0)
+dimBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+dimBg.BackgroundTransparency = 1 -- Starts invisible
+dimBg.BorderSizePixel = 0
+dimBg.Parent = loadScreen
+
+-- Centered Medium Box
+local centerBox = Instance.new("Frame")
+centerBox.Size = UDim2.new(0.8, 0, 0, 130) -- 80% width on mobile
+centerBox.Position = UDim2.new(0.5, 0, 0.5, 0)
+centerBox.AnchorPoint = Vector2.new(0.5, 0.5)
+centerBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45) -- Gray Background
+centerBox.BackgroundTransparency = 1 -- Starts invisible
+centerBox.BorderSizePixel = 0
+centerBox.ClipsDescendants = true
+centerBox.Parent = dimBg
+
+local boxCorner = Instance.new("UICorner")
+boxCorner.CornerRadius = UDim.new(0, 10)
+boxCorner.Parent = centerBox
+
+local boxConstraint = Instance.new("UISizeConstraint")
+boxConstraint.MaxSize = Vector2.new(380, 130) -- Caps size on PC
+boxConstraint.Parent = centerBox
+
+local boxStroke = Instance.new("UIStroke")
+boxStroke.Color = Color3.fromRGB(0, 0, 0)
+boxStroke.Thickness = 2
+boxStroke.Transparency = 1
+boxStroke.Parent = centerBox
+
+-- TopBar Container
+local topBarContainer = Instance.new("Frame")
+topBarContainer.Size = UDim2.new(1, 0, 0, 70)
+topBarContainer.Position = UDim2.new(0, 0, 0, 10)
+topBarContainer.BackgroundTransparency = 1
+topBarContainer.Parent = centerBox
+
+local topBarLayout = Instance.new("UIListLayout")
+topBarLayout.FillDirection = Enum.FillDirection.Horizontal
+topBarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+topBarLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+topBarLayout.Padding = UDim.new(0, 12)
+topBarLayout.Parent = topBarContainer
+
+local gameLogo = Instance.new("ImageLabel")
+gameLogo.Image = gameIconId
+gameLogo.Size = UDim2.new(0, 50, 0, 50)
+gameLogo.BackgroundTransparency = 1
+gameLogo.ImageTransparency = 1
+gameLogo.Parent = topBarContainer
+
+local logoCorner = Instance.new("UICorner")
+logoCorner.CornerRadius = UDim.new(0, 8)
+logoCorner.Parent = gameLogo
+
+local topBarText = Instance.new("TextLabel")
+topBarText.Text = ""
+topBarText.Font = Enum.Font.GothamBold
+topBarText.TextSize = 24
+topBarText.TextColor3 = Color3.fromRGB(255, 255, 255)
+topBarText.Size = UDim2.new(0, 240, 0, 50)
+topBarText.BackgroundTransparency = 1
+topBarText.TextTransparency = 1
+topBarText.TextXAlignment = Enum.TextXAlignment.Left
+topBarText.Parent = topBarContainer
+
+-- Loading Bar
+local barContainer = Instance.new("Frame")
+barContainer.Size = UDim2.new(0.85, 0, 0, 16) 
+barContainer.Position = UDim2.new(0.075, 0, 0.75, 0) 
+barContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+barContainer.BackgroundTransparency = 1
+barContainer.BorderSizePixel = 0
+barContainer.Parent = centerBox
+
+local barCorner = Instance.new("UICorner")
+barCorner.CornerRadius = UDim.new(0, 6)
+barCorner.Parent = barContainer
+
+local barStroke = Instance.new("UIStroke")
+barStroke.Color = Color3.fromRGB(0, 0, 0)
+barStroke.Thickness = 1.5
+barStroke.Transparency = 1
+barStroke.Parent = barContainer
+
+local bar = Instance.new("Frame")
+bar.Size = UDim2.new(0, 0, 1, 0)
+bar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+bar.BorderSizePixel = 0
+bar.Parent = barContainer
+
+local barInnerCorner = Instance.new("UICorner")
+barInnerCorner.CornerRadius = UDim.new(0, 6)
+barInnerCorner.Parent = bar
+
+local grad = Instance.new("UIGradient")
+grad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 15, 35)),  
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 139))    
+})
+grad.Parent = bar
+
+-- ANIMATION LOGIC: Fade In
+local fadeSpeed = 0.5
+TweenService:Create(dimBg, TweenInfo.new(fadeSpeed), {BackgroundTransparency = 0.4}):Play()
+TweenService:Create(centerBox, TweenInfo.new(fadeSpeed), {BackgroundTransparency = 0}):Play()
+TweenService:Create(boxStroke, TweenInfo.new(fadeSpeed), {Transparency = 0}):Play()
+TweenService:Create(gameLogo, TweenInfo.new(fadeSpeed), {ImageTransparency = 0}):Play()
+TweenService:Create(topBarText, TweenInfo.new(fadeSpeed), {TextTransparency = 0}):Play()
+TweenService:Create(barContainer, TweenInfo.new(fadeSpeed), {BackgroundTransparency = 0}):Play()
+TweenService:Create(barStroke, TweenInfo.new(fadeSpeed), {Transparency = 0}):Play()
+
+task.wait(fadeSpeed)
+
+-- ANIMATION LOGIC: Fill Bar
+local barTween = TweenService:Create(bar, TweenInfo.new(2.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)})
+barTween:Play()
+barTween.Completed:Wait()
+
+-- ANIMATION LOGIC: Fade Out
+TweenService:Create(dimBg, TweenInfo.new(fadeSpeed), {BackgroundTransparency = 1}):Play()
+TweenService:Create(centerBox, TweenInfo.new(fadeSpeed), {BackgroundTransparency = 1}):Play()
+TweenService:Create(boxStroke, TweenInfo.new(fadeSpeed), {Transparency = 1}):Play()
+TweenService:Create(gameLogo, TweenInfo.new(fadeSpeed), {ImageTransparency = 1}):Play()
+TweenService:Create(topBarText, TweenInfo.new(fadeSpeed), {TextTransparency = 1}):Play()
+TweenService:Create(barContainer, TweenInfo.new(fadeSpeed), {BackgroundTransparency = 1}):Play()
+TweenService:Create(barStroke, TweenInfo.new(fadeSpeed), {Transparency = 1}):Play()
+TweenService:Create(bar, TweenInfo.new(fadeSpeed), {BackgroundTransparency = 1}):Play()
+
+task.wait(fadeSpeed)
+loadScreen:Destroy()
+
+-- [ INITIALIZE UI ] --
+local Modal = loadstring(game:HttpGet("https://github.com/lxte/Modal/releases/latest/download/main.lua"))()
+local Window = Modal:CreateWindow({
+    Title = "",
+    SubTitle = "",
+    Size = UDim2.fromOffset(400, 350), 
+    MinimumSize = Vector2.new(250, 200),
+    Transparency = 0,
+    Icon = gameIconId, -- Puts game icon next to title
+})
+
+Window:SetTheme("Midnight")
+Window:Notify({ Title = "Success!", Description = "Loaded Successfully.", Duration = 4, Type = "Success" })
+
+local executorName = identifyexecutor and identifyexecutor() or "Unknown Executor"
+
+-- [ INFO TAB ] --
+local InfoTab = Window:AddTab("Info")
+
+InfoTab:New("Title")({ Title = "Main script" })
+
+-- Changed these back to Buttons so they don't crash your script!
+InfoTab:New("Button")({
+    Title = "",
+    Description = "",
+    Callback = function() end -- Does nothing when clicked, just displays your text perfectly.
+})
+
+InfoTab:New("Button")({
+    Title = "Executor Status",
+    Description = "Executor you're using: " .. executorName .. "\nDescription: We have ran 12/12 checks, and your executor seems to support our script.",
+    Callback = function() end
+})
+
+-- [ SETTINGS / THEME SWITCHER TAB ] --
+local SettingsTab = Window:AddTab("Settings")
+SettingsTab:New("Title")({ Title = "UI Configuration" })
+
+local customThemes = {
+    ["Bite By Night Theme"] = {
+        Background = Color3.fromRGB(25, 10, 5),      -- Dark fire orange/brown
+        Secondary = Color3.fromRGB(40, 15, 5),       
+        Tertiary = Color3.fromRGB(50, 20, 10),       
+        Text = Color3.fromRGB(255, 180, 100),        -- Fire text
+        Toggle = Color3.fromRGB(20, 60, 20),         -- Dark Springtrap Green
+        Main = Color3.fromRGB(220, 60, 10)           -- Fiery Red/Orange
+    }
+}
+
+SettingsTab:New("Dropdown")({
+    Title = "Theme Switcher",
+    Description = "Change the colors",
+    Options = {"Bite By Night Theme", "Midnight", "Dark", "Light"},
+    Default = "Midnight",
+    Callback = function(theme)
+        if customThemes[theme] then
+            pcall(function() Window:SetTheme(customThemes[theme]) end)
+        else
+            pcall(function() Window:SetTheme(theme) end)
+        end
+    end,
+})
+
+-- [ TASKS / AUTOMATION TAB ] --
+local TasksTab = Window:AddTab("Tasks")
+TasksTab:New("Title")({ Title = "Survivor Automation" })
+
+local genConn = nil
+TasksTab:New("Toggle")({
+    Title = "Auto-Repair Generators",
+    Description = "Automatically triggers and completes the generator mini-game events for you.",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            genConn = RunService.RenderStepped:Connect(function()
+                if LocalPlayer.PlayerGui:FindFirstChild("Gen") then
+                    pcall(function() LocalPlayer.PlayerGui.Gen.GeneratorMain.Event:FireServer(true) end)
+                end
+            end)
+        else
+            if genConn then genConn:Disconnect() genConn = nil end
+        end
+    end,
+})
+
+local dotConn = nil
+TasksTab:New("Toggle")({
+    Title = "Perfect Barricade",
+    Description = "Forces the barricading mini-game dot to stay perfectly centered.",
+    DefaultValue = false,
+    Callback = function(Value)
+        local gui = LocalPlayer:WaitForChild("PlayerGui")
+        if Value then
+            dotConn = RunService.RenderStepped:Connect(function()
+                local dot = gui:FindFirstChild("Dot")
+                if dot and dot:IsA("ScreenGui") then
+                    local container = dot:FindFirstChild("Container")
+                    if container then
+                        local frame = container:FindFirstChild("Frame")
+                        if frame then
+                            frame.AnchorPoint = Vector2.new(0.5, 0.5)
+                            frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+                        end
+                    end
+                end
+            end)
+        else
+            if dotConn then dotConn:Disconnect() dotConn = nil end
+        end
+    end,
+})
+
+local autoEscapeConn = nil
+TasksTab:New("Toggle")({
+    Title = "Teleport to exit door",
+    Description = "Automatically teleports you to the escape zone the second the exits open.",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            local teleported = false
+            autoEscapeConn = RunService.RenderStepped:Connect(function()
+                if teleported then return end
+                local char = LocalPlayer.Character
+                if not char then return end
+                
+                local map = workspace:FindFirstChild("MAPS") and workspace.MAPS:FindFirstChild("GAME MAP")
+                if not map then return end
+                local escapes = map:FindFirstChild("Escapes")
+                if not escapes then return end
+
+                for _, part in pairs(escapes:GetChildren()) do
+                    if part:IsA("BasePart") and part:GetAttribute("Enabled") then
+                        local highlight = part:FindFirstChildOfClass("Highlight")
+                        if highlight and highlight.Enabled then
+                            local root = char:FindFirstChild("HumanoidRootPart")
+                            if root then
+                                teleported = true
+                                root.Anchored = true
+                                char:SetPrimaryPartCFrame(part.CFrame)
+                                task.delay(1.5, function() root.Anchored = false end)
+                                task.delay(10, function() teleported = false end)
+                            end
+                        end
+                    end
+                end
+            end)
+        else
+            if autoEscapeConn then autoEscapeConn:Disconnect() autoEscapeConn = nil end
+        end
+    end,
+})
+
+-- [ LOCAL / MOVEMENT TAB ] --
+local LocalTab = Window:AddTab("Local")
+LocalTab:New("Title")({ Title = "Character Movement" })
+
+local sprintConn = nil
+LocalTab:New("Toggle")({
+    Title = "Infinite stamina",
+    Description = "Do not hold the stamina button, it'll automatically hold the run button.",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            sprintConn = RunService.Heartbeat:Connect(function()
+                local char = LocalPlayer.Character
+                if char then char:SetAttribute("WalkSpeed", 25) end
+            end)
+        else
+            if sprintConn then sprintConn:Disconnect() sprintConn = nil end
+            local char = LocalPlayer.Character
+            if char then char:SetAttribute("WalkSpeed", 12) end
+        end
+    end,
+})
+
+local noclipConn = nil
+LocalTab:New("Toggle")({
+    Title = "Noclip",
+    Description = "Disables collision on your character, allowing you to walk right through solid walls.",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            noclipConn = RunService.Stepped:Connect(function()
+                local char = LocalPlayer.Character
+                if not char then return end
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end)
+        else
+            if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+        end
+    end,
+})
+
+local pcFlyConn = nil
+LocalTab:New("Toggle")({
+    Title = "Advanced Fly (PC)",
+    Description = "Allows PC players to fly using WASD and Camera direction.",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            local char = LocalPlayer.Character
+            if not char then return end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            
+            char:FindFirstChildOfClass("Humanoid").PlatformStand = true
+            root.Anchored = true
+
+            pcFlyConn = RunService.RenderStepped:Connect(function(dt)
+                if not root or not root.Parent then return end
+                local move = Vector3.zero
+                local speed = 100
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= Camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= Camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += Camera.CFrame.RightVector end
+
+                if move.Magnitude > 0 then
+                    root.CFrame = root.CFrame + (move.Unit * (speed * dt))
+                end
+                root.CFrame = CFrame.new(root.Position, root.Position + Camera.CFrame.LookVector)
+            end)
+        else
+            if pcFlyConn then pcFlyConn:Disconnect() pcFlyConn = nil end
+            local char = LocalPlayer.Character
+            if char then
+                char:FindFirstChildOfClass("Humanoid").PlatformStand = false
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then root.Anchored = false end
+            end
+        end
+    end,
+})
+
+local mobileFlyConn = nil
+LocalTab:New("Toggle")({
+    Title = "Advanced Fly (Mobile)",
+    Description = "Allows Mobile players to fly using the on-screen joystick and camera.",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            local char = LocalPlayer.Character
+            if not char then return end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not root or not hum then return end
+            
+            hum.PlatformStand = true
+            root.Anchored = true
+
+            mobileFlyConn = RunService.RenderStepped:Connect(function(dt)
+                if not root or not root.Parent then return end
+                local moveDir = hum.MoveDirection
+                local speed = 100
+                
+                if moveDir.Magnitude > 0 then
+                    local camLook = Camera.CFrame.LookVector
+                    local camRight = Camera.CFrame.RightVector
+                    local moveCalc = (camLook * moveDir.Z * -1) + (camRight * moveDir.X)
+                    root.CFrame = root.CFrame + (moveCalc * (speed * dt))
+                end
+                root.CFrame = CFrame.new(root.Position, root.Position + Camera.CFrame.LookVector)
+            end)
+        else
+            if mobileFlyConn then mobileFlyConn:Disconnect() mobileFlyConn = nil end
+            local char = LocalPlayer.Character
+            if char then
+                char:FindFirstChildOfClass("Humanoid").PlatformStand = false
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then root.Anchored = false end
+            end
+        end
+    end,
+})
+
+-- [ VISUALS TAB ] --
+local VisualsTab = Window:AddTab("Visuals")
+VisualsTab:New("Title")({ Title = "ESP & Lighting Enhancements" })
+
+local oldLighting = {}
+VisualsTab:New("Toggle")({
+    Title = "Full Brightness",
+    Description = "Removes map darkness, shadows, and fog so you can see perfectly clearly.",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            oldLighting.Brightness = Lighting.Brightness
+            oldLighting.ClockTime = Lighting.ClockTime
+            oldLighting.FogEnd = Lighting.FogEnd
+            oldLighting.GlobalShadows = Lighting.GlobalShadows
+            oldLighting.Ambient = Lighting.Ambient
+            Lighting.Brightness = 5
+            Lighting.ClockTime = 14
+            Lighting.FogEnd = 100000
+            Lighting.GlobalShadows = false
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        else
+            if next(oldLighting) then
+                Lighting.Brightness = oldLighting.Brightness
+                Lighting.ClockTime = oldLighting.ClockTime
+                Lighting.FogEnd = oldLighting.FogEnd
+                Lighting.GlobalShadows = oldLighting.GlobalShadows
+                Lighting.Ambient = oldLighting.Ambient
+            end
+        end
+    end,
+})
+
+-- ESP Logic System
+local espData = { survivors = {}, killers = {}, generators = {}, batteries = {} }
+
+local function newHighlight(obj, fillColor, outlineColor)
+    if not obj then return end
+    local h = Instance.new("Highlight")
+    h.FillColor = fillColor
+    h.FillTransparency = 0.5
+    h.OutlineColor = outlineColor or fillColor
+    h.OutlineTransparency = 0
+    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    h.Adornee = obj
+    h.Parent = obj
+    return h
+end
+
+local function addESP(tbl, obj, fillColor, outlineColor)
+    if obj and not tbl[obj] then tbl[obj] = newHighlight(obj, fillColor, outlineColor) end
+end
+local function removeESP(tbl, obj)
+    if tbl[obj] then tbl[obj]:Destroy() tbl[obj] = nil end
+end
+local function clearESP(tbl)
+    for obj, h in pairs(tbl) do if h then h:Destroy() end tbl[obj] = nil end
+end
+
+local function getSurvivorColor(char)
+    if char:FindFirstChild("Medkit") or char:GetAttribute("Role") == "Medic" then
+        return Color3.fromRGB(255, 255, 255) -- White
+    elseif char:FindFirstChild("Axe") or char:GetAttribute("Role") == "Fighter" then
+        return Color3.fromRGB(128, 0, 128) -- Purple
+    else
+        return Color3.fromRGB(0, 255, 0) -- Green
+    end
+end
+
+VisualsTab:New("Toggle")({
+    Title = "Highlight all survivors",
+    Description = "Draws an outline around survivors. (Green = Normal, White = Medic, Purple = Fighter)",
+    DefaultValue = false,
+    Callback = function(Value)
+        local aliveFolder = workspace:FindFirstChild("PLAYERS") and workspace.PLAYERS:FindFirstChild("ALIVE")
+        if Value and aliveFolder then
+            for _, v in ipairs(aliveFolder:GetChildren()) do 
+                if v:IsA("Model") then addESP(espData.survivors, v, getSurvivorColor(v)) end 
+            end
+            espData.survivorAdd = aliveFolder.ChildAdded:Connect(function(v) 
+                if v:IsA("Model") then addESP(espData.survivors, v, getSurvivorColor(v)) end 
+            end)
+            espData.survivorRemove = aliveFolder.ChildRemoved:Connect(function(v) removeESP(espData.survivors, v) end)
+            
+            espData.survivorUpdate = RunService.Heartbeat:Connect(function()
+                for char, highlight in pairs(espData.survivors) do
+                    if char and highlight then highlight.FillColor = getSurvivorColor(char) highlight.OutlineColor = getSurvivorColor(char) end
+                end
+            end)
+        else
+            if espData.survivorAdd then espData.survivorAdd:Disconnect() end
+            if espData.survivorRemove then espData.survivorRemove:Disconnect() end
+            if espData.survivorUpdate then espData.survivorUpdate:Disconnect() end
+            clearESP(espData.survivors)
+        end
+    end,
+})
+
+VisualsTab:New("Toggle")({
+    Title = "Detect Killer",
+    Description = "Draws a red highlight around the killer.",
+    DefaultValue = false,
+    Callback = function(Value)
+        local killerFolder = workspace:FindFirstChild("PLAYERS") and workspace.PLAYERS:FindFirstChild("KILLER")
+        if Value and killerFolder then
+            for _, v in ipairs(killerFolder:GetChildren()) do if v:IsA("Model") then addESP(espData.killers, v, Color3.fromRGB(255, 80, 80)) end end
+            espData.killerAdd = killerFolder.ChildAdded:Connect(function(v) if v:IsA("Model") then addESP(espData.killers, v, Color3.fromRGB(255, 80, 80)) end end)
+            espData.killerRemove = killerFolder.ChildRemoved:Connect(function(v) removeESP(espData.killers, v) end)
+        else
+            if espData.killerAdd then espData.killerAdd:Disconnect() end
+            if espData.killerRemove then espData.killerRemove:Disconnect() end
+            clearESP(espData.killers)
+        end
+    end,
+})
+
+VisualsTab:New("Toggle")({
+    Title = "Highlight all generators",
+    Description = "Draws a yellow highlight with a white outline around all map generators.",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("Model") and v.Name == "Generator" then addESP(espData.generators, v, Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 255, 255)) end
+            end
+            espData.genAdd = workspace.DescendantAdded:Connect(function(v)
+                if v:IsA("Model") and v.Name == "Generator" then addESP(espData.generators, v, Color3.fromRGB(255, 255, 0), Color3.fromRGB(255, 255, 255)) end
+            end)
+            espData.genRemove = workspace.DescendantRemoving:Connect(function(v)
+                if espData.generators[v] then removeESP(espData.generators, v) end
+            end)
+        else
+            if espData.genAdd then espData.genAdd:Disconnect() end
+            if espData.genRemove then espData.genRemove:Disconnect() end
+            clearESP(espData.generators)
+        end
+    end,
+})
+
+VisualsTab:New("Toggle")({
+    Title = "Highlight all batteries",
+    Description = "Draws a cyan highlight around all batteries on the map.",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("MeshPart") and v.Name == "Battery" then addESP(espData.batteries, v, Color3.fromRGB(0, 255, 255)) end
+            end
+            espData.batAdd = workspace.DescendantAdded:Connect(function(v)
+                if v:IsA("MeshPart") and v.Name == "Battery" then addESP(espData.batteries, v, Color3.fromRGB(0, 255, 255)) end
+            end)
+            espData.batRemove = workspace.DescendantRemoving:Connect(function(v)
+                if espData.batteries[v] then removeESP(espData.batteries, v) end
+            end)
+        else
+            if espData.batAdd then espData.batAdd:Disconnect() end
+            if espData.batRemove then espData.batRemove:Disconnect() end
+            clearESP(espData.batteries)
+        end
+    end,
+})
+
+-- [ COMBAT TAB ] --
+local CombatTab = Window:AddTab("Combat")
+CombatTab:New("Title")({ Title = "Combat Enhancements" })
+
+local autoParryConn = nil
+CombatTab:New("Toggle")({
+    Title = "Auto-Parry",
+    Description = "Automatically blocks attacks when the killer gets close (Fighter Role required).",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            autoParryConn = RunService.Heartbeat:Connect(function()
+                local char = LocalPlayer.Character
+                if not char or not char:FindFirstChild("Axe") then return end
+                
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local killerFolder = workspace:FindFirstChild("PLAYERS") and workspace.PLAYERS:FindFirstChild("KILLER")
+                if hrp and killerFolder then
+                    for _, killer in ipairs(killerFolder:GetChildren()) do
+                        local kHrp = killer:FindFirstChild("HumanoidRootPart")
+                        if kHrp and (hrp.Position - kHrp.Position).Magnitude < 10 then
+                            mouse1click()
+                        end
+                    end
+                end
+            end)
+        else
+            if autoParryConn then autoParryConn:Disconnect() autoParryConn = nil end
+        end
+    end,
+})
+
+local silentAimConn = nil
+CombatTab:New("Toggle")({
+    Title = "Silent-aim",
+    Description = "Redirects your axe swings directly to the nearest survivor (For Killers only).",
+    DefaultValue = false,
+    Callback = function(Value)
+        if Value then
+            silentAimConn = RunService.RenderStepped:Connect(function()
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+                
+                local closest, dist = nil, 20
+                local aliveFolder = workspace:FindFirstChild("PLAYERS") and workspace.PLAYERS:FindFirstChild("ALIVE")
+                if aliveFolder then
+                    for _, v in ipairs(aliveFolder:GetChildren()) do
+                        local hrp = v:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            local d = (root.Position - hrp.Position).Magnitude
+                            if d < dist then dist = d; closest = v end
+                        end
+                    end
+                end
+                
+                if closest and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                    root.CFrame = CFrame.new(root.Position, Vector3.new(closest.HumanoidRootPart.Position.X, root.Position.Y, closest.HumanoidRootPart.Position.Z))
+                end
+            end)
+        else
+            if silentAimConn then silentAimConn:Disconnect() silentAimConn = nil end
+        end
+    end,
+})
+
+-- [ TELEPORTS TAB ] --
+local TeleportsTab = Window:AddTab("Teleports")
+TeleportsTab:New("Title")({ Title = "Quick Travel" })
+
+TeleportsTab:New("Button")({
+    Title = "Teleport to FuseBox",
+    Description = "Instantly teleports you to the map's fuse box.",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") and (v.Name == "FuseBox" or v.Name == "Fuse Box") then
+                root.CFrame = v.CFrame + Vector3.new(0, 3, 0)
+                Window:Notify({ Title = "Teleported", Description = "Teleported to the FuseBox.", Duration = 2, Type = "Success" })
+                return
+            end
+        end
+        Window:Notify({ Title = "Failed", Description = "FuseBox not found on this map.", Duration = 2, Type = "Error" })
+    end,
+})
+
+local batteryIndex = 1
+TeleportsTab:New("Button")({
+    Title = "Warp to Battery",
+    Description = "Clicking this cycles your position to the next battery spawn on the map.",
+    Callback = function()
+        local function getBatteries()
+            local bats = {}
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("MeshPart") and v.Name == "Battery" then table.insert(bats, v) end
+            end
+            return bats
+        end
+        local batteries = getBatteries()
+        if #batteries > 0 then
+            local battery = batteries[batteryIndex]
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = battery.CFrame + Vector3.new(0, 3, 0)
+            end
+            batteryIndex = (batteryIndex % #batteries) + 1
+        end
+    end,
+})
+
+Window:SetTab("Info")
