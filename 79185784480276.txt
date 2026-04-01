@@ -1,0 +1,284 @@
+if game.PlaceId~=91256372267009 and game.PlaceId~=79185784480276 then
+print("[oxblood] Stop Being Ret@rded.")
+return
+end
+print("[oxblood] Loaded For Ride The Coaster.")
+local L=game:GetService("Players")
+local P=L.LocalPlayer
+local TS=game:GetService("TweenService")
+local U=game:GetService("UserInputService")
+local RS=game:GetService("RunService")
+local REP=game:GetService("ReplicatedStorage")
+local S=Instance.new("ScreenGui",P.PlayerGui)
+S.ResetOnSpawn=false
+S.Name="[oxblood]"
+S.DisplayOrder=999
+local B=Instance.new("TextButton",S)
+local C=Instance.new("UICorner",B)
+local G=Instance.new("UIGradient",B)
+local K=Instance.new("UIStroke",B)
+local cR=Color3.fromRGB(120,10,10)
+local cG=Color3.fromRGB(20,80,20)
+B.Size=UDim2.new(0,110,0,40)
+B.Position=UDim2.new(0,20,0,20)
+B.Text="OFF"
+B.TextColor3=Color3.new(1,1,1)
+B.Font=Enum.Font.GothamBold
+B.TextSize=16
+B.AutoButtonColor=false
+B.BackgroundColor3=cR
+C.CornerRadius=UDim.new(0,8)
+K.Thickness=2
+K.Color=Color3.fromRGB(20,20,20)
+K.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+G.Rotation=45
+G.Color=ColorSequence.new(Color3.new(1,1,1),Color3.new(0.4,0.4,0.4))
+local T=false
+local d=false
+local m=false
+local dS
+local sP
+local cartCosts={
+[2]=15,[3]=100,[4]=300,[5]=800,[6]=3500,[7]=10000,[8]=24000,[9]=80000,
+[10]=120000,[11]=250000,[12]=360000,[13]=700000,[14]=950000,[15]=1800000,
+[16]=2500000,[17]=5000000,[18]=10000000,[19]=20000000,[20]=35000000,
+[21]=90000000,[22]=130000000,[23]=180000000,[24]=350000000,[25]=500000000,
+[26]=700000000,[27]=1000000000,[28]=2300000000,[29]=3500000000,
+[30]=10000000000,[31]=18000000000,[32]=30000000000,[33]=70000000000,
+[34]=150000000000,[35]=300000000000,[36]=670000000000
+}
+local initialSetupDone=false
+local lastHatch=0
+local lastCraft=0
+local lastLock=0
+local lastEquip=0
+local function setOn()
+B.Text="ON"
+TS:Create(B,TweenInfo.new(0.3),{BackgroundColor3=cG}):Play()
+initialSetupDone=false
+local worldData=P:FindFirstChild("WorldData")
+if worldData and worldData:FindFirstChild("BestWorld") and worldData.BestWorld.Value==1 then
+local winsStat=P.leaderstats:WaitForChild("Wins")
+local oldWins=winsStat.Value
+local addRemote=REP:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("Race"):WaitForChild("AddCoinsOrWins")
+addRemote:FireServer(90,"Wins")
+repeat task.wait(0.2) until winsStat.Value>=oldWins+90
+local unlockRemote=REP:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("World"):WaitForChild("[C-S]UnlockNewWorld")
+unlockRemote:FireServer(2)
+end
+local carriageFolder=P:FindFirstChild("CarriageFolder")
+if carriageFolder and carriageFolder:FindFirstChild("CurrentNum") then
+local current=carriageFolder.CurrentNum.Value
+local upgradeRemote=REP:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("Tool"):WaitForChild("[C-S]UpgradeCarriagge")
+for i=current+1,5 do
+pcall(function() upgradeRemote:FireServer() end)
+task.wait(0.1)
+end
+end
+local buyTrailRemote=REP:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("Trail"):WaitForChild("[C-S]PlrWannaBuyTrail")
+for i=1,10 do
+pcall(function() buyTrailRemote:FireServer("trail"..i) end)
+task.wait(0.05)
+end
+local equipTrailRemote=REP:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("Trail"):WaitForChild("[C-S]PlrWannaEquipTrail")
+pcall(function() equipTrailRemote:FireServer("trail10") end)
+local bestTool=P:WaitForChild("BestTool").Value
+local currentCart=tonumber(bestTool:match("%d+")) or 0
+if currentCart<36 then
+local cartsToBuy={}
+local totalCartCost=0
+for i=currentCart+1,36 do
+if cartCosts[i] then
+table.insert(cartsToBuy,"Cart"..i)
+totalCartCost=totalCartCost+cartCosts[i]
+end
+end
+local coinsStat=P.leaderstats:WaitForChild("Coins")
+local oldCoins=coinsStat.Value
+local addRemote=REP:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("Race"):WaitForChild("AddCoinsOrWins")
+addRemote:FireServer(totalCartCost,"Coins")
+repeat task.wait(0.3) until coinsStat.Value>=oldCoins+totalCartCost
+local buyCartRemote=REP:WaitForChild("Remote"):WaitForChild("Function"):WaitForChild("CarShop"):WaitForChild("[C-S]BuyTool")
+for _,cart in ipairs(cartsToBuy) do
+local success=pcall(function() return buyCartRemote:InvokeServer(cart) end)
+if success then
+repeat task.wait(0.2) until P.BestTool.Value==cart
+else
+break
+end
+end
+local equipRemote=REP:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("CarShop"):WaitForChild("[C-S]EquipCar")
+pcall(function() equipRemote:FireServer("Cart36") end)
+end
+local buyCartRemote=REP:WaitForChild("Remote"):WaitForChild("Function"):WaitForChild("CarShop"):WaitForChild("[C-S]BuyTool")
+pcall(function() buyCartRemote:InvokeServer("Robux Cart3") end)
+initialSetupDone=true
+end
+local function setOff()
+B.Text="OFF"
+TS:Create(B,TweenInfo.new(0.3),{BackgroundColor3=cR}):Play()
+end
+local function toggleState()
+T=not T
+if T then setOn() else setOff() end
+end
+local function activeLoop()
+pcall(function()
+local addRemote=REP:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("Race"):WaitForChild("AddCoinsOrWins")
+addRemote:FireServer(1000000000000,"Coins")
+addRemote:FireServer(1000000000000,"Wins")
+if initialSetupDone then
+local now=tick()
+if now-lastHatch>=0.2 then
+lastHatch=now
+local petFolder=P.PlayerGui.mAIN.petbag.Frame.Frame1.ScrollingFrame
+local currentPetCount=0
+for _,child in ipairs(petFolder:GetChildren()) do
+if child:FindFirstChild("cell") and child.cell:FindFirstChild("id") then
+currentPetCount=currentPetCount+1
+end
+end
+local spaceLeft=100-currentPetCount
+if spaceLeft>0 then
+local hatchAmount=math.min(5,spaceLeft)
+local luckRemote=REP.Remote.Function.Luck["[C-S]doLuck"]
+local args={"Egg2_3",{},hatchAmount}
+pcall(function() luckRemote:InvokeServer(unpack(args)) end)
+end
+end
+local idsToDelete={}
+for _,pet in ipairs(P.PlayerGui.mAIN.petbag.Frame.Frame1.ScrollingFrame:GetChildren()) do
+if pet:FindFirstChild("cell") and pet.cell:FindFirstChild("id") then
+if not pet.Name:find("Papagei") then
+table.insert(idsToDelete,pet.cell.id.Value)
+end
+end
+end
+if #idsToDelete>0 then
+local deleteRemote=REP.Remote.Function.Pet["[C-S]DeletePets"]
+local args={idsToDelete}
+pcall(function() deleteRemote:InvokeServer(unpack(args)) end)
+end
+if now-lastLock>=0.333 then
+lastLock=now
+local lockRemote=REP.Remote.Event.Pet["[C-S]lockPet"]
+for _,pet in ipairs(P.PlayerGui.mAIN.petbag.Frame.Frame1.ScrollingFrame:GetChildren()) do
+if pet:FindFirstChild("cell") and pet.cell:FindFirstChild("id") then
+if pet.Name=="Diamond Papagei" then
+local lockUi=pet.cell:FindFirstChild("lock")
+if lockUi and not lockUi.Visible then
+local args={pet.cell.id.Value,"lock"}
+pcall(function() lockRemote:FireServer(unpack(args)) end)
+end
+end
+end
+end
+end
+if now-lastCraft>=0.333 then
+lastCraft=now
+local diamondCount=0
+local goldCount=0
+local normalCount=0
+for _,pet in ipairs(P.PlayerGui.mAIN.petbag.Frame.Frame1.ScrollingFrame:GetChildren()) do
+if pet:FindFirstChild("cell") and pet.cell:FindFirstChild("id") then
+if pet.Name=="Diamond Papagei" then diamondCount=diamondCount+1
+elseif pet.Name=="Gold Papagei" then goldCount=goldCount+1
+elseif pet.Name=="Papagei" then normalCount=normalCount+1
+end
+end
+end
+local neededDiamond=3-diamondCount
+if neededDiamond>0 then
+local neededGold=neededDiamond*4-goldCount
+if neededGold>0 then
+local neededNormal=neededGold*4-normalCount
+local craftRemote=REP.Remote.Function.Craft["[C-S]IWannaCraftPets"]
+while neededNormal>=4 do
+local group={}
+for i=1,4 do
+local id="dummy"..i
+group[id]=id
+end
+local args={{
+id=group,
+Num=4,
+Petname="Papagei"
+}}
+pcall(function() craftRemote:InvokeServer(unpack(args)) end)
+neededNormal=neededNormal-4
+end
+while neededGold>=4 do
+local group={}
+for i=1,4 do
+local id="dummy"..i
+group[id]=id
+end
+local args={{
+id=group,
+Num=4,
+Petname="Gold Papagei"
+}}
+pcall(function() craftRemote:InvokeServer(unpack(args)) end)
+neededGold=neededGold-4
+end
+end
+end
+end
+if now-lastEquip>=0.333 then
+lastEquip=now
+local equipRemote=REP.Remote.Event.Pet["[C-S]EquipPet"]
+local userId=tostring(P.UserId)
+local workspacePetFolder=workspace:FindFirstChild("PetFolder")
+local myEquippedFolder=workspacePetFolder and workspacePetFolder:FindFirstChild(userId)
+local equippedCount=0
+if myEquippedFolder then
+for _,eq in ipairs(myEquippedFolder:GetChildren()) do
+if eq:FindFirstChild("ID") and eq.Name=="Diamond Papagei" then
+equippedCount=equippedCount+1
+end
+end
+end
+if equippedCount<3 then
+for _,pet in ipairs(P.PlayerGui.mAIN.petbag.Frame.Frame1.ScrollingFrame:GetChildren()) do
+if pet:FindFirstChild("cell") and pet.cell:FindFirstChild("id") and pet.Name=="Diamond Papagei" then
+local petId=pet.cell.id.Value
+local args={{
+name="Diamond Papagei",
+id=petId
+}}
+pcall(function() equipRemote:FireServer(unpack(args)) end)
+equippedCount=equippedCount+1
+if equippedCount>=3 then break end
+end
+end
+end
+end
+end
+end)
+end
+B.InputBegan:Connect(function(i)
+if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+d=true
+m=false
+dS=i.Position
+sP=B.Position
+end
+end)
+U.InputChanged:Connect(function(i)
+if d and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+local dL=i.Position-dS
+if dL.Magnitude>5 then m=true end
+TS:Create(B,TweenInfo.new(0.15),{Position=UDim2.new(sP.X.Scale,sP.X.Offset+dL.X,sP.Y.Scale,sP.Y.Offset+dL.Y)}):Play()
+end
+end)
+U.InputEnded:Connect(function(i)
+if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+if d then
+d=false
+if not m then toggleState() end
+end
+end
+end)
+RS.RenderStepped:Connect(function()
+if T then activeLoop() end
+end)
