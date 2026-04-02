@@ -1,0 +1,241 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+   Name = "Combat Initation",
+   Icon = 0,
+   LoadingTitle = "",
+   LoadingSubtitle = "",
+   Theme = "Default",
+
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false,
+
+   ConfigurationSaving = {
+      Enabled = false,
+      FolderName = nil,
+      FileName = ""
+   },
+
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
+
+   KeySystem = false,
+   KeySettings = {
+      Title = "Untitled",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided",
+      FileName = "Key",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"Hello"}
+   }
+})
+
+local function modifyToolAttributes(toolName, attributes)
+    local player = game.Players.LocalPlayer
+    local tool = player.Backpack:FindFirstChild(toolName) or player.Character:FindFirstChild(toolName)
+
+    if tool then
+        for attribute, value in pairs(attributes) do
+            tool:SetAttribute(attribute, value)
+        end
+        print(toolName .. " attributes have been set.")
+    else
+        print(toolName .. " not found in the Backpack or equipped.")
+    end
+end
+
+local Tab = Window:CreateTab("Main", 0)
+
+local Section1 = Tab:CreateSection("Sword")
+Tab:CreateParagraph({Title = "Sword", Content = "Parry PARRYYYYYYYYYYYY"})
+
+Tab:CreateButton({
+	Name = "Modded Sword",
+	Callback = function()
+		modifyToolAttributes("Sword", {
+			LungeRate = 0,
+			Swingrate = 0,
+			OffhandSwingRate = 0
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded Firebrand",
+	Callback = function()
+		modifyToolAttributes("Firebrand", {
+			LungeRate = 0,
+			Swingrate = 0,
+			OffhandSwingRate = 0,
+			Windup = 0
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded Katana",
+	Callback = function()
+		modifyToolAttributes("Katana", {
+		    LungeRate = 0,
+		    Swingrate = 0,
+		    OffhandSwingRate = 0
+		})
+	end
+})
+
+local Section2 = Tab:CreateSection("Slingshot")
+Tab:CreateParagraph({Title = "Slingshot", Content = "Spammy!"})
+
+Tab:CreateButton({
+	Name = "Modded Slingshot",
+	Callback = function()
+		modifyToolAttributes("Slingshot", {
+			Capacity = 10000,
+			ChargeRate = 0,
+			Firerate = 0,
+			Spread = 0,
+			ProjectileSpeed = 2250
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded Flamethrower",
+	Callback = function()
+		modifyToolAttributes("Flamethrower", {
+		    Cooldown = 0
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded Scatterblaster",
+	Callback = function()
+		modifyToolAttributes("Scatterblaster", {
+			Capacity = 10000,
+			ChargeRate = 0,
+			Firerate = 0,
+			Spread = 0,
+			ProjectileSpeed = 3000
+		})
+	end
+})
+
+local Section3 = Tab:CreateSection("Paintball Gun")
+Tab:CreateParagraph({Title = "Paintball Gun", Content = "Ah, yes! The good ol' ranged guns!"})
+
+Tab:CreateButton({
+	Name = "Modded Paintball Gun",
+	Callback = function()
+		modifyToolAttributes("Paintball Gun", {
+		    Firerate = 0,
+		    ProjectileSpeed = 2250
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded BB Gun",
+	Callback = function()
+		modifyToolAttributes("BB Gun", {
+		    Firerate = 0,
+		    MinShots = 2,
+		    MaxShots = math.huge
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded Freeze Ray (Always Charged)",
+	Callback = function()
+		modifyToolAttributes("Freeze Ray", {
+		    Firerate = 0,
+		    ProjectileSpeed = 2250,
+		    ChargeTime = 0
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded Freeze Ray (Hold to Charge)",
+	Callback = function()
+		modifyToolAttributes("Freeze Ray", {
+		    Firerate = 0,
+		    ProjectileSpeed = 2250,
+		})
+	end
+})
+
+local Section4 = Tab:CreateSection("Superball and Rocket launcher")
+Tab:CreateParagraph({Title = "Superball n shii", Content = "Bounce and BOOOMM!."})
+
+Tab:CreateButton({
+	Name = "Modded Superball",
+	Callback = function()
+		modifyToolAttributes("Superball", {
+		    ThrowRate = 0,
+		    ChargeRate = 0
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded Ninja Stars",
+	Callback = function()
+		modifyToolAttributes("Ninja Stars", {
+		    ThrowRate = 0,
+		    Capacity = 10000000,
+		    ChargeRate = 0
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded Bazooka",
+	Callback = function()
+		modifyToolAttributes("Bazooka", {
+			ReloadTick = 0,
+			Capacity = 100,
+			PassiveReloadTick = 0
+		})
+	end
+})
+
+local Section5 = Tab:CreateSection("Timebomb")
+Tab:CreateParagraph({Title = "Timebomb", Content = "Chat is this real?"})
+
+Tab:CreateButton({
+	Name = "Modded Subspace Tripmine",
+	Callback = function()
+		modifyToolAttributes("Subspace Tripmine", {
+		    Cooldown = 0
+		})
+	end
+})
+
+Tab:CreateButton({
+	Name = "Modded Explosive Pinata",
+	Callback = function()
+		    modifyToolAttributes("Explosive Pinata", {
+			    Cooldown = 0
+		    })
+	end
+})
+
+local Section6 = Tab:CreateSection("Trowel")
+Tab:CreateParagraph({Title = "Trowel", Content = "Hey look guys! I'm a Builder Man!"})
+
+Tab:CreateToggle({
+	Name = "Frozen Wrench",
+	Callback = function(Value)
+		local tool = game.Players.LocalPlayer.Backpack:FindFirstChild("Wrench") or game.Players.LocalPlayer.Character:FindFirstChild("Wrench")
+		if tool then
+			tool:SetAttribute("TimeScale", Value and 0 or 1)
+		else
+			print("Wrench not found in the Backpack or equipped.")
+		end
+	end
+})
