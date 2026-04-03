@@ -1,0 +1,216 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SpectateGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Create View Button
+local viewButton = Instance.new("TextButton")
+viewButton.Name = "ViewButton"
+viewButton.Size = UDim2.new(0, 100, 0, 40)
+viewButton.Position = UDim2.new(0, 20, 0, 20)
+viewButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+viewButton.TextColor3 = Color3.new(1, 1, 1)
+viewButton.Font = Enum.Font.SourceSansBold
+viewButton.TextSize = 20
+viewButton.Text = "View"
+viewButton.Parent = screenGui
+
+-- Create No Clip Button below View Button
+local noclipButton = Instance.new("TextButton")
+noclipButton.Name = "NoClipButton"
+noclipButton.Size = UDim2.new(0, 100, 0, 40)
+noclipButton.Position = UDim2.new(0, 20, 0, 70) -- 50 pixels below View button
+noclipButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+noclipButton.TextColor3 = Color3.new(1, 1, 1)
+noclipButton.Font = Enum.Font.SourceSansBold
+noclipButton.TextSize = 20
+noclipButton.Text = "No Clip"
+noclipButton.Parent = screenGui
+
+-- Create Spectate Controls Frame (hidden initially)
+local spectateControls = Instance.new("Frame")
+spectateControls.Name = "SpectateControls"
+spectateControls.Size = UDim2.new(0, 220, 0, 40)
+spectateControls.Position = UDim2.new(0, 140, 0, 20)
+spectateControls.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+spectateControls.BorderSizePixel = 0
+spectateControls.Visible = false
+spectateControls.Parent = screenGui
+
+-- Left Button
+local leftButton = Instance.new("TextButton")
+leftButton.Name = "LeftButton"
+leftButton.Size = UDim2.new(0, 40, 0, 40)
+leftButton.Position = UDim2.new(0, 0, 0, 0)
+leftButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+leftButton.TextColor3 = Color3.new(1, 1, 1)
+leftButton.Font = Enum.Font.SourceSansBold
+leftButton.TextSize = 24
+leftButton.Text = "<"
+leftButton.Parent = spectateControls
+
+-- Player Name Label
+local playerNameLabel = Instance.new("TextLabel")
+playerNameLabel.Name = "PlayerNameLabel"
+playerNameLabel.Size = UDim2.new(0, 140, 0, 40)
+playerNameLabel.Position = UDim2.new(0, 40, 0, 0)
+playerNameLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+playerNameLabel.TextColor3 = Color3.new(1, 1, 1)
+playerNameLabel.Font = Enum.Font.SourceSansBold
+playerNameLabel.TextSize = 18
+playerNameLabel.Text = "No players"
+playerNameLabel.Parent = spectateControls
+
+-- Right Button
+local rightButton = Instance.new("TextButton")
+rightButton.Name = "RightButton"
+rightButton.Size = UDim2.new(0, 40, 0, 40)
+rightButton.Position = UDim2.new(0, 180, 0, 0)
+rightButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+rightButton.TextColor3 = Color3.new(1, 1, 1)
+rightButton.Font = Enum.Font.SourceSansBold
+rightButton.TextSize = 24
+rightButton.Text = ">"
+rightButton.Parent = spectateControls
+
+-- Variables for spectate
+local spectating = false
+local spectateIndex = 1
+local spectateTarget = nil
+local playersList = {}
+
+-- No Clip state and connection
+local noclipEnabled = false
+local noclipConnection = nil
+
+local function updatePlayersList()
+    playersList = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            table.insert(playersList, player)
+        end
+    end
+    if #playersList == 0 then
+        spectateTarget = nil
+        playerNameLabel.Text = "No players to spectate"
+    else
+        if spectateIndex > #playersList then
+            spectateIndex = 1
+        elseif spectateIndex < 1 then
+            spectateIndex = #playersList
+        end
+        spectateTarget = playersList[spectateIndex]
+        playerNameLabel.Text = "Viewing: " .. spectateTarget.Name
+    end
+end
+
+local function changeSpectateTarget(offset)
+    if #playersList == 0 then return end
+    spectateIndex = spectateIndex + offset
+    if spectateIndex > #playersList then
+        spectateIndex = 1
+    elseif spectateIndex < 1 then
+        spectateIndex = #playersList
+    end
+    spectateTarget = playersList[spectateIndex]
+    playerNameLabel.Text = "Viewing: " .. spectateTarget.Name
+end
+
+local function updateCamera()
+    if not spectating or not spectateTarget or not spectateTarget.Character then
+        return
+    end
+    local head = spectateTarget.Character:FindFirstChild("Head")
+    if not head then return end
+
+    local headCFrame = head.CFrame
+    local cameraOffset = headCFrame.LookVector * -5 + Vector3.new(0, 2, 0) -- behind and above
+
+    Camera.CameraType = Enum.CameraType.Scriptable
+    Camera.CFrame = CFrame.new(cameraOffset + head.Position, head.Position)
+end
+
+local function stopSpectate()
+    spectating = false
+    spectateControls.Visible = false
+    viewButton.Text = "View"
+    RunService:UnbindFromRenderStep("SpectateCamera")
+    Camera.CameraType = Enum.CameraType.Custom
+end
+
+local function startSpectate()
+    updatePlayersList()
+    if spectateTarget then
+        spectateControls.Visible = true
+        viewButton.Text = "Stop Viewing"
+        RunService:BindToRenderStep("SpectateCamera", Enum.RenderPriority.Camera.Value + 1, updateCamera)
+    else
+        stopSpectate()
+    end
+end
+
+local function toggleSpectate()
+    if spectating then
+        stopSpectate()
+    else
+        spectating = true
+        startSpectate()
+    end
+end
+
+-- No Clip functions
+local function noclipStep()
+    local character = LocalPlayer.Character
+    if not character then return end
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and part.CanCollide ~= nil then
+            part.CanCollide = false
+        end
+    end
+end
+
+local function toggleNoClip()
+    noclipEnabled = not noclipEnabled
+    if noclipEnabled then
+        noclipConnection = RunService.Stepped:Connect(noclipStep)
+        noclipButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0) -- green
+    else
+        if noclipConnection then
+            noclipConnection:Disconnect()
+            noclipConnection = nil
+        end
+        local character = LocalPlayer.Character
+        if character then
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide ~= nil then
+                    part.CanCollide = true
+                end
+            end
+        end
+        noclipButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50) -- original color
+    end
+end
+
+-- Connect buttons
+viewButton.MouseButton1Click:Connect(toggleSpectate)
+leftButton.MouseButton1Click:Connect(function()
+    changeSpectateTarget(-1)
+end)
+rightButton.MouseButton1Click:Connect(function()
+    changeSpectateTarget(1)
+end)
+noclipButton.MouseButton1Click:Connect(toggleNoClip)
+
+-- Update player list when players join or leave
+Players.PlayerAdded:Connect(function()
+    if spectating then updatePlayersList() end
+end)
+Players.PlayerRemoving:Connect(function()
+    if spectating then updatePlayersList() end
+end)
