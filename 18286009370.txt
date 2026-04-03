@@ -1,0 +1,384 @@
+if game.PlaceId~=18286009370 then
+print("[oxblood] Stop Being Ret@rded.")
+return
+end
+print("[oxblood] Loaded For Guns Tycoon.")
+local L=game:GetService("Players")
+local P=L.LocalPlayer
+local TS=game:GetService("TweenService")
+local U=game:GetService("UserInputService")
+local RS=game:GetService("RunService")
+local REP=game:GetService("ReplicatedStorage")
+local TARGET_Y=319
+local MY_NAME=P.Name
+local TycoonsFolder=workspace:WaitForChild("Tycoons"):WaitForChild("Tycoons")
+local BoxesFolder=workspace:WaitForChild("CashSpawnSystem"):WaitForChild("Boxes")
+local RebirthEvent=REP:WaitForChild("RebirthEvent (Don't Move)")
+local autocashThread=nil
+local autobuyThread=nil
+local autorebirthThread=nil
+local autoreclaimThread=nil
+local boxThread=nil
+local clickerThread=nil
+local walkspeedThread=nil
+local destroyThread=nil
+local storedBaseName=nil
+local function parseCash(cashValue)
+local cashStr=tostring(cashValue)
+cashStr=cashStr:gsub(",",""):gsub("+","")
+local numberPart=cashStr:match("[%d%.]+")
+local letterPart=cashStr:match("[a-zA-Z]")
+local amount=tonumber(numberPart)or 0
+if letterPart then
+local mult=1
+local letter=letterPart:upper()
+if letter=="K"then mult=1000
+elseif letter=="M"then mult=1000000
+elseif letter=="B"then mult=1000000000
+elseif letter=="T"then mult=1000000000000
+end
+amount=amount*mult
+end
+return amount
+end
+local function startAutocash()
+if autocashThread then task.cancel(autocashThread)end
+autocashThread=task.spawn(function()
+while true do
+local char=P.Character
+local hum=char and char:FindFirstChildOfClass("Humanoid")
+local hrp=char and char:FindFirstChild("HumanoidRootPart")
+if hum and hum.Health>0 and hrp and hrp.Parent==char then
+for _,base in ipairs(TycoonsFolder:GetChildren())do
+local ownerObj=base:FindFirstChild("Owner")
+if ownerObj and tostring(ownerObj.Value)==MY_NAME then
+local giver=base:FindFirstChild("Essentials")and base.Essentials:FindFirstChild("Giver")
+if giver then
+firetouchinterest(hrp,giver,0)
+firetouchinterest(hrp,giver,1)
+end
+end
+end
+else
+break
+end
+RS.Heartbeat:Wait()
+end
+end)
+end
+local function startAutobuy()
+if autobuyThread then task.cancel(autobuyThread)end
+autobuyThread=task.spawn(function()
+while true do
+local char=P.Character
+local hum=char and char:FindFirstChildOfClass("Humanoid")
+local hrp=char and char:FindFirstChild("HumanoidRootPart")
+if hum and hum.Health>0 and hrp and hrp.Parent==char then
+local leaderstats=P:FindFirstChild("leaderstats")
+local cashValue=leaderstats and leaderstats:FindFirstChild("Cash")
+local playerCash=cashValue and parseCash(cashValue.Value)or 0
+for _,base in ipairs(TycoonsFolder:GetChildren())do
+local ownerObj=base:FindFirstChild("Owner")
+if ownerObj and tostring(ownerObj.Value)==MY_NAME then
+local buttons=base:FindFirstChild("Buttons")
+if buttons then
+local hasGenerator=false
+local affordableGenerators={}
+local affordableNormals={}
+for _,button in ipairs(buttons:GetChildren())do
+if not button:FindFirstChild("Gamepass")then
+local priceObj=button:FindFirstChild("Price")
+local price=priceObj and tonumber(priceObj.Value)or math.huge
+local head=button:FindFirstChild("Head")
+if head and head:IsA("BasePart")and head.CanCollide then
+local buttonNameLower=button.Name:lower()
+if buttonNameLower:find("generator")then
+hasGenerator=true
+if price<=playerCash then
+table.insert(affordableGenerators,{button=button,price=price})
+end
+else
+if price<=playerCash then
+table.insert(affordableNormals,{button=button,price=price})
+end
+end
+end
+end
+end
+local function sortByPrice(a,b)return a.price<b.price end
+table.sort(affordableGenerators,sortByPrice)
+table.sort(affordableNormals,sortByPrice)
+if hasGenerator then
+for _,data in ipairs(affordableGenerators)do
+local head=data.button:FindFirstChild("Head")
+if head then
+firetouchinterest(hrp,head,0)
+firetouchinterest(hrp,head,1)
+end
+end
+else
+for _,data in ipairs(affordableNormals)do
+local head=data.button:FindFirstChild("Head")
+if head then
+firetouchinterest(hrp,head,0)
+firetouchinterest(hrp,head,1)
+end
+end
+end
+end
+end
+end
+else
+break
+end
+RS.Heartbeat:Wait()
+end
+end)
+end
+local function startAutorebirth()
+if autorebirthThread then task.cancel(autorebirthThread)end
+autorebirthThread=task.spawn(function()
+while true do
+local char=P.Character
+local hum=char and char:FindFirstChildOfClass("Humanoid")
+if hum and hum.Health>0 and char then
+local canRebirth=P:FindFirstChild("CanRebirth")
+if canRebirth and canRebirth.Value==true then
+RebirthEvent:FireServer()
+end
+else
+break
+end
+RS.Heartbeat:Wait()
+end
+end)
+end
+local function startAutoreclaim()
+if autoreclaimThread then task.cancel(autoreclaimThread)end
+autoreclaimThread=task.spawn(function()
+while true do
+local char=P.Character
+local hum=char and char:FindFirstChildOfClass("Humanoid")
+local hrp=char and char:FindFirstChild("HumanoidRootPart")
+if hum and hum.Health>0 and hrp and hrp.Parent==char then
+for _,base in ipairs(TycoonsFolder:GetChildren())do
+local ownerObj=base:FindFirstChild("Owner")
+if ownerObj and tostring(ownerObj.Value)==MY_NAME then
+storedBaseName=base.Name
+end
+end
+if storedBaseName then
+local storedBase=TycoonsFolder:FindFirstChild(storedBaseName)
+if storedBase then
+local ownerObj=storedBase:FindFirstChild("Owner")
+if ownerObj and tostring(ownerObj.Value)~=MY_NAME then
+local entrance=storedBase:FindFirstChild("Entrance")
+local touchToClaim=entrance and entrance:FindFirstChild("Touch to claim!")
+local headPart=touchToClaim and touchToClaim:FindFirstChild("Head")
+if headPart and hrp then
+firetouchinterest(hrp,headPart,0)
+firetouchinterest(hrp,headPart,1)
+end
+end
+end
+end
+else
+break
+end
+RS.Heartbeat:Wait()
+end
+end)
+end
+local S=Instance.new("ScreenGui",P.PlayerGui)
+S.ResetOnSpawn=false
+S.Name="[oxblood]"
+S.DisplayOrder=999
+local B=Instance.new("TextButton",S)
+local C=Instance.new("UICorner",B)
+local G=Instance.new("UIGradient",B)
+local K=Instance.new("UIStroke",B)
+local cR=Color3.fromRGB(120,10,10)
+local cG=Color3.fromRGB(20,80,20)
+B.Size=UDim2.new(0,110,0,40)
+B.Position=UDim2.new(0,20,0,20)
+B.Text="OFF"
+B.TextColor3=Color3.new(1,1,1)
+B.Font=Enum.Font.GothamBold
+B.TextSize=16
+B.AutoButtonColor=false
+B.BackgroundColor3=cR
+C.CornerRadius=UDim.new(0,8)
+K.Thickness=2
+K.Color=Color3.fromRGB(20,20,20)
+K.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+G.Rotation=45
+G.Color=ColorSequence.new(Color3.new(1,1,1),Color3.new(0.4,0.4,0.4))
+local T=false
+local d=false
+local m=false
+local dS
+local sP
+local function setOn()
+B.Text="ON"
+TS:Create(B,TweenInfo.new(0.3),{BackgroundColor3=cG}):Play()
+startAutocash()
+startAutobuy()
+startAutorebirth()
+startAutoreclaim()
+if boxThread then task.cancel(boxThread)end
+boxThread=task.spawn(function()
+while true do
+local boxes=BoxesFolder:GetChildren()
+local char=P.Character
+local hum=char and char:FindFirstChildOfClass("Humanoid")
+local hrp=char and char:FindFirstChild("HumanoidRootPart")
+if #boxes>0 and hum and hum.Health>0 and hrp and hrp.Parent==char then
+local originalCFrame=hrp.CFrame
+local originalCameraCFrame=workspace.CurrentCamera.CFrame
+for _,box in ipairs(boxes)do
+char=P.Character
+hum=char and char:FindFirstChildOfClass("Humanoid")
+hrp=char and char:FindFirstChild("HumanoidRootPart")
+if not hrp or not hum or hum.Health<=0 then break end
+if box and box.Parent==BoxesFolder then
+local prompt=box:FindFirstChildOfClass("ProximityPrompt")or box:FindFirstChildWhichIsA("ProximityPrompt",true)
+local targetPart=box:IsA("BasePart")and box or box:FindFirstChildWhichIsA("BasePart")
+if prompt and targetPart then
+prompt.MaxActivationDistance=1000000
+prompt.HoldDuration=0
+repeat
+char=P.Character
+hum=char and char:FindFirstChildOfClass("Humanoid")
+hrp=char and char:FindFirstChild("HumanoidRootPart")
+if not hrp or not hum or hum.Health<=0 or not box:IsDescendantOf(BoxesFolder)then break end
+targetPart.CFrame=CFrame.new(targetPart.Position.X,TARGET_Y,targetPart.Position.Z)
+hrp.CFrame=CFrame.new(targetPart.Position.X,TARGET_Y-9.5,targetPart.Position.Z)
+workspace.CurrentCamera.CFrame=CFrame.lookAt(workspace.CurrentCamera.CFrame.Position,targetPart.Position)
+hrp.AssemblyLinearVelocity=Vector3.new(0,0,0)
+prompt:InputHoldBegin()
+prompt:InputHoldEnd()
+task.wait()
+until not box or not box:IsDescendantOf(BoxesFolder)
+end
+end
+end
+if hrp and hum and hum.Health>0 then hrp.CFrame=originalCFrame end
+workspace.CurrentCamera.CFrame=originalCameraCFrame
+end
+task.wait(0.1)
+end
+end)
+if clickerThread then task.cancel(clickerThread)end
+clickerThread=task.spawn(function()
+while true do
+for _,base in ipairs(TycoonsFolder:GetChildren())do
+local ownerObj=base:FindFirstChild("Owner")
+if ownerObj and tostring(ownerObj.Value)==MY_NAME then
+local po=base:FindFirstChild("PurchasedObjects")
+local dropper=po and po:FindFirstChild("Dropper0")
+local clicker=dropper and dropper:FindFirstChild("Clicker")
+local cd=clicker and clicker:FindFirstChildOfClass("ClickDetector")
+if cd then fireclickdetector(cd)end
+end
+end
+RS.Heartbeat:Wait()
+end
+end)
+if walkspeedThread then task.cancel(walkspeedThread)end
+walkspeedThread=task.spawn(function()
+while true do
+local char=P.Character
+local hum=char and char:FindFirstChildOfClass("Humanoid")
+if hum then hum.WalkSpeed=40 end
+RS.Heartbeat:Wait()
+end
+end)
+if destroyThread then task.cancel(destroyThread)end
+destroyThread=task.spawn(function()
+while true do
+for _,base in ipairs(TycoonsFolder:GetChildren())do
+local ownerObj=base:FindFirstChild("Owner")
+if ownerObj and tostring(ownerObj.Value)~=MY_NAME then
+local purchasedObjects=base:FindFirstChild("PurchasedObjects")
+if purchasedObjects then
+local greenBaseDoor=purchasedObjects:FindFirstChild("OwnerOnlyDoor")
+if greenBaseDoor then greenBaseDoor:Destroy()end
+local blueBaseForcefield=purchasedObjects:FindFirstChild("Forcefield")
+if blueBaseForcefield then blueBaseForcefield:Destroy()end
+end
+end
+end
+RS.Heartbeat:Wait()
+end
+end)
+end
+local function setOff()
+B.Text="OFF"
+TS:Create(B,TweenInfo.new(0.3),{BackgroundColor3=cR}):Play()
+if autocashThread then task.cancel(autocashThread)end
+if autobuyThread then task.cancel(autobuyThread)end
+if autorebirthThread then task.cancel(autorebirthThread)end
+if autoreclaimThread then task.cancel(autoreclaimThread)end
+if boxThread then task.cancel(boxThread)end
+if clickerThread then task.cancel(clickerThread)end
+if walkspeedThread then task.cancel(walkspeedThread)end
+if destroyThread then task.cancel(destroyThread)end
+autocashThread=nil
+autobuyThread=nil
+autorebirthThread=nil
+autoreclaimThread=nil
+boxThread=nil
+clickerThread=nil
+walkspeedThread=nil
+destroyThread=nil
+end
+local function toggleState()
+T=not T
+if T then setOn()else setOff()end
+end
+local function activeLoop()
+end
+B.InputBegan:Connect(function(i)
+if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+d=true
+m=false
+dS=i.Position
+sP=B.Position
+end
+end)
+U.InputChanged:Connect(function(i)
+if d and(i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch)then
+local dL=i.Position-dS
+if dL.Magnitude>5 then m=true end
+TS:Create(B,TweenInfo.new(0.15),{Position=UDim2.new(sP.X.Scale,sP.X.Offset+dL.X,sP.Y.Scale,sP.Y.Offset+dL.Y)}):Play()
+end
+end)
+U.InputEnded:Connect(function(i)
+if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+if d then
+d=false
+if not m then toggleState()end
+end
+end
+end)
+RS.RenderStepped:Connect(function()
+if T then activeLoop()end
+end)
+P.CharacterAdded:Connect(function()
+task.wait(0.05)
+if T then
+startAutocash()
+startAutobuy()
+startAutorebirth()
+startAutoreclaim()
+end
+end)
+if P.Character then
+task.wait(0.05)
+if T then
+startAutocash()
+startAutobuy()
+startAutorebirth()
+startAutoreclaim()
+end
+end
