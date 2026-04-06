@@ -1,0 +1,598 @@
+-- ISOXTERIA CHEAT | Pocong - Rayfield UI Version (Polished)
+
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+
+local function CleanUp()
+    local function cleanOldESP(folder)
+        if folder then
+            for _, obj in pairs(folder:GetDescendants()) do
+                if obj.Name == "IsoxteriaESP_Highlight" or obj.Name == "IsoxteriaESP_Text" or obj.Name == "IsoxteriaESP_Selection" or obj.Name == "PocongHL" then
+                    obj:Destroy()
+                end
+            end
+        end
+    end
+    cleanOldESP(workspace:FindFirstChild("CurrencyItems"))
+    cleanOldESP(workspace:FindFirstChild("Stages"))
+    cleanOldESP(workspace:FindFirstChild("Items"))
+    cleanOldESP(workspace:FindFirstChild("PocongModel"))
+end
+CleanUp()
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "",
+    LoadingTitle = "",
+    LoadingSubtitle = "",
+    Theme = "Default",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false,
+})
+
+local PlayerTab   = Window:CreateTab("Player",   "user")
+local TeleportTab = Window:CreateTab("Teleport", "map-pin")
+local ESPTab      = Window:CreateTab("ESP",      "eye")
+
+-- ============ STATE ============
+local minSpeed, maxSpeed, currentSpeed = 16, 250, 16
+local isFullBright      = false
+local isFotoMode        = false
+local isFly             = false
+local isNoclip          = false
+local isSembunyiMode    = false
+local isEvadeBtnVisible = false
+local isEvading         = false
+local savedEvadeCFrame  = nil
+local evadePlatform     = nil
+
+local originalLighting = {
+    Brightness     = Lighting.Brightness,
+    ClockTime      = Lighting.ClockTime,
+    FogEnd         = Lighting.FogEnd,
+    GlobalShadows  = Lighting.GlobalShadows,
+    Ambient        = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient
+}
+
+local espStates = {
+    Coin            = false,
+    Pocong          = false,
+    PocongHighlight = false,
+    Glasses         = false,
+    Wallet          = false,
+    Wristwatch      = false,
+    RitualPart      = false,
+    Clipboard       = false,
+    IDCard          = false,
+    RedPen          = false,
+    RitualPart2     = false,
+    MedRepA         = false,
+    MedRepB         = false,
+    MedRepC         = false,
+    RitualPart3     = false
+}
+
+-- ============ FLOATING BUTTONS ============
+local ActionGui = Instance.new("ScreenGui")
+ActionGui.Name = "IsoxteriaActionGui"
+ActionGui.ResetOnSpawn = false
+local ok = pcall(function() ActionGui.Parent = CoreGui end)
+if not ok then ActionGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+local function MakeActionBtn(text, color, posX, posY)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 85, 0, 85)
+    btn.Position = UDim2.new(posX, 0, posY, 0)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 16
+    btn.Visible = false
+    btn.Active = true
+    btn.Draggable = true
+    btn.Parent = ActionGui
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0.5, 0)
+    c.Parent = btn
+    return btn
+end
+
+local FotoActionBtn     = MakeActionBtn("PHOTO",  Color3.fromRGB(255, 80, 80),  0.5,  0.8)
+local SembunyiActionBtn = MakeActionBtn("LOCKER", Color3.fromRGB(0, 150, 255),  0.65, 0.8)
+local EvadeActionBtn    = MakeActionBtn("UP",     Color3.fromRGB(255, 165, 0),  0.35, 0.8)
+
+-- ============ PLAYER TAB ============
+PlayerTab:CreateSection("Movement")
+
+PlayerTab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 250},
+    Increment = 1,
+    Suffix = "spd",
+    CurrentValue = 16,
+    Flag = "WalkSpeed",
+    Callback = function(val)
+        currentSpeed = val
+    end,
+})
+
+PlayerTab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Flag = "Fly",
+    Callback = function(val)
+        isFly = val
+        if not val then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                if hrp:FindFirstChild("IsoxteriaFlyBV") then hrp.IsoxteriaFlyBV:Destroy() end
+                if hrp:FindFirstChild("IsoxteriaFlyBG") then hrp.IsoxteriaFlyBG:Destroy() end
+            end
+        end
+    end,
+})
+
+PlayerTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(val)
+        isNoclip = val
+    end,
+})
+
+PlayerTab:CreateSection("Visuals")
+
+PlayerTab:CreateToggle({
+    Name = "Full Bright",
+    CurrentValue = false,
+    Flag = "FullBright",
+    Callback = function(val)
+        isFullBright = val
+        if not val then
+            Lighting.Brightness     = originalLighting.Brightness
+            Lighting.ClockTime      = originalLighting.ClockTime
+            Lighting.FogEnd         = originalLighting.FogEnd
+            Lighting.GlobalShadows  = originalLighting.GlobalShadows
+            Lighting.Ambient        = originalLighting.Ambient
+            Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+        end
+    end,
+})
+
+PlayerTab:CreateSection("Utilities")
+
+PlayerTab:CreateToggle({
+    Name = "Photo Mode (Pocong)",
+    CurrentValue = false,
+    Flag = "FotoMode",
+    Callback = function(val)
+        isFotoMode = val
+        FotoActionBtn.Visible = val
+    end,
+})
+
+PlayerTab:CreateToggle({
+    Name = "Hide in Locker",
+    CurrentValue = false,
+    Flag = "Sembunyi",
+    Callback = function(val)
+        isSembunyiMode = val
+        SembunyiActionBtn.Visible = val
+    end,
+})
+
+PlayerTab:CreateToggle({
+    Name = "Evade Button",
+    CurrentValue = false,
+    Flag = "Evade",
+    Callback = function(val)
+        isEvadeBtnVisible = val
+        EvadeActionBtn.Visible = val
+        if not val and isEvading then
+            isEvading = false
+            EvadeActionBtn.Text = "UP"
+            EvadeActionBtn.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+            local char = LocalPlayer.Character
+            if char and savedEvadeCFrame then
+                char:PivotTo(savedEvadeCFrame)
+                savedEvadeCFrame = nil
+            end
+            if evadePlatform then evadePlatform:Destroy(); evadePlatform = nil end
+        end
+    end,
+})
+
+-- ============ TELEPORT TAB ============
+local function GetStageFolder(n)
+    local s = workspace:FindFirstChild("Stages")
+    return s and s:FindFirstChild("Stage"..n) or nil
+end
+
+local function TeleportToItem(itemName, stageNum)
+    local stageFolder = GetStageFolder(stageNum)
+    local item = nil
+    if stageFolder then
+        item = stageFolder:FindFirstChild(itemName)
+        if not item then
+            local itemsF = stageFolder:FindFirstChild("Items")
+            if itemsF then item = itemsF:FindFirstChild(itemName) end
+        end
+    end
+    if item then
+        local targetPart = item
+        if item:IsA("Model") then
+            targetPart = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
+        end
+        if targetPart and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0)
+        end
+    end
+end
+
+TeleportTab:CreateSection("Stage 1")
+TeleportTab:CreateButton({ Name = "Teleport to Glasses",       Callback = function() TeleportToItem("Glasses", 1) end })
+TeleportTab:CreateButton({ Name = "Teleport to Wallet",        Callback = function() TeleportToItem("Wallet", 1) end })
+TeleportTab:CreateButton({ Name = "Teleport to Wristwatch",    Callback = function() TeleportToItem("Wristwatch", 1) end })
+TeleportTab:CreateButton({ Name = "Teleport to Ritual Table",  Callback = function() TeleportToItem("RitualPart", 1) end })
+
+TeleportTab:CreateSection("Stage 2")
+TeleportTab:CreateButton({ Name = "Teleport to Clipboard",     Callback = function() TeleportToItem("Clipboard", 2) end })
+TeleportTab:CreateButton({ Name = "Teleport to ID Card",       Callback = function() TeleportToItem("ID Card", 2) end })
+TeleportTab:CreateButton({ Name = "Teleport to Red Pen",       Callback = function() TeleportToItem("Red Pen", 2) end })
+TeleportTab:CreateButton({ Name = "Teleport to Ritual Table 2",Callback = function() TeleportToItem("RitualPart", 2) end })
+
+TeleportTab:CreateSection("Stage 3")
+TeleportTab:CreateButton({ Name = "Teleport to Medical Report A", Callback = function() TeleportToItem("Medical Report A", 3) end })
+TeleportTab:CreateButton({ Name = "Teleport to Medical Report B", Callback = function() TeleportToItem("Medical Report B", 3) end })
+TeleportTab:CreateButton({ Name = "Teleport to Medical Report C", Callback = function() TeleportToItem("Medical Report C", 3) end })
+TeleportTab:CreateButton({ Name = "Teleport to Ritual Table 3",   Callback = function() TeleportToItem("RitualPart", 3) end })
+
+-- ============ ESP FUNCTIONS ============
+local function CreateESP(instance, name, color)
+    if instance:FindFirstChild("IsoxteriaESP_Highlight") then return end
+    local targetPart = instance
+    if instance:IsA("Model") then
+        targetPart = instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart", true)
+    end
+    if not targetPart then return end
+
+    local h = Instance.new("Highlight")
+    h.Name = "IsoxteriaESP_Highlight"
+    h.Parent = instance
+    h.Adornee = instance
+    h.FillColor = color
+    h.OutlineColor = Color3.fromRGB(255, 255, 255)
+    h.FillTransparency = 0.5
+    h.OutlineTransparency = 0
+    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+    local sel = Instance.new("SelectionBox")
+    sel.Name = "IsoxteriaESP_Selection"
+    sel.Parent = instance
+    sel.Adornee = targetPart
+    sel.Color3 = color
+    sel.LineThickness = 0.05
+    sel.SurfaceTransparency = 0.8
+    sel.SurfaceColor3 = color
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "IsoxteriaESP_Text"
+    bb.Parent = instance
+    bb.Adornee = targetPart
+    bb.AlwaysOnTop = true
+    bb.Size = UDim2.new(0, 200, 0, 30)
+    bb.StudsOffset = Vector3.new(0, 2.5, 0)
+    local lbl = Instance.new("TextLabel")
+    lbl.Parent = bb
+    lbl.BackgroundTransparency = 1
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.Text = name
+    lbl.TextColor3 = color
+    lbl.TextStrokeTransparency = 0
+    lbl.TextStrokeColor3 = Color3.new(0,0,0)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 20
+end
+
+local function RemoveESPFrom(folder, itemName)
+    if not folder then return end
+    for _, obj in pairs(folder:GetChildren()) do
+        if obj.Name == itemName then
+            for _, n in pairs({"IsoxteriaESP_Highlight","IsoxteriaESP_Selection","IsoxteriaESP_Text"}) do
+                if obj:FindFirstChild(n) then obj:FindFirstChild(n):Destroy() end
+            end
+        end
+    end
+end
+
+-- ============ POCONG HIGHLIGHT ============
+local function UpdatePocongHighlight()
+    local pocong = workspace:FindFirstChild("PocongModel")
+    if not pocong then return end
+    if espStates.PocongHighlight then
+        local hl = pocong:FindFirstChild("PocongHL")
+        if not hl then
+            hl = Instance.new("Highlight")
+            hl.Name = "PocongHL"
+            hl.Parent = pocong
+            hl.Adornee = pocong
+            hl.FillColor = Color3.fromRGB(255, 0, 0)
+            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+            hl.FillTransparency = 0.3
+            hl.OutlineTransparency = 0
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        end
+    else
+        local hl = pocong:FindFirstChild("PocongHL")
+        if hl then hl:Destroy() end
+    end
+end
+
+-- ============ ESP TAB ============
+ESPTab:CreateSection("Pocong")
+
+ESPTab:CreateToggle({
+    Name = "Pocong Highlight (Through Walls)",
+    CurrentValue = false,
+    Flag = "PocongHL",
+    Callback = function(val)
+        espStates.PocongHighlight = val
+        if not val then
+            local pocong = workspace:FindFirstChild("PocongModel")
+            if pocong then
+                local hl = pocong:FindFirstChild("PocongHL")
+                if hl then hl:Destroy() end
+            end
+        end
+    end,
+})
+
+ESPTab:CreateToggle({
+    Name = "Pocong ESP Label + Distance",
+    CurrentValue = false,
+    Flag = "PocongESP",
+    Callback = function(v)
+        espStates.Pocong = v
+        if not v then RemoveESPFrom(workspace, "PocongModel") end
+    end
+})
+
+ESPTab:CreateSection("Global")
+ESPTab:CreateToggle({ Name = "Coin ESP", CurrentValue = false, Flag = "CoinESP", Callback = function(v) espStates.Coin = v; if not v then RemoveESPFrom(workspace:FindFirstChild("CurrencyItems"), "CoinModel") end end })
+
+ESPTab:CreateSection("Stage 1 Items")
+ESPTab:CreateToggle({ Name = "Glasses ESP",       CurrentValue = false, Flag = "GlassESP",   Callback = function(v) espStates.Glasses    = v end })
+ESPTab:CreateToggle({ Name = "Wallet ESP",        CurrentValue = false, Flag = "WalletESP",  Callback = function(v) espStates.Wallet     = v end })
+ESPTab:CreateToggle({ Name = "Wristwatch ESP",    CurrentValue = false, Flag = "WristESP",   Callback = function(v) espStates.Wristwatch = v end })
+ESPTab:CreateToggle({ Name = "Ritual Table 1 ESP",CurrentValue = false, Flag = "Ritual1ESP", Callback = function(v) espStates.RitualPart = v end })
+
+ESPTab:CreateSection("Stage 2 Items")
+ESPTab:CreateToggle({ Name = "Clipboard ESP",     CurrentValue = false, Flag = "ClipESP",    Callback = function(v) espStates.Clipboard  = v end })
+ESPTab:CreateToggle({ Name = "ID Card ESP",       CurrentValue = false, Flag = "IDCardESP",  Callback = function(v) espStates.IDCard     = v end })
+ESPTab:CreateToggle({ Name = "Red Pen ESP",       CurrentValue = false, Flag = "RedPenESP",  Callback = function(v) espStates.RedPen     = v end })
+ESPTab:CreateToggle({ Name = "Ritual Table 2 ESP",CurrentValue = false, Flag = "Ritual2ESP", Callback = function(v) espStates.RitualPart2 = v end })
+
+ESPTab:CreateSection("Stage 3 Items")
+ESPTab:CreateToggle({ Name = "Medical Report A ESP", CurrentValue = false, Flag = "MedAESP",    Callback = function(v) espStates.MedRepA    = v end })
+ESPTab:CreateToggle({ Name = "Medical Report B ESP", CurrentValue = false, Flag = "MedBESP",    Callback = function(v) espStates.MedRepB    = v end })
+ESPTab:CreateToggle({ Name = "Medical Report C ESP", CurrentValue = false, Flag = "MedCESP",    Callback = function(v) espStates.MedRepC    = v end })
+ESPTab:CreateToggle({ Name = "Ritual Table 3 ESP",   CurrentValue = false, Flag = "Ritual3ESP", Callback = function(v) espStates.RitualPart3 = v end })
+
+-- ============ ESP LOOP ============
+task.spawn(function()
+    while task.wait(1) do
+        UpdatePocongHighlight()
+
+        if espStates.Coin then
+            local f = workspace:FindFirstChild("CurrencyItems")
+            if f then for _, o in pairs(f:GetChildren()) do if o.Name=="CoinModel" then CreateESP(o,"Coin",Color3.fromRGB(255,215,0)) end end end
+        end
+
+        local s1 = GetStageFolder(1)
+        if s1 then
+            local items1 = s1:FindFirstChild("Items")
+            if items1 then
+                for _, o in pairs(items1:GetChildren()) do
+                    if espStates.Glasses    and o.Name=="Glasses"    then CreateESP(o,"Glasses",   Color3.fromRGB(0,255,255))   end
+                    if espStates.Wallet     and o.Name=="Wallet"     then CreateESP(o,"Wallet",    Color3.fromRGB(0,255,0))     end
+                    if espStates.Wristwatch and o.Name=="Wristwatch" then CreateESP(o,"Wristwatch",Color3.fromRGB(255,100,100)) end
+                end
+            end
+            if espStates.RitualPart then
+                local rp = s1:FindFirstChild("RitualPart")
+                if rp then CreateESP(rp,"Ritual Table 1",Color3.fromRGB(255,0,255)) end
+            end
+        end
+
+        local s2 = GetStageFolder(2)
+        if s2 then
+            local items2 = s2:FindFirstChild("Items")
+            if items2 then
+                for _, o in pairs(items2:GetChildren()) do
+                    if espStates.Clipboard and o.Name=="Clipboard" then CreateESP(o,"Clipboard",Color3.fromRGB(255,165,0))  end
+                    if espStates.IDCard    and o.Name=="ID Card"   then CreateESP(o,"ID Card",  Color3.fromRGB(0,191,255))  end
+                    if espStates.RedPen    and o.Name=="Red Pen"   then CreateESP(o,"Red Pen",  Color3.fromRGB(255,20,147)) end
+                end
+            end
+            if espStates.RitualPart2 then
+                local rp2 = s2:FindFirstChild("RitualPart")
+                if rp2 then CreateESP(rp2,"Ritual Table 2",Color3.fromRGB(138,43,226)) end
+            end
+        end
+
+        local s3 = GetStageFolder(3)
+        if s3 then
+            local items3 = s3:FindFirstChild("Items")
+            if items3 then
+                for _, o in pairs(items3:GetChildren()) do
+                    if espStates.MedRepA and o.Name=="Medical Report A" then CreateESP(o,"Med Report A",Color3.fromRGB(255,255,0)) end
+                    if espStates.MedRepB and o.Name=="Medical Report B" then CreateESP(o,"Med Report B",Color3.fromRGB(0,255,255)) end
+                    if espStates.MedRepC and o.Name=="Medical Report C" then CreateESP(o,"Med Report C",Color3.fromRGB(50,255,50)) end
+                end
+            end
+            if espStates.RitualPart3 then
+                local rp3 = s3:FindFirstChild("RitualPart")
+                if rp3 then CreateESP(rp3,"Ritual Table 3",Color3.fromRGB(138,43,226)) end
+            end
+        end
+    end
+end)
+
+-- ============ RENDER STEP ============
+RunService:BindToRenderStep("IsoxteriaRayfield", Enum.RenderPriority.Character.Value + 1, function(dt)
+    if isFullBright then
+        Lighting.Brightness     = 2
+        Lighting.ClockTime      = 14
+        Lighting.FogEnd         = 100000
+        Lighting.GlobalShadows  = false
+        Lighting.Ambient        = Color3.fromRGB(255,255,255)
+        Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
+    end
+
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hum and hrp then
+            pcall(function() hum.WalkSpeed = currentSpeed end)
+            if isFly then
+                local cam = workspace.CurrentCamera
+                local bv = hrp:FindFirstChild("IsoxteriaFlyBV")
+                local bg = hrp:FindFirstChild("IsoxteriaFlyBG")
+                if not bv then bv = Instance.new("BodyVelocity"); bv.Name="IsoxteriaFlyBV"; bv.MaxForce=Vector3.new(1e5,1e5,1e5); bv.Parent=hrp end
+                if not bg then bg = Instance.new("BodyGyro");    bg.Name="IsoxteriaFlyBG"; bg.MaxTorque=Vector3.new(1e5,1e5,1e5); bg.P=9000; bg.Parent=hrp end
+                local dir = Vector3.new()
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector  end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector  end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
+                bg.CFrame = cam.CFrame
+                bv.Velocity = dir.Magnitude > 0 and dir.Unit * currentSpeed or Vector3.new()
+            end
+        end
+    end
+
+    local pocong = workspace:FindFirstChild("PocongModel")
+    if pocong and espStates.Pocong then
+        local char2 = LocalPlayer.Character
+        local pp = pocong.PrimaryPart or pocong:FindFirstChildWhichIsA("BasePart", true)
+        if pp and char2 and char2:FindFirstChild("HumanoidRootPart") then
+            local dist = math.floor((char2.HumanoidRootPart.Position - pp.Position).Magnitude)
+            CreateESP(pocong, "POCONG", Color3.fromRGB(255, 0, 0))
+            local bb = pocong:FindFirstChild("IsoxteriaESP_Text")
+            if bb then
+                local lbl = bb:FindFirstChildOfClass("TextLabel")
+                if lbl then lbl.Text = "POCONG ["..dist.."m]" end
+            end
+        end
+    end
+end)
+
+-- ============ NOCLIP ============
+RunService.Stepped:Connect(function()
+    if isNoclip and LocalPlayer.Character then
+        for _, p in pairs(LocalPlayer.Character:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+    end
+end)
+
+-- ============ ACTION BUTTON LOGIC ============
+FotoActionBtn.MouseButton1Click:Connect(function()
+    local pocong = workspace:FindFirstChild("PocongModel")
+    if not pocong then return end
+    local pp = pocong.PrimaryPart or pocong:FindFirstChildWhichIsA("BasePart", true)
+    local char = LocalPlayer.Character
+    if pp and char and char:FindFirstChild("HumanoidRootPart") then
+        local hrp = char.HumanoidRootPart
+        local offset = pocong.PrimaryPart.CFrame * CFrame.new(0, 0, 22)
+        hrp.CFrame = CFrame.new(Vector3.new(offset.Position.X, pp.Position.Y+3, offset.Position.Z), pp.Position)
+        task.wait(0.2)
+        local cam = workspace.CurrentCamera
+        cam.CFrame = CFrame.new(cam.CFrame.Position, pp.Position)
+        task.wait(0.1)
+        pcall(function()
+            if type(mouse1click)=="function" then mouse1click()
+            else
+                local vim = game:GetService("VirtualInputManager")
+                local cx, cy = cam.ViewportSize.X/2, cam.ViewportSize.Y/2
+                vim:SendMouseButtonEvent(cx,cy,0,true,game,1)
+                task.wait(0.05)
+                vim:SendMouseButtonEvent(cx,cy,0,false,game,1)
+            end
+        end)
+    end
+end)
+
+SembunyiActionBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
+    local nearest, minDist = nil, math.huge
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj.Name=="Locker" and obj:IsA("Model") then
+            local tp = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart",true)
+            if tp then
+                local d = (hrp.Position - tp.Position).Magnitude
+                if d < minDist then minDist=d; nearest=obj end
+            end
+        end
+    end
+    if nearest then
+        local prompt = nearest:FindFirstChildWhichIsA("ProximityPrompt", true)
+        local tp = nearest.PrimaryPart or nearest:FindFirstChildWhichIsA("BasePart",true)
+        if tp and prompt then
+            hrp.CFrame = tp.CFrame
+            task.wait(0.1)
+            pcall(function()
+                if fireproximityprompt then fireproximityprompt(prompt)
+                else
+                    local vim = game:GetService("VirtualInputManager")
+                    vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(prompt.HoldDuration + 0.1)
+                    vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                end
+            end)
+        end
+    end
+end)
+
+EvadeActionBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if not isEvading then
+        isEvading = true
+        EvadeActionBtn.Text = "DOWN"
+        EvadeActionBtn.BackgroundColor3 = Color3.fromRGB(40,180,40)
+        savedEvadeCFrame = hrp.CFrame
+        if evadePlatform then evadePlatform:Destroy() end
+        evadePlatform = Instance.new("Part")
+        evadePlatform.Name = "IsoxteriaEvadePlatform"
+        evadePlatform.Size = Vector3.new(15,1,15)
+        evadePlatform.Anchored = true
+        evadePlatform.Transparency = 0.5
+        evadePlatform.Material = Enum.Material.ForceField
+        evadePlatform.Color = Color3.fromRGB(138,43,226)
+        evadePlatform.CFrame = savedEvadeCFrame + Vector3.new(0,97,0)
+        evadePlatform.Parent = workspace
+        char:PivotTo(savedEvadeCFrame + Vector3.new(0,100,0))
+    else
+        isEvading = false
+        EvadeActionBtn.Text = "UP"
+        EvadeActionBtn.BackgroundColor3 = Color3.fromRGB(255,165,0)
+        if savedEvadeCFrame then char:PivotTo(savedEvadeCFrame); savedEvadeCFrame=nil end
+        if evadePlatform then evadePlatform:Destroy(); evadePlatform=nil end
+    end
+end)
