@@ -1,0 +1,143 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+-- Wait for plot to load
+while not player:GetAttribute("Plot") do
+	task.wait(0.1)
+end
+
+local plotName = player:GetAttribute("Plot")
+local plotFolder = workspace:WaitForChild("Plots"):WaitForChild(plotName)
+
+-- Create UI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoCollectUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = CoreGui
+
+local Frame = Instance.new("Frame")
+Frame.Name = "MainFrame"
+Frame.Size = UDim2.new(0, 220, 0, 60)
+Frame.Position = UDim2.new(0.5, -110, 0.1, 0) -- Top center
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BackgroundTransparency = 0.1
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+-- Make frame draggable
+local UIS = game:GetService("UserInputService")
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function update(input)
+	local delta = input.Position - dragStart
+	Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+Frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = Frame.Position
+		
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+Frame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+-- Title Label
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(1, 0, 0, 20)
+Title.Position = UDim2.new(0, 0, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Auto Collect"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold
+Title.Parent = Frame
+
+-- Status Label
+local Status = Instance.new("TextLabel")
+Status.Name = "Status"
+Status.Size = UDim2.new(1, -40, 0, 20)
+Status.Position = UDim2.new(0, 10, 0, 25)
+Status.BackgroundTransparency = 1
+Status.Text = "Status: Off"
+Status.TextColor3 = Color3.fromRGB(200, 200, 200)
+Status.TextSize = 12
+Status.Font = Enum.Font.Gotham
+Status.TextXAlignment = Enum.TextXAlignment.Left
+Status.Parent = Frame
+
+-- Toggle Button
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Name = "ToggleBtn"
+ToggleBtn.Size = UDim2.new(0, 50, 0, 25)
+ToggleBtn.Position = UDim2.new(1, -60, 0, 22)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+ToggleBtn.Text = "OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.TextSize = 12
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Parent = Frame
+
+-- Rounded corners for button
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 4)
+UICorner.Parent = ToggleBtn
+
+-- Logic
+local enabled = false
+
+ToggleBtn.MouseButton1Click:Connect(function()
+	enabled = not enabled
+	if enabled then
+		ToggleBtn.Text = "ON"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+		Status.Text = "Status: On"
+	else
+		ToggleBtn.Text = "OFF"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+		Status.Text = "Status: Off"
+	end
+end)
+
+-- Auto-collect function
+local function collect()
+	if not enabled then return end
+	if not (player.Character and player.Character:FindFirstChild("HumanoidRootPart")) then return end
+	local hrp = player.Character.HumanoidRootPart
+
+	for _, part in ipairs(plotFolder:GetDescendants()) do
+		if part:IsA("BasePart") then
+			for _, ti in ipairs(part:GetChildren()) do
+				if ti:IsA("TouchTransmitter") then
+					firetouchinterest(hrp, part, 0)
+					firetouchinterest(hrp, part, 1)
+				end
+			end
+		end
+	end
+end
+
+-- Connect to RenderStepped
+RunService.RenderStepped:Connect(collect)
