@@ -1,0 +1,175 @@
+-- hey plz read this
+-- this script was mainly made for the new valentine event in drive world but you can do this for any kind of trailer job
+-- not obfuscated because i don't care
+-- don't edit or touch the script if you're a regular skid and don't know wtf you're doing
+local partName        = "Primary"
+local targetColor     = Color3.fromRGB(66, 162, 63)
+local use_velocity    = true
+local stepFactor      = 0.2
+local stepDelay       = 0.05
+
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+-- setups (don't touch dragging or drag connection)
+local dragging = false
+local dragConnection = nil
+local collisionMemory = {}
+local baseSpeed = 300
+
+local function disableCarCollisions(seat)
+    local parentFolder = seat.Parent
+    local parentModel = parentFolder and parentFolder.Parent
+    if parentModel and parentModel:IsA("Model") then
+        for _, descendant in ipairs(parentModel:GetDescendants()) do
+            if descendant:IsA("BasePart") then
+                collisionMemory[descendant] = descendant.CanCollide
+                descendant.CanCollide = false
+            end
+        end
+    end
+end
+
+local function restoreCarCollisions()
+    for part, originalState in pairs(collisionMemory) do
+        if part and part:IsA("BasePart") then
+            part.CanCollide = originalState
+        end
+    end
+    collisionMemory = {}
+end
+
+local function dragPlayerToPart()
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not root or not humanoid then return end
+
+    local seat = humanoid.SeatPart
+    if seat then disableCarCollisions(seat) end
+
+    for _, model in ipairs(Workspace:GetChildren()) do
+        if model:IsA("Model") then
+            local part = model:FindFirstChild(partName)
+            if part and part:IsA("BasePart") and part.Color == targetColor then
+                local targetPos = part.Position + Vector3.new(0, 50, 0)
+                dragging = true
+
+                if use_velocity then
+                    dragConnection = RunService.Heartbeat:Connect(function()
+                        if not dragging then
+                            if dragConnection then dragConnection:Disconnect() end
+                            restoreCarCollisions()
+                            return
+                        end
+
+                        local direction = (targetPos - root.Position)
+                        if direction.Magnitude <= 0.5 then
+                            root.Velocity = Vector3.zero
+                            dragging = false
+                            if dragConnection then dragConnection:Disconnect() end
+                            restoreCarCollisions()
+                            return
+                        end
+
+                        local speed = math.clamp(direction.Magnitude, 15, baseSpeed)
+                        root.Velocity = direction.Unit * speed
+                    end)
+                else
+                    while dragging and (root.Position - targetPos).Magnitude > 0.1 do
+                        local newPos = root.Position:Lerp(targetPos, stepFactor)
+                        root.CFrame = CFrame.new(newPos, targetPos)
+                        task.wait(stepDelay)
+                    end
+                    restoreCarCollisions()
+                end
+                return
+            end
+        end
+    end
+    restoreCarCollisions()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DragControllerUI"
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 160)
+frame.Position = UDim2.new(0, 20, 0, 200)
+frame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 12)
+uiCorner.Parent = frame
+
+local uiStroke = Instance.new("UIStroke")
+uiStroke.Thickness = 2
+uiStroke.Color = Color3.fromRGB(200, 200, 200)
+uiStroke.Parent = frame
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(120,120,120)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(40,40,40))
+})
+gradient.Rotation = 90
+gradient.Parent = frame
+
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(1, -40, 0, 40)
+speedBox.Position = UDim2.new(0, 20, 0, 30)
+speedBox.Text = tostring(baseSpeed)
+speedBox.TextColor3 = Color3.new(1,1,1)
+speedBox.BackgroundColor3 = Color3.fromRGB(80,80,80)
+speedBox.ClearTextOnFocus = false
+speedBox.Parent = frame
+
+local speedCorner = Instance.new("UICorner")
+speedCorner.CornerRadius = UDim.new(0, 8)
+speedCorner.Parent = speedBox
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(1, -40, 0, 40)
+toggleButton.Position = UDim2.new(0, 20, 0, 90)
+toggleButton.Text = "Enable"
+toggleButton.TextColor3 = Color3.new(1,1,1)
+toggleButton.BackgroundColor3 = Color3.fromRGB(100,100,100)
+toggleButton.Parent = frame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 8)
+buttonCorner.Parent = toggleButton
+
+local statusDot = Instance.new("Frame")
+statusDot.Size = UDim2.new(0, 20, 0, 20)
+statusDot.Position = UDim2.new(1, -30, 0, 95)
+statusDot.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+statusDot.Parent = frame
+
+local dotCorner = Instance.new("UICorner")
+dotCorner.CornerRadius = UDim.new(1, 0)
+dotCorner.Parent = statusDot
+
+toggleButton.MouseButton1Click:Connect(function()
+    if not dragging then
+        baseSpeed = tonumber(speedBox.Text) or baseSpeed
+        dragging = true
+        toggleButton.Text = "Disable"
+        statusDot.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        dragPlayerToPart()
+    else
+        dragging = false
+        toggleButton.Text = "Enable"
+        statusDot.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        if dragConnection then dragConnection:Disconnect() end
+        restoreCarCollisions()
+    end
+end)
