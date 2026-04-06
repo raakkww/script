@@ -1,0 +1,253 @@
+local Player = game:GetService("Players").LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+
+if CoreGui:FindFirstChild("UtilityHub_Pro") then
+    CoreGui.UtilityHub_Pro:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "UtilityHub_Pro"
+
+-- ПЕРЕМЕННЫЕ
+local SavedBaseCF = nil
+local InfJump = false
+
+-- === УЛУЧШЕННАЯ ЛОГИКА ПОИСКА БАЗЫ ===
+local function FindMyBase()
+    -- Если игрок сам нажал "SET BASE", используем его сохранение
+    if SavedBaseCF then return SavedBaseCF end
+    
+    -- Авто-поиск по всем возможным папкам
+    local searchIn = {workspace, workspace:FindFirstChild("Tycoons"), workspace:FindFirstChild("Plots"), workspace:FindFirstChild("Bases")}
+    
+    for _, folder in pairs(searchIn) do
+        if folder then
+            for _, base in pairs(folder:GetChildren()) do
+                -- Проверка: имя базы совпадает с ником ИЛИ внутри есть объект Owner с ником
+                local owner = base:FindFirstChild("Owner") or base:FindFirstChild("Player") or base:FindFirstChild("OwnerName")
+                local isOwner = (base.Name == Player.Name) or (owner and (tostring(owner.Value) == Player.Name or owner.Value == Player))
+                
+                if isOwner then
+                    -- Ищем точку для ТП (Спавн, Сборщик или просто центр)
+                    local spawn = base:FindFirstChild("Spawn") or base:FindFirstChild("Essentials") and base.Essentials:FindFirstChild("Spawn") or base:FindFirstChild("Collector") or base:FindFirstChildWhichIsA("BasePart", true)
+                    return spawn and spawn.CFrame
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- ОТКРЫТИЕ НА ПРАВЫЙ ШИФТ
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
+        ScreenGui.Enabled = not ScreenGui.Enabled
+    end
+end)
+
+-- ГЛАВНОЕ ОКНО
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 480, 0, 420)
+Main.Position = UDim2.new(0.5, -240, 0.4, -210)
+Main.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+Main.Active = true
+Main.Draggable = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+-- ЗАГОЛОВОК
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, -80, 0, 45)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Text = "Ultimate Mining Tycoon"
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+
+-- ВКЛАДКИ
+local TabsFrame = Instance.new("Frame", Main)
+TabsFrame.Size = UDim2.new(1, -20, 0, 40)
+TabsFrame.Position = UDim2.new(0, 10, 0, 50)
+TabsFrame.BackgroundTransparency = 1
+local TabList = Instance.new("UIListLayout", TabsFrame)
+TabList.FillDirection = Enum.FillDirection.Horizontal
+TabList.Padding = UDim.new(0, 8)
+
+local Pages = Instance.new("Frame", Main)
+Pages.Size = UDim2.new(1, -20, 1, -110)
+Pages.Position = UDim2.new(0, 10, 0, 100)
+Pages.BackgroundTransparency = 1
+
+local function CreatePage(name)
+    local Page = Instance.new("ScrollingFrame", Pages)
+    Page.Name = name .. "Page"
+    Page.Size = UDim2.new(1, 0, 1, 0)
+    Page.BackgroundTransparency = 1
+    Page.Visible = false
+    Page.ScrollBarThickness = 0
+    Instance.new("UIListLayout", Page).Padding = UDim.new(0, 10)
+    return Page
+end
+
+local TeleportPage = CreatePage("Teleport")
+local MiscPage = CreatePage("Misc")
+
+local function OpenTab(tabName)
+    for _, page in pairs(Pages:GetChildren()) do
+        if page:IsA("ScrollingFrame") then page.Visible = false end
+    end
+    Pages[tabName .. "Page"].Visible = true
+end
+
+local function AddTabBtn(name)
+    local btn = Instance.new("TextButton", TabsFrame)
+    btn.Size = UDim2.new(0, 100, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 15
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.MouseButton1Click:Connect(function() OpenTab(name) end)
+end
+
+AddTabBtn("Teleport")
+AddTabBtn("Misc")
+
+-- === ТЕЛЕПОРТЫ ===
+local function AddTP(name, color, defaultCoords)
+    local btn = Instance.new("TextButton", TeleportPage)
+    btn.Size = UDim2.new(1, -5, 0, 50)
+    btn.BackgroundColor3 = color
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 17
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    btn.MouseButton1Click:Connect(function()
+        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            if name == "BASE" then
+                local baseCF = FindMyBase()
+                hrp.CFrame = baseCF and (baseCF + Vector3.new(0, 5, 0)) or CFrame.new(defaultCoords)
+            else
+                hrp.CFrame = CFrame.new(defaultCoords + Vector3.new(0, 3, 0))
+            end
+            btn.Text = "done!"
+            task.wait(0.5)
+            btn.Text = name
+        end
+    end)
+end
+
+AddTP("BASE", Color3.fromRGB(34, 139, 34), Vector3.new(0.23, 8.14, -199.85))
+AddTP("SHOP", Color3.fromRGB(210, 105, 30), Vector3.new(-1579.96, 4.70, -11.34))
+AddTP("MINE", Color3.fromRGB(105, 105, 105), Vector3.new(-1857.58, 4.61, -195.28))
+
+-- Кнопка SET BASE
+local SetBaseBtn = Instance.new("TextButton", TeleportPage)
+SetBaseBtn.Size = UDim2.new(1, -5, 0, 45)
+SetBaseBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+SetBaseBtn.Text = "SET MY BASE"
+SetBaseBtn.TextColor3 = Color3.new(1,1,1)
+SetBaseBtn.Font = Enum.Font.GothamBold
+SetBaseBtn.TextSize = 14
+Instance.new("UICorner", SetBaseBtn)
+SetBaseBtn.MouseButton1Click:Connect(function()
+    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        SavedBaseCF = hrp.CFrame
+        SetBaseBtn.Text = "BASE SAVED!"
+        task.wait(1)
+        SetBaseBtn.Text = "SET MY BASE"
+    end
+end)
+
+-- SELL & RETURN
+local AutoBase = Instance.new("TextButton", TeleportPage)
+AutoBase.Size = UDim2.new(1, -5, 0, 50)
+AutoBase.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+AutoBase.Text = "SELL (5 Sec)"
+AutoBase.TextColor3 = Color3.new(1, 1, 1)
+AutoBase.Font = Enum.Font.GothamBold
+AutoBase.TextSize = 17
+Instance.new("UICorner", AutoBase)
+
+AutoBase.MouseButton1Click:Connect(function()
+    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local lastPos = hrp.CFrame
+        local baseCF = FindMyBase()
+        hrp.CFrame = baseCF and (baseCF + Vector3.new(0, 5, 0)) or CFrame.new(0.23, 8.14, -199.85)
+        AutoBase.Text = "WAITING..."
+        task.wait(5)
+        hrp.CFrame = lastPos
+        AutoBase.Text = "SELL(5 Sec)"
+    end
+end)
+
+-- === MISC РАЗДЕЛ ===
+local function CreateRow(parent, text)
+    local Row = Instance.new("Frame", parent)
+    Row.Size = UDim2.new(1, -5, 0, 60)
+    Row.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Instance.new("UICorner", Row)
+    local Lbl = Instance.new("TextLabel", Row)
+    Lbl.Size = UDim2.new(0.5, 0, 1, 0)
+    Lbl.Position = UDim2.new(0, 15, 0, 0)
+    Lbl.Text = text
+    Lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Lbl.BackgroundTransparency = 1
+    Lbl.Font = Enum.Font.GothamBold
+    Lbl.TextSize = 18
+    return Row
+end
+
+-- Скорость
+local SpeedRow = CreateRow(MiscPage, "WalkSpeed")
+local SpeedInp = Instance.new("TextBox", SpeedRow)
+SpeedInp.Size = UDim2.new(0, 100, 0, 35)
+SpeedInp.Position = UDim2.new(1, -115, 0.5, -17)
+SpeedInp.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+SpeedInp.Text = "16"
+SpeedInp.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", SpeedInp)
+SpeedInp.FocusLost:Connect(function() 
+    if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+        Player.Character.Humanoid.WalkSpeed = tonumber(SpeedInp.Text) or 16 
+    end
+end)
+
+-- Бесконечный прыжок
+local JumpRow = CreateRow(MiscPage, "Inf Jump")
+local JumpBtn = Instance.new("TextButton", JumpRow)
+JumpBtn.Size = UDim2.new(0, 100, 0, 35)
+JumpBtn.Position = UDim2.new(1, -115, 0.5, -17)
+JumpBtn.Text = "OFF"
+JumpBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+JumpBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", JumpBtn)
+
+JumpBtn.MouseButton1Click:Connect(function()
+    InfJump = not InfJump
+    JumpBtn.Text = InfJump and "ON" or "OFF"
+    JumpBtn.BackgroundColor3 = InfJump and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(50, 50, 50)
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if InfJump and Player.Character and Player.Character:FindFirstChildOfClass("Humanoid") then
+        Player.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+OpenTab("Teleport")
+
+-- ANTI-AFK
+Player.Idled:Connect(function()
+    game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+end)
