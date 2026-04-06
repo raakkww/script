@@ -1,0 +1,291 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local aimbot = false
+local wallcheck = true
+local teamcheck = false
+local esp = false
+local fov = 150
+local smoothness = 0.3
+local prediction = true
+local predictionAmount = 0.05
+
+local espObjects = {}
+local lockedTarget = nil
+local hitboxCache = {}
+local cacheNeedsUpdate = true
+
+smoothness = math.clamp(smoothness, 0.05, 0.6)
+
+local function isAlive(p)
+    local c = p.Character
+    local h = c and c:FindFirstChild("Humanoid")
+    return h and h.Health > 0
+end
+
+local function updateHitboxCache()
+    local hitboxes = Workspace:FindFirstChild("Hitboxes")
+    if not hitboxes then 
+        cacheNeedsUpdate = true
+        return 
+    end
+    local newCache = {}
+    for _, folder in ipairs(hitboxes:GetChildren()) do
+        if folder:IsA("Folder") then
+            local userId = folder.Name
+            local head = folder:FindFirstChild("HitboxHead")
+            if head and head.Parent then
+                newCache[userId] = head
+            end
+        end
+    end
+    hitboxCache = newCache
+    cacheNeedsUpdate = false
+end
+
+local function getHitboxPart(player)
+    local userId = tostring(player.UserId)
+    if cacheNeedsUpdate then
+        updateHitboxCache()
+    end
+    local head = hitboxCache[userId]
+    if head and head.Parent then
+        return head
+    end
+    cacheNeedsUpdate = true
+    updateHitboxCache()
+    return hitboxCache[userId]
+end
+
+local function canSee(player)
+    if not wallcheck then return true end
+    local head = getHitboxPart(player)
+    if not head or not head.Parent then return false end
+    local origin = Camera.CFrame.Position
+    local direction = head.Position - origin
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local ignoreList = {LocalPlayer.Character}
+    local hitboxes = Workspace:FindFirstChild("Hitboxes")
+    if hitboxes then
+        table.insert(ignoreList, hitboxes)
+    end
+    raycastParams.FilterDescendantsInstances = ignoreList
+    local result = Workspace:Raycast(origin, direction, raycastParams)
+    if not result then return true end
+    local hit = result and result.Instance
+    if hit and player.Character and hit:IsDescendantOf(player.Character) then
+        return true
+    end
+    return false
+end
+
+local function getTargets()
+    local targets = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and isAlive(p) then
+            if teamcheck and p.Team == LocalPlayer.Team then
+            else
+                local head = getHitboxPart(p)
+                if head and head.Parent then
+                    table.insert(targets, {player = p, head = head})
+                end
+            end
+        end
+    end
+    return targets
+end
+
+local function getClosestTarget()
+    local targets = getTargets()
+    local best, bestDist = nil, math.huge
+    local center = Camera.ViewportSize / 2
+    for _, t in ipairs(targets) do
+        if canSee(t.player) then
+            if t.head and t.head.Parent then
+                local pos, on = Camera:WorldToViewportPoint(t.head.Position)
+                if on then
+                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if dist <= fov and dist < bestDist then
+                        bestDist = dist
+                        best = t
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+local function getPredictedPosition(head)
+    if not prediction then return head.Position end
+    local velocity = head.AssemblyLinearVelocity or Vector3.zero
+    if velocity.Magnitude > 1 and velocity.Magnitude < 50 then
+        local vel = velocity * 0.8
+        local predicted = head.Position + vel * predictionAmount
+        if predicted.X ~= predicted.X then return head.Position end
+        return predicted
+    end
+    return head.Position
+end
+
+local function smoothAim(target)
+    if not target or not target.Parent then return end
+    local targetPos = getPredictedPosition(target)
+    if targetPos.X ~= targetPos.X then return end
+    local current = Camera.CFrame
+    local targetCF = CFrame.new(current.Position, targetPos)
+    Camera.CFrame = current:Lerp(targetCF, smoothness)
+end
+
+local function createESP(player)
+    if espObjects[player] then return end
+    espObjects[player] = {
+        box = Drawing.new("Square"),
+        name = Drawing.new("Text"),
+    }
+    espObjects[player].box.Thickness = 2
+    espObjects[player].box.Color = Color3.fromRGB(255, 0, 0)
+    espObjects[player].box.Filled = false
+    espObjects[player].name.Size = 14
+    espObjects[player].name.Color = Color3.fromRGB(255, 255, 255)
+    espObjects[player].name.Center = true
+    espObjects[player].name.Outline = true
+end
+
+local function updateESP()
+    if not esp then
+        for _, e in pairs(espObjects) do
+            e.box.Visible = false
+            e.name.Visible = false
+        end
+        return
+    end
+    for player, e in pairs(espObjects) do
+        e.box.Visible = false
+        e.name.Visible = false
+        if player and player.Parent and isAlive(player) then
+            if teamcheck and player.Team == LocalPlayer.Team then
+            else
+                local head = getHitboxPart(player)
+                if head and head.Parent then
+                    local pos, on = Camera:WorldToViewportPoint(head.Position)
+                    if on then
+                        local dist = (Camera.CFrame.Position - head.Position).Magnitude
+                        local size = math.clamp(200 / dist, 30, 100)
+                        e.box.Size = Vector2.new(size, size)
+                        e.box.Position = Vector2.new(pos.X - size/2, pos.Y - size/2)
+                        e.box.Visible = true
+                        e.name.Position = Vector2.new(pos.X, pos.Y - size/2 - 15)
+                        e.name.Text = player.Name
+                        e.name.Visible = true
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function removeESP(player)
+    if espObjects[player] then
+        espObjects[player].box:Remove()
+        espObjects[player].name:Remove()
+        espObjects[player] = nil
+    end
+end
+
+UserInputService.InputBegan:Connect(function(i, gp)
+    if gp then return end
+    if i.KeyCode == Enum.KeyCode.X then
+        aimbot = not aimbot
+        if not aimbot then lockedTarget = nil end
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Aimbot", Text = aimbot and "ON" or "OFF", Duration = 1})
+    end
+    if i.KeyCode == Enum.KeyCode.V then
+        wallcheck = not wallcheck
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Wallcheck", Text = wallcheck and "ON" or "OFF", Duration = 1})
+    end
+    if i.KeyCode == Enum.KeyCode.N then
+        teamcheck = not teamcheck
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Teamcheck", Text = teamcheck and "ON" or "OFF", Duration = 1})
+    end
+    if i.KeyCode == Enum.KeyCode.E then
+        esp = not esp
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title = "ESP", Text = esp and "ON" or "OFF", Duration = 1})
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if aimbot then
+        local targetVisible = lockedTarget and isAlive(lockedTarget.player) and canSee(lockedTarget.player)
+        if not targetVisible then
+            local best = getClosestTarget()
+            if best then
+                lockedTarget = best
+            else
+                lockedTarget = nil
+            end
+        end
+        if lockedTarget and isAlive(lockedTarget.player) then
+            local head = getHitboxPart(lockedTarget.player)
+            if head and head.Parent then
+                local pos, on = Camera:WorldToViewportPoint(head.Position)
+                if on then
+                    local center = Camera.ViewportSize / 2
+                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if dist <= fov then
+                        smoothAim(head)
+                    else
+                        lockedTarget = nil
+                    end
+                else
+                    lockedTarget = nil
+                end
+            else
+                lockedTarget = nil
+            end
+        end
+    end
+    if esp then
+        updateESP()
+    end
+end)
+
+local function onPlayerAdded(p)
+    if p ~= LocalPlayer then 
+        createESP(p)
+    end
+    cacheNeedsUpdate = true
+end
+
+local function onPlayerRemoving(p)
+    removeESP(p)
+    cacheNeedsUpdate = true
+end
+
+local function onHitboxesChanged()
+    cacheNeedsUpdate = true
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then createESP(p) end
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+local hitboxes = Workspace:FindFirstChild("Hitboxes")
+if hitboxes then
+    hitboxes.ChildAdded:Connect(onHitboxesChanged)
+    hitboxes.ChildRemoved:Connect(onHitboxesChanged)
+end
+
+updateHitboxCache()
+
+print("SIMPLE AIMBOT V2.0 by OSOBA - Loaded")
+print("X=Aimbot | V=Wallcheck | N=Teamcheck | E=ESP")
