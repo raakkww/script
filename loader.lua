@@ -1,40 +1,41 @@
 task.spawn(function()
     local function loadScript(id)
         local url = "https://raw.githubusercontent.com/raakkww/script/refs/heads/hoho/" .. id .. ".txt"
-        local source = game:HttpGet(url)
+        
+        local ok, source = pcall(function()
+            return game:HttpGet(url, true)
+        end)
+
+        if not ok then
+            return false, "HttpGet failed: " .. tostring(source)
+        end
 
         if not source or #source <= 5 then
             return false, "Empty or too short"
         end
 
-        if source:find("<!DOCTYPE") then
-            return false, "Invalid HTML response"
+        if source:find("<!DOCTYPE") or source:find("404: Not Found") then
+            return false, "404 or invalid response"
         end
 
-        loadstring(source)()
+        local loadOk, loadErr = pcall(loadstring(source))
+        if not loadOk then
+            return false, "loadstring error: " .. tostring(loadErr)
+        end
+
         return true
     end
 
-    local success, err = pcall(function()
-        local placeId = tostring(game.PlaceId)
-        local universeId = tostring(game.GameId)
+    local placeId = tostring(game.PlaceId)
+    local universeId = tostring(game.GameId)
 
-        -- 🔹 Coba Place ID dulu
-        local ok, reason = loadScript(placeId)
+    local ok1, err1 = loadScript(placeId)
+    if not ok1 then
+        warn("[LOADER] PlaceId failed: " .. err1)
 
-        if not ok then
-            warn("[LOADER] PlaceId failed, trying UniverseId... (" .. tostring(reason) .. ")")
-
-            -- 🔹 Fallback ke Universe ID
-            local ok2, reason2 = loadScript(universeId)
-
-            if not ok2 then
-                error("Both PlaceId & UniverseId failed: " .. tostring(reason2))
-            end
+        local ok2, err2 = loadScript(universeId)
+        if not ok2 then
+            warn("[LOADER] UniverseId failed: " .. err2)
         end
-    end)
-
-    if not success then
-        warn("[LOADER ERROR]: " .. tostring(err))
     end
 end)
