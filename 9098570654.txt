@@ -1,0 +1,953 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local adjustBackpackRemote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Tools") and ReplicatedStorage.Remotes.Tools:FindFirstChild("AdjustBackpack")
+local pickUpItemRemote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Interaction") and ReplicatedStorage.Remotes.Interaction:FindFirstChild("PickUpItem")
+
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ForceCheckbox = false
+Library.ShowToggleFrameInKeybinds = true
+
+local Window = Library:CreateWindow({
+    Title = "",
+    Footer = "Survive the Apocalypse",
+    NotifySide = "Right",
+    ShowCustomCursor = true,
+})
+
+local Tabs = {
+    Visuals = Window:AddTab("Visuals", "eye"),
+    Player = Window:AddTab("Player", "user"),
+    Exploits = Window:AddTab("Exploits", "zap"),
+    Misc = Window:AddTab("Misc", "settings"),
+    Info = Window:AddTab("Info", "info"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "sliders-horizontal"),
+}
+
+local connections = {}
+local mobESPInstances = {}
+local itemESPInstances = {}
+local autoPickupConnection = nil
+local originalValues = {
+    walkSpeed = nil,
+    jumpPower = nil,
+}
+
+local mobOptions = { ESP = false, Chams = false, Name = false, Distance = false }
+local itemOptions = { ESP = false, Chams = false, Name = false, Distance = false }
+
+local mobNames = {"Runner", "Crawler", "Riot", "Zombie"}
+local itemNames = {
+    "Bandage", "Barbed Wire", "Battery", "Beans", "Bloxiade", "Bloxy Cola",
+    "Compound I", "Crowbar", "Dumbell", "Fuel", "Grenade", "Knife",
+    "Long Ammo", "Medium Ammo", "Pistol Ammo", "Revolver", "Scrap",
+    "Screws", "Shells", "Spatula", "Tray", "Gas Mask", "Emerald"
+}
+
+local charactersFolder = Workspace:FindFirstChild("Characters")
+local droppedItemsFolder = Workspace:FindFirstChild("DroppedItems")
+
+-- Anti-Slow variables
+local antiSlowActive = false
+local speedHackActive = false
+local currentSpeedValue = 50
+local speedCheckConnection = nil
+
+-- Prevent auto-jump
+local lastJumpTime = 0
+local jumpCooldown = 0.3
+
+-- Auto Pickup multiple items selection (changed from single to multiple)
+local selectedMultipleItems = {} -- Table to store multiple selected items
+
+local function getItemMainPart(item)
+    if item.PrimaryPart then return item.PrimaryPart end
+    for _, child in ipairs(item:GetChildren()) do
+        if child:IsA("BasePart") then
+            return child
+        end
+    end
+    return nil
+end
+
+local function removeMobESP(char)
+    local esp = mobESPInstances[char]
+    if esp then
+        if esp.Highlight then esp.Highlight:Destroy() end
+        if esp.Billboard then esp.Billboard:Destroy() end
+        if esp.DistanceConnection then
+            esp.DistanceConnection:Disconnect()
+        end
+        mobESPInstances[char] = nil
+    end
+end
+
+local function removeItemESP(item)
+    local esp = itemESPInstances[item]
+    if esp then
+        if esp.Highlight then esp.Highlight:Destroy() end
+        if esp.Billboard then esp.Billboard:Destroy() end
+        if esp.DistanceConnection then
+            esp.DistanceConnection:Disconnect()
+        end
+        itemESPInstances[item] = nil
+    end
+end
+
+local function createMobESP(char)
+    if not char:IsA("Model") then return end
+    if mobESPInstances[char] then return end
+
+    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    if not root then return end
+
+    local espTable = {}
+
+    if mobOptions.Chams then
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "MobESP_Highlight"
+        highlight.Adornee = char
+        highlight.FillColor = Color3.fromRGB(220, 0, 0)
+        highlight.FillTransparency = 0.3
+        highlight.OutlineColor = Color3.fromRGB(255, 185, 185)
+        highlight.OutlineTransparency = 0.8
+        highlight.Parent = char
+        espTable.Highlight = highlight
+    end
+
+    if mobOptions.Name or mobOptions.Distance then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "MobESP_NameDistance"
+        billboard.Adornee = root
+        billboard.Size = UDim2.new(0, 200, 0, 50)
+        billboard.StudsOffset = Vector3.new(0, 3, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = char
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundTransparency = 1
+        frame.Parent = billboard
+
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Name = "NameLabel"
+        nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        nameLabel.Position = UDim2.new(0, 0, 0, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = char.Name
+        nameLabel.TextColor3 = Color3.fromRGB(255, 200, 200)
+        nameLabel.TextStrokeTransparency = 0.3
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.TextSize = 14
+        nameLabel.Visible = mobOptions.Name
+        nameLabel.Parent = frame
+
+        local distLabel = Instance.new("TextLabel")
+        distLabel.Name = "DistLabel"
+        distLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        distLabel.Position = UDim2.new(0, 0, 0.5, 0)
+        distLabel.BackgroundTransparency = 1
+        distLabel.Text = "0m"
+        distLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        distLabel.TextStrokeTransparency = 0.3
+        distLabel.Font = Enum.Font.Gotham
+        distLabel.TextSize = 12
+        distLabel.Visible = mobOptions.Distance
+        distLabel.Parent = frame
+
+        espTable.Billboard = billboard
+        espTable.NameLabel = nameLabel
+        espTable.DistLabel = distLabel
+
+        local connection
+        connection = RunService.RenderStepped:Connect(function()
+            if not char or not char.Parent then
+                connection:Disconnect()
+                return
+            end
+            if distLabel and distLabel.Visible then
+                local myChar = LocalPlayer.Character
+                local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("UpperTorso"))
+                if myRoot then
+                    local dist = (myRoot.Position - root.Position).Magnitude
+                    distLabel.Text = math.floor(dist) .. "m"
+                end
+            end
+        end)
+        espTable.DistanceConnection = connection
+        table.insert(connections, connection)
+    end
+
+    mobESPInstances[char] = espTable
+end
+
+local function createItemESP(item)
+    if not item:IsA("Model") then return end
+    if itemESPInstances[item] then return end
+
+    local mainPart = getItemMainPart(item)
+    if not mainPart then return end
+
+    local espTable = {}
+
+    if itemOptions.Chams then
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "ItemESP_Highlight"
+        highlight.Adornee = item
+        highlight.FillColor = Color3.fromRGB(255, 0, 255)
+        highlight.FillTransparency = 0.4
+        highlight.OutlineColor = Color3.fromRGB(200, 180, 255)
+        highlight.OutlineTransparency = 0.8
+        highlight.Parent = item
+        espTable.Highlight = highlight
+    end
+
+    if itemOptions.Name or itemOptions.Distance then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "ItemESP_NameDistance"
+        billboard.Adornee = mainPart
+        billboard.Size = UDim2.new(0, 200, 0, 50)
+        billboard.StudsOffset = Vector3.new(0, 2, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = item
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundTransparency = 1
+        frame.Parent = billboard
+
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Name = "NameLabel"
+        nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        nameLabel.Position = UDim2.new(0, 0, 0, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = item.Name
+        nameLabel.TextColor3 = Color3.fromRGB(200, 255, 200)
+        nameLabel.TextStrokeTransparency = 0.3
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.TextSize = 14
+        nameLabel.Visible = itemOptions.Name
+        nameLabel.Parent = frame
+
+        local distLabel = Instance.new("TextLabel")
+        distLabel.Name = "DistLabel"
+        distLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        distLabel.Position = UDim2.new(0, 0, 0.5, 0)
+        distLabel.BackgroundTransparency = 1
+        distLabel.Text = "0m"
+        distLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        distLabel.TextStrokeTransparency = 0.3
+        distLabel.Font = Enum.Font.Gotham
+        distLabel.TextSize = 12
+        distLabel.Visible = itemOptions.Distance
+        distLabel.Parent = frame
+
+        espTable.Billboard = billboard
+        espTable.NameLabel = nameLabel
+        espTable.DistLabel = distLabel
+
+        local connection
+        connection = RunService.RenderStepped:Connect(function()
+            if not item or not item.Parent then
+                connection:Disconnect()
+                return
+            end
+            if distLabel and distLabel.Visible then
+                local myChar = LocalPlayer.Character
+                local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("UpperTorso"))
+                if myRoot then
+                    local dist = (myRoot.Position - mainPart.Position).Magnitude
+                    distLabel.Text = math.floor(dist) .. "m"
+                end
+            end
+        end)
+        espTable.DistanceConnection = connection
+        table.insert(connections, connection)
+    end
+
+    itemESPInstances[item] = espTable
+end
+
+local function refreshMobESP()
+    for char, _ in pairs(mobESPInstances) do
+        removeMobESP(char)
+    end
+    if not mobOptions.ESP then return end
+    if not charactersFolder then
+        Library:Notify({ Title = "Mob ESP", Description = "Characters folder not found", Time = 3 })
+        return
+    end
+    for _, child in ipairs(charactersFolder:GetChildren()) do
+        if table.find(mobNames, child.Name) then
+            createMobESP(child)
+        end
+    end
+end
+
+local function refreshItemESP()
+    for item, _ in pairs(itemESPInstances) do
+        removeItemESP(item)
+    end
+    if not itemOptions.ESP then return end
+    if not droppedItemsFolder then
+        Library:Notify({ Title = "Item ESP", Description = "DroppedItems folder not found", Time = 3 })
+        return
+    end
+    for _, child in ipairs(droppedItemsFolder:GetChildren()) do
+        if table.find(itemNames, child.Name) then
+            createItemESP(child)
+        end
+    end
+end
+
+-- Anti-Slow function (without auto-jump)
+local function startAntiSlow()
+    if antiSlowActive then return end
+    antiSlowActive = true
+    
+    speedCheckConnection = RunService.Heartbeat:Connect(function()
+        if not Toggles.SpeedHack.Value then return end
+        
+        local char = LocalPlayer.Character
+        if char then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                -- Check if speed was reduced (anti-slow)
+                if humanoid.WalkSpeed < currentSpeedValue and humanoid.WalkSpeed ~= 0 then
+                    -- Restore speed hack speed without affecting jump
+                    humanoid.WalkSpeed = currentSpeedValue
+                end
+                
+                -- Prevent auto-jump by ensuring jump power isn't modified
+                if humanoid.JumpPower ~= (originalValues.jumpPower or 50) then
+                    if not Toggles.InfJump.Value then
+                        humanoid.JumpPower = originalValues.jumpPower or 50
+                    end
+                end
+            end
+        end
+    end)
+    
+    table.insert(connections, speedCheckConnection)
+end
+
+local function stopAntiSlow()
+    if speedCheckConnection then
+        speedCheckConnection:Disconnect()
+        speedCheckConnection = nil
+    end
+    antiSlowActive = false
+end
+
+-- Apply speed hack function (without affecting jump)
+local function applySpeedHack(state, speedValue)
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            if state then
+                originalValues.walkSpeed = humanoid.WalkSpeed
+                originalValues.jumpPower = humanoid.JumpPower
+                humanoid.WalkSpeed = speedValue
+                currentSpeedValue = speedValue
+                Library:Notify({ Title = "Speed Hack", Description = "Speed set to " .. speedValue, Time = 2 })
+            else
+                humanoid.WalkSpeed = originalValues.walkSpeed or 16
+                if originalValues.jumpPower then
+                    humanoid.JumpPower = originalValues.jumpPower
+                end
+                Library:Notify({ Title = "Speed Hack", Description = "Speed restored to " .. (originalValues.walkSpeed or 16), Time = 2 })
+            end
+        end
+    end
+end
+
+-- ========== UPDATED AUTO PICKUP FUNCTIONS (MULTIPLE ITEMS SELECTION) ==========
+local function isItemAllowed(itemName)
+    -- Check if "Pick Up All Items" is enabled
+    if Toggles.AllItems.Value then
+        return true
+    end
+    
+    -- Check if multiple items mode is enabled (replaces single item mode)
+    if Toggles.MultipleItemsMode.Value then
+        -- Check if the item is in the selected multiple items list
+        for _, selectedItem in pairs(selectedMultipleItems) do
+            if itemName == selectedItem then
+                return true
+            end
+        end
+        return false
+    end
+    
+    -- Check whitelist (multi-select)
+    local whitelist = Options.ItemWhitelist.Value
+    if whitelist and type(whitelist) == "table" then
+        for _, v in pairs(whitelist) do
+            if v == itemName then
+                return true
+            end
+        end
+    end
+    
+    return false
+end
+
+local function startAutoPickup()
+    if autoPickupConnection then return end
+    
+    autoPickupConnection = RunService.Heartbeat:Connect(function()
+        if not Toggles.AutoPickup.Value then return end
+
+        local char = LocalPlayer.Character
+        if not char then return end
+        local rootPart = char:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+
+        local radius = Options.PickupRadius.Value
+        local pos = rootPart.Position
+
+        if not droppedItemsFolder then return end
+
+        -- Get the list of items to pick up
+        local itemsToPickup = {}
+        
+        for _, item in ipairs(droppedItemsFolder:GetChildren()) do
+            if isItemAllowed(item.Name) then
+                table.insert(itemsToPickup, item)
+            end
+        end
+        
+        -- Sort by distance (optional but more efficient)
+        table.sort(itemsToPickup, function(a, b)
+            local aPart = a.PrimaryPart or getItemMainPart(a)
+            local bPart = b.PrimaryPart or getItemMainPart(b)
+            if not aPart or not bPart then return false end
+            local distA = (aPart.Position - pos).Magnitude
+            local distB = (bPart.Position - pos).Magnitude
+            return distA < distB
+        end)
+        
+        for _, item in ipairs(itemsToPickup) do
+            if not Toggles.AutoPickup.Value then break end
+            
+            local mainPart = item.PrimaryPart or getItemMainPart(item)
+            if mainPart then
+                local dist = (mainPart.Position - pos).Magnitude
+                if dist <= radius then
+                    -- Try to pick up the item
+                    local success = false
+                    
+                    if adjustBackpackRemote then
+                        pcall(function()
+                            adjustBackpackRemote:FireServer(item)
+                            success = true
+                        end)
+                    end
+                    
+                    if not success and pickUpItemRemote then
+                        pcall(function()
+                            pickUpItemRemote:FireServer(item)
+                            success = true
+                        end)
+                    end
+                    
+                    if not success then
+                        local fireProximity = item:FindFirstChild("FireProximity")
+                        if fireProximity then
+                            pcall(function()
+                                fireProximity:FireServer()
+                                success = true
+                            end)
+                        end
+                    end
+                    
+                    -- Small delay to prevent overwhelming the server
+                    task.wait(0.05)
+                end
+            end
+        end
+    end)
+end
+
+local function stopAutoPickup()
+    if autoPickupConnection then
+        autoPickupConnection:Disconnect()
+        autoPickupConnection = nil
+    end
+end
+-- ========== END AUTO PICKUP FUNCTIONS ==========
+
+if charactersFolder then
+    local childAddedConn = charactersFolder.ChildAdded:Connect(function(child)
+        if mobOptions.ESP and table.find(mobNames, child.Name) then
+            createMobESP(child)
+        end
+    end)
+    table.insert(connections, childAddedConn)
+
+    local childRemovedConn = charactersFolder.ChildRemoved:Connect(function(child)
+        removeMobESP(child)
+    end)
+    table.insert(connections, childRemovedConn)
+end
+
+if droppedItemsFolder then
+    local childAddedConn = droppedItemsFolder.ChildAdded:Connect(function(child)
+        if itemOptions.ESP and table.find(itemNames, child.Name) then
+            createItemESP(child)
+        end
+    end)
+    table.insert(connections, childAddedConn)
+
+    local childRemovedConn = droppedItemsFolder.ChildRemoved:Connect(function(child)
+        removeItemESP(child)
+    end)
+    table.insert(connections, childRemovedConn)
+end
+
+-- Visuals Tab
+local mobESPGroup = Tabs.Visuals:AddLeftGroupbox("Mob ESP", "eye")
+
+mobESPGroup:AddToggle("MobESP", {
+    Text = "Mob ESP",
+    Default = false,
+    Callback = function(state)
+        mobOptions.ESP = state
+        refreshMobESP()
+    end,
+})
+
+mobESPGroup:AddToggle("MobChams", {
+    Text = "Chams",
+    Default = false,
+    Callback = function(state)
+        mobOptions.Chams = state
+        refreshMobESP()
+    end,
+})
+
+mobESPGroup:AddToggle("MobName", {
+    Text = "Show Names",
+    Default = false,
+    Callback = function(state)
+        mobOptions.Name = state
+        refreshMobESP()
+    end,
+})
+
+mobESPGroup:AddToggle("MobDistance", {
+    Text = "Show Distance",
+    Default = false,
+    Callback = function(state)
+        mobOptions.Distance = state
+        refreshMobESP()
+    end,
+})
+
+local itemESPGroup = Tabs.Visuals:AddRightGroupbox("Item ESP", "package")
+
+itemESPGroup:AddToggle("ItemESP", {
+    Text = "Item ESP",
+    Default = false,
+    Callback = function(state)
+        itemOptions.ESP = state
+        refreshItemESP()
+    end,
+})
+
+itemESPGroup:AddToggle("ItemChams", {
+    Text = "Chams",
+    Default = false,
+    Callback = function(state)
+        itemOptions.Chams = state
+        refreshItemESP()
+    end,
+})
+
+itemESPGroup:AddToggle("ItemName", {
+    Text = "Show Names",
+    Default = false,
+    Callback = function(state)
+        itemOptions.Name = state
+        refreshItemESP()
+    end,
+})
+
+itemESPGroup:AddToggle("ItemDistance", {
+    Text = "Show Distance",
+    Default = false,
+    Callback = function(state)
+        itemOptions.Distance = state
+        refreshItemESP()
+    end,
+})
+
+-- Player Tab
+local movementGroup = Tabs.Player:AddLeftGroupbox("Movement", "move")
+
+movementGroup:AddToggle("SpeedHack", {
+    Text = "Speed Hack",
+    Default = false,
+    Callback = function(state)
+        speedHackActive = state
+        if state then
+            applySpeedHack(true, Options.SpeedValue.Value)
+            startAntiSlow()
+        else
+            stopAntiSlow()
+            applySpeedHack(false)
+        end
+    end,
+})
+
+movementGroup:AddSlider("SpeedValue", {
+    Text = "Walk Speed",
+    Default = 50,
+    Min = 16,
+    Max = 200,
+    Rounding = 0,
+    Suffix = " studs/s",
+    Callback = function(value)
+        currentSpeedValue = value
+        if Toggles.SpeedHack.Value then
+            local char = LocalPlayer.Character
+            if char then
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = value
+                end
+            end
+        end
+    end,
+})
+
+movementGroup:AddToggle("InfJump", {
+    Text = "Inf Jump",
+    Default = false,
+    Callback = function(state)
+        if state then
+            -- Store original jump power if not already stored
+            local char = LocalPlayer.Character
+            if char then
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if humanoid and originalValues.jumpPower == nil then
+                    originalValues.jumpPower = humanoid.JumpPower
+                end
+            end
+            Library:Notify({
+                Title = "Inf Jump",
+                Description = "Enabled - Press space to jump!",
+                Time = 2,
+            })
+        else
+            -- Restore original jump power
+            local char = LocalPlayer.Character
+            if char then
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if humanoid and originalValues.jumpPower then
+                    humanoid.JumpPower = originalValues.jumpPower
+                end
+            end
+            Library:Notify({
+                Title = "Inf Jump",
+                Description = "Disabled",
+                Time = 2,
+            })
+        end
+    end,
+})
+
+movementGroup:AddToggle("AntiSlow", {
+    Text = "Anti-Slow",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if Toggles.SpeedHack.Value then
+                startAntiSlow()
+            end
+            Library:Notify({ Title = "Anti-Slow", Description = "Anti-Slow enabled - prevents speed reduction", Time = 2 })
+        else
+            stopAntiSlow()
+            Library:Notify({ Title = "Anti-Slow", Description = "Anti-Slow disabled", Time = 2 })
+        end
+    end,
+})
+
+-- Fixed Jump Connection - Proper infinite jump
+local jumpConn = UserInputService.JumpRequest:Connect(function()
+    if Toggles.InfJump.Value then
+        local char = LocalPlayer.Character
+        if char then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                -- Remove the state checks that prevent jumping
+                -- Just force the jump state
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                -- Also set jump power to a higher value for better effect
+                if originalValues.jumpPower == nil then
+                    originalValues.jumpPower = humanoid.JumpPower
+                end
+                humanoid.JumpPower = 80 -- Higher jump for better infinite jump feel
+            end
+        end
+    end
+end)
+table.insert(connections, jumpConn)
+
+-- Also add a spacebar listener as backup (sometimes JumpRequest doesn't fire)
+local spacebarConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if Toggles.InfJump.Value and input.KeyCode == Enum.KeyCode.Space then
+        local char = LocalPlayer.Character
+        if char then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                -- Only jump if not already jumping (to prevent double jumps)
+                if humanoid:GetState() ~= Enum.HumanoidStateType.Jumping and 
+                   humanoid:GetState() ~= Enum.HumanoidStateType.Falling then
+                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+            end
+        end
+    end
+end)
+table.insert(connections, spacebarConn)
+
+-- Exploits Tab
+local autoPickupGroup = Tabs.Exploits:AddLeftGroupbox("Auto Pickup", "hand")
+
+autoPickupGroup:AddToggle("AutoPickup", {
+    Text = "Auto Pickup",
+    Default = false,
+    Callback = function(state)
+        if state then
+            startAutoPickup()
+            Library:Notify({ Title = "Auto Pickup", Description = "Auto Pickup started", Time = 2 })
+        else
+            stopAutoPickup()
+            Library:Notify({ Title = "Auto Pickup", Description = "Auto Pickup stopped", Time = 2 })
+        end
+    end,
+})
+
+autoPickupGroup:AddSlider("PickupRadius", {
+    Text = "Pickup Radius",
+    Default = 15,
+    Min = 1,
+    Max = 50,
+    Rounding = 0,
+    Suffix = " studs",
+})
+
+autoPickupGroup:AddDivider()
+
+-- UPDATED: Multiple Items Mode Toggle (replaces Single Item Mode)
+autoPickupGroup:AddToggle("MultipleItemsMode", {
+    Text = "Multiple Items Mode",
+    Default = false,
+    Tooltip = "When enabled, only picks up the selected multiple items (overrides whitelist)",
+    Callback = function(state)
+        if state then
+            local count = #selectedMultipleItems
+            Library:Notify({ 
+                Title = "Multiple Items Mode", 
+                Description = "Enabled - " .. count .. " item(s) selected for pickup", 
+                Time = 2 
+            })
+        else
+            Library:Notify({ 
+                Title = "Multiple Items Mode", 
+                Description = "Disabled - Using whitelist or all items mode", 
+                Time = 2 
+            })
+        end
+    end,
+})
+
+-- UPDATED: Multiple Items Dropdown (allows multiple selections)
+autoPickupGroup:AddDropdown("MultipleItemsSelect", {
+    Values = itemNames,
+    Default = {},
+    Multi = true,
+    Text = "Select Multiple Items",
+    Tooltip = "Select MULTIPLE items to pick up when Multiple Items Mode is enabled",
+    Callback = function(value)
+        selectedMultipleItems = value
+        if Toggles.MultipleItemsMode.Value then
+            local count = #selectedMultipleItems
+            Library:Notify({ 
+                Title = "Multiple Items", 
+                Description = "Now picking up " .. count .. " item(s)", 
+                Time = 2 
+            })
+        end
+    end,
+})
+
+autoPickupGroup:AddDivider()
+
+autoPickupGroup:AddToggle("AllItems", {
+    Text = "Pick Up All Items",
+    Default = false,
+    Tooltip = "When enabled, all items within radius are picked up regardless of filter",
+})
+
+autoPickupGroup:AddDivider()
+
+autoPickupGroup:AddLabel("Item Whitelist (Multi-Select)")
+autoPickupGroup:AddDropdown("ItemWhitelist", {
+    Values = itemNames,
+    Default = {},
+    Multi = true,
+    Text = "Item Whitelist",
+    Tooltip = "Select which items to pick up. Only applies when 'Pick Up All Items' and 'Multiple Items Mode' are off.",
+    Searchable = true,
+})
+
+-- Info text about pickup priority
+autoPickupGroup:AddDivider()
+autoPickupGroup:AddLabel("Pickup Priority:")
+autoPickupGroup:AddLabel("1. Pick Up All Items (overrides everything)")
+autoPickupGroup:AddLabel("2. Multiple Items Mode (overrides whitelist)")
+autoPickupGroup:AddLabel("3. Item Whitelist (multi-select)")
+
+-- Misc Tab
+local miscGroup = Tabs.Misc:AddLeftGroupbox("Misc", "settings")
+
+miscGroup:AddLabel("No additional features yet", { DoesWrap = true })
+
+-- Info Tab
+local infoGroup = Tabs.Info:AddLeftGroupbox("About", "info")
+
+infoGroup:AddDivider()
+
+infoGroup:AddButton({
+    Text = "UNLOAD",
+    Func = function()
+        Library:Unload()
+    end,
+    Risky = true,
+    Tooltip = "Removes the GUI and cleans up all active features",
+})
+
+-- Unload Cleanup
+Library:OnUnload(function()
+    for char, _ in pairs(mobESPInstances) do
+        removeMobESP(char)
+    end
+    for item, _ in pairs(itemESPInstances) do
+        removeItemESP(item)
+    end
+
+    for _, conn in ipairs(connections) do
+        if typeof(conn) == "RBXScriptConnection" then
+            conn:Disconnect()
+        end
+    end
+    connections = {}
+
+    stopAutoPickup()
+    stopAntiSlow()
+
+    if Toggles.SpeedHack.Value then
+        local char = LocalPlayer.Character
+        if char then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = originalValues.walkSpeed or 16
+                if originalValues.jumpPower then
+                    humanoid.JumpPower = originalValues.jumpPower
+                end
+            end
+        end
+    end
+
+    Library:Notify({ Title = "", Description = "Bye!", Time = 3 })
+    print("")
+end)
+
+-- UI Settings Tab
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default = Library.KeybindFrame.Visible,
+    Text = "Open Keybind Menu",
+    Callback = function(value)
+        Library.KeybindFrame.Visible = value
+    end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Custom Cursor",
+    Default = true,
+    Callback = function(Value)
+        Library.ShowCustomCursor = Value
+    end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values = { "Left", "Right" },
+    Default = "Right",
+    Text = "Notification Side",
+    Callback = function(Value)
+        Library:SetNotifySide(Value)
+    end,
+})
+
+MenuGroup:AddDropdown("DPIDropdown", {
+    Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
+    Default = "100%",
+    Text = "DPI Scale",
+    Callback = function(Value)
+        Value = Value:gsub("%%", "")
+        local DPI = tonumber(Value)
+        Library:SetDPIScale(DPI)
+    end,
+})
+
+MenuGroup:AddSlider("UICornerSlider", {
+    Text = "Corner Radius",
+    Default = Library.CornerRadius,
+    Min = 0,
+    Max = 20,
+    Rounding = 0,
+    Callback = function(value)
+        Window:SetCornerRadius(value)
+    end,
+})
+
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menu bind")
+    :AddKeyPicker("MenuKeybind", { Default = "Insert", NoUI = true, Text = "Menu keybind" })
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("SPYMM")
+SaveManager:SetFolder("SPYMM/survive-the-apocalypse")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+SaveManager:LoadAutoloadConfig()
+
+Library:Notify({
+    Title = "",
+    Description = "",
+    Time = 5,
+})
