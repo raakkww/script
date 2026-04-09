@@ -1,0 +1,816 @@
+-- ============================
+--       DZINDRAS MENU
+--  ESP | Server | TP | Damage
+-- ============================
+-- Place as LocalScript in StarterPlayerScripts
+ 
+local Players        = game:GetService("Players")
+local TeleportService= game:GetService("TeleportService")
+local HttpService    = game:GetService("HttpService")
+local RunService     = game:GetService("RunService")
+local Camera         = workspace.CurrentCamera
+ 
+local player    = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart  = character:WaitForChild("HumanoidRootPart")
+ 
+player.CharacterAdded:Connect(function(c)
+    character = c
+    rootPart  = c:WaitForChild("HumanoidRootPart")
+end)
+ 
+-- ============================
+--           ESP
+-- ============================
+ 
+local espEnabled = { tracers = false, highlight = false, box = false, health = false }
+local espObjects  = {} -- [player] = { highlight, box, tracer, healthBillboard, nameLabel }
+ 
+local function removeESP(p)
+    local obj = espObjects[p]
+    if not obj then return end
+    if obj.highlight       then obj.highlight:Destroy() end
+    if obj.box             then pcall(function() obj.box:Remove() end) end
+    if obj.tracer          then pcall(function() obj.tracer:Remove() end) end
+    if obj.healthBillboard then obj.healthBillboard:Destroy() end
+    if obj.nameBillboard   then obj.nameBillboard:Destroy() end
+    espObjects[p] = nil
+end
+ 
+local function newDrawing(type_, props)
+    local ok, obj = pcall(Drawing.new, type_)
+    if not ok then return nil end
+    for k, v in pairs(props) do pcall(function() obj[k] = v end) end
+    return obj
+end
+ 
+-- Highlight: vÅ¾dy znovu vytvoÅ s aktuÃ¡lnÃ­m charakterem, zabraÅuje blikÃ¡nÃ­
+local function rebuildHighlight(p)
+    local obj = espObjects[p]
+    if not obj then return end
+    if obj.highlight then obj.highlight:Destroy(); obj.highlight = nil end
+    if not espEnabled.highlight then return end
+    if not p.Character then return end
+    local hl = Instance.new("Highlight")
+    hl.FillColor          = Color3.fromRGB(220, 50, 50)
+    hl.OutlineColor       = Color3.fromRGB(255, 80, 80)
+    hl.FillTransparency   = 0.65   -- mÃ©nÄ agresivnÃ­ fill = Å¾Ã¡dnÃ¡ ÄervenÃ¡ mapa
+    hl.OutlineTransparency= 0
+    hl.DepthMode          = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Adornee            = p.Character
+    hl.Parent             = player.PlayerGui -- v PlayerGui neovlivnÃ­ workspace geometrii
+    obj.highlight         = hl
+end
+ 
+local function setupESP(p)
+    if p == player then return end
+    if not espObjects[p] then espObjects[p] = {} end
+    local obj = espObjects[p]
+ 
+    -- Highlight
+    if espEnabled.highlight then
+        rebuildHighlight(p)
+    elseif obj.highlight then
+        obj.highlight:Destroy(); obj.highlight = nil
+    end
+ 
+    -- Box (Drawing)
+    if espEnabled.box and not obj.box then
+        obj.box = newDrawing("Square", {
+            Color     = Color3.fromRGB(255, 60, 60),
+            Thickness = 1.5,
+            Filled    = false,
+            Visible   = false,
+        })
+    elseif not espEnabled.box and obj.box then
+        pcall(function() obj.box:Remove() end); obj.box = nil
+    end
+ 
+    -- Tracer (Drawing)
+    if espEnabled.tracers and not obj.tracer then
+        obj.tracer = newDrawing("Line", {
+            Color     = Color3.fromRGB(255, 200, 50),
+            Thickness = 1,
+            Visible   = false,
+        })
+    elseif not espEnabled.tracers and obj.tracer then
+        pcall(function() obj.tracer:Remove() end); obj.tracer = nil
+    end
+ 
+    -- Health BillboardGui
+    if espEnabled.health and not obj.healthBillboard then
+        local bb = Instance.new("BillboardGui")
+        bb.Size          = UDim2.new(0, 70, 0, 14)
+        bb.StudsOffset   = Vector3.new(0, 3.2, 0)
+        bb.AlwaysOnTop   = true
+        bb.ResetOnSpawn  = false
+        bb.Name          = "DzindraHealth"
+        -- background
+        local bg = Instance.new("Frame", bb)
+        bg.Size               = UDim2.new(1, 0, 1, 0)
+        bg.BackgroundColor3   = Color3.fromRGB(20, 20, 20)
+        bg.BorderSizePixel    = 0
+        bg.Name               = "BG"
+        Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
+        -- fill bar
+        local bar = Instance.new("Frame", bg)
+        bar.Size             = UDim2.new(1, 0, 1, 0)
+        bar.BackgroundColor3 = Color3.fromRGB(30, 200, 60)
+        bar.BorderSizePixel  = 0
+        bar.Name             = "HealthBar"
+        Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+        -- text
+        local lbl = Instance.new("TextLabel", bb)
+        lbl.Size                 = UDim2.new(1, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.TextColor3           = Color3.fromRGB(255, 255, 255)
+        lbl.TextStrokeColor3     = Color3.fromRGB(0, 0, 0)
+        lbl.TextStrokeTransparency = 0.3
+        lbl.TextSize             = 9
+        lbl.Font                 = Enum.Font.GothamBold
+        lbl.Text                 = "100%"
+        lbl.Name                 = "HealthLabel"
+        if p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then bb.Adornee = hrp end
+        end
+        bb.Parent          = player.PlayerGui
+        obj.healthBillboard = bb
+    elseif not espEnabled.health and obj.healthBillboard then
+        obj.healthBillboard:Destroy(); obj.healthBillboard = nil
+    end
+end
+ 
+local function refreshAllESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player then setupESP(p) end
+    end
+end
+ 
+-- RenderStepped update loop
+RunService.RenderStepped:Connect(function()
+    local anyActive = espEnabled.tracers or espEnabled.box or espEnabled.highlight or espEnabled.health
+    if not anyActive then return end
+ 
+    local vp           = Camera.ViewportSize
+    local screenCenter = Vector2.new(vp.X / 2, vp.Y)
+ 
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == player then continue end
+        local obj = espObjects[p]
+        if not obj then continue end
+ 
+        local char = p.Character
+        if not char then continue end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+ 
+        -- Highlight: oprav adornee pokud se charakter zmÄnil
+        if obj.highlight then
+            if obj.highlight.Adornee ~= char then
+                obj.highlight.Adornee = char
+            end
+        end
+ 
+        -- Health bar update
+        if obj.healthBillboard and hrp then
+            obj.healthBillboard.Adornee = hrp
+            if hum then
+                local pct = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+                local bar = obj.healthBillboard:FindFirstChild("BG") and obj.healthBillboard.BG:FindFirstChild("HealthBar")
+                local lbl = obj.healthBillboard:FindFirstChild("HealthLabel")
+                if bar then
+                    bar.Size             = UDim2.new(pct, 0, 1, 0)
+                    bar.BackgroundColor3 = Color3.fromRGB(
+                        math.floor((1 - pct) * 220),
+                        math.floor(pct * 200),
+                        40
+                    )
+                end
+                if lbl then lbl.Text = math.floor(pct * 100) .. "%" end
+            end
+        end
+ 
+        -- Box + Tracer
+        if (obj.box or obj.tracer) and hrp then
+            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            if onScreen and pos.Z > 0 then
+                if obj.box then
+                    local scale = 1 / pos.Z
+                    local w = 100 * scale * 35
+                    local h = w * 1.8
+                    obj.box.Size     = Vector2.new(w, h)
+                    obj.box.Position = Vector2.new(pos.X - w / 2, pos.Y - h / 2)
+                    obj.box.Visible  = true
+                end
+                if obj.tracer then
+                    obj.tracer.From    = screenCenter
+                    obj.tracer.To      = Vector2.new(pos.X, pos.Y)
+                    obj.tracer.Visible = true
+                end
+            else
+                if obj.box    then obj.box.Visible    = false end
+                if obj.tracer then obj.tracer.Visible = false end
+            end
+        end
+    end
+end)
+ 
+-- PÅi spawnu hrÃ¡Äe znovu postav ESP (fix blikÃ¡nÃ­ po respawnu)
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if espObjects[p] then rebuildHighlight(p) end
+        setupESP(p)
+    end)
+    setupESP(p)
+end)
+Players.PlayerRemoving:Connect(removeESP)
+ 
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= player then
+        p.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            if espObjects[p] then rebuildHighlight(p) end
+            setupESP(p)
+        end)
+    end
+end
+ 
+-- ============================
+--         SERVER
+-- ============================
+ 
+local function rejoin()
+    local ok, err = pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
+    if not ok then warn("[DZINDRAS] Rejoin failed: " .. tostring(err)) end
+end
+ 
+local function joinSmallServer()
+    local placeId = game.PlaceId
+    local cursor, smallestServer, smallestCount = "", nil, math.huge
+    repeat
+        local ok, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet(
+                "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100&cursor="..cursor))
+        end)
+        if not ok then break end
+        for _, s in ipairs(result.data or {}) do
+            if s.playing < smallestCount and s.id ~= game.JobId then
+                smallestCount = s.playing; smallestServer = s.id
+            end
+        end
+        cursor = result.nextPageCursor or ""
+    until cursor == "" or cursor == nil
+    if smallestServer then TeleportService:TeleportToPlaceInstance(placeId, smallestServer, player)
+    else warn("[DZINDRAS] No small server found.") end
+end
+ 
+local function joinBigServer()
+    local placeId = game.PlaceId
+    local biggestServer, biggestCount = nil, 0
+    local ok, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(
+            "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Desc&limit=100"))
+    end)
+    if ok then
+        for _, s in ipairs(result.data or {}) do
+            if s.playing > biggestCount and s.id ~= game.JobId then
+                biggestCount = s.playing; biggestServer = s.id
+            end
+        end
+    end
+    if biggestServer then TeleportService:TeleportToPlaceInstance(placeId, biggestServer, player)
+    else warn("[DZINDRAS] No big server found.") end
+end
+ 
+-- ============================
+--        TELEPORT
+-- ============================
+ 
+local function teleportToName(name)
+    local target = workspace:FindFirstChild(name, true)
+    if not target then return false, "'"..name.."' not found!" end
+    local pos
+    if target:IsA("BasePart") or target:IsA("MeshPart") then
+        pos = target.Position + Vector3.new(0, 4, 0)
+    elseif target:IsA("Model") then
+        pos = target:GetModelCFrame().Position + Vector3.new(0, 4, 0)
+    elseif target.Parent and target.Parent:IsA("BasePart") then
+        pos = target.Parent.Position + Vector3.new(0, 4, 0)
+    end
+    if pos then rootPart.CFrame = CFrame.new(pos); return true, "Teleported!" end
+    return false, "Can't get position."
+end
+ 
+local function teleportToAny(names)
+    for _, name in ipairs(names) do
+        local ok, msg = teleportToName(name)
+        if ok then return true, msg end
+    end
+    return false, "Location not found!"
+end
+ 
+-- ============================
+--           GUI
+-- ============================
+ 
+local sg = Instance.new("ScreenGui")
+sg.Name = "DzindrasMenu"; sg.ResetOnSpawn = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+sg.Parent = player.PlayerGui
+ 
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 300, 0, 900)
+main.Position = UDim2.new(0, 24, 0, 24)
+main.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
+main.BorderSizePixel = 0
+main.Active = true; main.Draggable = true; main.ClipsDescendants = true
+main.Parent = sg
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
+ 
+-- Top bar
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(1, 0, 0, 72)
+topBar.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+topBar.BorderSizePixel = 0; topBar.Parent = main
+Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 14)
+ 
+local topFix = Instance.new("Frame")
+topFix.Size = UDim2.new(1, 0, 0, 14); topFix.Position = UDim2.new(0, 0, 1, -14)
+topFix.BackgroundColor3 = Color3.fromRGB(18, 18, 28); topFix.BorderSizePixel = 0; topFix.Parent = topBar
+ 
+-- Title row
+local titleLbl = Instance.new("TextLabel")
+titleLbl.Size = UDim2.new(1, -90, 0, 28); titleLbl.Position = UDim2.new(0, 14, 0, 6)
+titleLbl.BackgroundTransparency = 1; titleLbl.Text = "MENU"
+titleLbl.TextColor3 = Color3.fromRGB(255, 255, 255); titleLbl.TextSize = 15
+titleLbl.Font = Enum.Font.GothamBold; titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+titleLbl.Parent = topBar
+ 
+-- Welcome label
+local welcomeLbl = Instance.new("TextLabel")
+welcomeLbl.Size = UDim2.new(1, -90, 0, 22); welcomeLbl.Position = UDim2.new(0, 16, 0, 36)
+welcomeLbl.BackgroundTransparency = 1
+welcomeLbl.Text = "Welcome, " .. player.Name
+welcomeLbl.TextColor3 = Color3.fromRGB(130, 200, 255); welcomeLbl.TextSize = 12
+welcomeLbl.Font = Enum.Font.Gotham; welcomeLbl.TextXAlignment = Enum.TextXAlignment.Left
+welcomeLbl.Parent = topBar
+ 
+local isMinimized = false
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 28, 0, 28); minBtn.Position = UDim2.new(1, -66, 0, 10)
+minBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80); minBtn.Text = "â"
+minBtn.TextColor3 = Color3.fromRGB(200, 200, 220); minBtn.TextSize = 16
+minBtn.Font = Enum.Font.GothamBold; minBtn.BorderSizePixel = 0; minBtn.Parent = topBar
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
+ 
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 28, 0, 28); closeBtn.Position = UDim2.new(1, -34, 0, 10)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50); closeBtn.Text = "â"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); closeBtn.TextSize = 13
+closeBtn.Font = Enum.Font.GothamBold; closeBtn.BorderSizePixel = 0; closeBtn.Parent = topBar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+closeBtn.MouseButton1Click:Connect(function()
+    -- VyÄisti ESP pÅed zavÅenÃ­m
+    for _, p in ipairs(Players:GetPlayers()) do removeESP(p) end
+    sg:Destroy()
+end)
+ 
+local content = Instance.new("ScrollingFrame")
+content.Size = UDim2.new(1, 0, 1, -72); content.Position = UDim2.new(0, 0, 0, 72)
+content.BackgroundTransparency = 1; content.BorderSizePixel = 0
+content.ScrollBarThickness = 3; content.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 120)
+content.CanvasSize = UDim2.new(0, 0, 0, 0); content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+content.Parent = main
+ 
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 0); layout.SortOrder = Enum.SortOrder.LayoutOrder; layout.Parent = content
+ 
+local padding = Instance.new("UIPadding")
+padding.PaddingLeft = UDim.new(0, 12); padding.PaddingRight = UDim.new(0, 12)
+padding.PaddingTop = UDim.new(0, 10); padding.PaddingBottom = UDim.new(0, 10)
+padding.Parent = content
+ 
+-- ============================
+--      HELPER FUNCTIONS
+-- ============================
+ 
+local function sectionLabel(text, order)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 0, 30); lbl.BackgroundTransparency = 1; lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(160, 160, 200); lbl.TextSize = 11; lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.LayoutOrder = order; lbl.Parent = content
+    return lbl
+end
+ 
+local function statusLabel(order)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 0, 20); lbl.BackgroundTransparency = 1; lbl.Text = "Status: Ready"
+    lbl.TextColor3 = Color3.fromRGB(100, 220, 130); lbl.TextSize = 11; lbl.Font = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.LayoutOrder = order; lbl.Parent = content
+    return lbl
+end
+ 
+local function makeBtn(text, color, order)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 40); btn.BackgroundColor3 = color; btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.TextSize = 13; btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0; btn.LayoutOrder = order; btn.AutoButtonColor = false; btn.Parent = content
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    local gap = Instance.new("Frame")
+    gap.Size = UDim2.new(1, 0, 0, 6); gap.BackgroundTransparency = 1; gap.LayoutOrder = order + 1; gap.Parent = content
+    local baseColor = color
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(
+            math.min(baseColor.R * 255 + 25, 255),
+            math.min(baseColor.G * 255 + 25, 255),
+            math.min(baseColor.B * 255 + 25, 255)
+        )
+    end)
+    btn.MouseLeave:Connect(function() btn.BackgroundColor3 = baseColor end)
+    return btn
+end
+ 
+local function makeDivider(order)
+    local d = Instance.new("Frame")
+    d.Size = UDim2.new(1, 0, 0, 1); d.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    d.BorderSizePixel = 0; d.LayoutOrder = order; d.Parent = content
+    local gap = Instance.new("Frame")
+    gap.Size = UDim2.new(1, 0, 0, 8); gap.BackgroundTransparency = 1; gap.LayoutOrder = order + 1; gap.Parent = content
+end
+ 
+-- VytvoÅÃ­ ÅÃ¡dek se dvÄma tlaÄÃ­tky vedle sebe
+local function makeBtnRow(text1, color1, text2, color2, order)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 40); row.BackgroundTransparency = 1
+    row.LayoutOrder = order; row.Parent = content
+    local function makeHalf(text, color, xPos)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.5, -3, 1, 0)
+        btn.Position = UDim2.new(xPos, xPos == 0 and 0 or 6, 0, 0)
+        btn.BackgroundColor3 = color; btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255); btn.TextSize = 11; btn.Font = Enum.Font.GothamBold
+        btn.BorderSizePixel = 0; btn.AutoButtonColor = false; btn.Parent = row
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        local baseColor = color
+        btn.MouseEnter:Connect(function()
+            btn.BackgroundColor3 = Color3.fromRGB(
+                math.min(baseColor.R*255+25,255), math.min(baseColor.G*255+25,255), math.min(baseColor.B*255+25,255))
+        end)
+        btn.MouseLeave:Connect(function() btn.BackgroundColor3 = baseColor end)
+        return btn
+    end
+    local btn1 = makeHalf(text1, color1, 0)
+    local btn2 = makeHalf(text2, color2, 0.5)
+    local gap = Instance.new("Frame")
+    gap.Size = UDim2.new(1, 0, 0, 6); gap.BackgroundTransparency = 1; gap.LayoutOrder = order + 1; gap.Parent = content
+    return btn1, btn2
+end
+ 
+-- VytvoÅÃ­ ÅÃ¡dek se dvÄma togglemi vedle sebe
+local function makeToggleRow(label1, label2, order, onEnable1, onDisable1, onEnable2, onDisable2)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 40); row.BackgroundTransparency = 1
+    row.LayoutOrder = order; row.Parent = content
+    local function makeHalfToggle(labelText, xPos, onEnable, onDisable)
+        local cell = Instance.new("Frame")
+        cell.Size = UDim2.new(0.5, -3, 1, 0)
+        cell.Position = UDim2.new(xPos, xPos == 0 and 0 or 6, 0, 0)
+        cell.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+        cell.BorderSizePixel = 0; cell.Parent = row
+        Instance.new("UICorner", cell).CornerRadius = UDim.new(0, 8)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -44, 1, 0); lbl.Position = UDim2.new(0, 7, 0, 0)
+        lbl.BackgroundTransparency = 1; lbl.Text = labelText
+        lbl.TextColor3 = Color3.fromRGB(220, 220, 255); lbl.TextSize = 10
+        lbl.Font = Enum.Font.GothamBold; lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextWrapped = true; lbl.Parent = cell
+        local toggleBg = Instance.new("Frame")
+        toggleBg.Size = UDim2.new(0, 34, 0, 18); toggleBg.Position = UDim2.new(1, -40, 0.5, -9)
+        toggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 70); toggleBg.BorderSizePixel = 0; toggleBg.Parent = cell
+        Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(0, 9)
+        local knob = Instance.new("Frame")
+        knob.Size = UDim2.new(0, 14, 0, 14); knob.Position = UDim2.new(0, 2, 0, 2)
+        knob.BackgroundColor3 = Color3.fromRGB(180, 180, 200); knob.BorderSizePixel = 0; knob.Parent = toggleBg
+        Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 7)
+        local enabled = false
+        local function setToggle(state)
+            enabled = state
+            if enabled then
+                toggleBg.BackgroundColor3 = Color3.fromRGB(80, 160, 90)
+                knob.Position = UDim2.new(0, 18, 0, 2)
+                knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                onEnable()
+            else
+                toggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+                knob.Position = UDim2.new(0, 2, 0, 2)
+                knob.BackgroundColor3 = Color3.fromRGB(180, 180, 200)
+                onDisable()
+            end
+        end
+        toggleBg.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 then setToggle(not enabled) end
+        end)
+    end
+    makeHalfToggle(label1, 0, onEnable1, onDisable1)
+    makeHalfToggle(label2, 0.5, onEnable2, onDisable2)
+    local gap = Instance.new("Frame")
+    gap.Size = UDim2.new(1, 0, 0, 6); gap.BackgroundTransparency = 1; gap.LayoutOrder = order + 1; gap.Parent = content
+end
+ 
+local function makeToggle(labelText, order, onEnable, onDisable)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 40); row.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+    row.BorderSizePixel = 0; row.LayoutOrder = order; row.Parent = content
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -60, 1, 0); lbl.Position = UDim2.new(0, 12, 0, 0); lbl.BackgroundTransparency = 1
+    lbl.Text = labelText; lbl.TextColor3 = Color3.fromRGB(220, 220, 255); lbl.TextSize = 13
+    lbl.Font = Enum.Font.GothamBold; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = row
+    local toggleBg = Instance.new("Frame")
+    toggleBg.Size = UDim2.new(0, 44, 0, 22); toggleBg.Position = UDim2.new(1, -54, 0.5, -11)
+    toggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 70); toggleBg.BorderSizePixel = 0; toggleBg.Parent = row
+    Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(0, 11)
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 18, 0, 18); knob.Position = UDim2.new(0, 2, 0, 2)
+    knob.BackgroundColor3 = Color3.fromRGB(180, 180, 200); knob.BorderSizePixel = 0; knob.Parent = toggleBg
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 9)
+    local enabled = false
+    local function setToggle(state)
+        enabled = state
+        if enabled then
+            toggleBg.BackgroundColor3 = Color3.fromRGB(80, 160, 90)
+            knob.Position = UDim2.new(0, 24, 0, 2)
+            knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            onEnable()
+        else
+            toggleBg.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+            knob.Position = UDim2.new(0, 2, 0, 2)
+            knob.BackgroundColor3 = Color3.fromRGB(180, 180, 200)
+            onDisable()
+        end
+    end
+    toggleBg.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then setToggle(not enabled) end
+    end)
+    local gap = Instance.new("Frame")
+    gap.Size = UDim2.new(1, 0, 0, 6); gap.BackgroundTransparency = 1; gap.LayoutOrder = order + 1; gap.Parent = content
+    return row
+end
+ 
+-- ============================
+--        ESP SECTION
+-- ============================
+sectionLabel("ðï¸  ESP", 1)
+ 
+makeToggleRow("ð´  Tracers", "ð£  Highlight", 2,
+    function() espEnabled.tracers = true; refreshAllESP() end,
+    function()
+        espEnabled.tracers = false
+        for _, obj in pairs(espObjects) do
+            if obj.tracer then pcall(function() obj.tracer:Remove() end); obj.tracer = nil end
+        end
+    end,
+    function() espEnabled.highlight = true; refreshAllESP() end,
+    function()
+        espEnabled.highlight = false
+        for _, obj in pairs(espObjects) do
+            if obj.highlight then obj.highlight:Destroy(); obj.highlight = nil end
+        end
+    end
+)
+makeToggleRow("ð¦  Box", "ð  Health", 4,
+    function() espEnabled.box = true; refreshAllESP() end,
+    function()
+        espEnabled.box = false
+        for _, obj in pairs(espObjects) do
+            if obj.box then pcall(function() obj.box:Remove() end); obj.box = nil end
+        end
+    end,
+    function() espEnabled.health = true; refreshAllESP() end,
+    function()
+        espEnabled.health = false
+        for _, obj in pairs(espObjects) do
+            if obj.healthBillboard then obj.healthBillboard:Destroy(); obj.healthBillboard = nil end
+        end
+    end
+)
+ 
+makeDivider(6)
+ 
+-- ============================
+--       SERVER SECTION
+-- ============================
+sectionLabel("ð  SERVER", 7)
+local serverStatus = statusLabel(8)
+local rejoinBtn = makeBtn("â©  Rejoin", Color3.fromRGB(60, 80, 180), 9)
+rejoinBtn.MouseButton1Click:Connect(function()
+    serverStatus.Text = "Status: Rejoining..."
+    serverStatus.TextColor3 = Color3.fromRGB(255, 220, 80)
+    rejoin()
+end)
+local smallBtn, bigBtn = makeBtnRow("ðµ  Small Server", Color3.fromRGB(40, 120, 160), "ð´  Big Server", Color3.fromRGB(160, 60, 40), 11)
+smallBtn.MouseButton1Click:Connect(function()
+    serverStatus.Text = "Status: Finding small server..."
+    serverStatus.TextColor3 = Color3.fromRGB(255, 220, 80)
+    task.spawn(joinSmallServer)
+end)
+bigBtn.MouseButton1Click:Connect(function()
+    serverStatus.Text = "Status: Finding big server..."
+    serverStatus.TextColor3 = Color3.fromRGB(255, 220, 80)
+    task.spawn(joinBigServer)
+end)
+ 
+makeDivider(13)
+ 
+-- ============================
+--      TELEPORTS SECTION
+-- ============================
+sectionLabel("ð  TELEPORTS", 14)
+local tpStatus = statusLabel(15)
+tpStatus.Text = "Status: Ready"; tpStatus.TextColor3 = Color3.fromRGB(100, 220, 130)
+ 
+local tpList = {
+    { "ð¦  Bank",           Color3.fromRGB(180,140,20),  {"Bank","bank","BANK","BankBuilding","Bank_Interior","TheBank"} },
+    { "ð°  BankCash",       Color3.fromRGB(140,160,20),  {"BankCash","Bank_Cash","bankcash","BankCashRegister","CashRegister","BankVault","Vault"} },
+    { "ð  Jewelry Store",  Color3.fromRGB(140,60,180),  {"JewelryStore","JewleryStore","Jewelry","Jewlery","JewelryShop","JewelStore","DiamondStore"} },
+    { "ðª  Military Gate",  Color3.fromRGB(60,120,50),   {"MilitaryGate","Military_Gate","MilGate","Gate","MilitaryBase","ArmyGate","Military"} },
+    { "ð¤  Dealer",         Color3.fromRGB(180,80,20),   {"Dealer","dealer","DEALER","DrugDealer","Drug_Dealer","DealerNPC","WeaponDealer","Weapon_Dealer","ItemDealer"} },
+    { "ð  Police Station", Color3.fromRGB(30,80,180),   {"PoliceStation","Police_Station","policestation","PoliceDept","PD","CopStation","LawEnforcement"} },
+    { "ð¹ï¸  Arcade",         Color3.fromRGB(180,40,140),  {"Arcade","arcade","ARCADE","ArcadeBuilding","ArcadeShop","GameRoom"} },
+    { "ð¥  Hospital",       Color3.fromRGB(200,40,60),   {"Hospital","hospital","HOSPITAL","HospitalBuilding","MedCenter","Clinic","HealthCenter"} },
+    { "ð«  Armory 1",       Color3.fromRGB(90,90,90),    {"armory1","Armory1","ARMORY1","Armory_1","GunStore1","WeaponStore1","Arsenal1"} },
+    { "ð«  Armory 2",       Color3.fromRGB(65,65,65),    {"armory2","Armory2","ARMORY2","Armory_2","GunStore2","WeaponStore2","Arsenal2"} },
+    { "ð«  Armory 3",       Color3.fromRGB(40,40,40),    {"armory3","Armory3","ARMORY3","Armory_3","GunStore3","WeaponStore3","Arsenal3"} },
+}
+ 
+local tpOrder = 16
+local i = 1
+while i <= #tpList do
+    local d1, d2 = tpList[i], tpList[i+1]
+    if d2 then
+        local btn1, btn2 = makeBtnRow(d1[1], d1[2], d2[1], d2[2], tpOrder)
+        btn1.MouseButton1Click:Connect(function()
+            tpStatus.Text = "Status: Teleporting..."
+            tpStatus.TextColor3 = Color3.fromRGB(255, 220, 80)
+            local ok, msg = teleportToAny(d1[3])
+            tpStatus.Text = "Status: " .. msg
+            tpStatus.TextColor3 = ok and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(220, 80, 80)
+        end)
+        btn2.MouseButton1Click:Connect(function()
+            tpStatus.Text = "Status: Teleporting..."
+            tpStatus.TextColor3 = Color3.fromRGB(255, 220, 80)
+            local ok, msg = teleportToAny(d2[3])
+            tpStatus.Text = "Status: " .. msg
+            tpStatus.TextColor3 = ok and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(220, 80, 80)
+        end)
+        i = i + 2
+    else
+        -- lichÃ½ zbytek â celÃ¡ Å¡Ã­Åka
+        local btn = makeBtn(d1[1], d1[2], tpOrder)
+        btn.MouseButton1Click:Connect(function()
+            tpStatus.Text = "Status: Teleporting..."
+            tpStatus.TextColor3 = Color3.fromRGB(255, 220, 80)
+            local ok, msg = teleportToAny(d1[3])
+            tpStatus.Text = "Status: " .. msg
+            tpStatus.TextColor3 = ok and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(220, 80, 80)
+        end)
+        i = i + 1
+    end
+    tpOrder = tpOrder + 2
+end
+ 
+makeDivider(tpOrder); tpOrder = tpOrder + 2
+ 
+-- ============================
+--    CUSTOM TELEPORT SECTION
+-- ============================
+sectionLabel("ð  CUSTOM TELEPORT", tpOrder)
+local customStatus = statusLabel(tpOrder + 1)
+customStatus.Text = "Status: Ready"; customStatus.TextColor3 = Color3.fromRGB(100, 220, 130)
+ 
+local customRow = Instance.new("Frame")
+customRow.Size = UDim2.new(1, 0, 0, 36); customRow.BackgroundTransparency = 1
+customRow.LayoutOrder = tpOrder + 2; customRow.Parent = content
+local customLbl = Instance.new("TextLabel")
+customLbl.Size = UDim2.new(0.42, 0, 1, 0); customLbl.BackgroundTransparency = 1; customLbl.Text = "Object name:"
+customLbl.TextColor3 = Color3.fromRGB(140, 140, 180); customLbl.TextSize = 11; customLbl.Font = Enum.Font.Gotham
+customLbl.TextXAlignment = Enum.TextXAlignment.Left; customLbl.Parent = customRow
+local customInput = Instance.new("TextBox")
+customInput.Size = UDim2.new(0.55, 0, 0, 26); customInput.Position = UDim2.new(0.45, 0, 0.5, -13)
+customInput.BackgroundColor3 = Color3.fromRGB(30, 30, 44); customInput.PlaceholderText = "e.g. SpawnLocation"
+customInput.PlaceholderColor3 = Color3.fromRGB(80, 80, 100); customInput.Text = ""
+customInput.TextColor3 = Color3.fromRGB(220, 220, 255); customInput.TextSize = 12; customInput.Font = Enum.Font.Gotham
+customInput.BorderSizePixel = 0; customInput.Parent = customRow
+Instance.new("UICorner", customInput).CornerRadius = UDim.new(0, 6)
+ 
+local customGap = Instance.new("Frame")
+customGap.Size = UDim2.new(1, 0, 0, 6); customGap.BackgroundTransparency = 1
+customGap.LayoutOrder = tpOrder + 3; customGap.Parent = content
+ 
+local customTpBtn = makeBtn("ð  Teleport to Custom Name", Color3.fromRGB(80, 80, 160), tpOrder + 4)
+customTpBtn.MouseButton1Click:Connect(function()
+    local name = customInput.Text
+    if name == "" then
+        customStatus.Text = "Status: Enter a name first!"
+        customStatus.TextColor3 = Color3.fromRGB(220, 80, 80); return
+    end
+    customStatus.Text = "Status: Searching..."
+    customStatus.TextColor3 = Color3.fromRGB(255, 220, 80)
+    local ok, msg = teleportToName(name)
+    customStatus.Text = "Status: " .. msg
+    customStatus.TextColor3 = ok and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(220, 80, 80)
+end)
+ 
+makeDivider(tpOrder + 6); local dmgOrder = tpOrder + 8
+ 
+-- ============================
+--     DAMAGE INDICATOR
+-- ============================
+sectionLabel("ð¥  DAMAGE INDICATOR", dmgOrder)
+ 
+local dmgIndicatorEnabled = false
+local dmgConnections = {}
+ 
+local function spawnDmgLabel(targetChar, amount)
+    if not targetChar then return end
+    local hrp = targetChar:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local bb = Instance.new("BillboardGui")
+    bb.Size = UDim2.new(0, 70, 0, 30)
+    bb.StudsOffset = Vector3.new(math.random(-10, 10) * 0.1, 3.5 + math.random(0, 15) * 0.1, 0)
+    bb.AlwaysOnTop = true; bb.ResetOnSpawn = false; bb.Adornee = hrp
+    bb.Parent = player.PlayerGui
+    local lbl = Instance.new("TextLabel", bb)
+    lbl.Size = UDim2.new(1, 0, 1, 0); lbl.BackgroundTransparency = 1
+    lbl.Text = "-" .. tostring(math.floor(amount))
+    lbl.TextColor3 = Color3.fromRGB(255, 60, 60)
+    lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    lbl.TextStrokeTransparency = 0.3
+    lbl.TextSize = 17; lbl.Font = Enum.Font.GothamBold
+    local startTime = tick()
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        local elapsed = tick() - startTime
+        if elapsed > 1.2 then conn:Disconnect(); bb:Destroy(); return end
+        local alpha = elapsed / 1.2
+        bb.StudsOffset = bb.StudsOffset + Vector3.new(0, 0.045, 0)
+        lbl.TextTransparency = alpha
+        lbl.TextStrokeTransparency = 0.3 + alpha * 0.7
+    end)
+end
+ 
+local function hookDmgIndicator()
+    for _, c in ipairs(dmgConnections) do c:Disconnect() end
+    dmgConnections = {}
+    local function watchChar(char)
+        if not char then return end
+        local hum = char:WaitForChild("Humanoid", 5)
+        if not hum then return end
+        local lastHP = hum.Health
+        local c = hum:GetPropertyChangedSignal("Health"):Connect(function()
+            if not dmgIndicatorEnabled then return end
+            local diff = lastHP - hum.Health
+            if diff > 0 then spawnDmgLabel(char, diff) end
+            lastHP = hum.Health
+        end)
+        table.insert(dmgConnections, c)
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == player then continue end
+        if p.Character then watchChar(p.Character) end
+        local c2 = p.CharacterAdded:Connect(watchChar)
+        table.insert(dmgConnections, c2)
+    end
+    local c3 = Players.PlayerAdded:Connect(function(p)
+        if p == player then return end
+        if p.Character then watchChar(p.Character) end
+        p.CharacterAdded:Connect(watchChar)
+    end)
+    table.insert(dmgConnections, c3)
+end
+ 
+makeToggle("ð¥  Damage Numbers", dmgOrder + 1,
+    function() dmgIndicatorEnabled = true; hookDmgIndicator() end,
+    function()
+        dmgIndicatorEnabled = false
+        for _, c in ipairs(dmgConnections) do c:Disconnect() end
+        dmgConnections = {}
+    end
+)
+ 
+-- ============================
+--         MINIMIZE
+-- ============================
+minBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    content.Visible = not isMinimized
+    if isMinimized then
+        main.Size = UDim2.new(0, 300, 0, 72); minBtn.Text = "+"
+    else
+        main.Size = UDim2.new(0, 300, 0, 900); minBtn.Text = "â"
+    end
+end)
+ 
+print("[DzindrasMenu] Loaded for " .. player.Name .. ". Enjoy!")
