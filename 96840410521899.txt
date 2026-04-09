@@ -1,0 +1,531 @@
+-- // 🌲 True Human Simulation AutoFarm v.21 (Dropdown UI Edition) 🌲 \\ --
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- ⚙️ CHARGE SETTINGS
+local CHARGE_TIME = 2.4 
+
+if _G.TreeFarmUI then _G.TreeFarmUI:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TreeFarm"
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+screenGui.Parent = RunService:IsStudio() and Players.LocalPlayer:WaitForChild("PlayerGui") or CoreGui
+_G.TreeFarmUI = screenGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 320, 0, 300)
+frame.Position = UDim2.new(0.5, -160, 0.8, -150)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+frame.Active = true
+frame.Draggable = true
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "A"
+title.TextColor3 = Color3.fromRGB(255, 150, 50)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 15
+title.Parent = frame
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, 0, 0, 25)
+status.Position = UDim2.new(0, 0, 0, 35)
+status.BackgroundTransparency = 1
+status.Text = "Status: READY TO WORK"
+status.TextColor3 = Color3.fromRGB(150, 150, 150)
+status.Font = Enum.Font.GothamMedium
+status.TextSize = 13
+status.Parent = frame
+
+local UIParams = {
+    farmEnabled = false,
+    sellEnabled = false,
+    collectEnabled = false,
+    rareOnlyEnabled = false,
+    selectedBiome = "Nearest"
+}
+
+local function CreateButton(text, yPos, paramName)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 40)
+    btn.Position = UDim2.new(0.05, 0, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    btn.Text = "❌ " .. text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.Parent = frame
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = btn
+
+    btn.MouseButton1Click:Connect(function()
+        UIParams[paramName] = not UIParams[paramName]
+        if UIParams[paramName] then
+            btn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+            btn.Text = "✅ " .. text
+            if paramName == "farmEnabled" then status.Text = "⏳ Searching for trees..." end
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+            btn.Text = "❌ " .. text
+            if paramName == "farmEnabled" then 
+                status.Text = "Status: STOPPED"
+                local char = Players.LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    char.HumanoidRootPart.Anchored = false
+                end
+            end
+        end
+    end)
+    return btn
+end
+
+CreateButton("AUTO FARM", 65, "farmEnabled")
+CreateButton("AUTO SELL", 110, "sellEnabled")
+CreateButton("COLLECT BASE MONEY", 155, "collectEnabled")
+CreateButton("ONLY RARE TREES", 200, "rareOnlyEnabled")
+
+
+-- ==========================================================
+-- 🌍 UI: DROPDOWN MENU
+local dropdownFrame = Instance.new("Frame")
+dropdownFrame.Size = UDim2.new(0.9, 0, 0, 40)
+dropdownFrame.Position = UDim2.new(0.05, 0, 0, 245)
+dropdownFrame.BackgroundTransparency = 1
+dropdownFrame.ZIndex = 5
+dropdownFrame.Parent = frame
+
+local mainDropdownBtn = Instance.new("TextButton")
+mainDropdownBtn.Size = UDim2.new(1, 0, 1, 0)
+mainDropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 100, 180)
+mainDropdownBtn.Text = "🌍 Biome: Nearest ▼"
+mainDropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+mainDropdownBtn.Font = Enum.Font.GothamBold
+mainDropdownBtn.TextSize = 14
+mainDropdownBtn.ZIndex = 6
+mainDropdownBtn.Parent = dropdownFrame
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 8)
+mainCorner.Parent = mainDropdownBtn
+
+local listFrame = Instance.new("ScrollingFrame")
+listFrame.Size = UDim2.new(1, 0, 0, 150)
+listFrame.Position = UDim2.new(0, 0, 1, 5)
+listFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+listFrame.BorderSizePixel = 0
+listFrame.ScrollBarThickness = 4
+listFrame.Visible = false
+listFrame.ZIndex = 15 
+listFrame.Parent = dropdownFrame
+
+local listCorner = Instance.new("UICorner")
+listCorner.CornerRadius = UDim.new(0, 8)
+listCorner.Parent = listFrame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding = UDim.new(0, 2)
+listLayout.Parent = listFrame
+
+local function ToggleDropdown()
+    listFrame.Visible = not listFrame.Visible
+    mainDropdownBtn.Text = "🌍 Biome: " .. UIParams.selectedBiome .. (listFrame.Visible and " ▲" or " ▼")
+end
+mainDropdownBtn.MouseButton1Click:Connect(ToggleDropdown)
+
+local function PopulateDropdown(items)
+    for _, child in ipairs(listFrame:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    
+    local totalHeight = 0
+    for _, itemName in ipairs(items) do
+        local itemBtn = Instance.new("TextButton")
+        itemBtn.Size = UDim2.new(1, -8, 0, 30)
+        itemBtn.Position = UDim2.new(0, 4, 0, 0)
+        itemBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+        itemBtn.BorderSizePixel = 0
+        itemBtn.Text = "  " .. itemName
+        itemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        itemBtn.Font = Enum.Font.GothamMedium
+        itemBtn.TextSize = 13
+        itemBtn.TextXAlignment = Enum.TextXAlignment.Left
+        itemBtn.ZIndex = 16
+        itemBtn.Parent = listFrame
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = itemBtn
+        
+        itemBtn.MouseButton1Click:Connect(function()
+            UIParams.selectedBiome = itemName
+            ToggleDropdown()
+        end)
+        
+        itemBtn.MouseEnter:Connect(function() itemBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 65) end)
+        itemBtn.MouseLeave:Connect(function() itemBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45) end)
+        
+        totalHeight = totalHeight + 32
+    end
+    
+    listFrame.Size = UDim2.new(1, 0, 0, math.min(150, totalHeight))
+    listFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+end
+
+-- ==========================================================
+-- 🌍 BIOME AND EXCEPTION ANALYZER
+local validBiomes = {
+    ["Birch Glade"] = true,
+    ["Enchanted Forest"] = true,
+    ["Palv Cove"] = true,
+    ["Redwood Forest"] = true,
+    ["Sakura Forest"] = true,
+    ["Snowy Peak"] = true
+}
+
+local function IsValidBiome(name)
+    return validBiomes[name] == true
+end
+
+local biomeAllowedCommons = {
+    ["Birch Glade"] = {"birch"},
+    ["Sakura Forest"] = {"sakura"},
+    ["Redwood Forest"] = {"redwood"},
+    ["Snowy Peak"] = {"fir", "blackthorn"},
+    ["Enchanted Forest"] = {"mushroom", "hazel", "chestnut"},
+    ["Palv Cove"] = {"oak", "palm"}
+}
+
+local biomeCenters = {}
+local biomeRadiuses = {}
+local biomeProps = {}
+
+local function CalculateBiomeData()
+    if not Workspace:FindFirstChild("Map") then return {"Nearest"} end
+    
+    for _, folder in ipairs(Workspace.Map:GetChildren()) do
+        if (folder:IsA("Folder") or folder:IsA("Model")) and IsValidBiome(folder.Name) then
+            local minX, minZ = math.huge, math.huge
+            local maxX, maxZ = -math.huge, -math.huge
+            local props = {}
+            for _, obj in ipairs(folder:GetChildren()) do
+                local pos = nil
+                if obj:IsA("Model") and obj.PrimaryPart then pos = obj.PrimaryPart.Position
+                elseif obj:IsA("BasePart") then pos = obj.Position end
+                
+                if pos then
+                    table.insert(props, pos)
+                    minX, minZ = math.min(minX, pos.X), math.min(minZ, pos.Z)
+                    maxX, maxZ = math.max(maxX, pos.X), math.max(maxZ, pos.Z)
+                end
+            end
+            
+            if #props > 0 then
+                biomeCenters[folder.Name] = Vector3.new((minX + maxX)/2, 0, (minZ + maxZ)/2)
+                local diag = math.sqrt((maxX - minX)^2 + (maxZ - minZ)^2)
+                biomeRadiuses[folder.Name] = (diag / 2) + 70 
+                biomeProps[folder.Name] = props
+            end
+        end
+    end
+    
+    local biomesList = {"Nearest"}
+    for _, folder in ipairs(Workspace.Map:GetChildren()) do
+        if biomeCenters[folder.Name] then table.insert(biomesList, folder.Name) end
+    end
+    return biomesList
+end
+
+local generatedBiomes = CalculateBiomeData()
+PopulateDropdown(generatedBiomes)
+
+-- ==========================================================
+-- (ANTI-STEAL)
+local blacklistedTrees = {}
+local currentTargetTree = nil
+
+task.spawn(function()
+    local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui", 10)
+    if not PlayerGui then return end
+    local notifs = PlayerGui:WaitForChild("Notifications", 10)
+    if not notifs then return end
+    local feed = notifs:WaitForChild("Feed", 10)
+    if not feed then return end
+
+    feed.ChildAdded:Connect(function(notif)
+        task.delay(0.05, function()
+            local container = notif:FindFirstChild("Container")
+            local label = container and container:FindFirstChild("Label")
+            if label and label:IsA("TextLabel") then
+                local function checkTxt()
+                    local text = string.lower(label.Text or "")
+                    if string.find(text, "is already chopping this tree") then
+                        if currentTargetTree then
+                            blacklistedTrees[currentTargetTree] = os.clock() + 32
+                            status.Text = "⛔ Ignoring someone else's tree..."
+                            VirtualInputManager:SendMouseButtonEvent(20, 60, 0, false, game, 1)
+                        end
+                    end
+                end
+                checkTxt()
+                label:GetPropertyChangedSignal("Text"):Connect(checkTxt)
+            end
+        end)
+    end)
+end)
+
+-- 💰 AUTO SELL
+task.spawn(function()
+    while task.wait(3) do
+        if UIParams.sellEnabled then
+            pcall(function()
+                local b = buffer.create(3)
+                buffer.writeu8(b, 0, 59) 
+                buffer.writeu8(b, 1, 1)
+                buffer.writeu8(b, 2, 1)
+                game:GetService("ReplicatedStorage"):WaitForChild("ByteNetReliable"):FireServer(b)
+            end)
+        end
+    end
+end)
+
+-- 📦 AUTO COLLECT SEEDS
+task.spawn(function()
+    while task.wait(3) do
+        if UIParams.collectEnabled then
+            pcall(function()
+                local myUserId = Players.LocalPlayer.UserId
+                local treesFolder = Workspace:FindFirstChild("Trees")
+                if not treesFolder then return end
+
+                for _, tree in pairs(treesFolder:GetChildren()) do
+                    if tree:GetAttribute("Owner") == myUserId then
+                        local seed = tree:GetAttribute("Seed")
+                        if seed then
+                            local b = buffer.create(5)
+                            buffer.writeu8(b, 0, 22)       
+                            buffer.writeu32(b, 1, seed)   
+                            game:GetService("ReplicatedStorage"):WaitForChild("ByteNetReliable"):FireServer(b)
+                            task.wait(0.05)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- 🪓 AUTO FARM SPATIAL
+local function EquipAxe()
+    local char = Players.LocalPlayer.Character
+    local backpack = Players.LocalPlayer:FindFirstChild("Backpack")
+    if not char or not backpack then return false end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") and string.find(string.lower(tool.Name), "axe") then return true end
+    end
+
+    for _, tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and string.find(string.lower(tool.Name), "axe") then
+            humanoid:EquipTool(tool)
+            task.wait(0.2)
+            return true
+        end
+    end
+    return false
+end
+
+local function GetClosestTree()
+    local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    local closestDist = math.huge
+    local closestTree = nil
+    local treesFolder = Workspace:FindFirstChild("Trees")
+    if not treesFolder then return nil end
+    
+    for _, tree in pairs(treesFolder:GetChildren()) do
+        local treeName = string.lower(tree.Name)
+        if string.find(treeName, "debris") then continue end
+        
+        -- Проверка на нужные типы деревьев
+        local isCommon = false
+        local matchedCommonName = nil
+        local allCommons = {"birch", "blackthorn", "chestnut", "fir", "hazel", "mushroom", "oak", "redwood", "sakura"}
+        
+        for _, cName in ipairs(allCommons) do
+            if string.find(treeName, cName) then
+                isCommon = true
+                matchedCommonName = cName
+                break
+            end
+        end
+
+        if UIParams.rareOnlyEnabled and isCommon then continue end
+
+        if UIParams.selectedBiome ~= "Nearest" and isCommon then
+            local allowedHere = biomeAllowedCommons[UIParams.selectedBiome]
+            local ok = false
+            if allowedHere then
+                for _, a in ipairs(allowedHere) do
+                    if a == matchedCommonName then ok = true break end
+                end
+            end
+            if not ok then continue end
+        end
+        
+        local origin = tree:FindFirstChild("Origin")
+        if not origin or not origin:FindFirstChild("TreeHealth") or origin:FindFirstChild("TreeGrowInfo") then continue end
+        
+        if blacklistedTrees[tree] and os.clock() < blacklistedTrees[tree] then continue end
+        
+        local seed = tree:GetAttribute("Seed")
+        local culled = tree:GetAttribute("TreeCulled")
+        local owner = tree:GetAttribute("Owner")
+        
+        if seed and culled == false and owner == nil then
+            local pivot = tree:GetPivot()
+            
+            if UIParams.selectedBiome ~= "Nearest" then
+                local bCenter = biomeCenters[UIParams.selectedBiome]
+                local bRadius = biomeRadiuses[UIParams.selectedBiome]
+                if bCenter and bRadius then
+                    local distToCenter = math.sqrt((pivot.Position.X - bCenter.X)^2 + (pivot.Position.Z - bCenter.Z)^2)
+                    if distToCenter > bRadius then
+                        continue 
+                    end
+                end
+            end
+            
+            local dist = (root.Position - pivot.Position).Magnitude
+            if dist < closestDist then
+                closestDist = dist
+                closestTree = tree
+            end
+        end
+    end
+    return closestTree
+end
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if UIParams.farmEnabled then
+            if not EquipAxe() then
+                status.Text = "❌ Axe not found!"
+                task.wait(1)
+                continue
+            end
+
+            local targetTree = GetClosestTree()
+            local char = Players.LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            
+            currentTargetTree = targetTree 
+            
+            if targetTree and root then
+                status.Text = "🔥 Chopping: " .. (targetTree.Name or "Tree")
+                local targetPos = targetTree:GetPivot().Position
+                
+                if (root.Position - targetPos).Magnitude > 6 then
+                    root.Anchored = false 
+                    
+                    local p1, p2 = root.Position, targetPos
+                    local dir = Vector3.new(p1.X - p2.X, 0, p1.Z - p2.Z)
+                    if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
+                    dir = dir.Unit
+                    local standPos = targetPos + (dir * 5)
+                    
+                    local excludeList = {}
+                    if char then table.insert(excludeList, char) end
+                    local treesFolder = Workspace:FindFirstChild("Trees")
+                    if treesFolder then table.insert(excludeList, treesFolder) end
+                    
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = excludeList
+                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                    rayParams.RespectCanCollide = true 
+                    
+                    local rayOrigin = Vector3.new(standPos.X, targetPos.Y + 30, standPos.Z)
+                    local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -100, 0), rayParams)
+                    local groundY = targetPos.Y + 3
+                    if rayResult then groundY = rayResult.Position.Y + 3.2 end
+                    
+                    root.Velocity, root.RotVelocity = Vector3.zero, Vector3.zero
+                    root.CFrame = CFrame.lookAt(
+                        Vector3.new(standPos.X, groundY, standPos.Z), 
+                        Vector3.new(targetPos.X, groundY, targetPos.Z)
+                    )
+                    
+                    if humanoid then
+                        humanoid.Sit = false
+                        if humanoid:GetState() == Enum.HumanoidStateType.Ragdoll or humanoid:GetState() == Enum.HumanoidStateType.FallingDown then
+                            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                        end
+                    end
+                    
+                    task.wait(0.2)
+                    root.Anchored = true 
+                    
+                else
+                    root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
+                    root.Anchored = true
+                end
+                
+                local safeX, safeY = 20, 60 
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 1)
+                wait(0.315)
+                VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 1)
+                task.wait(0.5) 
+            else
+                if UIParams.selectedBiome ~= "Nearest" and root then
+                    local center = biomeCenters[UIParams.selectedBiome]
+                    local radius = biomeRadiuses[UIParams.selectedBiome]
+                    
+                    if center and radius then
+                        local dist = math.sqrt((root.Position.X - center.X)^2 + (root.Position.Z - center.Z)^2)
+                        
+                        if dist > radius * 0.9 then
+                            status.Text = "✈️ Teleporting to biome: " .. UIParams.selectedBiome
+                            local props = biomeProps[UIParams.selectedBiome]
+                            if props and #props > 0 then
+                                local tPos = props[math.random(#props)]
+                                
+                                local dropRay = RaycastParams.new()
+                                if char then dropRay.FilterDescendantsInstances = {char} end
+                                dropRay.FilterType = Enum.RaycastFilterType.Exclude
+                                dropRay.RespectCanCollide = true
+                                local groundHit = Workspace:Raycast(tPos + Vector3.new(0, 100, 0), Vector3.new(0, -200, 0), dropRay)
+                                local safeY = tPos.Y + 5
+                                if groundHit then safeY = groundHit.Position.Y + 3 end
+                                
+                                root.Anchored = false
+                                root.CFrame = CFrame.new(Vector3.new(tPos.X, safeY, tPos.Z))
+                                task.wait(0.5)
+                            end
+                            continue
+                        else
+                            status.Text = "⏳ Waiting for trees in " .. UIParams.selectedBiome
+                        end
+                    end
+                else
+                    status.Text = "🤷‍♂️ No wild trees..."
+                end
+            end
+        end
+    end
+end)
