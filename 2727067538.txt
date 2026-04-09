@@ -1,0 +1,468 @@
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+
+pcall(function()
+    CoreGui:FindFirstChild("GZSSF_SPLASH"):Destroy()
+end)
+
+-- BLUR
+local blur = Instance.new("BlurEffect", Lighting)
+blur.Size = 0
+TweenService:Create(blur, TweenInfo.new(0.5), {Size = 18}):Play()
+
+-- GUI
+local gui = Instance.new("ScreenGui", CoreGui)
+gui.Name = "GZSSF_SPLASH"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+
+local bg = Instance.new("Frame", gui)
+bg.Size = UDim2.new(1,0,1,0)
+bg.BackgroundColor3 = Color3.fromRGB(5,6,10)
+
+-- LIGHTNING LAYER (FONDO)
+local lightningLayer = Instance.new("Frame", bg)
+lightningLayer.Size = UDim2.new(1,0,1,0)
+lightningLayer.BackgroundTransparency = 1
+lightningLayer.ZIndex = 1
+
+-- Rayos: zigzag sólido que caen hasta abajo
+local function spawnLightning()
+    local segments = math.random(8,11)
+    local x = math.random(15,85)/100
+    local y = -0.25
+    local lastX = x
+
+    for _ = 1, segments do
+        local segHeight = math.random(60,90)
+        local seg = Instance.new("Frame", lightningLayer)
+        seg.AnchorPoint = Vector2.new(0.5,0)
+        seg.Position = UDim2.new(lastX,0,y,0)
+        seg.Size = UDim2.new(0,4,0,segHeight)
+        seg.Rotation = math.random(-20,20)
+        seg.BackgroundColor3 = Color3.fromRGB(120,240,255) -- celeste sólido
+        seg.BorderSizePixel = 0
+        seg.ZIndex = 1
+
+        local glow = Instance.new("UIStroke", seg)
+        glow.Thickness = 3
+        glow.Color = Color3.fromRGB(120,255,255)
+        glow.Transparency = 0
+
+        local offset = math.random(-25,25)/1000
+        lastX += offset
+        y += segHeight / math.max(1, (game:GetService("Workspace").CurrentCamera and game:GetService("Workspace").CurrentCamera.ViewportSize.Y) or 720)
+
+        -- Desvanece después
+        TweenService:Create(seg, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
+        task.delay(0.3, function() if seg and seg.Parent then seg:Destroy() end end)
+    end
+end
+
+-- TITULOS
+local title = Instance.new("TextLabel", bg)
+title.Size = UDim2.new(0,400,0,70)
+title.Position = UDim2.new(0.5,-200,0.42,-60)
+title.BackgroundTransparency = 1
+title.Text = ""
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 54
+title.TextColor3 = Color3.fromRGB(200,255,255)
+title.ZIndex = 2
+
+local sub = Instance.new("TextLabel", bg)
+sub.Size = UDim2.new(0,400,0,30)
+sub.Position = UDim2.new(0.5,-200,0.42,5)
+sub.BackgroundTransparency = 1
+sub.Text = ""
+sub.Font = Enum.Font.Gotham
+sub.TextSize = 18
+sub.TextColor3 = Color3.fromRGB(160,220,220)
+sub.ZIndex = 2
+
+-- FLOAT ANIMATION PARA TEXTOS
+task.spawn(function()
+    while title.Parent do
+        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = title.Position + UDim2.new(0,0,0,-8)}):Play()
+        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = sub.Position + UDim2.new(0,0,0,-8)}):Play()
+        task.wait(2)
+        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = title.Position + UDim2.new(0,0,0,8)}):Play()
+        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = sub.Position + UDim2.new(0,0,0,8)}):Play()
+        task.wait(2)
+    end
+end)
+
+-- LOADING BAR (ABAJO)
+local barBG = Instance.new("Frame", bg)
+barBG.Size = UDim2.new(0,460,0,12)
+barBG.Position = UDim2.new(0.5,-230,0.72,0)
+barBG.BackgroundColor3 = Color3.fromRGB(30,40,50)
+barBG.BorderSizePixel = 0
+barBG.ZIndex = 2
+barBG.ClipsDescendants = true -- <<< muy importante: evita que la linea se "escape"
+Instance.new("UICorner", barBG)
+
+-- BARRA DE LLENADO REAL (progreso)
+local barFill = Instance.new("Frame", barBG)
+barFill.Size = UDim2.new(0,0,1,0)
+barFill.BackgroundColor3 = Color3.fromRGB(55,95,140)
+barFill.BorderSizePixel = 0
+Instance.new("UICorner", barFill)
+
+-- SHIMMER LINE (SIEMPRE DENTRO DE barBG)
+local shimmer = Instance.new("Frame", barBG)
+shimmer.Size = UDim2.new(0.25,0,1,0) -- 25% del ancho de la barra
+shimmer.Position = UDim2.new(-0.25,0,0,0)
+shimmer.BackgroundColor3 = Color3.fromRGB(150,255,255)
+shimmer.BorderSizePixel = 0
+Instance.new("UICorner", shimmer)
+shimmer.ZIndex = 3
+
+-- Texto porcentaje
+local percent = Instance.new("TextLabel", bg)
+percent.Size = UDim2.new(0,200,0,20)
+percent.Position = UDim2.new(0.5,-100,0.76,0)
+percent.BackgroundTransparency = 1
+percent.Text = "0%"
+percent.Font = Enum.Font.Gotham
+percent.TextSize = 14
+percent.TextColor3 = Color3.fromRGB(150,150,200)
+percent.ZIndex = 2
+
+-- SKIP BUTTON (ABAJO DERECHA)
+local skip = Instance.new("TextButton", bg)
+skip.Size = UDim2.new(0,90,0,32)
+skip.Position = UDim2.new(1,-110,1,-50)
+skip.Text = "SKIP"
+skip.Font = Enum.Font.GothamBold
+skip.TextSize = 14
+skip.TextColor3 = Color3.new(1,1,1)
+skip.BackgroundColor3 = Color3.fromRGB(60,60,60)
+skip.BorderSizePixel = 0
+skip.ZIndex = 4
+Instance.new("UICorner", skip)
+
+local closed = false
+local function closeSplash()
+    if closed then return end
+    closed = true
+    -- fade blur y GUI
+    TweenService:Create(blur, TweenInfo.new(0.35), {Size = 0}):Play()
+    -- fade gui elements (rápido)
+    for _, v in pairs(bg:GetDescendants()) do
+        if v:IsA("TextLabel") or v:IsA("TextButton") then
+            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {TextTransparency = 1}):Play() end)
+        elseif v:IsA("Frame") then
+            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play() end)
+        end
+    end
+    task.wait(0.36)
+    if blur and blur.Parent then blur:Destroy() end
+    if gui and gui.Parent then gui:Destroy() end
+end
+
+skip.MouseButton1Click:Connect(closeSplash)
+
+-- ANIMACION DEL SHIMMER (dentro de la barra; no puede escaparse por ClipsDescendants)
+local shimmerTweenTime = 1.1
+local shimmerTweenInfo = TweenInfo.new(shimmerTweenTime, Enum.EasingStyle.Linear)
+
+local shimmerLoop = task.spawn(function()
+    while shimmer.Parent and not closed do
+        -- from left outside to right outside of barBG's coordinates, but clipped by barBG
+        shimmer.Position = UDim2.new(-shimmer.Size.X.Scale, 0, 0, 0)
+        local targetPos = UDim2.new(1, 0, 0, 0)
+        local tw = TweenService:Create(shimmer, shimmerTweenInfo, {Position = targetPos})
+        tw:Play()
+        local ok, err = pcall(function() tw.Completed:Wait() end)
+        if not ok then break end
+        task.wait(0.05)
+    end
+end)
+
+-- RAYOS LOOP
+local lightningLoop = task.spawn(function()
+    while gui.Parent and not closed do
+        spawnLightning()
+        task.wait(math.random(12,20)/100) -- 0.12 - 0.20s
+    end
+end)
+
+-- CARGA (simulada): llena la barra y actualiza porcentaje
+for i = 1, 100 do
+    if closed then break end
+    local scale = i / 100
+    barFill.Size = UDim2.new(scale, 0, 1, 0)
+    percent.Text = tostring(i) .. "%"
+    task.wait(0.035)
+end
+
+-- AL FINAL: mini explosiones antes de cerrar
+if not closed then
+    local function miniExplosionAt(xScale)
+        local circ = Instance.new("Frame", bg)
+        circ.AnchorPoint = Vector2.new(0.5, 1)
+        circ.Position = UDim2.new(xScale, 0, 1, -18) -- justo encima del borde inferior
+        circ.Size = UDim2.new(0,12,0,12)
+        circ.BackgroundColor3 = Color3.fromRGB(140,255,255)
+        circ.BorderSizePixel = 0
+        local uic = Instance.new("UICorner", circ)
+        uic.CornerRadius = UDim.new(1,0)
+
+        -- expand & fade
+        TweenService:Create(circ, TweenInfo.new(0.35, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0,140,0,140),
+            BackgroundTransparency = 1,
+            Position = UDim2.new(xScale, 0, 1, -70)
+        }):Play()
+
+        task.delay(0.36, function()
+            if circ and circ.Parent then circ:Destroy() end
+        end)
+    end
+
+    -- dispara varias mini explosiones a lo largo de la parte baja (alineadas con la barra)
+    local n = 4
+    for k = 1, n do
+        local x = 0.5 - 230/460 + ( (k-1) * (460/(n-1)) ) / 460 -- mapea 0..460 a 0..1 centrado en la barra
+        x = math.clamp(x, 0.05, 0.95)
+        miniExplosionAt(x)
+        task.wait(0.14)
+    end
+
+    task.wait(0.45)
+end
+
+-- CERRAR SPLASH
+closeSplash()
+
+-- =========================================================
+-- Teleport List Script - EggHunt Spawns (Xeno Optimized)
+-- =========================================================
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+
+-- Clear previous GUI
+if CoreGui:FindFirstChild("ProfesionalTeleportList") then
+    CoreGui.ProfesionalTeleportList:Destroy()
+end
+
+-- ==========================================
+-- GUI CREATION
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ProfesionalTeleportList"
+ScreenGui.Parent = CoreGui
+
+-- Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 300, 0, 380) -- Adjusted height for warning label
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -190)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local MainUICorner = Instance.new("UICorner")
+MainUICorner.CornerRadius = UDim.new(0, 8)
+MainUICorner.Parent = MainFrame
+
+-- Top Bar (Draggable)
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarUICorner = Instance.new("UICorner")
+TopBarUICorner.CornerRadius = UDim.new(0, 8)
+TopBarUICorner.Parent = TopBar
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Spawns Teleport List"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- Minimize Button
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Position = UDim2.new(1, -30, 0, 0)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 18
+MinimizeBtn.Parent = TopBar
+
+-- Main Content
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -30)
+ContentFrame.Position = UDim2.new(0, 0, 0, 30)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+-- Warning Label (NEW)
+local WarningLabel = Instance.new("TextLabel")
+WarningLabel.Size = UDim2.new(1, 0, 0, 25)
+WarningLabel.Position = UDim2.new(0, 0, 0, 5)
+WarningLabel.BackgroundTransparency = 1
+WarningLabel.Text = "Use Mount To Not Die"
+WarningLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- RED
+WarningLabel.Font = Enum.Font.GothamBold
+WarningLabel.TextSize = 14
+WarningLabel.Parent = ContentFrame
+
+-- Refresh Button
+local RefreshBtn = Instance.new("TextButton")
+RefreshBtn.Size = UDim2.new(0, 280, 0, 30)
+RefreshBtn.Position = UDim2.new(0, 10, 0, 35)
+RefreshBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+RefreshBtn.Text = "Refresh Spawns List"
+RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RefreshBtn.Font = Enum.Font.GothamBold
+RefreshBtn.TextSize = 13
+RefreshBtn.Parent = ContentFrame
+
+local RefreshUICorner = Instance.new("UICorner")
+RefreshUICorner.CornerRadius = UDim.new(0, 6)
+RefreshUICorner.Parent = RefreshBtn
+
+-- Scrolling Frame
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Size = UDim2.new(0, 280, 0, 270)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 75)
+ScrollingFrame.BackgroundTransparency = 1
+ScrollingFrame.ScrollBarThickness = 6
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollingFrame.Parent = ContentFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 5)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = ScrollingFrame
+
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+end)
+
+-- ==========================================
+-- DRAGGABLE LOGIC
+-- ==========================================
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then update(input) end
+end)
+
+-- ==========================================
+-- MINIMIZE LOGIC
+-- ==========================================
+local minimized = false
+
+MinimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        MainFrame:TweenSize(UDim2.new(0, 300, 0, 30), "Out", "Quad", 0.3, true)
+        MinimizeBtn.Text = "+"
+    else
+        MainFrame:TweenSize(UDim2.new(0, 300, 0, 380), "Out", "Quad", 0.3, true)
+        MinimizeBtn.Text = "-"
+    end
+end)
+
+-- ==========================================
+-- LIST & TELEPORT LOGIC
+-- ==========================================
+local function CargarLista()
+    for _, child in pairs(ScrollingFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+
+    local ruta = workspace:FindFirstChild("ScavengerHunts")
+    if ruta and ruta:FindFirstChild("EggHunt") and ruta.EggHunt:FindFirstChild("Spawns") then
+        local folderSpawns = ruta.EggHunt.Spawns
+        local items = folderSpawns:GetChildren()
+        
+        if #items == 0 then
+            RefreshBtn.Text = "Folder is empty"
+            task.wait(2)
+            RefreshBtn.Text = "Refresh Spawns List"
+            return
+        end
+        
+        for i, part in ipairs(items) do
+            if part:IsA("BasePart") then
+                local PartBtn = Instance.new("TextButton")
+                PartBtn.Size = UDim2.new(1, -10, 0, 30)
+                PartBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 60)
+                PartBtn.Text = "Tp to: " .. (part.Name ~= "Part" and part.Name or "Spawn #" .. i)
+                PartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                PartBtn.Font = Enum.Font.Gotham
+                PartBtn.TextSize = 12
+                PartBtn.Parent = ScrollingFrame
+                
+                local BtnCorner = Instance.new("UICorner")
+                BtnCorner.CornerRadius = UDim.new(0, 4)
+                BtnCorner.Parent = PartBtn
+                
+                PartBtn.MouseButton1Click:Connect(function()
+                    local character = LocalPlayer.Character
+                    if character and character:FindFirstChild("HumanoidRootPart") then
+                        character.HumanoidRootPart.CFrame = part.CFrame
+                    end
+                end)
+            end
+        end
+    else
+        RefreshBtn.Text = "Path not found!"
+        RefreshBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+        task.wait(2)
+        RefreshBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        RefreshBtn.Text = "Refresh Spawns List"
+    end
+end
+
+RefreshBtn.MouseButton1Click:Connect(CargarLista)
+CargarLista()
