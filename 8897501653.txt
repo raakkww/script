@@ -1,0 +1,330 @@
+--// SERVICES
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UIS = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local eggFolder = workspace:WaitForChild("EggDrops")
+
+--// STATES
+local autoFarm = false
+local espEnabled = false
+local flying = false
+local loopTP = false
+local flingEnabled = false
+local moneyPerCycle = 5
+local cycleTime = 4
+local moneyLabel
+
+local flingThread
+local targetName = ""
+local highlights = {}
+local spin
+
+--// SETTINGS
+local walkSpeed = 16
+local flySpeed = 60
+
+-- LOOP TP POSITIONS
+local pos1 = Vector3.new(-0.25, -491.32, 143.68)
+local pos2 = Vector3.new(-0.65, -491.32, 39.62)
+
+--// LOAD RAYFIELD
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+	Name = "panel",
+	LoadingTitle = "panel",
+	LoadingSubtitle = "",
+	ConfigurationSaving = { Enabled = false },
+	KeySystem = false
+})
+
+local Main = Window:CreateTab("Main", 4483362458)
+local Misc = Window:CreateTab("Misc", 4483362458)
+
+--// HELPERS
+
+local function getHRP()
+	local char = player.Character or player.CharacterAdded:Wait()
+	return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getClosestEgg()
+	local hrp = getHRP()
+	if not hrp then return end
+	
+	local closest, dist = nil, math.huge
+	
+	for _, egg in ipairs(eggFolder:GetChildren()) do
+		local pos = egg:GetPivot().Position
+		local d = (hrp.Position - pos).Magnitude
+		
+		if d < dist then
+			dist = d
+			closest = egg
+		end
+	end
+	
+	return closest
+end
+
+--// ESP
+
+local function addHighlight(egg)
+	if highlights[egg] then return end
+	
+	local h = Instance.new("Highlight")
+	h.FillColor = Color3.fromRGB(255,0,0)
+	h.FillTransparency = 0.5
+	h.OutlineColor = Color3.fromRGB(255,0,0)
+	h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	h.Adornee = egg
+	h.Parent = egg
+	
+	highlights[egg] = h
+end
+
+local function clearESP()
+	for _, h in pairs(highlights) do
+		if h then h:Destroy() end
+	end
+	highlights = {}
+end
+
+--// NOCLIP
+RunService.Stepped:Connect(function()
+	if autoFarm or flingEnabled then
+		local char = player.Character
+		if char then
+			for _, v in ipairs(char:GetDescendants()) do
+				if v:IsA("BasePart") then
+					v.CanCollide = false
+				end
+			end
+		end
+	end
+end)
+
+--// AUTO E SPAM
+local function spamE()
+	task.spawn(function()
+		while autoFarm do
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+			task.wait(0.05)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+			task.wait(0.1)
+		end
+	end)
+end
+
+--// AUTO FARM (CLOSEST EGG)
+local function startAutoFarm()
+	task.spawn(function()
+		while autoFarm do
+			local egg = getClosestEgg()
+			if egg then
+				local hrp = getHRP()
+				if hrp then
+					hrp.CFrame = egg:GetPivot() + Vector3.new(0,3,0)
+					
+					local t = tick()
+					while tick() - t < 5 and autoFarm do
+						task.wait(0.1)
+					end
+				end
+			end
+			task.wait(0.2)
+		end
+	end)
+end
+
+--// LOOP TELEPORT
+local function startLoopTP()
+	task.spawn(function()
+		while loopTP do
+			local hrp = getHRP()
+			if not hrp then break end
+			
+			hrp.CFrame = CFrame.new(pos1)
+			task.wait(0.2)
+			
+			if not loopTP then break end
+			
+			hrp.CFrame = CFrame.new(pos2)
+			task.wait(0.2)
+		end
+	end)
+end
+
+local flingThread
+local spin
+
+--// ONE-TIME FLING (FIXED NAMES)
+
+local function flingThread()
+	local target = Players:FindFirstChild(targetName)
+	if not target or not target.Character then return end
+	
+	local myChar = player.Character or player.CharacterAdded:Wait()
+	local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+	local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+	
+	if not myHRP or not targetHRP then return end
+	
+	-- SAVE POSITION
+	local originalCFrame = myHRP.CFrame
+	
+	-- APPLY PHYSICS (same as original script)
+	for _, child in pairs(myChar:GetDescendants()) do
+		if child:IsA("BasePart") then
+			child.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5)
+		end
+	end
+	
+	for _, v in pairs(myChar:GetChildren()) do
+		if v:IsA("BasePart") then
+			v.CanCollide = false
+			v.Massless = true
+			v.Velocity = Vector3.zero
+		end
+	end
+	
+	task.wait(0.1)
+	
+	-- CREATE SPIN (renamed from bambam)
+	local spin = Instance.new("BodyAngularVelocity")
+	spin.MaxTorque = Vector3.new(0, math.huge, 0)
+	spin.P = math.huge
+	spin.Parent = myHRP
+	
+	-- TELEPORT TO TARGET
+	myHRP.CFrame = targetHRP.CFrame
+	
+	-- RUN FLING FOR ~3 SECONDS
+	local startTime = tick()
+	while tick() - startTime < 3 do
+		myHRP.CFrame = targetHRP.CFrame
+		
+		spin.AngularVelocity = Vector3.new(0, 999999, 0)
+		task.wait(0.2)
+		
+		spin.AngularVelocity = Vector3.zero
+		task.wait(0.1)
+	end
+	
+	-- CLEANUP
+	spin:Destroy()
+	
+	-- RETURN PLAYER
+	myHRP.CFrame = originalCFrame
+end
+
+--// UI (MAIN)
+
+Main:CreateToggle({
+	Name = "Auto Farm Closest Egg",
+	CurrentValue = false,
+	Callback = function(v)
+		autoFarm = v
+		if v then spamE() startAutoFarm() end
+	end
+})
+
+Main:CreateToggle({
+	Name = "Egg ESP",
+	CurrentValue = false,
+	Callback = function(v)
+		espEnabled = v
+		if v then
+			for _, e in ipairs(eggFolder:GetChildren()) do addHighlight(e) end
+		else
+			clearESP()
+		end
+	end
+})
+
+Main:CreateToggle({
+	Name = "Money Farm (OBBY)",
+	CurrentValue = false,
+	Callback = function(v)
+		loopTP = v
+		if v then startLoopTP() else
+			local hrp = getHRP()
+			if hrp then hrp.CFrame = CFrame.new(pos2) end
+		end
+	end
+})
+
+--// UI (MISC)
+
+Misc:CreateSlider({
+	Name = "WalkSpeed",
+	Range = {16, 100},
+	Increment = 1,
+	CurrentValue = 16,
+	Callback = function(v)
+		walkSpeed = v
+		local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if hum then hum.WalkSpeed = v end
+	end
+})
+
+
+Misc:CreateInput({
+	Name = "Target Player (Cap Sensitve)",
+	PlaceholderText = "TEXTVALUE",
+	RemoveTextAfterFocusLost = false,
+	Callback = function(txt)
+		targetName = txt
+	end
+})
+
+Misc:CreateButton({
+	Name = "Fling Player (barely works)",
+	Callback = function()
+		flingThread()
+	end
+})
+
+Misc:CreateButton({
+	Name = "Remove Borders & Barriers",
+	Callback = function()
+		local studioWorkspace = workspace:FindFirstChild("Studio Workspace")
+		if not studioWorkspace then return end
+		
+		-- REMOVE BORDERS
+		local borders = studioWorkspace:FindFirstChild("Borders")
+		if borders then
+			for _, obj in ipairs(borders:GetDescendants()) do
+				if obj:IsA("BasePart") then
+					obj:Destroy()
+				end
+			end
+		end
+		
+		-- REMOVE ZONE BARRIERS
+		local zoneSystem = studioWorkspace:FindFirstChild("ZoneSystem")
+		if zoneSystem then
+			local barriers = zoneSystem:FindFirstChild("ZoneBarriers")
+			if barriers then
+				for _, obj in ipairs(barriers:GetDescendants()) do
+					if obj:IsA("BasePart") then
+						obj:Destroy()
+					end
+				end
+			end
+		end
+		
+		Rayfield:Notify({
+			Title = "Done",
+			Content = "Borders & Barriers removed",
+			Duration = 3
+		})
+	end
+})
+--// EVENTS
+eggFolder.ChildAdded:Connect(function(e)
+	if espEnabled then addHighlight(e) end
+end)
