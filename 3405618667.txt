@@ -1,0 +1,59 @@
+local player = game.Players.LocalPlayer
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = ""
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 200, 0, 100)
+frame.Position = UDim2.new(0.5, -100, 0.5, -50)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Currency Farm"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+
+local toggle = Instance.new("TextButton", frame)
+toggle.Size = UDim2.new(0.8, 0, 0, 40)
+toggle.Position = UDim2.new(0.1, 0, 0.5, -20)
+toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggle.Font = Enum.Font.Gotham
+toggle.TextSize = 14
+toggle.Text = "OFF"
+
+local corner = Instance.new("UICorner", frame)
+local corner2 = Instance.new("UICorner", toggle)
+local farming = false
+
+toggle.MouseButton1Click:Connect(function()
+    farming = not farming
+    
+    if farming then
+        toggle.Text = "ON"
+        toggle.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+    else
+        toggle.Text = "OFF"
+        toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if farming then
+            for _, currency in pairs(workspace["Zone Currencies"]:GetDescendants()) do
+                if currency then
+                    local args = {currency.Name}
+                    game:GetService("ReplicatedStorage"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("WorldCurrencyService"):WaitForChild("RE"):WaitForChild("PickupWorldCurrency"):FireServer(unpack(args))
+                end
+            end
+        end
+    end
+end)
