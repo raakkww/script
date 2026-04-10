@@ -1,0 +1,196 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+local SafeParent = (pcall(function() return gethui() end) and gethui()) or PlayerGui
+
+local old = SafeParent:FindFirstChild("script_ui")
+if old then
+    old:Destroy()
+end
+
+-- [[ THEME SETUP ]] --
+local Theme = {
+    Background = Color3.fromRGB(5, 5, 8),
+    Surface = Color3.fromRGB(15, 15, 20),
+    SurfaceLight = Color3.fromRGB(25, 25, 35),
+    Accent = Color3.fromRGB(4, 203, 41),
+    Text = Color3.fromRGB(255, 255, 255),
+    TextDim = Color3.fromRGB(150, 150, 150)
+}
+
+-- [[ BRAINROT LITE SETTINGS ]] --
+_G.SpeedHack = false 
+_G.BoostSpeed = 150 
+_G.AutoCollectCash = false
+
+-- [[ 2. UI CREATION ]] --
+local ScreenGui = Instance.new("ScreenGui", SafeParent)
+ScreenGui.Name = "script_ui"
+
+local toggleBtn = Instance.new("TextButton", ScreenGui)
+toggleBtn.Size = UDim2.new(0, 50, 0, 50); toggleBtn.Position = UDim2.new(0, 15, 0, 150)
+toggleBtn.Text = "FZ"; toggleBtn.BackgroundColor3 = Theme.Accent; toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.TextSize = 24; toggleBtn.Font = Enum.Font.GothamBold; toggleBtn.Draggable = true
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0.5, 0)
+
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 340, 0, 300); 
+Main.Position = UDim2.new(0.5, -170, 0.5, -150)
+Main.BackgroundColor3 = Theme.Background; Main.ClipsDescendants = true; Main.Active = true; Main.Draggable = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+
+local RainContainer = Instance.new("Frame", Main)
+RainContainer.Size = UDim2.new(1, 0, 1, 0); RainContainer.BackgroundTransparency = 1; RainContainer.ZIndex = 1
+local RainDrops = {}
+for i = 1, 20 do
+    local drop = Instance.new("Frame", RainContainer)
+    drop.Size = UDim2.new(0, 1, 0, math.random(10, 25)); drop.Position = UDim2.new(math.random(), 0, -0.1, 0)
+    drop.BackgroundColor3 = Theme.Accent; drop.BackgroundTransparency = 0.7; drop.BorderSizePixel = 0; drop.ZIndex = 2
+    table.insert(RainDrops, {Object = drop, Speed = math.random(15, 35) / 100})
+end
+RunService.RenderStepped:Connect(function()
+    for _, drop in pairs(RainDrops) do
+        local cp = drop.Object.Position
+        drop.Object.Position = UDim2.new(cp.X.Scale, 0, cp.Y.Scale + drop.Speed, 0)
+        if drop.Object.Position.Y.Scale > 1.1 then drop.Object.Position = UDim2.new(math.random(), 0, -0.1, 0) end
+    end
+end)
+
+local TopBar = Instance.new("Frame", Main)
+TopBar.Size = UDim2.new(1, 0, 0, 50); TopBar.BackgroundColor3 = Theme.Surface; TopBar.ZIndex = 10
+
+-- [ Title & Subtitle ] (อัปเดตตามที่คุณส่งมา)
+local Title = Instance.new("TextLabel") 
+Title.Size = UDim2.new(0, 160, 0, 22) 
+Title.Position = UDim2.new(0, 52, 0, 5) 
+Title.BackgroundTransparency = 1 
+Title.Text = "" 
+Title.TextColor3 = Theme.Text 
+Title.TextSize = 18 
+Title.Font = Enum.Font.GothamBold 
+Title.TextXAlignment = Enum.TextXAlignment.Left 
+Title.ZIndex = 11 
+Title.Parent = TopBar
+
+local Subtitle = Instance.new("TextLabel") 
+Subtitle.Size = UDim2.new(0, 160, 0, 16) 
+Subtitle.Position = UDim2.new(0, 52, 0, 26) 
+Subtitle.BackgroundTransparency = 1 
+Subtitle.Text = "Be a Brainrot" 
+Subtitle.TextColor3 = Theme.Accent -- เปลี่ยนเป็นสีเขียว Theme.Accent
+Subtitle.TextSize = 10 
+Subtitle.Font = Enum.Font.GothamSemibold 
+Subtitle.TextXAlignment = Enum.TextXAlignment.Left 
+Subtitle.ZIndex = 11 
+Subtitle.Parent = TopBar
+
+local TabContainer = Instance.new("Frame", Main)
+TabContainer.Size = UDim2.new(1, -16, 0, 36); TabContainer.Position = UDim2.new(0, 8, 0, 56); TabContainer.BackgroundColor3 = Theme.Surface
+Instance.new("UICorner", TabContainer).CornerRadius = UDim.new(0, 8)
+local TabLayout = Instance.new("UIListLayout", TabContainer); TabLayout.FillDirection = Enum.FillDirection.Horizontal; TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center; TabLayout.Padding = UDim.new(0, 4)
+
+local Content = Instance.new("Frame", Main)
+Content.Size = UDim2.new(1, -16, 1, -110); Content.Position = UDim2.new(0, 8, 0, 98); Content.BackgroundColor3 = Theme.Surface; Content.ClipsDescendants = true
+Instance.new("UICorner", Content).CornerRadius = UDim.new(0, 10)
+
+local Tabs = {}
+local function CreateTab(name)
+    local Btn = Instance.new("TextButton", TabContainer)
+    Btn.Size = UDim2.new(0, 100, 0, 28); Btn.BackgroundColor3 = Theme.SurfaceLight; Btn.Text = name; Btn.TextColor3 = Theme.TextDim; Btn.TextSize = 10; Btn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+    local Page = Instance.new("ScrollingFrame", Content)
+    Page.Size = UDim2.new(1, 0, 1, 0); Page.BackgroundTransparency = 1; Page.Visible = false; Page.ScrollBarThickness = 2
+    local PL = Instance.new("UIListLayout", Page); PL.Padding = UDim.new(0, 10); PL.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    Instance.new("UIPadding", Page).PaddingTop = UDim.new(0, 12)
+    table.insert(Tabs, {Btn = Btn, Page = Page})
+    Btn.MouseButton1Click:Connect(function()
+        for _, t in pairs(Tabs) do t.Page.Visible = false; TweenService:Create(t.Btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.SurfaceLight, TextColor3 = Theme.TextDim}):Play() end
+        Page.Visible = true; TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.new(0,0,0)}):Play()
+    end)
+    return Page
+end
+
+-- สร้างแท็บเดียว
+local MainTab = CreateTab("Features")
+Tabs[1].Page.Visible = true; Tabs[1].Btn.BackgroundColor3 = Theme.Accent; Tabs[1].Btn.TextColor3 = Color3.new(0,0,0)
+
+local function CreateToggleButton(parentPage, text, varName)
+    local btn = Instance.new("TextButton", parentPage)
+    btn.Size = UDim2.new(0.9, 0, 0, 40); btn.BackgroundColor3 = Theme.SurfaceLight; btn.Text = text; btn.TextColor3 = Theme.Text; btn.Font = Enum.Font.GothamBold; btn.TextSize = 12
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    btn.MouseButton1Click:Connect(function()
+        _G[varName] = not _G[varName]
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = _G[varName] and Theme.Accent or Theme.SurfaceLight, TextColor3 = _G[varName] and Color3.new(0,0,0) or Theme.Text}):Play()
+    end)
+    return btn
+end
+
+local function CreateToggleWithInput(parentPage, text, toggleVar, numVar, minVal, maxVal)
+    local frame = Instance.new("Frame", parentPage)
+    frame.Size = UDim2.new(0.9, 0, 0, 40); frame.BackgroundTransparency = 1
+    
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0.65, 0, 1, 0); btn.BackgroundColor3 = Theme.SurfaceLight; btn.Text = text; btn.TextColor3 = Theme.Text; btn.Font = Enum.Font.GothamBold; btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    
+    btn.MouseButton1Click:Connect(function()
+        _G[toggleVar] = not _G[toggleVar]
+        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = _G[toggleVar] and Theme.Accent or Theme.SurfaceLight, TextColor3 = _G[toggleVar] and Color3.new(0,0,0) or Theme.Text}):Play()
+    end)
+    
+    local input = Instance.new("TextBox", frame)
+    input.Size = UDim2.new(0.3, 0, 1, 0); input.Position = UDim2.new(0.7, 0, 0, 0); input.BackgroundColor3 = Theme.SurfaceLight; input.TextColor3 = Theme.Accent; input.Font = Enum.Font.GothamBold; input.TextSize = 14
+    input.Text = tostring(_G[numVar])
+    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 8)
+    
+    input.FocusLost:Connect(function()
+        local val = tonumber(input.Text)
+        if val then val = math.clamp(val, minVal, maxVal); _G[numVar] = val; input.Text = tostring(val)
+        else input.Text = tostring(_G[numVar]) end
+    end)
+    return frame
+end
+
+CreateToggleWithInput(MainTab, "⚡ SPEED HACK", "SpeedHack", "BoostSpeed", 1, 1000)
+CreateToggleButton(MainTab, "💰 AUTO COLLECT CASH ($)", "AutoCollectCash")
+
+toggleBtn.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
+
+-- [[ 3. MAIN LOOPS ]] --
+
+-- ลูป Speed Hack
+RunService.Stepped:Connect(function(time, deltaTime)
+    if _G.SpeedHack and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+        local hum = player.Character.Humanoid
+        local hrp = player.Character.HumanoidRootPart
+        if hum.MoveDirection.Magnitude > 0 then hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (_G.BoostSpeed * deltaTime)) end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(5) do
+        if _G.AutoCollectCash and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            pcall(function()
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("TouchTransmitter") or v.Name == "TouchInterest" then
+                        local part = v.Parent
+                        if part and part:IsA("BasePart") then
+                            for _, txt in pairs(part:GetDescendants()) do
+                                if txt:IsA("TextLabel") and txt.Text:find("%$") then
+                                    firetouchinterest(player.Character.HumanoidRootPart, part, 0)
+                                    firetouchinterest(player.Character.HumanoidRootPart, part, 1)
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+print("Loaded Successfully!")
