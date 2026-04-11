@@ -1,0 +1,320 @@
+local PilferingPiratesGUI = Instance.new("ScreenGui")
+local MainFrame = Instance.new("ScrollingFrame")
+local KOTHLabel = Instance.new("TextLabel")
+local KOTHRedSpawnButton = Instance.new("TextButton")
+local KOTHBlueSpawnButton = Instance.new("TextButton")
+local KOTHGreenSpawnButton = Instance.new("TextButton")
+local KOTHYellowSpawnButton = Instance.new("TextButton")
+local AbilitiesLabel = Instance.new("TextLabel")
+local GhostSwordButton = Instance.new("TextButton")
+local BoomBallButton = Instance.new("TextButton")
+local TurboPaintballButton = Instance.new("TextButton")
+local MiscLabel = Instance.new("TextLabel")
+local NoWaterButton = Instance.new("TextButton")
+local CollectGoldsBtn = Instance.new("TextButton")
+local TeleportToLobbyButton = Instance.new("TextButton")
+
+--Properties:
+PilferingPiratesGUI.Name = "PilferingPiratesGUI"
+PilferingPiratesGUI.Parent = game.CoreGui
+PilferingPiratesGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = PilferingPiratesGUI
+MainFrame.Active = true
+MainFrame.BackgroundColor3 = Color3.fromRGB(101, 150, 255)
+MainFrame.Position = UDim2.new(0.787, 0, 0.718, 0)
+MainFrame.Size = UDim2.new(0, 412, 0, 210)
+MainFrame.CanvasSize = UDim2.new(0, 0, 0, 250) 
+MainFrame.ScrollBarThickness = 8
+MainFrame.BorderSizePixel = 1
+
+-- [[ GREEN TOP BAR ]]
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Parent = PilferingPiratesGUI
+TopBar.BackgroundColor3 = Color3.fromRGB(0, 255, 127)
+TopBar.BorderSizePixel = 1
+TopBar.Position = MainFrame.Position - UDim2.new(0, 0, 0, 30)
+TopBar.Size = UDim2.new(0, 412, 0, 30)
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = ""
+TitleLabel.Parent = TopBar
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.Size = UDim2.new(0, 200, 1, 0)
+TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.Text = "Pilfering Pirates GUI"
+TitleLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+TitleLabel.TextSize = 16
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Name = "MinimizeBtn"
+MinimizeBtn.Parent = TopBar
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
+MinimizeBtn.Position = UDim2.new(1, -65, 0, 5)
+MinimizeBtn.Size = UDim2.new(0, 25, 0, 20)
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.new(0, 0, 0)
+MinimizeBtn.TextSize = 20
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Name = "CloseBtn"
+CloseBtn.Parent = TopBar
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+CloseBtn.Position = UDim2.new(1, -30, 0, 5)
+CloseBtn.Size = UDim2.new(0, 25, 0, 20)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.new(1, 1, 1)
+
+-- [[ SECTION 1: KING OF THE HILL ]]
+KOTHLabel.Name = "KOTHLabel"
+KOTHLabel.Parent = MainFrame
+KOTHLabel.BackgroundTransparency = 1
+KOTHLabel.Position = UDim2.new(0, 0, 0, 5)
+KOTHLabel.Size = UDim2.new(0, 398, 0, 25)
+KOTHLabel.Font = Enum.Font.SourceSans
+KOTHLabel.Text = "King Of The Hill"
+KOTHLabel.TextSize = 14
+
+KOTHRedSpawnButton.Name = "KOTHRedSpawnButton"
+KOTHRedSpawnButton.Parent = MainFrame
+KOTHRedSpawnButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+KOTHRedSpawnButton.Position = UDim2.new(0.024, 0, 0, 35)
+KOTHRedSpawnButton.Size = UDim2.new(0, 80, 0, 30)
+KOTHRedSpawnButton.Text = "Red Spawn"
+KOTHRedSpawnButton.MouseButton1Down:connect(function()
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-170, 263, -381)  
+end)
+
+KOTHBlueSpawnButton.Name = "KOTHBlueSpawnButton"
+KOTHBlueSpawnButton.Parent = MainFrame
+KOTHBlueSpawnButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+KOTHBlueSpawnButton.Position = UDim2.new(0.267, 0, 0, 35)
+KOTHBlueSpawnButton.Size = UDim2.new(0, 80, 0, 30)
+KOTHBlueSpawnButton.Text = "Blue Spawn"
+KOTHBlueSpawnButton.MouseButton1Down:connect(function()
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(383, 255, 432)    
+end)
+
+KOTHGreenSpawnButton.Name = "KOTHGreenSpawnButton"
+KOTHGreenSpawnButton.Parent = MainFrame
+KOTHGreenSpawnButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+KOTHGreenSpawnButton.Position = UDim2.new(0.512, 0, 0, 35)
+KOTHGreenSpawnButton.Size = UDim2.new(0, 80, 0, 30)
+KOTHGreenSpawnButton.Text = "Green Spawn"
+KOTHGreenSpawnButton.MouseButton1Down:connect(function()
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-119, 265, 432)   
+end)
+
+KOTHYellowSpawnButton.Name = "KOTHYellowSpawnButton"
+KOTHYellowSpawnButton.Parent = MainFrame
+KOTHYellowSpawnButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+KOTHYellowSpawnButton.Position = UDim2.new(0.75, 0, 0, 35)
+KOTHYellowSpawnButton.Size = UDim2.new(0, 80, 0, 30)
+KOTHYellowSpawnButton.Text = "Yellow Spawn"
+KOTHYellowSpawnButton.MouseButton1Down:connect(function()
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(609, 255, -146)   
+end)
+
+-- [[ SECTION 2: ABILITIES ]]
+AbilitiesLabel.Name = "AbilitiesLabel"
+AbilitiesLabel.Parent = MainFrame
+AbilitiesLabel.BackgroundTransparency = 1
+AbilitiesLabel.Position = UDim2.new(0, 0, 0, 75)
+AbilitiesLabel.Size = UDim2.new(0, 398, 0, 25)
+AbilitiesLabel.Font = Enum.Font.SourceSans
+AbilitiesLabel.Text = "Abilities"
+AbilitiesLabel.TextSize = 14
+
+GhostSwordButton.Name = "GhostSwordButton"
+GhostSwordButton.Parent = MainFrame
+GhostSwordButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+GhostSwordButton.Position = UDim2.new(0.024, 0, 0, 105)
+GhostSwordButton.Size = UDim2.new(0, 80, 0, 30)
+GhostSwordButton.Text = "Ghost Sword"
+GhostSwordButton.MouseButton1Down:connect(function()
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-263, 278, -427)  
+end)
+
+local IslandChestButton = Instance.new("TextButton")
+IslandChestButton.Name = "IslandChestButton"
+IslandChestButton.Parent = MainFrame
+IslandChestButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255) 
+IslandChestButton.Position = UDim2.new(0.267, 0, 0, 105) -- Moved to fill the gap
+IslandChestButton.Size = UDim2.new(0, 80, 0, 30) 
+IslandChestButton.Font = Enum.Font.SourceSans
+IslandChestButton.Text = "Island Chest"
+IslandChestButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+IslandChestButton.TextSize = 14
+
+IslandChestButton.MouseButton1Down:connect(function()
+    local character = game.Players.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local islands = workspace:FindFirstChild("ActiveMapFolder", true) 
+        and workspace.ActiveMapFolder:FindFirstChild("Map", true) 
+        and workspace.ActiveMapFolder.Map:FindFirstChild("Islands")
+    if islands then
+        for _, island in ipairs(islands:GetChildren()) do
+            local chest = island:FindFirstChild("IslandChest")
+            if chest and chest:IsA("Model") then
+                local toolFolder = chest:FindFirstChild("Tool")
+                local toolNameVal = toolFolder and toolFolder:FindFirstChild("ToolName")
+                if toolNameVal and toolNameVal.Value == "Plank" then
+                    local target = chest:FindFirstChild("Back") or chest:FindFirstChild("Part")
+                    if target then
+                        root.CFrame = target.CFrame * CFrame.new(0, 3, 0)
+                        return 
+                    end
+                end
+            end
+        end
+    end
+end)
+
+BoomBallButton.Name = "BoomBallButton"
+BoomBallButton.Parent = MainFrame
+BoomBallButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+BoomBallButton.Position = UDim2.new(0.512, 0, 0, 105)
+BoomBallButton.Size = UDim2.new(0, 80, 0, 30)
+BoomBallButton.Text = "Boom Ball"
+BoomBallButton.MouseButton1Down:connect(function()
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(657, 256, -124)   
+end)
+
+TurboPaintballButton.Name = "TurboPaintballButton"
+TurboPaintballButton.Parent = MainFrame
+TurboPaintballButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TurboPaintballButton.Position = UDim2.new(0.75, 0, 0, 105)
+TurboPaintballButton.Size = UDim2.new(0, 85, 0, 30)
+TurboPaintballButton.Text = "Turbo Paint"
+TurboPaintballButton.MouseButton1Down:connect(function()
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-143, 267, 483)   
+end)
+
+-- [[ SECTION 3: MISC ]]
+MiscLabel.Name = "MiscLabel"
+MiscLabel.Parent = MainFrame
+MiscLabel.BackgroundTransparency = 1
+MiscLabel.Position = UDim2.new(0, 0, 0, 145)
+MiscLabel.Size = UDim2.new(0, 398, 0, 25)
+MiscLabel.Font = Enum.Font.SourceSans
+MiscLabel.Text = "Misc."
+MiscLabel.TextSize = 14
+
+NoWaterButton.Name = "NoWaterButton"
+NoWaterButton.Parent = MainFrame 
+NoWaterButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255) 
+NoWaterButton.Position = UDim2.new(0.024, 0, 0, 175) 
+NoWaterButton.Size = UDim2.new(0, 105, 0, 30) 
+NoWaterButton.Text = "NoWaterDamage"
+NoWaterButton.TextColor3 = Color3.fromRGB(255, 0, 0) 
+
+local waterToggled = false
+NoWaterButton.MouseButton1Down:connect(function()
+    waterToggled = not waterToggled
+    NoWaterButton.TextColor3 = waterToggled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+    for _, v in pairs(workspace.WaterParts:GetDescendants()) do
+        if v:IsA("BasePart") then v.CanTouch = not waterToggled end
+    end
+end)
+
+-- 1. Create the Button
+local CollectGoldsBtn = Instance.new("TextButton")
+CollectGoldsBtn.Name = "CollectGoldsBtn"
+CollectGoldsBtn.Parent = MainFrame -- Attaching it to the same place as your MiscLabel
+CollectGoldsBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+CollectGoldsBtn.BorderSizePixel = 1
+CollectGoldsBtn.Size = UDim2.new(0, 100, 0, 30)
+
+-- Using your exact Y-position for the buttons in that row
+-- X is set to 0.407 to put it right in the middle gap
+CollectGoldsBtn.Position = UDim2.new(0.35, 0, 0, 175)
+
+CollectGoldsBtn.Font = Enum.Font.SourceSans
+CollectGoldsBtn.Text = "Collect Golds"
+CollectGoldsBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+CollectGoldsBtn.TextSize = 12
+
+-- 2. The R6 Gold Farm Logic
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local isRunning = false
+
+local function startMegaTeleport()
+    if isRunning then return end
+    
+    local character = player.Character
+    -- R6 FIX: Targeting Torso for movement
+    local torso = character and (character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart"))
+    
+    if not torso then return end
+    isRunning = true
+
+    -- Scan for Gold
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "Gold" and (obj:IsA("Folder") or obj:IsA("Model")) then
+            for _, item in ipairs(obj:GetChildren()) do
+                if item:IsA("BasePart") then
+                    -- Move your R6 character to the gold piece
+                    torso.CFrame = item.CFrame
+                    task.wait(0.08) -- Your preferred fast speed
+                end
+            end
+        end
+    end
+
+    isRunning = false
+end
+
+-- Connect the click
+CollectGoldsBtn.MouseButton1Click:Connect(startMegaTeleport)
+
+TeleportToLobbyButton.Name = "TeleportToLobbyButton"
+TeleportToLobbyButton.Parent = MainFrame
+TeleportToLobbyButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TeleportToLobbyButton.Position = UDim2.new(0.63, 0, 0, 175) -- Moved to prevent overlap
+TeleportToLobbyButton.Size = UDim2.new(0, 120, 0, 30)
+TeleportToLobbyButton.Text = "Teleport To Lobby"
+TeleportToLobbyButton.MouseButton1Down:connect(function()
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(133, 702, -48)    
+end)
+
+-- [[ DRAGGING LOGIC ]]
+local UserInputService = game:GetService("UserInputService")
+local dragging, dragInput, mousePos, framePos
+
+local function update(input)
+    local delta = input.Position - mousePos
+    local newPos = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+    TopBar.Position = newPos
+    MainFrame.Position = newPos + UDim2.new(0, 0, 0, 30)
+end
+
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        mousePos = input.Position
+        framePos = TopBar.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then update(input) end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+MinimizeBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+    MinimizeBtn.Text = MainFrame.Visible and "-" or "+"
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    PilferingPiratesGUI:Destroy()
+end)
