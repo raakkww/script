@@ -1,0 +1,112 @@
+-- Services
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- GUI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ToggleToolsGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.fromOffset(200, 100)
+Frame.Position = UDim2.fromScale(0.8, 0.1)
+Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Frame.BackgroundTransparency = 0.3
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+Frame.Active = true
+Frame.Draggable = true
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 20)
+Title.BackgroundTransparency = 1
+Title.Text = "Toggle Tools"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Title.Parent = Frame
+
+-- Buttons
+local function createButton(name, yPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 30)
+    btn.Position = UDim2.new(0, 5, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 16
+    btn.Text = name
+    btn.Parent = Frame
+    return btn
+end
+
+local deleteBreakablesBtn = createButton("Delete Breakables", 30)
+local godmodeBtn = createButton("Glass GodMode", 65)
+
+-- GodMode state
+local godmodeEnabled = false
+local godPart: Part? = nil
+
+-- Function to delete breakable parts
+local function removeBreakables()
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") and part:FindFirstChild("breakable") then
+            part:Destroy()
+        end
+    end
+end
+
+-- GodMode function
+local function updateGodmode()
+    if godmodeEnabled then
+        if not godPart then
+            godPart = Instance.new("Part")
+            godPart.Size = Vector3.new(41, 1, 1259)
+            godPart.Position = Vector3.new(-746.07, -6.7, 45.54)
+            godPart.Transparency = 1
+            godPart.Anchored = true
+            godPart.CanCollide = true
+            godPart.Name = "GodModePart"
+            godPart.Parent = workspace
+        else
+            godPart.CanCollide = true
+        end
+    else
+        if godPart then
+            godPart.CanCollide = false
+        end
+    end
+end
+
+-- Button connections
+deleteBreakablesBtn.MouseButton1Click:Connect(function()
+    removeBreakables()
+end)
+
+godmodeBtn.MouseButton1Click:Connect(function()
+    godmodeEnabled = not godmodeEnabled
+    godmodeBtn.Text = "GodMode: " .. (godmodeEnabled and "ON" or "OFF")
+    updateGodmode()
+end)
+
+-- Persist GUI after respawn
+LocalPlayer.CharacterAdded:Connect(function()
+    ScreenGui.Parent = PlayerGui
+end)
+
+-- Function to send notification
+local function notify(title: string, text: string, duration: number)
+    StarterGui:SetCore("SendNotification", {
+        Title = title;
+        Text = text;
+        Duration = duration; -- in seconds
+        Button1 = "OK"; -- optional
+    })
+end
+
+-- Example usage
+notify("SCRIPT LOADED", 10)
