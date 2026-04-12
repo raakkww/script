@@ -1,0 +1,247 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Teleport Locations
+local locations = {
+	{ name = "Red Cube",         pos = Vector3.new(373, 36, -429), color = Color3.fromRGB(220, 60,  60)  },
+	{ name = "Blue Cube",        pos = Vector3.new(396, 36, -132), color = Color3.fromRGB(60,  120, 220) },
+	{ name = "Green Cube",       pos = Vector3.new(488, 38, -318), color = Color3.fromRGB(60,  190, 90)  },
+	{ name = "Manager's Office", pos = Vector3.new(287, 36, -320), color = Color3.fromRGB(200, 160, 40)  },
+	{ name = "Key Room",         pos = Vector3.new(532, 37, -329), color = Color3.fromRGB(180, 80,  220) },
+	{ name = "Military",         pos = Vector3.new(387, 36, -175), color = Color3.fromRGB(100, 160, 60)  },
+	{ name = "Safe Spot",        pos = Vector3.new(237, 99, -164), color = Color3.fromRGB(60,  200, 200) },
+}
+
+-- Constants
+local BTN_HEIGHT   = 40
+local BTN_SPACING  = 8
+local BTN_START_Y  = 70
+local PADDING      = 10
+local NUM_BUTTONS  = #locations
+
+local FRAME_HEIGHT = BTN_START_Y + (NUM_BUTTONS * (BTN_HEIGHT + BTN_SPACING)) - BTN_SPACING + PADDING + 30
+local FRAME_WIDTH  = 230
+
+-- Cleanup old GUI
+if playerGui:FindFirstChild("TeleportGUI") then
+	playerGui:FindFirstChild("TeleportGUI"):Destroy()
+end
+
+-- ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TeleportGUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = playerGui
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Name = "MainFrame"
+frame.Size = UDim2.new(0, FRAME_WIDTH, 0, FRAME_HEIGHT)
+frame.Position = UDim2.new(0, 20, 0.5, -(FRAME_HEIGHT / 2))
+frame.BackgroundColor3 = Color3.fromRGB(13, 13, 20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.ClipsDescendants = false
+frame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = frame
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(55, 55, 75)
+mainStroke.Thickness = 1.5
+mainStroke.Parent = frame
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.BackgroundColor3 = Color3.fromRGB(22, 22, 34)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = frame
+
+local tbCorner = Instance.new("UICorner")
+tbCorner.CornerRadius = UDim.new(0, 10)
+tbCorner.Parent = titleBar
+
+local tbPatch = Instance.new("Frame")
+tbPatch.Size = UDim2.new(1, 0, 0, 10)
+tbPatch.Position = UDim2.new(0, 0, 1, -10)
+tbPatch.BackgroundColor3 = Color3.fromRGB(22, 22, 34)
+tbPatch.BorderSizePixel = 0
+tbPatch.Parent = titleBar
+
+local titleIcon = Instance.new("TextLabel")
+titleIcon.Size = UDim2.new(0, 28, 1, 0)
+titleIcon.Position = UDim2.new(0, 10, 0, 0)
+titleIcon.BackgroundTransparency = 1
+titleIcon.Text = "⚡"
+titleIcon.TextSize = 15
+titleIcon.Font = Enum.Font.GothamBold
+titleIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleIcon.Parent = titleBar
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -44, 1, 0)
+titleLabel.Position = UDim2.new(0, 36, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "TELEPORT"
+titleLabel.TextColor3 = Color3.fromRGB(215, 215, 245)
+titleLabel.TextSize = 13
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+local divider = Instance.new("Frame")
+divider.Size = UDim2.new(1, -20, 0, 1)
+divider.Position = UDim2.new(0, 10, 0, 46)
+divider.BackgroundColor3 = Color3.fromRGB(38, 38, 55)
+divider.BorderSizePixel = 0
+divider.Parent = frame
+
+-- Toast
+local toast = Instance.new("Frame")
+toast.Size = UDim2.new(1, -20, 0, 26)
+toast.Position = UDim2.new(0, 10, 1, 6)
+toast.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
+toast.BorderSizePixel = 0
+toast.ClipsDescendants = false
+toast.Parent = frame
+
+local toastCorner = Instance.new("UICorner")
+toastCorner.CornerRadius = UDim.new(0, 6)
+toastCorner.Parent = toast
+
+local toastStroke = Instance.new("UIStroke")
+toastStroke.Color = Color3.fromRGB(50, 50, 70)
+toastStroke.Thickness = 1
+toastStroke.Parent = toast
+
+local toastLabel = Instance.new("TextLabel")
+toastLabel.Size = UDim2.new(1, -10, 1, 0)
+toastLabel.Position = UDim2.new(0, 8, 0, 0)
+toastLabel.BackgroundTransparency = 1
+toastLabel.Text = ""
+toastLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+toastLabel.TextSize = 11
+toastLabel.Font = Enum.Font.Gotham
+toastLabel.TextXAlignment = Enum.TextXAlignment.Left
+toastLabel.Parent = toast
+
+local toastActive = false
+local function showToast(name, color)
+	if toastActive then return end
+	toastActive = true
+	toastLabel.Text = "✔  Teleported to " .. name
+	toastLabel.TextColor3 = color
+	TweenService:Create(toast, TweenInfo.new(0.22, Enum.EasingStyle.Quad), {
+		Position = UDim2.new(0, 10, 1, -32)
+	}):Play()
+	task.delay(2.2, function()
+		TweenService:Create(toast, TweenInfo.new(0.22, Enum.EasingStyle.Quad), {
+			Position = UDim2.new(0, 10, 1, 6)
+		}):Play()
+		task.wait(0.25)
+		toastActive = false
+	end)
+end
+
+-- Button builder
+local function createButton(index, data)
+	local yPos = BTN_START_Y + (index - 1) * (BTN_HEIGHT + BTN_SPACING)
+
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -20, 0, BTN_HEIGHT)
+	btn.Position = UDim2.new(0, 10, 0, yPos)
+	btn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+	btn.BorderSizePixel = 0
+	btn.AutoButtonColor = false
+	btn.Text = ""
+	btn.ZIndex = 2
+	btn.Parent = frame
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 7)
+	btnCorner.Parent = btn
+
+	local btnStroke = Instance.new("UIStroke")
+	btnStroke.Color = Color3.fromRGB(38, 38, 55)
+	btnStroke.Thickness = 1
+	btnStroke.Parent = btn
+
+	local accent = Instance.new("Frame")
+	accent.Size = UDim2.new(0, 3, 0.55, 0)
+	accent.Position = UDim2.new(0, 8, 0.225, 0)
+	accent.BackgroundColor3 = data.color
+	accent.BorderSizePixel = 0
+	accent.ZIndex = 3
+	accent.Parent = btn
+
+	local accentCorner = Instance.new("UICorner")
+	accentCorner.CornerRadius = UDim.new(1, 0)
+	accentCorner.Parent = accent
+
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, -95, 1, 0)
+	nameLabel.Position = UDim2.new(0, 18, 0, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = data.name
+	nameLabel.TextColor3 = Color3.fromRGB(210, 210, 235)
+	nameLabel.TextSize = 12
+	nameLabel.Font = Enum.Font.GothamSemibold
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.ZIndex = 3
+	nameLabel.Parent = btn
+
+	local coordsLabel = Instance.new("TextLabel")
+	coordsLabel.Size = UDim2.new(0, 82, 1, 0)
+	coordsLabel.Position = UDim2.new(1, -88, 0, 0)
+	coordsLabel.BackgroundTransparency = 1
+	coordsLabel.Text = string.format("%d,%d,%d", data.pos.X, data.pos.Y, data.pos.Z)
+	coordsLabel.TextColor3 = Color3.fromRGB(65, 65, 90)
+	coordsLabel.TextSize = 9
+	coordsLabel.Font = Enum.Font.Gotham
+	coordsLabel.TextXAlignment = Enum.TextXAlignment.Right
+	coordsLabel.ZIndex = 3
+	coordsLabel.Parent = btn
+
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.12), { BackgroundColor3 = Color3.fromRGB(30, 30, 46) }):Play()
+		TweenService:Create(btnStroke, TweenInfo.new(0.12), { Color = data.color }):Play()
+		TweenService:Create(nameLabel, TweenInfo.new(0.12), { TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+	end)
+
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.12), { BackgroundColor3 = Color3.fromRGB(20, 20, 30) }):Play()
+		TweenService:Create(btnStroke, TweenInfo.new(0.12), { Color = Color3.fromRGB(38, 38, 55) }):Play()
+		TweenService:Create(nameLabel, TweenInfo.new(0.12), { TextColor3 = Color3.fromRGB(210, 210, 235) }):Play()
+	end)
+
+	btn.MouseButton1Down:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.07), { BackgroundColor3 = Color3.fromRGB(15, 15, 24) }):Play()
+	end)
+
+	btn.MouseButton1Up:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.07), { BackgroundColor3 = Color3.fromRGB(30, 30, 46) }):Play()
+	end)
+
+	btn.MouseButton1Click:Connect(function()
+		local character = player.Character
+		if character then
+			local root = character:FindFirstChild("HumanoidRootPart")
+			if root then
+				root.CFrame = CFrame.new(data.pos)
+				showToast(data.name, data.color)
+			end
+		end
+	end)
+end
+
+for i, loc in ipairs(locations) do
+	createButton(i, loc)
+end
