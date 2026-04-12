@@ -1,0 +1,123 @@
+-- Load Rayfield
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield", true))()
+
+-- Fallback if Rayfield fails
+if not Rayfield then
+    warn("Rayfield failed to load - using fallback GUI")
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "FloorDeleter"
+    screenGui.ResetOnSpawn = false
+    pcall(function() screenGui.Parent = game:GetService("CoreGui") end)
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 250, 0, 100)
+    frame.Position = UDim2.new(0.5, -125, 0.5, -50)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    frame.Parent = screenGui
+    
+    local title = Instance.new("TextLabel")
+    title.Text = "Floor Deleter"
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.BackgroundTransparency = 1
+    title.TextColor3 = Color3.fromRGB(255, 200, 100)
+    title.Parent = frame
+    
+    local deleteBtn = Instance.new("TextButton")
+    deleteBtn.Text = "🗑 DELETE FLOORS ONCE"
+    deleteBtn.Position = UDim2.new(0, 10, 0, 45)
+    deleteBtn.Size = UDim2.new(0, 230, 0, 40)
+    deleteBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    deleteBtn.Parent = frame
+    
+    deleteBtn.MouseButton1Click:Connect(function()
+        local folder = workspace:FindFirstChild("_MAP")
+        if folder then
+            local count = 0
+            for _, child in ipairs(folder:GetChildren()) do
+                pcall(function() child:Destroy(); count = count + 1 end)
+            end
+            print("Deleted " .. count .. " floors")
+        else
+            print("_MAP folder not found")
+        end
+    end)
+    return
+end
+
+-- ================================
+-- CORE FUNCTIONS
+-- ================================
+local function getMapFolder()
+    return workspace:FindFirstChild("_MAP")
+end
+
+local function deleteAllFloors()
+    local folder = getMapFolder()
+    if not folder then
+        Rayfield:Notify({
+            Title = "Error",
+            Content = "_MAP folder not found!",
+            Duration = 2
+        })
+        return 0
+    end
+    
+    local children = folder:GetChildren()
+    if #children == 0 then
+        Rayfield:Notify({
+            Title = "Info",
+            Content = "No floors found to delete.",
+            Duration = 2
+        })
+        return 0
+    end
+    
+    local count = 0
+    for _, child in ipairs(children) do
+        pcall(function()
+            child:Destroy()
+            count = count + 1
+        end)
+    end
+    
+    Rayfield:Notify({
+        Title = "Floors Deleted",
+        Content = "Removed " .. count .. " floor(s) from _MAP",
+        Duration = 2
+    })
+    
+    return count
+end
+
+-- ================================
+-- CREATE RAYFIELD WINDOW
+-- ================================
+local window = Rayfield:CreateWindow({
+    Name = "🧨 Floor Deleter",
+    LoadingTitle = "Floor Deleter",
+    LoadingSubtitle = "Delete floors in one click",
+    Theme = "Default"
+})
+
+-- Main Tab
+local mainTab = window:CreateTab("Delete")
+
+-- ================================
+-- THE ONLY BUTTON
+-- ================================
+mainTab:CreateButton({
+    Name = "🗑 Delete Floors Once",
+    Callback = function()
+        deleteAllFloors()
+    end
+})
+
+-- ================================
+-- STARTUP NOTIFICATION
+-- ================================
+task.wait(0.5)
+Rayfield:Notify({
+    Title = "Floor Deleter Ready",
+    Content = "Click the button to delete all floors in _MAP",
+    Duration = 3
+})
