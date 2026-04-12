@@ -1,0 +1,181 @@
+local TweenService = game:GetService("TweenService")
+    local Lighting = game:GetService("Lighting")
+    local player = game.Players.LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    local eggsFolder = workspace:WaitForChild("Eggs")
+
+    -- ===== INTRO COM BLUR =====
+    -- limpa blur antigo
+    for _, v in pairs(Lighting:GetChildren()) do
+    if v:IsA("BlurEffect") then
+        v:Destroy()
+    end
+    end
+
+    local blur = Instance.new("BlurEffect")
+    blur.Size = 0
+    blur.Parent = Lighting
+    TweenService:Create(blur, TweenInfo.new(0.3), {Size = 25}):Play()
+
+    local introGui = Instance.new("ScreenGui")
+    introGui.IgnoreGuiInset = true
+    introGui.ResetOnSpawn = false
+    introGui.DisplayOrder = 999
+    introGui.Parent = playerGui
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+    textLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+    textLabel.Size = UDim2.new(0, 600, 0, 120)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = "SCRIPT"
+    textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    textLabel.TextStrokeTransparency = 0
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+    textLabel.Font = Enum.Font.GothamBlack
+    textLabel.TextScaled = true
+    textLabel.TextTransparency = 1
+    textLabel.ZIndex = 10
+    textLabel.Parent = introGui
+
+    -- fade in
+    TweenService:Create(textLabel, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+
+    -- espera 5 segundos
+    task.wait(5)
+    
+    -- fade out
+    TweenService:Create(textLabel, TweenInfo.new(0.4), {TextTransparency = 1}):Play()
+    TweenService:Create(blur, TweenInfo.new(0.4), {Size = 0}):Play()
+    task.wait(0.5)
+
+    introGui:Destroy()
+    blur:Destroy()
+
+    -- ===== PAINEL ESP + TP =====
+        local gui = Instance.new("ScreenGui")
+    gui.Name = "EggPanel"
+    gui.Parent = playerGui
+    gui.DisplayOrder = 10
+
+    local container = Instance.new("Frame", gui)
+    container.Size = UDim2.new(0, 0, 0, 0)
+    container.BackgroundTransparency = 1
+    container.Active = true
+    container.Draggable = true
+
+    -- sombra
+    local shadow = Instance.new("Frame", container)
+    shadow.Size = UDim2.new(1, 10, 1, 10)
+    shadow.Position = UDim2.new(0, 6, 0, 6)
+    shadow.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    shadow.BackgroundTransparency = 0.4
+    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 12)
+    
+    -- painel
+    local frame = Instance.new("Frame", container)
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+    frame.BackgroundTransparency = 0.1
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = Color3.fromRGB(120,120,120)
+    stroke.Thickness = 2
+
+    -- animação abrir
+    TweenService:Create(container, TweenInfo.new(0.4, Enum.EasingStyle.Back), {
+    Size = UDim2.new(0, 220, 0, 170)
+    }):Play()
+
+    -- título
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1, 0, 0, 35)
+    title.BackgroundTransparency = 1
+    title.Text = "🥚 EGG PANEL"
+    title.TextColor3 = Color3.fromRGB(255,255,255)
+    title.Font = Enum.Font.GothamBlack
+    title.TextScaled = true
+    title.TextStrokeTransparency = 0
+
+    -- botões
+    local espBtn = Instance.new("TextButton", frame)
+    espBtn.Size = UDim2.new(1, -20, 0, 45)
+    espBtn.Position = UDim2.new(0, 10, 0, 45)
+    espBtn.Text = "ESP OFF"
+    espBtn.Font = Enum.Font.GothamBold
+    espBtn.TextScaled = true
+    espBtn.TextColor3 = Color3.new(1,1,1)
+    espBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+    Instance.new("UICorner", espBtn).CornerRadius = UDim.new(0, 8)
+
+    local tpBtn = Instance.new("TextButton", frame)
+    tpBtn.Size = UDim2.new(1, -20, 0, 45)
+    tpBtn.Position = UDim2.new(0, 10, 0, 100)
+    tpBtn.Text = "TP NOS OVOS"
+    tpBtn.Font = Enum.Font.GothamBold
+    tpBtn.TextScaled = true
+    tpBtn.TextColor3 = Color3.new(1,1,1)
+    tpBtn.BackgroundColor3 = Color3.fromRGB(0, 90, 170)
+    Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 8)
+
+    -- ===== ESP =====
+    local espOn = false
+
+    local function criarESP(egg)
+    if egg:FindFirstChild("ESP_H") then return end
+    local adornee = egg:IsA("Model") and egg:FindFirstChildWhichIsA("BasePart") or egg
+    if not adornee then return end
+        local h = Instance.new("Highlight")
+    h.Name = "ESP_H"
+        h.FillColor = Color3.fromRGB(255,255,0)
+    h.FillTransparency = 0.2
+        h.Parent = egg
+    local bill = Instance.new("BillboardGui")
+    bill.Name = "ESP_B"
+    bill.Size = UDim2.new(0,120,0,40)
+    bill.AlwaysOnTop = true
+    bill.Adornee = adornee
+    local txt = Instance.new("TextLabel", bill)
+    txt.Size = UDim2.new(1,0,1,0)
+    txt.BackgroundTransparency = 1
+    txt.Text = "🥚 EGG"
+    txt.TextScaled = true
+    txt.TextColor3 = Color3.fromRGB(255,255,0)
+    bill.Parent = egg
+    end
+
+    local function removerESP()
+    for _, egg in pairs(eggsFolder:GetChildren()) do
+        if egg:FindFirstChild("ESP_H") then egg.ESP_H:Destroy() end
+        if egg:FindFirstChild("ESP_B") then egg.ESP_B:Destroy() end
+    end
+    end
+
+    espBtn.MouseButton1Click:Connect(function()
+    espOn = not espOn
+    if espOn then
+        espBtn.Text = "ESP ON"
+        espBtn.BackgroundColor3 = Color3.fromRGB(0,170,0)
+        for _, egg in pairs(eggsFolder:GetChildren()) do criarESP(egg) end
+    else
+        espBtn.Text = "ESP OFF"
+        espBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+        removerESP()
+    end
+    end)
+
+    eggsFolder.ChildAdded:Connect(function(egg)
+        task.wait(0.2)
+    if espOn then criarESP(egg) end
+    end)
+
+    -- ===== TP =====
+    tpBtn.MouseButton1Click:Connect(function()
+        local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    for _, egg in pairs(eggsFolder:GetChildren()) do
+        local pos = egg:IsA("Model") and egg:GetPivot().Position or egg.Position
+        hrp.CFrame = CFrame.new(pos + Vector3.new(0,3,0))
+        task.wait(0.3)
+    end
+    end)
