@@ -1,0 +1,471 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local Window = Rayfield:CreateWindow({
+    Name = "Ray Field",
+    LoadingTitle = "Ray Field UI",
+    LoadingSubtitle = "Build A Farm Factory",
+    ConfigurationSaving = {
+        Enabled = false,
+    },
+    KeySystem = false,
+})
+
+
+local function rerollUntilSeed(seedName, activeCheckFn)
+    Rayfield:Notify({
+        Title = "Searching...",
+        Content = "Rerolling until " .. seedName .. " appears!",
+        Duration = 3,
+        Image = 4483362458,
+    })
+
+    local foundSlot = nil
+    local attempts = 0
+
+    while not foundSlot and activeCheckFn() do
+        attempts += 1
+        if attempts > 1000 then
+            Rayfield:Notify({
+                Title = "Failed",
+                Content = "Gave up after 1000 rerolls!",
+                Duration = 5,
+                Image = 4483362458,
+            })
+            return
+        end
+
+        local result = game:GetService("ReplicatedStorage")
+            :WaitForChild("Communication")
+            :WaitForChild("DoRoll")
+            :InvokeServer()
+
+        if type(result) == "table" then
+            for slot, data in pairs(result) do
+                if type(data) == "table" and data["Type"] then
+                    if string.lower(data["Type"]):find(string.lower(seedName)) then
+                        foundSlot = slot
+                        break
+                    end
+                end
+            end
+        end
+
+        if not foundSlot then
+            task.wait(0.1)
+        end
+    end
+
+    if not activeCheckFn() then
+        Rayfield:Notify({
+            Title = "Stopped",
+            Content = seedName .. " reroll stopped after " .. tostring(attempts) .. " attempts.",
+            Duration = 4,
+            Image = 4483362458,
+        })
+        return
+    end
+
+    if foundSlot then
+        game:GetService("ReplicatedStorage")
+            :WaitForChild("Communication")
+            :WaitForChild("BuySeeds")
+            :FireServer(foundSlot)
+
+        Rayfield:Notify({
+            Title = "Purchase",
+            Content = seedName .. " found and bought after " .. tostring(attempts) .. " rerolls!",
+            Duration = 5,
+            Image = 4483362458,
+        })
+    end
+end
+
+local function rerollUntilPineappleOrKiwi(activeCheckFn)
+    Rayfield:Notify({
+        Title = "Searching...",
+        Content = "Rerolling until Kiwi or Pineapple appears!",
+        Duration = 3,
+        Image = 4483362458,
+    })
+
+    local kiwiSlot = nil
+    local pineappleSlot = nil
+    local attempts = 0
+
+    while not (kiwiSlot or pineappleSlot) and activeCheckFn() do
+        attempts += 1
+        if attempts > 1000 then
+            Rayfield:Notify({
+                Title = "Failed",
+                Content = "Gave up after 1000 rerolls!",
+                Duration = 5,
+                Image = 4483362458,
+            })
+            return
+        end
+
+        local result = game:GetService("ReplicatedStorage")
+            :WaitForChild("Communication")
+            :WaitForChild("DoRoll")
+            :InvokeServer()
+
+        if type(result) == "table" then
+            kiwiSlot = nil
+            pineappleSlot = nil
+            for slot, data in pairs(result) do
+                if type(data) == "table" and data["Type"] then
+                    local seedType = string.lower(data["Type"])
+                    if seedType:find("kiwi") then
+                        kiwiSlot = slot
+                    elseif seedType:find("pineapple") then
+                        pineappleSlot = slot
+                    end
+                end
+            end
+        end
+
+        if not (kiwiSlot or pineappleSlot) then
+            task.wait(0.1)
+        end
+    end
+
+    if not activeCheckFn() then
+        Rayfield:Notify({
+            Title = "Stopped",
+            Content = "Pineapple & Kiwi reroll stopped after " .. tostring(attempts) .. " attempts.",
+            Duration = 4,
+            Image = 4483362458,
+        })
+        return
+    end
+
+    local comm = game:GetService("ReplicatedStorage"):WaitForChild("Communication"):WaitForChild("BuySeeds")
+    if kiwiSlot then comm:FireServer(kiwiSlot) end
+    task.wait(0.1)
+    if pineappleSlot then comm:FireServer(pineappleSlot) end
+
+    Rayfield:Notify({
+        Title = "Purchase",
+        Content = "Kiwi/Pineapple found and bought after " .. tostring(attempts) .. " rerolls!",
+        Duration = 5,
+        Image = 4483362458,
+    })
+end
+
+local Tab = Window:CreateTab("Features", 4483362458)
+
+Tab:CreateSection("Rerolls")
+
+Tab:CreateButton({
+    Name = "Reroll",
+    Callback = function()
+        local success, result = pcall(function()
+            return game:GetService("ReplicatedStorage")
+                :WaitForChild("Communication")
+                :WaitForChild("DoRoll")
+                :InvokeServer()
+        end)
+
+        if success then
+            Rayfield:Notify({
+                Title = "Success",
+                Content = "DoRoll executed!",
+                Duration = 5,
+                Image = 4483362458,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Failed",
+                Content = "Error: " .. tostring(result),
+                Duration = 5,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+local autoRolling = false
+
+Tab:CreateToggle({
+    Name = "Auto Reroll",
+    CurrentValue = false,
+    Flag = "AutoReroll",
+    Callback = function(value)
+        autoRolling = value
+        if autoRolling then
+            Rayfield:Notify({
+                Title = "Auto Reroll",
+                Content = "Auto Reroll enabled.",
+                Duration = 3,
+                Image = 4483362458,
+            })
+            task.spawn(function()
+                while autoRolling do
+                    pcall(function()
+                        game:GetService("ReplicatedStorage")
+                            :WaitForChild("Communication")
+                            :WaitForChild("DoRoll")
+                            :InvokeServer()
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Auto Reroll",
+                Content = "Auto Reroll disabled.",
+                Duration = 3,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+Tab:CreateSection("Beet Seeds")
+
+Tab:CreateButton({
+    Name = "Auto Reroll Until Beet Seed",
+    Callback = function()
+        task.spawn(function()
+            rerollUntilSeed("Beet Seeds", function() return true end)
+        end)
+    end,
+})
+
+local autoBeetActive = false
+
+Tab:CreateToggle({
+    Name = "Auto Reroll Until Beet Seed (Loop)",
+    CurrentValue = false,
+    Flag = "AutoBeetReroll",
+    Callback = function(value)
+        autoBeetActive = value
+        if autoBeetActive then
+            task.spawn(function()
+                while autoBeetActive do
+                    rerollUntilSeed("Beet Seeds", function() return autoBeetActive end)
+                    if autoBeetActive then task.wait(0.5) end
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Stopped",
+                Content = "Auto Beet Reroll loop disabled.",
+                Duration = 3,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+Tab:CreateSection("Kiwi Seeds")
+
+Tab:CreateButton({
+    Name = "Auto Reroll Until Kiwi Seed",
+    Callback = function()
+        task.spawn(function()
+            rerollUntilSeed("Kiwi Seeds", function() return true end)
+        end)
+    end,
+})
+
+local autoKiwiActive = false
+
+Tab:CreateToggle({
+    Name = "Auto Reroll Until Kiwi Seed (Loop)",
+    CurrentValue = false,
+    Flag = "AutoKiwiReroll",
+    Callback = function(value)
+        autoKiwiActive = value
+        if autoKiwiActive then
+            task.spawn(function()
+                while autoKiwiActive do
+                    rerollUntilSeed("Kiwi Seeds", function() return autoKiwiActive end)
+                    if autoKiwiActive then task.wait(0.5) end
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Stopped",
+                Content = "Auto Kiwi Reroll loop disabled.",
+                Duration = 3,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+Tab:CreateSection("Pineapple Seeds")
+
+Tab:CreateButton({
+    Name = "Auto Reroll Until Pineapple Seed",
+    Callback = function()
+        task.spawn(function()
+            rerollUntilSeed("Pineapple Seeds", function() return true end)
+        end)
+    end,
+})
+
+local autoPineappleActive = false
+
+Tab:CreateToggle({
+    Name = "Auto Reroll Until Pineapple Seed (Loop)",
+    CurrentValue = false,
+    Flag = "AutoPineappleReroll",
+    Callback = function(value)
+        autoPineappleActive = value
+        if autoPineappleActive then
+            task.spawn(function()
+                while autoPineappleActive do
+                    rerollUntilSeed("Pineapple Seeds", function() return autoPineappleActive end)
+                    if autoPineappleActive then task.wait(0.5) end
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Stopped",
+                Content = "Auto Pineapple Reroll loop disabled.",
+                Duration = 3,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+Tab:CreateSection("Pineapple & Kiwi")
+
+Tab:CreateButton({
+    Name = "Auto Reroll Until Pineapple & Kiwi",
+    Callback = function()
+        task.spawn(function()
+            rerollUntilPineappleOrKiwi(function() return true end)
+        end)
+    end,
+})
+
+local autoPineappleKiwiActive = false
+
+Tab:CreateToggle({
+    Name = "Auto Reroll Until Pineapple & Kiwi (Loop)",
+    CurrentValue = false,
+    Flag = "AutoPineappleKiwiReroll",
+    Callback = function(value)
+        autoPineappleKiwiActive = value
+        if autoPineappleKiwiActive then
+            task.spawn(function()
+                while autoPineappleKiwiActive do
+                    rerollUntilPineappleOrKiwi(function() return autoPineappleKiwiActive end)
+                    if autoPineappleKiwiActive then task.wait(0.5) end
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Stopped",
+                Content = "Auto Pineapple & Kiwi Reroll loop disabled.",
+                Duration = 3,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+Tab:CreateSection("Auto Sell")
+
+local sellInterval = 10
+local cashThreshold = 0
+local autoSellActive = false
+
+Tab:CreateSlider({
+    Name = "Sell Every X Seconds",
+    Range = {1, 300},
+    Increment = 1,
+    CurrentValue = 10,
+    Flag = "SellInterval",
+    Callback = function(value)
+        sellInterval = value
+    end,
+})
+
+Tab:CreateSlider({
+    Name = "Sell At Cash Amount (0 = disabled)",
+    Range = {0, 100000},
+    Increment = 100,
+    CurrentValue = 0,
+    Flag = "CashThreshold",
+    Callback = function(value)
+        cashThreshold = value
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Auto Sell",
+    CurrentValue = false,
+    Flag = "AutoSell",
+    Callback = function(value)
+        autoSellActive = value
+
+        if autoSellActive then
+            Rayfield:Notify({
+                Title = "Auto Sell",
+                Content = "Auto Sell enabled!",
+                Duration = 3,
+                Image = 4483362458,
+            })
+
+            task.spawn(function()
+                local timer = 0
+                while autoSellActive do
+                    task.wait(1)
+                    timer += 1
+
+                    if cashThreshold > 0 then
+                        local cash = 0
+                        pcall(function()
+                            cash = game:GetService("Players").LocalPlayer.leaderstats.Cash.Value
+                        end)
+                        if cash >= cashThreshold then
+                            pcall(function()
+                                game:GetService("ReplicatedStorage")
+                                    :WaitForChild("Communication")
+                                    :WaitForChild("SellCrate")
+                                    :FireServer()
+                            end)
+                            Rayfield:Notify({
+                                Title = "Auto Sell",
+                                Content = "Sold! Cash threshold reached.",
+                                Duration = 3,
+                                Image = 4483362458,
+                            })
+                            timer = 0
+                        end
+                    end
+
+                    if timer >= sellInterval then
+                        pcall(function()
+                            game:GetService("ReplicatedStorage")
+                                :WaitForChild("Communication")
+                                :WaitForChild("SellCrate")
+                                :FireServer()
+                        end)
+                        Rayfield:Notify({
+                            Title = "Auto Sell",
+                            Content = "Sold after " .. sellInterval .. " seconds!",
+                            Duration = 3,
+                            Image = 4483362458,
+                        })
+                        timer = 0
+                    end
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Auto Sell",
+                Content = "Auto Sell disabled.",
+                Duration = 3,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
