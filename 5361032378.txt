@@ -1,0 +1,126 @@
+
+local SimplePath = {}
+do
+    local DEFAULT_SETTINGS = {TIME_VARIANCE = 0.07; COMPARISON_CHECKS = 1; JUMP_WHEN_STUCK = true;}
+    local PathfindingService = game:GetService("PathfindingService")
+    local function output(func, msg) func(((func == error and "SimplePath Error: ") or "SimplePath: ")..msg) end
+    local Path = {
+        StatusType = {Idle = "Idle"; Active = "Active";};
+        ErrorType = {LimitReached = "LimitReached"; TargetUnreachable = "TargetUnreachable"; ComputationError = "ComputationError"; AgentStuck = "AgentStuck";};
+    }
+    Path.__index = function(table, index)
+        return (table._events[index] and table._events[index].Event) or (index == "LastError" and table._lastError) or (index == "Status" and table._status) or Path[index]
+    end
+
+    function Path:Stop()
+        if self._moveConnection then self._moveConnection:Disconnect() self._moveConnection = nil end
+        if self._humanoid then self._humanoid:MoveTo(self._agent.PrimaryPart.Position) end
+        self._status = Path.StatusType.Idle
+    end
+
+    function Path:Run(target)
+        local targetPos = (typeof(target) == "Vector3" and target) or (target:IsA("BasePart") and target.Position) or (target:IsA("Model") and target:GetPivot().Position)
+        if not targetPos then return false end
+        local success, _ = pcall(function() self._path:ComputeAsync(self._agent.PrimaryPart.Position, targetPos) end)
+        if success and self._path.Status == Enum.PathStatus.Success then
+            self._waypoints = self._path:GetWaypoints()
+            if #self._waypoints < 2 then return false end
+            self._status = Path.StatusType.Active
+            self._currentWaypoint = 2
+            self._humanoid:MoveTo(self._waypoints[self._currentWaypoint].Position)
+            if not self._moveConnection then
+                self._moveConnection = self._humanoid.MoveToFinished:Connect(function()
+                    self._currentWaypoint = self._currentWaypoint + 1
+                    if self._currentWaypoint <= #self._waypoints then
+                        self._humanoid:MoveTo(self._waypoints[self._currentWaypoint].Position)
+                        if self._waypoints[self._currentWaypoint].Action == Enum.PathWaypointAction.Jump then self._humanoid.Jump = true end
+                    else self:Stop() end
+                end)
+            end
+            return true
+        end
+        return false
+    end
+
+    function SimplePath.new(agent, agentParameters, overrideSettings)
+        local self = setmetatable({}, Path)
+        self._agent = agent
+        self._humanoid = agent:FindFirstChildOfClass("Humanoid")
+        self._path = PathfindingService:CreatePath(agentParameters)
+        self._status = Path.StatusType.Idle
+        self._events = {Error = Instance.new("BindableEvent"), WaypointReached = Instance.new("BindableEvent"), Stopped = Instance.new("BindableEvent")}
+        return self
+    end
+end
+
+
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local character = Player.Character or Player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local Path = SimplePath.new(character)
+
+-- [CONFIG]
+local Config = {
+    Enabled = false,
+    EggReachDist = 10,
+    StuckThreshold = 2,
+    MAX_EGG_HEIGHT = 130
+}
+
+-- [EGG SCANNER & FARMING LOOP]
+local function getEggs()
+    local eggs = {}
+    for _, v in pairs(workspace:GetChildren()) do
+        if v:IsA("BasePart") and v.Name:find("Egg") and v.Position.Y <= Config.MAX_EGG_HEIGHT then
+            table.insert(eggs, v)
+        end
+    end
+    return eggs
+end
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if Config.Enabled then
+            local eggs = getEggs()
+            if #eggs > 0 then
+                -- Sort by distance
+                table.sort(eggs, function(a, b)
+                    return (rootPart.Position - a.Position).Magnitude < (rootPart.Position - b.Position).Magnitude
+                end)
+                
+                local targetEgg = eggs[1]
+                Path:Run(targetEgg.Position)
+                
+                -- Auto-collect if close
+                if (rootPart.Position - targetEgg.Position).Magnitude < Config.EggReachDist then
+                    firetouchinterest(rootPart, targetEgg, 0)
+                    firetouchinterest(rootPart, targetEgg, 1)
+                end
+            end
+        else
+            Path:Stop()
+        end
+    end
+end)
+
+
+local ScreenGui = Instance.new("ScreenGui", Player:WaitForChild("PlayerGui"))
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 200, 0, 100)
+Frame.Position = UDim2.new(0.5, -100, 0.8, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+local ToggleBtn = Instance.new("TextButton", Frame)
+ToggleBtn.Size = UDim2.new(1, 0, 1, 0)
+ToggleBtn.Text = "FARM: OFF"
+ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    Config.Enabled = not Config.Enabled
+    ToggleBtn.Text = Config.Enabled and "FARM: ON" or "FARM: OFF"
+    ToggleBtn.BackgroundColor3 = Config.Enabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+end)
+
+warn("SUKSES: 
