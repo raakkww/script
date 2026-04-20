@@ -1,0 +1,102 @@
+local character = game:GetService("Players").LocalPlayer.Character
+local map = game:GetService("Workspace").Map
+local treasures = map.Treasures
+local obby_land = map.ObbyLand
+
+getgenv().settings = {
+    -- main setting
+    auto_farm = false,
+    -- misc setting
+    farm_treasures = true 
+}
+
+function get_time()
+    return os.date("%X")
+end
+
+local success, Rayfield = pcall(function()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+end)
+
+if success then
+    local Window = Rayfield:CreateWindow({
+       Name = "Auto Farm Hub",
+       LoadingTitle = "Memuat Script Upgrade...",
+       LoadingSubtitle = "by Agent & kylosilly",
+       ConfigurationSaving = { Enabled = false },
+       KeySystem = false
+    })
+
+    local Tab = Window:CreateTab("Main Farm", 4483362458)
+
+    Tab:CreateToggle({
+       Name = "Aktifkan Auto Farm (Lanjut/Berhenti)",
+       CurrentValue = false,
+       Flag = "AutoFarmToggle",
+       Callback = function(Value)
+           getgenv().settings.auto_farm = Value
+       end,
+    })
+
+    Tab:CreateToggle({
+       Name = "Auto Collect Treasures",
+       CurrentValue = true,
+       Flag = "TreasureToggle",
+       Callback = function(Value)
+           getgenv().settings.farm_treasures = Value
+       end,
+    })
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        
+        if getgenv().settings.auto_farm then
+            local teleporters = obby_land.Teleporters
+            local finish = obby_land.Finish
+            
+            if (#teleporters:GetChildren() == 0) or (#finish:GetChildren() == 0) then
+                pcall(function() rconsoleprint("[Auto Farm] Teleporter or finish folder is empty. Attempting to fix. "..get_time().."\n") end)
+                character:SetPrimaryPartCFrame(CFrame.new(obby_land.Model:GetPivot().Position))
+                pcall(function() rconsoleprint("[Auto Farm] Empty folders fixed. "..get_time().."\n") end)
+                task.wait(2)
+            end
+            
+            local final_obby_teleporter = teleporters:FindFirstChild("11")
+            local final_obby_finish = finish:FindFirstChild("11")
+            
+            if final_obby_teleporter and final_obby_finish then
+                character:SetPrimaryPartCFrame(CFrame.new(final_obby_teleporter.Position))
+                pcall(function() rconsoleprint("[Auto Farm] Starting last obby. "..get_time().."\n") end)
+                task.wait(.5)
+                fireproximityprompt(final_obby_teleporter.ProximityPrompt)
+                task.wait(5)
+                
+                character:SetPrimaryPartCFrame(CFrame.new(final_obby_finish.Position))
+                pcall(function() rconsoleprint("[Auto Farm] Teleported to the end. "..get_time().."\n") end)
+                task.wait(.5)
+                fireproximityprompt(final_obby_finish.ProximityPrompt)
+                pcall(function() rconsoleprint("[Auto Farm] Claimed 20k. "..get_time().."\n") end)
+                task.wait(.5)
+            end
+            
+            -- Perbaikan: Menambahkan pengecekan toggle farm_treasures yang lupa dimasukkan author asli
+            if getgenv().settings.farm_treasures then
+                if (#treasures:GetChildren() < 3) then
+                    continue
+                end
+                pcall(function() rconsoleprint("[Auto Farm] Collecting treasures. "..get_time().."\n") end)
+                for _, v in pairs(treasures:GetChildren()) do
+                    local prompt = v:FindFirstChildWhichIsA("ProximityPrompt")
+                    if (not prompt) then
+                        continue
+                    end
+                    character:SetPrimaryPartCFrame(CFrame.new(v.Position + Vector3.new(0, 20, 0)))
+                    task.wait(.5)
+                    fireproximityprompt(prompt)
+                end
+            end
+        end
+    end
+end)
