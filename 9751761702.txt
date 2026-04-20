@@ -1,0 +1,87 @@
+local player = game.Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "PortalTP_UI"
+gui.ResetOnSpawn = false
+
+local toggle = Instance.new("TextButton", gui)
+toggle.Size = UDim2.new(0,120,0,30)
+toggle.Position = UDim2.new(0,20,0.5,-160)
+toggle.Text = "Abrir TP"
+toggle.BackgroundColor3 = Color3.fromRGB(35,35,35)
+toggle.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", toggle)
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,220,0,0)
+frame.Position = UDim2.new(0,20,0.5,-120)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.BorderSizePixel = 0
+Instance.new("UICorner", frame)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.BackgroundTransparency = 1
+title.Text = "PORTAL TP"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+
+local scroll = Instance.new("ScrollingFrame", frame)
+scroll.Position = UDim2.new(0,0,0,30)
+scroll.Size = UDim2.new(1,0,1,-30)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 4
+scroll.CanvasSize = UDim2.new(0,0,0,0)
+
+local layout = Instance.new("UIListLayout", scroll)
+layout.Padding = UDim.new(0,5)
+
+local function tp(part)
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    hrp.CFrame = part.CFrame + Vector3.new(0,5,0)
+end
+
+local aberto = false
+
+toggle.MouseButton1Click:Connect(function()
+    aberto = not aberto
+
+    if aberto then
+        toggle.Text = "Fechar TP"
+        TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0,220,0,300)
+        }):Play()
+    else
+        toggle.Text = "Abrir TP"
+        TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0,220,0,0)
+        }):Play()
+    end
+end)
+
+local portals = workspace:FindFirstChild("Portals")
+
+if portals then
+    for _,p in pairs(portals:GetChildren()) do
+        local btn = Instance.new("TextButton", scroll)
+        btn.Size = UDim2.new(1,-10,0,30)
+        btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+        btn.TextColor3 = Color3.new(1,1,1)
+        btn.Text = p.Name
+        Instance.new("UICorner", btn)
+
+        btn.MouseButton1Click:Connect(function()
+            local part = p:FindFirstChildWhichIsA("BasePart")
+            if part then
+                tp(part)
+            end
+        end)
+    end
+
+    task.wait()
+    scroll.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 10)
+end
