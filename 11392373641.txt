@@ -1,0 +1,398 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+
+player.CharacterAdded:Connect(function(c)
+	character = c
+	hrp = c:WaitForChild("HumanoidRootPart")
+end)
+
+------------------------------------------------
+-- FOLDERS
+------------------------------------------------
+local animFolder = workspace:WaitForChild("Game"):WaitForChild("Animatronics")
+local gameFolder = workspace:WaitForChild("Game")
+local clockModel = gameFolder:WaitForChild("Clock")
+local surfaceGui = clockModel:WaitForChild("Part"):WaitForChild("SurfaceGui")
+local horas = surfaceGui:WaitForChild("Horas")
+local minutos = surfaceGui:WaitForChild("Minutos")
+
+------------------------------------------------
+-- STATE
+------------------------------------------------
+local espEnabled = false
+local fuseEnabled = false
+local clockRunning = false
+local autofarmEnabled = false
+local savedCFrame = nil
+local menuVisible = true
+
+------------------------------------------------
+-- UI ROOT
+------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "FNAF Eternal Nights"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = playerGui
+
+------------------------------------------------
+-- MAIN PANEL (MODERN FNAF UI)
+------------------------------------------------
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 380, 0, 450)
+main.Position = UDim2.new(0, 20, 0.5, -225)
+main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+main.Parent = gui
+
+local corner = Instance.new("UICorner", main)
+corner.CornerRadius = UDim.new(0, 14)
+
+local stroke = Instance.new("UIStroke", main)
+stroke.Thickness = 2
+
+task.spawn(function()
+	local h = 0
+	while true do
+		h = (h + 1) % 360
+		stroke.Color = Color3.fromHSV(h/360, 1, 1)
+		task.wait(0.03)
+	end
+end)
+
+------------------------------------------------
+-- HEADER
+------------------------------------------------
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 55)
+header.BackgroundTransparency = 1
+header.Parent = main
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "FNAF Eternal Nights"
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 20
+title.Parent = header
+
+task.spawn(function()
+	local h = 0
+	while true do
+		h = (h + 2) % 360
+		title.TextColor3 = Color3.fromHSV(h/360, 1, 1)
+		task.wait(0.03)
+	end
+end)
+
+local tip = Instance.new("TextLabel")
+tip.Size = UDim2.new(1, 0, 0, 18)
+tip.Position = UDim2.new(0, 0, 0, 35)
+tip.BackgroundTransparency = 1
+tip.Text = "Press P to toggle menu"
+tip.TextColor3 = Color3.fromRGB(180,180,180)
+tip.Font = Enum.Font.Gotham
+tip.TextSize = 11
+tip.Parent = header
+
+------------------------------------------------
+-- BUTTON STYLE SYSTEM
+------------------------------------------------
+local function createButton(text, y)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(0.9, 0, 0, 42)
+	b.Position = UDim2.new(0.05, 0, 0, y)
+	b.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+	b.Text = text .. " : OFF"
+	b.TextColor3 = Color3.fromRGB(235,235,235)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	b.AutoButtonColor = false
+	b.Parent = main
+
+	local c = Instance.new("UICorner", b)
+	c.CornerRadius = UDim.new(0, 10)
+
+	local s = Instance.new("UIStroke", b)
+	s.Thickness = 1
+	s.Color = Color3.fromRGB(70,70,90)
+
+	b.MouseEnter:Connect(function()
+		TweenService:Create(b, TweenInfo.new(0.15), {
+			BackgroundColor3 = Color3.fromRGB(35,35,50)
+		}):Play()
+	end)
+
+	b.MouseLeave:Connect(function()
+		TweenService:Create(b, TweenInfo.new(0.15), {
+			BackgroundColor3 = Color3.fromRGB(18,18,26)
+		}):Play()
+	end)
+
+	return b
+end
+
+------------------------------------------------
+-- ESP
+------------------------------------------------
+local function addESP(obj)
+	if not espEnabled then return end
+	if obj:FindFirstChild("ESP_Highlight") then return end
+	if not (obj:IsA("Model") or obj:IsA("BasePart")) then return end
+
+	local h = Instance.new("Highlight")
+	h.Name = "ESP_Highlight"
+	h.FillColor = Color3.fromRGB(255,0,0)
+	h.OutlineColor = Color3.fromRGB(255,255,255)
+	h.Parent = obj
+end
+
+local function enableESP()
+	espEnabled = true
+	for _,v in pairs(animFolder:GetDescendants()) do addESP(v) end
+end
+
+local function disableESP()
+	espEnabled = false
+	for _,v in ipairs(workspace:GetDescendants()) do
+		local h = v:FindFirstChild("ESP_Highlight")
+		if h then h:Destroy() end
+	end
+end
+
+------------------------------------------------
+-- FUSE (FIXED + CONSTANT CHECK + OVERHEAD TEXT)
+------------------------------------------------
+
+local fuseLabels = {}
+
+local function createFuseESP(obj)
+	if fuseLabels[obj] then return end
+	if not obj then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "Fuse_ESP"
+	highlight.FillColor = Color3.fromRGB(0,170,255)
+	highlight.OutlineColor = Color3.fromRGB(255,255,255)
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Parent = obj
+
+	-- pick a base part (model safe)
+	local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
+	if not part then return end
+
+	-- overhead billboard (old style)
+	local bb = Instance.new("BillboardGui")
+	bb.Name = "Fuse_Tag"
+	bb.Size = UDim2.new(0, 200, 0, 50)
+	bb.StudsOffset = Vector3.new(0, 3, 0)
+	bb.AlwaysOnTop = true
+	bb.Parent = part
+
+	local txt = Instance.new("TextLabel")
+	txt.Size = UDim2.new(1, 0, 1, 0)
+	txt.BackgroundTransparency = 1
+	txt.Text = "⚡ FUSE"
+	txt.TextColor3 = Color3.fromRGB(0, 170, 255)
+	txt.TextStrokeTransparency = 0.2
+	txt.Font = Enum.Font.GothamBlack
+	txt.TextScaled = true
+	txt.Parent = bb
+
+	fuseLabels[obj] = {highlight = highlight, gui = bb}
+end
+
+local function enableFuse()
+	fuseEnabled = true
+
+	-- initial scan
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj.Name == "Fuse" then
+			createFuseESP(obj)
+		end
+	end
+
+	-- CONSTANT WATCH (fixes "sometimes not showing")
+	task.spawn(function()
+		while fuseEnabled do
+			for _, obj in ipairs(workspace:GetDescendants()) do
+				if obj.Name == "Fuse" then
+					createFuseESP(obj)
+				end
+			end
+			task.wait(0.5)
+		end
+	end)
+
+	-- auto-clean removed fuses
+	task.spawn(function()
+		while fuseEnabled do
+			for obj, data in pairs(fuseLabels) do
+				if not obj or not obj.Parent then
+					if data.highlight then data.highlight:Destroy() end
+					if data.gui then data.gui:Destroy() end
+					fuseLabels[obj] = nil
+				end
+			end
+			task.wait(1)
+		end
+	end)
+end
+
+local function disableFuse()
+	fuseEnabled = false
+
+	for obj, data in pairs(fuseLabels) do
+		if data.highlight then data.highlight:Destroy() end
+		if data.gui then data.gui:Destroy() end
+	end
+
+	table.clear(fuseLabels)
+end
+
+------------------------------------------------
+-- CLOCK (ULTRA CLEAN FINAL VERSION)
+------------------------------------------------
+local clockGui
+
+local function enableClock()
+	clockRunning = true
+
+	clockGui = Instance.new("ScreenGui")
+	clockGui.ResetOnSpawn = false
+	clockGui.Parent = playerGui
+
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(0, 340, 0, 95)
+	frame.Position = UDim2.new(0.5, -170, 0.08, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(15,15,22)
+	frame.Parent = clockGui
+
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 14)
+
+	local stroke = Instance.new("UIStroke", frame)
+	stroke.Thickness = 2
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1,0,1,0)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBlack
+	label.TextScaled = true
+	label.Parent = frame
+
+	task.spawn(function()
+		local h = 0
+		while clockRunning do
+			h = (h + 2) % 360
+			local c = Color3.fromHSV(h/360,1,1)
+
+			label.Text = horas.Text .. ":" .. minutos.Text
+			label.TextColor3 = c
+			stroke.Color = c
+
+			task.wait(0.05)
+		end
+	end)
+end
+
+local function disableClock()
+	clockRunning = false
+	if clockGui then clockGui:Destroy() end
+end
+
+------------------------------------------------
+-- AUTOFARM
+------------------------------------------------
+local farmPart
+
+local function toggleAutoFarm()
+	if not hrp then return end
+
+	if not autofarmEnabled then
+		savedCFrame = hrp.CFrame
+		hrp.CFrame += Vector3.new(0,300,0)
+
+		farmPart = Instance.new("Part")
+		farmPart.Size = Vector3.new(7,1,7)
+		farmPart.Anchored = true
+		farmPart.Position = hrp.Position - Vector3.new(0,3,0)
+		farmPart.Parent = workspace
+
+		autofarmEnabled = true
+	else
+		if savedCFrame then hrp.CFrame = savedCFrame end
+		if farmPart then farmPart:Destroy() end
+		autofarmEnabled = false
+	end
+end
+
+------------------------------------------------
+-- DELETE BARRIERS
+------------------------------------------------
+local function deleteBarriers()
+	local map = workspace:FindFirstChild("Map")
+	if map and map:FindFirstChild("TeleportReturn") then
+		map.TeleportReturn:Destroy()
+	end
+end
+
+------------------------------------------------
+-- BUTTONS
+------------------------------------------------
+local b1 = createButton("ANIMATRONICS ESP", 70)
+local b2 = createButton("FUSE ESP", 120)
+local b3 = createButton("CLOCK", 170)
+local b4 = createButton("DELETE BARRIERS", 220)
+local b5 = createButton("AUTO FARM", 270)
+
+------------------------------------------------
+-- EVENTS
+------------------------------------------------
+local function updateButton(b, state)
+	b.Text = b.Text:match("(.+) :") .. " : " .. (state and "ON" or "OFF")
+end
+
+b1.MouseButton1Click:Connect(function()
+	if espEnabled then disableESP() else enableESP() end
+	updateButton(b1, espEnabled)
+end)
+
+b2.MouseButton1Click:Connect(function()
+	if fuseEnabled then disableFuse() else enableFuse() end
+	updateButton(b2, fuseEnabled)
+end)
+
+b3.MouseButton1Click:Connect(function()
+	if clockRunning then disableClock() else enableClock() end
+	updateButton(b3, clockRunning)
+end)
+
+b4.MouseButton1Click:Connect(function()
+	deleteBarriers()
+	b4.Text = "DELETED"
+	task.wait(1)
+	b4.Text = "DELETE BARRIERS : OFF"
+end)
+
+b5.MouseButton1Click:Connect(function()
+	toggleAutoFarm()
+	updateButton(b5, autofarmEnabled)
+end)
+
+------------------------------------------------
+-- TOGGLE MENU
+------------------------------------------------
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.P then
+		menuVisible = not menuVisible
+		main.Visible = menuVisible
+	end
+end)
