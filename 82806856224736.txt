@@ -1,0 +1,296 @@
+local GrabOresUI = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local Autofarm = Instance.new("TextButton")
+local Name = Instance.new("TextLabel")
+local Zone1 = Instance.new("TextButton")
+local ZoneFarm = Instance.new("TextLabel")
+local Zone3 = Instance.new("TextButton")
+local Zone4 = Instance.new("TextButton")
+local Zone2 = Instance.new("TextButton")
+local Zone8 = Instance.new("TextButton")
+local Zone6 = Instance.new("TextButton")
+local Zone5 = Instance.new("TextButton")
+local Zone7 = Instance.new("TextButton")
+
+--Properties:
+
+GrabOresUI.Name = "GrabOresUI"
+GrabOresUI.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+GrabOresUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+Frame.Parent = GrabOresUI
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Frame.BorderSizePixel = 5
+Frame.Position = UDim2.new(0.66258496, 0, 0.115848415, 0)
+Frame.Size = UDim2.new(0, 271, 0, 189)
+
+Autofarm.Name = "Autofarm"
+Autofarm.Parent = Frame
+Autofarm.BackgroundColor3 = Color3.fromRGB(39, 39, 39)
+Autofarm.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Autofarm.BorderSizePixel = 5
+Autofarm.Position = UDim2.new(0.0699593499, 0, 0.253010184, 0)
+Autofarm.Size = UDim2.new(0, 233, 0, 48)
+Autofarm.Font = Enum.Font.SourceSans
+Autofarm.Text = "Autofarm"
+Autofarm.TextColor3 = Color3.fromRGB(255, 255, 255)
+Autofarm.TextScaled = true
+Autofarm.TextSize = 14.000
+Autofarm.TextWrapped = true
+
+Name.Name = "Name"
+Name.Parent = Frame
+Name.BackgroundColor3 = Color3.fromRGB(59, 59, 59)
+Name.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Name.BorderSizePixel = 5
+Name.Position = UDim2.new(0.00427358691, 0, 0, 0)
+Name.Size = UDim2.new(0, 269, 0, 33)
+Name.Font = Enum.Font.SourceSans
+Name.Text = "Grab Ores! [NEW]"
+Name.TextColor3 = Color3.fromRGB(255, 255, 255)
+Name.TextScaled = true
+Name.TextSize = 14.000
+Name.TextWrapped = true
+
+Zone1.Name = "Zone1"
+Zone1.Parent = Frame
+Zone1.BackgroundColor3 = Color3.fromRGB(39, 39, 39)
+Zone1.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Zone1.BorderSizePixel = 5
+Zone1.Position = UDim2.new(0.00722872466, 0, 0.71331948, 0)
+Zone1.Size = UDim2.new(0, 59, 0, 25)
+Zone1.Font = Enum.Font.SourceSans
+Zone1.Text = "Zone 1"
+Zone1.TextColor3 = Color3.fromRGB(255, 255, 255)
+Zone1.TextScaled = true
+Zone1.TextSize = 14.000
+Zone1.TextWrapped = true
+
+ZoneFarm.Name = "ZoneFarm"
+ZoneFarm.Parent = Frame
+ZoneFarm.BackgroundColor3 = Color3.fromRGB(59, 59, 59)
+ZoneFarm.BorderColor3 = Color3.fromRGB(0, 0, 0)
+ZoneFarm.BorderSizePixel = 5
+ZoneFarm.Position = UDim2.new(0.00427381229, 0, 0.556057751, 0)
+ZoneFarm.Size = UDim2.new(0, 269, 0, 22)
+ZoneFarm.Font = Enum.Font.SourceSans
+ZoneFarm.Text = "Select Zones To Farm:"
+ZoneFarm.TextColor3 = Color3.fromRGB(255, 255, 255)
+ZoneFarm.TextScaled = true
+ZoneFarm.TextSize = 14.000
+ZoneFarm.TextWrapped = true
+
+Zone3.Name = "Zone3"
+Zone3.Parent = Frame
+Zone3.BackgroundColor3 = Color3.fromRGB(39, 39, 39)
+Zone3.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Zone3.BorderSizePixel = 5
+Zone3.Position = UDim2.new(0.00722872466, 0, 0.866980314, 0)
+Zone3.Size = UDim2.new(0, 59, 0, 25)
+Zone3.Font = Enum.Font.SourceSans
+Zone3.Text = "Zone 3"
+Zone3.TextColor3 = Color3.fromRGB(255, 255, 255)
+Zone3.TextScaled = true
+Zone3.TextSize = 14.000
+Zone3.TextWrapped = true
+
+Zone4.Name = "Zone4"
+Zone4.Parent = Frame
+Zone4.BackgroundColor3 = Color3.fromRGB(39, 39, 39)
+Zone4.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Zone4.BorderSizePixel = 5
+Zone4.Position = UDim2.new(0.247081116, 0, 0.866980314, 0)
+Zone4.Size = UDim2.new(0, 59, 0, 25)
+Zone4.Font = Enum.Font.SourceSans
+Zone4.Text = "Zone 4"
+Zone4.TextColor3 = Color3.fromRGB(255, 255, 255)
+Zone4.TextScaled = true
+Zone4.TextSize = 14.000
+Zone4.TextWrapped = true
+
+Zone2.Name = "Zone2"
+Zone2.Parent = Frame
+Zone2.BackgroundColor3 = Color3.fromRGB(39, 39, 39)
+Zone2.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Zone2.BorderSizePixel = 5
+Zone2.Position = UDim2.new(0.247081116, 0, 0.71331948, 0)
+Zone2.Size = UDim2.new(0, 59, 0, 25)
+Zone2.Font = Enum.Font.SourceSans
+Zone2.Text = "Zone 2"
+Zone2.TextColor3 = Color3.fromRGB(255, 255, 255)
+Zone2.TextScaled = true
+Zone2.TextSize = 14.000
+Zone2.TextWrapped = true
+
+Zone8.Name = "Zone8"
+Zone8.Parent = Frame
+Zone8.BackgroundColor3 = Color3.fromRGB(39, 39, 39)
+Zone8.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Zone8.BorderSizePixel = 5
+Zone8.Position = UDim2.new(0.7821365, 0, 0.866980314, 0)
+Zone8.Size = UDim2.new(0, 59, 0, 25)
+Zone8.Font = Enum.Font.SourceSans
+Zone8.Text = "Zone 8"
+Zone8.TextColor3 = Color3.fromRGB(255, 255, 255)
+Zone8.TextScaled = true
+Zone8.TextSize = 14.000
+Zone8.TextWrapped = true
+
+Zone6.Name = "Zone6"
+Zone6.Parent = Frame
+Zone6.BackgroundColor3 = Color3.fromRGB(39, 39, 39)
+Zone6.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Zone6.BorderSizePixel = 5
+Zone6.Position = UDim2.new(0.7821365, 0, 0.71331948, 0)
+Zone6.Size = UDim2.new(0, 59, 0, 25)
+Zone6.Font = Enum.Font.SourceSans
+Zone6.Text = "Zone 6"
+Zone6.TextColor3 = Color3.fromRGB(255, 255, 255)
+Zone6.TextScaled = true
+Zone6.TextSize = 14.000
+Zone6.TextWrapped = true
+
+Zone5.Name = "Zone5"
+Zone5.Parent = Frame
+Zone5.BackgroundColor3 = Color3.fromRGB(39, 39, 39)
+Zone5.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Zone5.BorderSizePixel = 5
+Zone5.Position = UDim2.new(0.542284071, 0, 0.71331948, 0)
+Zone5.Size = UDim2.new(0, 59, 0, 25)
+Zone5.Font = Enum.Font.SourceSans
+Zone5.Text = "Zone 5"
+Zone5.TextColor3 = Color3.fromRGB(255, 255, 255)
+Zone5.TextScaled = true
+Zone5.TextSize = 14.000
+Zone5.TextWrapped = true
+
+Zone7.Name = "Zone7"
+Zone7.Parent = Frame
+Zone7.BackgroundColor3 = Color3.fromRGB(39, 39, 39)
+Zone7.BorderColor3 = Color3.fromRGB(0, 0, 0)
+Zone7.BorderSizePixel = 5
+Zone7.Position = UDim2.new(0.542284071, 0, 0.866980314, 0)
+Zone7.Size = UDim2.new(0, 59, 0, 25)
+Zone7.Font = Enum.Font.SourceSans
+Zone7.Text = "Zone 7"
+Zone7.TextColor3 = Color3.fromRGB(255, 255, 255)
+Zone7.TextScaled = true
+Zone7.TextSize = 14.000
+Zone7.TextWrapped = true
+
+local function QUSGZZ_fake_script()
+	local script = Instance.new('LocalScript', Autofarm)
+
+	local button = script.Parent
+	local frame = button.Parent
+	local player = game.Players.LocalPlayer
+	
+	local farming = false
+	local toggledZones = {}
+	
+	local ON_COLOR = Color3.fromRGB(0, 200, 0)
+	local OFF_COLOR = Color3.fromRGB(200, 0, 0)
+	
+	local function getChar()
+		local char = player.Character or player.CharacterAdded:Wait()
+		local hrp = char:WaitForChild("HumanoidRootPart")
+		return char, hrp
+	end
+	
+	for _, ui in ipairs(frame:GetChildren()) do
+		if ui:IsA("TextButton") and ui.Name:match("Zone%d+") then
+			toggledZones[ui.Name] = false
+			ui.BackgroundColor3 = OFF_COLOR
+	
+			ui.MouseButton1Click:Connect(function()
+				toggledZones[ui.Name] = not toggledZones[ui.Name]
+				ui.BackgroundColor3 = toggledZones[ui.Name] and ON_COLOR or OFF_COLOR
+			end)
+		end
+	end
+	
+	local function getSelectedZones()
+		local list = {}
+	
+		for zoneName, enabled in pairs(toggledZones) do
+			if enabled then
+				table.insert(list, zoneName)
+			end
+		end
+	
+		table.sort(list, function(a, b)
+			return tonumber(a:match("%d+")) < tonumber(b:match("%d+"))
+		end)
+	
+		return list
+	end
+	
+	local function farm()
+		if farming then return end
+		farming = true
+	
+		local _, hrp = getChar()
+		local originalCFrame = hrp.CFrame
+	
+		local zonesFolder = workspace:WaitForChild("Zones")
+		local oresFolder = zonesFolder:WaitForChild("Ores")
+	
+		while farming do
+			local selectedZones = getSelectedZones()
+	
+			if #selectedZones == 0 then
+				break
+			end
+	
+			for _, zoneName in ipairs(selectedZones) do
+	
+				if not toggledZones[zoneName] then
+					continue
+				end
+	
+				local zonePart = oresFolder:FindFirstChild(zoneName)
+	
+				if zonePart then
+					local pointsFolder = zonePart:FindFirstChild("GeneratedOrePoints")
+	
+					if pointsFolder then
+						for i = 1, 13 do
+	
+							if not toggledZones[zoneName] then
+								break
+							end
+	
+							local pointName = string.format("OrePoint_%03d", i)
+							local point = pointsFolder:FindFirstChild(pointName)
+	
+							if point and point:IsA("BasePart") then
+								hrp.CFrame = CFrame.new(point.Position)
+								task.wait(0.8)
+							end
+						end
+					end
+				end
+			end
+	
+			task.wait(0.2)
+		end
+	
+		hrp.CFrame = originalCFrame
+		farming = false
+	end
+	
+	button.MouseButton1Click:Connect(function()
+		farm()
+	end)
+end
+coroutine.wrap(QUSGZZ_fake_script)()
+local function HYHLM_fake_script()
+	local script = Instance.new('LocalScript', Frame)
+
+
+	
+	script.Parent.Active = true
+	script.Parent.Draggable = true
+end
+coroutine.wrap(HYHLM_fake_script)()
