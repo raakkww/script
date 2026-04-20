@@ -1,0 +1,115 @@
+local RunService = game:GetService("RunService")
+
+local HIGHLIGHT_COLOR   = Color3.fromRGB(255, 215, 0)
+local FILL_COLOR        = Color3.fromRGB(255, 215, 0)
+local FILL_TRANSPARENCY = 0.6
+local CHECK_INTERVAL    = 2
+local LABEL_TEXT        = "Easter Egg"
+local LABEL_DISTANCE    = 1000
+
+local highlights = {}
+local labels     = {}
+local lastCheck  = 0
+
+local function applyHighlight(obj)
+    if highlights[obj] then return end
+
+    local h = Instance.new("SelectionBox")
+    h.Adornee = obj
+    h.Color3 = HIGHLIGHT_COLOR
+    h.LineThickness = 0.05
+    h.SurfaceTransparency = FILL_TRANSPARENCY
+    h.SurfaceColor3 = FILL_COLOR
+    h.Parent = workspace
+
+    highlights[obj] = h
+end
+
+local function applyLabel(obj)
+    if labels[obj] then return end
+
+    -- Find a part to attach to (the obj itself, or its first BasePart child)
+    local attachTo = obj
+    if not obj:IsA("BasePart") then
+        attachTo = obj:FindFirstChildWhichIsA("BasePart", true)
+    end
+    if not attachTo then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = attachTo
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 160, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.MaxDistance = LABEL_DISTANCE
+    billboard.Parent = attachTo
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    frame.BackgroundTransparency = 0.4
+    frame.BorderSizePixel = 0
+    frame.Parent = billboard
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = LABEL_TEXT
+    label.TextColor3 = Color3.fromRGB(255, 215, 0)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Parent = frame
+
+    labels[obj] = billboard
+end
+
+local function scanForEasterEggs()
+    for obj, highlight in pairs(highlights) do
+        if not obj or not obj.Parent then
+            highlight:Destroy()
+            highlights[obj] = nil
+            if labels[obj] then
+                labels[obj]:Destroy()
+                labels[obj] = nil
+            end
+        end
+    end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "EasterEgg" then
+            applyHighlight(obj)
+            applyLabel(obj)
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    local now = tick()
+    if now - lastCheck >= CHECK_INTERVAL then
+        lastCheck = now
+        scanForEasterEggs()
+    end
+end)
+
+workspace.DescendantAdded:Connect(function(obj)
+    if obj.Name == "EasterEgg" then
+        applyHighlight(obj)
+        applyLabel(obj)
+    end
+end)
+
+workspace.DescendantRemoving:Connect(function(obj)
+    if highlights[obj] then
+        highlights[obj]:Destroy()
+        highlights[obj] = nil
+    end
+    if labels[obj] then
+        labels[obj]:Destroy()
+        labels[obj] = nil
+    end
+end)
+
+scanForEasterEggs()
