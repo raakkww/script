@@ -1,0 +1,40 @@
+local LOBBY_POS = Vector3.new(-2.18, 51.0, 185.85)
+local ARENA_HEIGHT = 60
+
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local InvisBtn = Instance.new("TextButton", ScreenGui)
+
+-- Simple Button Setup
+InvisBtn.Size = UDim2.new(0, 120, 0, 50)
+InvisBtn.Position = UDim2.new(0.5, -60, 0.1, 0) -- Top center of screen
+InvisBtn.Text = "Invis"
+InvisBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+InvisBtn.TextColor3 = Color3.new(1, 1, 1)
+InvisBtn.Draggable = true
+InvisBtn.Active = true
+Instance.new("UICorner", InvisBtn)
+
+local function runCycle()
+    local char = game.Players.LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    -- 1. Teleport to Lobby
+    root.CFrame = CFrame.new(LOBBY_POS + Vector3.new(0, 3, 0))
+    
+    -- 2. Tiny wait to let the game register the move
+    task.wait(0.15)
+    
+    -- 3. Find Current Map and Teleport Back
+    local maps = workspace:FindFirstChild("Gameplay") 
+        and workspace.Gameplay:FindFirstChild("Dynamic") 
+        and workspace.Gameplay.Dynamic:FindFirstChild("Maps")
+    
+    local currentMap = maps and maps:GetChildren()[1]
+    if currentMap then
+        local pivot = currentMap:GetPivot().Position
+        root.CFrame = CFrame.new(pivot + Vector3.new(0, ARENA_HEIGHT, 0))
+    end
+end
+
+InvisBtn.MouseButton1Click:Connect(runCycle)
