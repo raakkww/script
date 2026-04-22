@@ -1,0 +1,240 @@
+repeat task.wait() until game:IsLoaded()
+
+local player = game.Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("ReplicatedStorage")
+local Remotes = RS:WaitForChild("Remotes")
+
+-- Settings
+local flags = {
+    autoGodly = false,
+    autoCollect = false,
+    autoUpgrade = false,
+    autoBuyJump = false
+}
+local jumpAmount = 10 
+local uiVisible = true
+
+-- Utility functions
+local function round(obj, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius)
+    c.Parent = obj
+end
+
+local function addStroke(obj, color, thickness)
+    local s = Instance.new("UIStroke")
+    s.Color = color
+    s.Thickness = thickness
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent = obj
+end
+
+-- UI Setup
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "67"
+
+-- Floating Toggle
+local toggleBtn = Instance.new("TextButton", gui)
+toggleBtn.Size = UDim2.new(0, 40, 0, 40)
+toggleBtn.Position = UDim2.new(0, 10, 0.5, -20)
+toggleBtn.Text = "67"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.Draggable = true
+round(toggleBtn, 20)
+addStroke(toggleBtn, Color3.fromRGB(80, 80, 80), 2)
+
+-- Main Frame
+local mainFrame = Instance.new("Frame", gui)
+mainFrame.Size = UDim2.new(0, 220, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -175)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+mainFrame.Draggable = true
+mainFrame.Active = true
+round(mainFrame, 12)
+addStroke(mainFrame, Color3.fromRGB(40, 40, 40), 1)
+
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Text = "Jump Color Block Steal Brainrots"
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+title.TextColor3 = Color3.fromRGB(0, 255, 150)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 11
+round(title, 12)
+
+-- Helper to create Toggle Buttons
+local function createToggle(text, pos, flagName)
+    local btn = Instance.new("TextButton", mainFrame)
+    btn.Size = UDim2.new(1, -20, 0, 32)
+    btn.Position = pos
+    btn.Text = text .. ": OFF"
+    btn.BackgroundColor3 = Color3.fromRGB(35, 20, 20)
+    btn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    round(btn, 6)
+    addStroke(btn, Color3.fromRGB(60, 30, 30), 1)
+
+    btn.MouseButton1Click:Connect(function()
+        flags[flagName] = not flags[flagName]
+        btn.Text = text .. ": " .. (flags[flagName] and "ON" or "OFF")
+        btn.BackgroundColor3 = flags[flagName] and Color3.fromRGB(20, 40, 25) or Color3.fromRGB(35, 20, 20)
+        btn.TextColor3 = flags[flagName] and Color3.fromRGB(100, 255, 150) or Color3.fromRGB(255, 100, 100)
+        btn.UIStroke.Color = flags[flagName] and Color3.fromRGB(40, 80, 50) or Color3.fromRGB(60, 30, 30)
+    end)
+    return btn
+end
+
+-- Toggles
+createToggle("AUTO GODLY", UDim2.new(0, 10, 0, 45), "autoGodly")
+createToggle("AUTO COLLECT", UDim2.new(0, 10, 0, 82), "autoCollect")
+createToggle("AUTO UPGRADE", UDim2.new(0, 10, 0, 119), "autoUpgrade")
+createToggle("AUTO BUY JUMP", UDim2.new(0, 10, 0, 156), "autoBuyJump")
+
+-- Modern Dropdown
+local ddBtn = Instance.new("TextButton", mainFrame)
+ddBtn.Size = UDim2.new(1, -20, 0, 30)
+ddBtn.Position = UDim2.new(0, 10, 0, 193)
+ddBtn.Text = "Jump Amount: 10 ▽"
+ddBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ddBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+ddBtn.Font = Enum.Font.GothamBold
+ddBtn.TextSize = 11
+round(ddBtn, 6)
+addStroke(ddBtn, Color3.fromRGB(50, 50, 50), 1)
+
+local ddFrame = Instance.new("Frame", mainFrame)
+ddFrame.Size = UDim2.new(1, -20, 0, 90)
+ddFrame.Position = UDim2.new(0, 10, 0, 225)
+ddFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ddFrame.Visible = false
+ddFrame.ZIndex = 10
+round(ddFrame, 6)
+addStroke(ddFrame, Color3.fromRGB(60, 60, 60), 1)
+
+local layout = Instance.new("UIListLayout", ddFrame)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+for _, v in pairs({1, 5, 10}) do
+    local opt = Instance.new("TextButton", ddFrame)
+    opt.Size = UDim2.new(1, 0, 0, 30)
+    opt.Text = tostring(v)
+    opt.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    opt.TextColor3 = Color3.fromRGB(255, 255, 255)
+    opt.Font = Enum.Font.GothamBold
+    opt.ZIndex = 11
+    opt.BorderSizePixel = 0
+    opt.MouseButton1Click:Connect(function()
+        jumpAmount = v
+        ddBtn.Text = "Jump Amount: " .. v .. " ▽"
+        ddFrame.Visible = false
+    end)
+end
+
+-- Improved Remove VIP Wall Button
+local removeWallBtn = Instance.new("TextButton", mainFrame)
+removeWallBtn.Size = UDim2.new(1, -20, 0, 38)
+removeWallBtn.Position = UDim2.new(0, 10, 1, -50)
+removeWallBtn.Text = "REMOVE VIP WALL"
+removeWallBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+removeWallBtn.TextColor3 = Color3.fromRGB(150, 200, 255)
+removeWallBtn.Font = Enum.Font.GothamBold
+removeWallBtn.TextSize = 11
+round(removeWallBtn, 8)
+addStroke(removeWallBtn, Color3.fromRGB(60, 60, 120), 1)
+
+removeWallBtn.MouseButton1Click:Connect(function()
+    local wall = workspace:FindFirstChild("W_01") 
+        and workspace.W_01:FindFirstChild("LobbyBase") 
+        and workspace.W_01.LobbyBase:FindFirstChild("Collision")
+    
+    if wall then
+        wall:Destroy()
+        removeWallBtn.Text = "WALL REMOVED!"
+        removeWallBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 30)
+    else
+        removeWallBtn.Text = "WALL NOT FOUND"
+        removeWallBtn.BackgroundColor3 = Color3.fromRGB(60, 30, 30)
+    end
+    
+    task.delay(1.5, function()
+        removeWallBtn.Text = "REMOVE VIP WALL"
+        removeWallBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    end)
+end)
+
+--- Logic Loops ---
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if flags.autoGodly then
+            pcall(function()
+                local level9Base = workspace.W_01.LobbyBase.Level.Level9.Base
+                for _, base in pairs(level9Base:GetChildren()) do
+                    if not flags.autoGodly then break end
+                    local prompt = base:FindFirstChild("Prompt") and base.Prompt:FindFirstChild("UserPrompt")
+                    if prompt then
+                        for _, obj in pairs(base:GetChildren()) do
+                            if not flags.autoGodly then break end
+                            if obj.Name:match("^Pet/") then
+                                local part = obj:FindFirstChild("Base") or obj:FindFirstChildWhichIsA("BasePart", true)
+                                if part then
+                                    local hrp = player.Character.HumanoidRootPart
+                                    local oldPos = hrp.CFrame
+                                    hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+                                    task.wait(0.2)
+                                    fireproximityprompt(prompt)
+                                    task.wait(0.2)
+                                    hrp.CFrame = oldPos
+                                    task.wait(0.2)
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if flags.autoCollect then
+            for i = 0, 100 do
+                if not flags.autoCollect then break end
+                Remotes.ClaimOutputRE:FireServer(i, "Pet")
+            end
+        end
+        if flags.autoUpgrade then
+            for i = 0, 100 do
+                if not flags.autoUpgrade then break end
+                Remotes.UpgradePetRE:FireServer(i)
+            end
+        end
+        if flags.autoBuyJump then
+            Remotes.UpgradeAttributeRE:FireServer("Power", jumpAmount)
+        end
+    end
+end)
+
+-- UI Toggle
+toggleBtn.MouseButton1Click:Connect(function()
+    uiVisible = not uiVisible
+    mainFrame.Visible = uiVisible
+end)
+
+ddBtn.MouseButton1Click:Connect(function() 
+    ddFrame.Visible = not ddFrame.Visible 
+end)
+
+UIS.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightControl then
+        uiVisible = not uiVisible
+        mainFrame.Visible = uiVisible
+    end
+end)
