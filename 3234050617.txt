@@ -1,0 +1,672 @@
+-- // Load Rayfield // --
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- // Services // --
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+-- // Variables // --
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+-- // Settings // --
+local Settings = {
+    NoRecoil = false,
+    NoSpread = false,
+    SilentAim = false,
+    AutoHeadshot = false,
+    ZombieESP = false,
+    InfiniteStamina = false,
+    FOV = 300,
+    ShowFOV = false,
+    ESPColor = Color3.fromRGB(255, 0, 0),
+    FOVColor = Color3.fromRGB(255, 255, 255),
+    TeamCheck = false,
+    VisibleCheck = false
+}
+
+-- // Tables // --
+local ESPObjects = {}
+local HookedWeapons = {}
+
+-- // Create Rayfield Window // --
+local Window = Rayfield:CreateWindow({
+    Name = "Left 2 Die",
+    LoadingTitle = "Left 2 Die",
+    LoadingSubtitle = "",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "Left2DieExploit",
+        FileName = "Config"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "noinvitelink",
+        RememberJoins = true
+    },
+    KeySystem = false
+})
+
+-- // Tabs // --
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+
+-- // Notifications // --
+Rayfield:Notify({
+    Title = "Script Loaded",
+    Content = "Left 2 Die has been loaded successfully!",
+    Duration = 5,
+    Image = 4483362458,
+    Actions = {
+        Ignore = {
+            Name = "Okay!",
+            Callback = function()
+                print("Notification dismissed")
+            end
+        },
+    },
+})
+
+-- // FOV Circle // --
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.NumSides = 50
+FOVCircle.Radius = Settings.FOV
+FOVCircle.Color = Settings.FOVColor
+FOVCircle.Visible = Settings.ShowFOV
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+
+-- // Functions // --
+
+-- // Get Character Function // --
+local function GetCharacter()
+    return LocalPlayer.Character
+end
+
+local function GetRootPart()
+    local char = GetCharacter()
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function GetHumanoid()
+    local char = GetCharacter()
+    return char and char:FindFirstChild("Humanoid")
+end
+
+-- // Get Current Weapon // --
+local function GetCurrentWeapon()
+    local char = GetCharacter()
+    if not char then return nil end
+    
+    for _, tool in pairs(char:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Handle") then
+            return tool
+        end
+    end
+    return nil
+end
+
+-- // No Recoil & No Spread Hook // --
+local function HookWeapon(weapon)
+    if not weapon then return end
+    if HookedWeapons[weapon] then return end
+    
+    HookedWeapons[weapon] = true
+    
+    -- Find weapon scripts
+    for _, script in pairs(weapon:GetDescendants()) do
+        -- Hook NumberValues that control recoil/spread
+        if script:IsA("NumberValue") then
+            local name = script.Name:lower()
+            
+            if name:find("recoil") or name:find("kick") then
+                local connection
+                connection = script:GetPropertyChangedSignal("Value"):Connect(function()
+                    if Settings.NoRecoil then
+                        script.Value = 0
+                    end
+                end)
+                
+                if Settings.NoRecoil then
+                    script.Value = 0
+                end
+            end
+            
+            if name:find("spread") or name:find("accuracy") or name:find("inaccuracy") then
+                local connection
+                connection = script:GetPropertyChangedSignal("Value"):Connect(function()
+                    if Settings.NoSpread then
+                        script.Value = 0
+                    end
+                end)
+                
+                if Settings.NoSpread then
+                    script.Value = 0
+                end
+            end
+        end
+        
+        -- Hook ModuleScripts for weapon stats
+        if script:IsA("ModuleScript") then
+            local success, module = pcall(require, script)
+            if success and type(module) == "table" then
+                local mt = getrawmetatable(module)
+                if mt then
+                    setreadonly(mt, false)
+                    
+                    local oldIndex = mt.__index
+                    mt.__index = newcclosure(function(t, k)
+                        if Settings.NoRecoil and (k == "Recoil" or k == "RecoilX" or k == "RecoilY" or k == "CameraKick") then
+                            return 0
+                        end
+                        
+                        if Settings.NoSpread and (k == "Spread" or k == "Inaccuracy" or k == "MaxSpread" or k == "MinSpread") then
+                            return 0
+                        end
+                        
+                        if Settings.AutoHeadshot and k == "HeadshotMultiplier" then
+                            return 999
+                        end
+                        
+                        return oldIndex(t, k)
+                    end)
+                    
+                    setreadonly(mt, true)
+                end
+            end
+        end
+    end
+    
+    -- Hook weapon configurations
+    local weaponConfig = weapon:FindFirstChild("Configuration") or weapon:FindFirstChild("Config")
+    if weaponConfig then
+        for _, stat in pairs(weaponConfig:GetChildren()) do
+            if stat:IsA("NumberValue") then
+                local name = stat.Name:lower()
+                
+                if name:find("recoil") or name:find("kick") then
+                    stat:GetPropertyChangedSignal("Value"):Connect(function()
+                        if Settings.NoRecoil then
+                            stat.Value = 0
+                        end
+                    end)
+                    
+                    if Settings.NoRecoil then
+                        stat.Value = 0
+                    end
+                end
+                
+                if name:find("spread") or name:find("accuracy") then
+                    stat:GetPropertyChangedSignal("Value"):Connect(function()
+                        if Settings.NoSpread then
+                            stat.Value = 0
+                        end
+                    end)
+                    
+                    if Settings.NoSpread then
+                        stat.Value = 0
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- // Monitor for weapon equip // --
+local function MonitorWeapons()
+    local char = GetCharacter()
+    if not char then return end
+    
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            task.wait(0.1)
+            HookWeapon(child)
+        end
+    end)
+    
+    -- Hook current weapon
+    local currentWeapon = GetCurrentWeapon()
+    if currentWeapon then
+        HookWeapon(currentWeapon)
+    end
+end
+
+-- // Get Closest Zombie // --
+local function GetClosestZombie()
+    if not Settings.SilentAim then return nil end
+    
+    local ClosestZombie = nil
+    local ShortestDistance = Settings.FOV
+    local RootPart = GetRootPart()
+    if not RootPart then return nil end
+    
+    local enemyFolder = Workspace:FindFirstChild("Enemies") or Workspace
+    
+    for _, zombie in pairs(enemyFolder:GetChildren()) do
+        if zombie:IsA("Model") and zombie ~= GetCharacter() then
+            local humanoid = zombie:FindFirstChild("Humanoid")
+            local head = zombie:FindFirstChild("Head")
+            local rootPart = zombie:FindFirstChild("HumanoidRootPart") or zombie:FindFirstChild("Torso")
+            
+            if humanoid and humanoid.Health > 0 and head and rootPart then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                
+                if onScreen then
+                    local mousePos = Vector2.new(Mouse.X, Mouse.Y)
+                    local screenPosVec = Vector2.new(screenPos.X, screenPos.Y)
+                    local distance = (mousePos - screenPosVec).Magnitude
+                    
+                    if distance < ShortestDistance then
+                        ShortestDistance = distance
+                        ClosestZombie = zombie
+                    end
+                end
+            end
+        end
+    end
+    
+    return ClosestZombie
+end
+
+-- // Silent Aim Hook // --
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+    
+    if Settings.SilentAim and method == "FireServer" then
+        local closestZombie = GetClosestZombie()
+        
+        if closestZombie then
+            local targetPart = Settings.AutoHeadshot and closestZombie:FindFirstChild("Head") or closestZombie:FindFirstChild("HumanoidRootPart")
+            
+            if targetPart then
+                for i, arg in pairs(args) do
+                    if typeof(arg) == "Vector3" then
+                        args[i] = targetPart.Position
+                    elseif typeof(arg) == "CFrame" then
+                        args[i] = targetPart.CFrame
+                    elseif type(arg) == "table" then
+                        if arg.Position then
+                            arg.Position = targetPart.Position
+                        end
+                        if arg.Hit then
+                            arg.Hit = targetPart
+                        end
+                        if arg.Target then
+                            arg.Target = targetPart
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return oldNamecall(self, unpack(args))
+end)
+
+-- // ESP Functions // --
+local function CreateESP(zombie)
+    if not Settings.ZombieESP then return end
+    if ESPObjects[zombie] then return end
+    
+    local Box = Drawing.new("Square")
+    Box.Thickness = 1
+    Box.Color = Settings.ESPColor
+    Box.Filled = false
+    Box.Visible = false
+    
+    local Name = Drawing.new("Text")
+    Name.Size = 14
+    Name.Center = true
+    Name.Outline = true
+    Name.Color = Color3.fromRGB(255, 255, 255)
+    Name.Visible = false
+    
+    local Distance = Drawing.new("Text")
+    Distance.Size = 12
+    Distance.Center = true
+    Distance.Outline = true
+    Distance.Color = Color3.fromRGB(255, 255, 255)
+    Distance.Visible = false
+    
+    local HealthBar = Drawing.new("Line")
+    HealthBar.Thickness = 2
+    HealthBar.Color = Color3.fromRGB(0, 255, 0)
+    HealthBar.Visible = false
+    
+    ESPObjects[zombie] = {
+        Box = Box,
+        Name = Name,
+        Distance = Distance,
+        HealthBar = HealthBar,
+        Zombie = zombie
+    }
+end
+
+local function UpdateESP()
+    if not Settings.ZombieESP then
+        for _, esp in pairs(ESPObjects) do
+            esp.Box:Remove()
+            esp.Name:Remove()
+            esp.Distance:Remove()
+            esp.HealthBar:Remove()
+        end
+        ESPObjects = {}
+        return
+    end
+    
+    local RootPart = GetRootPart()
+    
+    for zombie, esp in pairs(ESPObjects) do
+        if not zombie or not zombie.Parent or not zombie:FindFirstChild("Humanoid") or zombie.Humanoid.Health <= 0 then
+            esp.Box:Remove()
+            esp.Name:Remove()
+            esp.Distance:Remove()
+            esp.HealthBar:Remove()
+            ESPObjects[zombie] = nil
+        else
+            local rootPart = zombie:FindFirstChild("HumanoidRootPart") or zombie:FindFirstChild("Torso")
+            local head = zombie:FindFirstChild("Head")
+            
+            if rootPart and head and RootPart then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                local headPos = Camera:WorldToViewportPoint(head.Position)
+                
+                if onScreen then
+                    local distance = (RootPart.Position - rootPart.Position).Magnitude
+                    local boxSize = Vector2.new(2000 / distance, 3000 / distance)
+                    
+                    esp.Box.Size = boxSize
+                    esp.Box.Position = Vector2.new(screenPos.X - boxSize.X / 2, screenPos.Y - boxSize.Y / 2)
+                    esp.Box.Color = Settings.ESPColor
+                    esp.Box.Visible = true
+                    
+                    esp.Name.Text = zombie.Name
+                    esp.Name.Position = Vector2.new(screenPos.X, headPos.Y - 20)
+                    esp.Name.Visible = true
+                    
+                    esp.Distance.Text = string.format("[%d studs]", math.floor(distance))
+                    esp.Distance.Position = Vector2.new(screenPos.X, screenPos.Y + boxSize.Y / 2 + 5)
+                    esp.Distance.Visible = true
+                    
+                    local healthPercent = zombie.Humanoid.Health / zombie.Humanoid.MaxHealth
+                    esp.HealthBar.From = Vector2.new(screenPos.X - boxSize.X / 2, screenPos.Y - boxSize.Y / 2 - 5)
+                    esp.HealthBar.To = Vector2.new(screenPos.X - boxSize.X / 2 + (boxSize.X * healthPercent), screenPos.Y - boxSize.Y / 2 - 5)
+                    esp.HealthBar.Color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
+                    esp.HealthBar.Visible = true
+                else
+                    esp.Box.Visible = false
+                    esp.Name.Visible = false
+                    esp.Distance.Visible = false
+                    esp.HealthBar.Visible = false
+                end
+            end
+        end
+    end
+end
+
+-- // Scan for Zombies // --
+local function ScanForZombies()
+    local enemyFolder = Workspace:FindFirstChild("Enemies") or Workspace
+    
+    for _, obj in pairs(enemyFolder:GetChildren()) do
+        if obj:IsA("Model") and obj ~= GetCharacter() and obj:FindFirstChild("Humanoid") then
+            CreateESP(obj)
+        end
+    end
+end
+
+-- // Auto-detect new zombies // --
+local enemyFolder = Workspace:FindFirstChild("Enemies") or Workspace
+enemyFolder.ChildAdded:Connect(function(child)
+    if child:IsA("Model") then
+        task.wait(0.1)
+        CreateESP(child)
+    end
+end)
+
+-- // Combat Tab // --
+local NoRecoilToggle = CombatTab:CreateToggle({
+    Name = "No Recoil",
+    CurrentValue = false,
+    Flag = "NoRecoil",
+    Callback = function(Value)
+        Settings.NoRecoil = Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "No Recoil",
+                Content = "No Recoil has been enabled!",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end,
+})
+
+local NoSpreadToggle = CombatTab:CreateToggle({
+    Name = "No Spread (Perfect Accuracy)",
+    CurrentValue = false,
+    Flag = "NoSpread",
+    Callback = function(Value)
+        Settings.NoSpread = Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "No Spread",
+                Content = "Perfect accuracy enabled!",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end,
+})
+
+local SilentAimToggle = CombatTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Flag = "SilentAim",
+    Callback = function(Value)
+        Settings.SilentAim = Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Silent Aim",
+                Content = "Silent Aim has been enabled!",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end,
+})
+
+local AutoHeadshotToggle = CombatTab:CreateToggle({
+    Name = "Auto Headshot",
+    CurrentValue = false,
+    Flag = "AutoHeadshot",
+    Callback = function(Value)
+        Settings.AutoHeadshot = Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Auto Headshot",
+                Content = "Auto Headshot enabled!",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end,
+})
+
+local FOVSlider = CombatTab:CreateSlider({
+    Name = "Silent Aim FOV",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "FOV",
+    CurrentValue = 300,
+    Flag = "FOV",
+    Callback = function(Value)
+        Settings.FOV = Value
+        FOVCircle.Radius = Value
+    end,
+})
+
+local ShowFOVToggle = CombatTab:CreateToggle({
+    Name = "Show FOV Circle",
+    CurrentValue = false,
+    Flag = "ShowFOV",
+    Callback = function(Value)
+        Settings.ShowFOV = Value
+        FOVCircle.Visible = Value
+    end,
+})
+
+-- // Visuals Tab // --
+local ZombieESPToggle = VisualsTab:CreateToggle({
+    Name = "Zombie ESP",
+    CurrentValue = false,
+    Flag = "ZombieESP",
+    Callback = function(Value)
+        Settings.ZombieESP = Value
+        
+        if Value then
+            ScanForZombies()
+            Rayfield:Notify({
+                Title = "Zombie ESP",
+                Content = "ESP has been enabled!",
+                Duration = 3,
+                Image = 4483362458
+            })
+        else
+            for _, esp in pairs(ESPObjects) do
+                esp.Box:Remove()
+                esp.Name:Remove()
+                esp.Distance:Remove()
+                esp.HealthBar:Remove()
+            end
+            ESPObjects = {}
+        end
+    end,
+})
+
+local ESPColorPicker = VisualsTab:CreateColorPicker({
+    Name = "ESP Color",
+    Color = Color3.fromRGB(255, 0, 0),
+    Flag = "ESPColor",
+    Callback = function(Value)
+        Settings.ESPColor = Value
+    end
+})
+
+local FOVColorPicker = VisualsTab:CreateColorPicker({
+    Name = "FOV Circle Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "FOVColor",
+    Callback = function(Value)
+        Settings.FOVColor = Value
+        FOVCircle.Color = Value
+    end
+})
+
+-- // Misc Tab // --
+local InfiniteStaminaToggle = MiscTab:CreateToggle({
+    Name = "Infinite Stamina",
+    CurrentValue = false,
+    Flag = "InfiniteStamina",
+    Callback = function(Value)
+        Settings.InfiniteStamina = Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Infinite Stamina",
+                Content = "Infinite stamina enabled!",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+    end,
+})
+
+local RefreshESPButton = MiscTab:CreateButton({
+    Name = "Refresh ESP",
+    Callback = function()
+        for _, esp in pairs(ESPObjects) do
+            esp.Box:Remove()
+            esp.Name:Remove()
+            esp.Distance:Remove()
+            esp.HealthBar:Remove()
+        end
+        ESPObjects = {}
+        ScanForZombies()
+        
+        Rayfield:Notify({
+            Title = "ESP Refreshed",
+            Content = "All ESP has been refreshed!",
+            Duration = 3,
+            Image = 4483362458
+        })
+    end,
+})
+
+-- // Settings Tab // --
+local DestroyGUIButton = SettingsTab:CreateButton({
+    Name = "Destroy GUI",
+    Callback = function()
+        Rayfield:Destroy()
+    end,
+})
+
+-- // Update FOV Circle // --
+RunService.RenderStepped:Connect(function()
+    if Settings.ShowFOV then
+        FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
+        FOVCircle.Radius = Settings.FOV
+        FOVCircle.Color = Settings.FOVColor
+        FOVCircle.Visible = true
+    else
+        FOVCircle.Visible = false
+    end
+end)
+
+-- // Infinite Stamina Loop // --
+RunService.Heartbeat:Connect(function()
+    if Settings.InfiniteStamina then
+        local humanoid = GetHumanoid()
+        if humanoid then
+            local staminaValue = humanoid:FindFirstChild("Stamina") or LocalPlayer:FindFirstChild("Stamina")
+            if staminaValue and staminaValue:IsA("NumberValue") then
+                staminaValue.Value = 100
+            end
+        end
+    end
+end)
+
+-- // ESP Update Loop // --
+RunService.RenderStepped:Connect(UpdateESP)
+
+-- // Character Respawn Handler // --
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    task.wait(1)
+    MonitorWeapons()
+end)
+
+-- // Initial Setup // --
+task.spawn(function()
+    MonitorWeapons()
+    if Settings.ZombieESP then
+        ScanForZombies()
+    end
+end)
+
+print("========================================")
+print("Left 2 Die Loaded")
+print("Delta Compatible Version")
+print("========================================")
