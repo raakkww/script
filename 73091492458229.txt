@@ -1,0 +1,110 @@
+-- My Brainrot Army - Rayfield GUI (Mythic-Focused)
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "My Brainrot Army",
+    LoadingTitle = "Mythic Mode Activated",
+    LoadingSubtitle = "Higher Chance for Mythics",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "BrainrotArmy",
+        FileName = "MythicFarm"
+    }
+})
+
+local Tab = Window:CreateTab("Main", 4483362458)
+
+Tab:CreateSection("Mythic Auto Farming")
+
+local autoEnabled = false
+local farmSpeed = 0.55   -- Slightly slower for more stable mythic pulls
+
+-- Remotes
+local Roll   = game:GetService("ReplicatedStorage").Shared.Utilities.NetworkUtility.Functions.RollBrainrot
+local Select = game:GetService("ReplicatedStorage").Shared.Utilities.NetworkUtility.Functions.SelectCurrentBrainrot
+local Kill   = game:GetService("ReplicatedStorage").Shared.Utilities.NetworkUtility.Events.UseWeapon
+
+-- Main Auto Farm Toggle (Mythic Focused)
+Tab:CreateToggle({
+    Name = "Auto Mythic Farm (Roll + Select + Kill)",
+    CurrentValue = false,
+    Callback = function(Value)
+        autoEnabled = Value
+        Rayfield:Notify({
+            Title = Value and "🔥 Mythic Auto Farm ON" or "❌ Farm OFF",
+            Content = "Now rolling aggressively for Mythics",
+            Duration = 4
+        })
+    end,
+})
+
+-- Speed Slider
+Tab:CreateSlider({
+    Name = "Farm Speed (Lower = More Rolls)",
+    Range = {0.35, 1.0},
+    Increment = 0.05,
+    CurrentValue = 0.55,
+    Callback = function(Value)
+        farmSpeed = Value
+    end,
+})
+
+Tab:CreateSection("Manual Mythic Roll")
+
+-- Mythic Roll Button
+Tab:CreateButton({
+    Name = "🔥 Roll Once for Mythic (High Chance)",
+    Callback = function()
+        Rayfield:Notify({Title = "🎰 Rolling for Mythic...", Content = "Spamming roll + select for best chance", Duration = 3})
+        
+        for i = 1, 4 do          -- Multiple rolls for better odds
+            pcall(function() Roll:InvokeServer() end)
+            task.wait(0.25)
+        end
+        
+        for i = 1, 8 do          -- Heavy select spam to claim mythic
+            pcall(function() Select:InvokeServer() end)
+            task.wait(0.09)
+        end
+        
+        Rayfield:Notify({Title = "✅ Mythic Roll Finished", Content = "Check your brainrot! Look for Mythic rarity.", Duration = 5})
+    end,
+})
+
+Tab:CreateSection("Status")
+local Status = Tab:CreateLabel("Status: Stopped - Waiting for Mythics")
+
+-- Main Loop (Mythic Focused)
+spawn(function()
+    while true do
+        if autoEnabled then
+            -- Aggressive roll for mythic chance
+            pcall(function() Roll:InvokeServer() end)
+            task.wait(0.28)
+
+            -- Heavy select to claim the best one (mythic priority)
+            for i = 1, 6 do
+                pcall(function() Select:InvokeServer() end)
+                task.wait(0.08)
+            end
+
+            -- Keep killing
+            for i = 1, 10 do
+                pcall(function() Kill:FireServer() end)
+                task.wait(0.06)
+            end
+
+            Status:Set("Status: Hunting Mythics... | Speed: " .. farmSpeed)
+        else
+            Status:Set("Status: Stopped - Mythic Mode Ready")
+        end
+        task.wait(farmSpeed)
+    end
+end)
+
+Rayfield:Notify({
+    Title = "✅ Mythic Mode Loaded!",
+    Content = "Use the big button for single mythic attempts.\nAuto farm now focuses on pulling mythics.\nGood luck pulling Mythics! 🟣",
+    Duration = 7
+})
