@@ -1,0 +1,322 @@
+-- 🔐 ANTI AFK
+local VirtualUser = game:GetService("VirtualUser")
+game.Players.LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+end)
+
+-- UI
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "ui",
+    LoadingTitle = "ui",
+    LoadingSubtitle = "",
+    ConfigurationSaving = {Enabled = false}
+})
+
+-- 🔓 GARANTE QUE NÃO FIQUE HIDDEN
+pcall(function()
+    Rayfield:ToggleUI(true)
+end)
+
+local Main = Window:CreateTab("Main", 4483362458)
+local Teleport = Window:CreateTab("Teleport", 4483362458)
+local Discord = Window:CreateTab("Discord", 4483362458)
+local PlayerTab = Window:CreateTab("Player", 4483362458)
+
+local player = game.Players.LocalPlayer
+
+-- 🔧 TP
+local function tp(pos)
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(pos)
+    end
+end
+
+-- =====================
+-- 💎 AUTO DIAMOND
+-- =====================
+local autoDiamond = false
+
+local diamondPositions = {
+    Vector3.new(47.55,621.20,-48.67),
+    Vector3.new(-47.84,261.20,-36.70),
+    Vector3.new(1.36,130.20,0.45),
+    Vector3.new(-48.19,458.50,47.73)
+}
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if autoDiamond then
+            for _,pos in ipairs(diamondPositions) do
+                if not autoDiamond then break end
+                tp(pos)
+                task.wait(0.2)
+            end
+        end
+    end
+end)
+
+Main:CreateToggle({
+    Name = "Auto Diamond",
+    CurrentValue = false,
+    Callback = function(v)
+        autoDiamond = v
+    end
+})
+
+-- =====================
+-- 🦘 AUTO JUMP (ADICIONADO)
+-- =====================
+local autoJump = false
+
+task.spawn(function()
+    while true do
+        task.wait(0.15)
+        if autoJump and player.Character then
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.FloorMaterial ~= Enum.Material.Air then
+                hum.Jump = true
+            end
+        end
+    end
+end)
+
+Main:CreateToggle({
+    Name = "Auto Jump",
+    CurrentValue = false,
+    Callback = function(v)
+        autoJump = v
+    end
+})
+
+-- =====================
+-- 🦘 AUTO JUMP FARM (1 TP)
+-- =====================
+local autoJumpFarm = false
+local farmPos = Vector3.new(-43.69,2.20,3.27)
+local farmTeleported = false
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if autoJumpFarm then
+
+            if not farmTeleported then
+                tp(farmPos)
+                farmTeleported = true
+            end
+
+            if player.Character then
+                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.FloorMaterial ~= Enum.Material.Air then
+                    hum.Jump = true
+                end
+            end
+
+        else
+            farmTeleported = false
+        end
+    end
+end)
+
+Main:CreateToggle({
+    Name = "Auto Jump Farm",
+    CurrentValue = false,
+    Callback = function(v)
+        autoJumpFarm = v
+    end
+})
+
+-- =====================
+-- 💰 AUTO COINS
+-- =====================
+local autoCoins = false
+
+local coinPositions = {
+    Vector3.new(-47.92,14.20,-10.23),
+    Vector3.new(2.06,27.20,-47.73),
+    Vector3.new(47.93,31.20,-47.25),
+    Vector3.new(42.36,54.20,48.16),
+    Vector3.new(-47.78,54.20,47.42),
+    Vector3.new(-48.10,72.20,-48.39),
+    Vector3.new(47.73,83.20,-47.61),
+    Vector3.new(47.85,102.20,31.21),
+    Vector3.new(47.56,31.20,17.85),
+    Vector3.new(-0.10,130.20,-48.49),
+    Vector3.new(47.47,135.20,18.67),
+    Vector3.new(-48.19,154.20,46.89),
+    Vector3.new(-62.68,153.20,-61.73),
+    Vector3.new(2.97,153.20,-65.15),
+    Vector3.new(48.50,176.20,-1.30),
+    Vector3.new(26.53,216.20,48.90),
+    Vector3.new(-47.99,228.20,47.58),
+    Vector3.new(48.83,262.20,-47.72),
+    Vector3.new(-48.97,352.20,48.44),
+    Vector3.new(-47.34,352.20,-47.59),
+    Vector3.new(9.80,322.20,-64.79),
+    Vector3.new(64.11,316.20,17.85),
+    Vector3.new(48.35,402.20,31.51),
+    Vector3.new(-34.53,404.20,47.25),
+    Vector3.new(-47.70,458.20,-48.38),
+    Vector3.new(51.85,449.20,-30.26),
+    Vector3.new(42.14,504.20,49.73),
+    Vector3.new(-65.24,504.20,47.80),
+    Vector3.new(-48.45,560.20,13.38),
+    Vector3.new(47.86,560.20,-0.43),
+    Vector3.new(-47.11,621.20,-63.17),
+    Vector3.new(64.04,637.20,-64.38),
+    Vector3.new(48.96,702.20,14.96),
+    Vector3.new(-1.91,104.20,47.89)
+}
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if autoCoins then
+            for _,pos in ipairs(coinPositions) do
+                if not autoCoins then break end
+                tp(pos)
+                task.wait(0.2)
+            end
+        end
+    end
+end)
+
+Main:CreateToggle({
+    Name = "Auto Coins",
+    CurrentValue = false,
+    Callback = function(v)
+        autoCoins = v
+    end
+})
+
+-- =====================
+-- 🪙 AUTO COIN JUMP (TP 1x + PULO)
+-- =====================
+local autoJumpCoins = {false,false,false,false}
+local jumped = {false,false,false,false}
+
+local jumpPositions = {
+    Vector3.new(0.03,228.35,-33.35),
+    Vector3.new(80.46,316.35,-64.31),
+    Vector3.new(-16.58,449.35,-34.77),
+    Vector3.new(-33.77,560.35,47.51)
+}
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        for i,pos in ipairs(jumpPositions) do
+            if autoJumpCoins[i] then
+
+                if not jumped[i] then
+                    tp(pos)
+                    jumped[i] = true
+                end
+
+                if player.Character then
+                    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.FloorMaterial ~= Enum.Material.Air then
+                        hum.Jump = true
+                    end
+                end
+
+            else
+                jumped[i] = false
+            end
+        end
+    end
+end)
+
+for i = 1,4 do
+    Main:CreateToggle({
+        Name = "Auto Coin Jump "..i,
+        CurrentValue = false,
+        Callback = function(v)
+            autoJumpCoins[i] = v
+        end
+    })
+end
+
+-- =====================
+-- 📍 TELEPORT (tudo mantido)
+-- =====================
+Teleport:CreateButton({
+Name = "Tp for Eggs",
+Callback = function()
+tp(Vector3.new(31.33, 2.35, 0.12))
+end
+})
+
+Teleport:CreateButton({
+Name = "Tp for Egg Hacker",
+Callback = function()
+tp(Vector3.new(-14.25, 504.35, 72.10))
+end
+})
+Teleport:CreateButton({Name="Tp for End",Callback=function() tp(Vector3.new(41.20,704.50,48.26)) end})
+Teleport:CreateButton({Name="Tp for 600 m",Callback=function() tp(Vector3.new(48.30,621.50,-47.04)) end})
+Teleport:CreateButton({Name="Tp for 500 m",Callback=function() tp(Vector3.new(-13.71,504.50,67.66)) end})
+Teleport:CreateButton({Name="Tp for 400 m",Callback=function() tp(Vector3.new(-30.29,404.50,11.63)) end})
+Teleport:CreateButton({Name="Tp for 300 m",Callback=function() tp(Vector3.new(22.14,307.50,47.19)) end})
+Teleport:CreateButton({Name="Tp for 200 m",Callback=function() tp(Vector3.new(42.41,204.50,48.61)) end})
+Teleport:CreateButton({Name="Tp for 100 m",Callback=function() tp(Vector3.new(-4.14,104.50,48.07)) end})
+Teleport:CreateButton({Name="Tp for 0 m",Callback=function() tp(Vector3.new(0.91,2.50,4.87)) end})
+
+Teleport:CreateButton({Name="Tp for Trophy 1",Callback=function() tp(Vector3.new(-1.18,104.50,34.42)) end})
+Teleport:CreateButton({Name="Tp for Trophy 2",Callback=function() tp(Vector3.new(-48.07,154.50,33.56)) end})
+Teleport:CreateButton({Name="Tp for Trophy 3",Callback=function() tp(Vector3.new(-6.63,228.50,34.06)) end})
+Teleport:CreateButton({Name="Tp for Trophy 4",Callback=function() tp(Vector3.new(3.95,313.50,34.35)) end})
+Teleport:CreateButton({Name="Tp for Trophy 5",Callback=function() tp(Vector3.new(-49.12,404.50,14.32)) end})
+Teleport:CreateButton({Name="Tp for Trophy 6",Callback=function() tp(Vector3.new(14.17,504.50,78.37)) end})
+
+Teleport:CreateButton({Name="Tp for Unlock staircase 1",Callback=function() tp(Vector3.new(51.52,52.50,35.30)) end})
+Teleport:CreateButton({Name="Tp for Unlock staircase 2",Callback=function() tp(Vector3.new(51.57,102.50,34.27)) end})
+Teleport:CreateButton({Name="Tp for Unlock staircase 3",Callback=function() tp(Vector3.new(51.31,152.50,35.40)) end})
+Teleport:CreateButton({Name="Tp for Unlock staircase 4",Callback=function() tp(Vector3.new(50.17,402.50,35.37)) end})
+Teleport:CreateButton({Name="Tp for Unlock staircase 5",Callback=function() tp(Vector3.new(51.06,202.50,35.98)) end})
+Teleport:CreateButton({Name="Tp for Unlock staircase 6",Callback=function() tp(Vector3.new(49.22,502.50,34.23)) end})
+Teleport:CreateButton({Name="Tp for Unlock staircase 7",Callback=function() tp(Vector3.new(50.31,302.50,34.29)) end})
+Teleport:CreateButton({Name="Tp for Unlock staircase 8",Callback=function() tp(Vector3.new(51.76,702.50,34.84)) end})
+
+-- =====================
+-- 👤 PLAYER TAB
+-- =====================
+PlayerTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 200},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(v)
+        if player.Character then
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = v end
+        end
+    end
+})
+
+local infJump = false
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if infJump and player.Character then
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+PlayerTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Callback = function(v)
+        infJump = v
+    end
+})
+
+
+        end
+    end
+})
