@@ -1,0 +1,87 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TOGGLE_KEY = Enum.KeyCode.K
+local UNLOAD_KEY = Enum.KeyCode.M
+local FIRE_DELAY = 0.05 -- adjust if needed
+
+local remote = ReplicatedStorage:WaitForChild("BuyUnit")
+--Shop Names
+--AdvancedUnitShop
+--MainUnitShop
+local ARGS = {
+	"AdvancedUnitShop",
+	50,
+	{	--Unit Rarity that will be auto-sold on purchase.
+		Legendary = true,
+		Common = true,
+		Epic = true,
+		Mythic = true,
+		Rare = true,
+	}
+}
+
+
+local SINGLETON_KEY = "_AUTO_BUY_LUNAR_V1"
+local env = (getgenv and getgenv()) or _G
+
+if env[SINGLETON_KEY] then
+	pcall(env[SINGLETON_KEY])
+end
+
+local enabled = false
+local loopToken = 0
+local connections = {}
+
+local function cleanup()
+	enabled = false
+	loopToken += 1
+	for _, c in ipairs(connections) do
+		pcall(function() c:Disconnect() end)
+	end
+	connections = {}
+	env[SINGLETON_KEY] = nil
+	print("[AutoBuy] Unloaded.")
+end
+
+env[SINGLETON_KEY] = cleanup
+
+local function connect(sig, fn)
+	local c = sig:Connect(fn)
+	table.insert(connections, c)
+	return c
+end
+
+
+local function startLoop()
+	loopToken += 1
+	local myToken = loopToken
+
+	task.spawn(function()
+		print("[AutoBuy] Started.")
+		while enabled and loopToken == myToken do
+			pcall(function()
+				remote:InvokeServer(table.unpack(ARGS))
+			end)
+			task.wait(FIRE_DELAY)
+		end
+		print("[AutoBuy] Stopped.")
+	end)
+end
+
+connect(UserInputService.InputBegan, function(input, gp)
+	if gp then return end
+
+	if input.KeyCode == TOGGLE_KEY then
+		enabled = not enabled
+		if enabled then
+			startLoop()
+		else
+			print("[AutoBuy] Toggled OFF.")
+		end
+
+	elseif input.KeyCode == UNLOAD_KEY then
+		cleanup()
+	end
+end)
+
+print("[AutoBuy] Ready | Toggle: K | Unload: M")
