@@ -1,0 +1,649 @@
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+
+pcall(function()
+    CoreGui:FindFirstChild("screen_gui"):Destroy()
+end)
+
+-- BLUR
+local blur = Instance.new("BlurEffect", Lighting)
+blur.Size = 0
+TweenService:Create(blur, TweenInfo.new(0.5), {Size = 18}):Play()
+
+-- GUI
+local gui = Instance.new("ScreenGui", CoreGui)
+gui.Name = "screen_gui"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+
+local bg = Instance.new("Frame", gui)
+bg.Size = UDim2.new(1,0,1,0)
+bg.BackgroundColor3 = Color3.fromRGB(5,6,10)
+
+-- LIGHTNING LAYER (FONDO)
+local lightningLayer = Instance.new("Frame", bg)
+lightningLayer.Size = UDim2.new(1,0,1,0)
+lightningLayer.BackgroundTransparency = 1
+lightningLayer.ZIndex = 1
+
+local function spawnLightning()
+    local segments = math.random(8,11)
+    local x = math.random(15,85)/100
+    local y = -0.25
+    local lastX = x
+
+    for _ = 1, segments do
+        local segHeight = math.random(60,90)
+        local seg = Instance.new("Frame", lightningLayer)
+        seg.AnchorPoint = Vector2.new(0.5,0)
+        seg.Position = UDim2.new(lastX,0,y,0)
+        seg.Size = UDim2.new(0,4,0,segHeight)
+        seg.Rotation = math.random(-20,20)
+        seg.BackgroundColor3 = Color3.fromRGB(120,240,255) -- celeste sólido
+        seg.BorderSizePixel = 0
+        seg.ZIndex = 1
+
+        local glow = Instance.new("UIStroke", seg)
+        glow.Thickness = 3
+        glow.Color = Color3.fromRGB(120,255,255)
+        glow.Transparency = 0
+
+        local offset = math.random(-25,25)/1000
+        lastX += offset
+        y += segHeight / math.max(1, (game:GetService("Workspace").CurrentCamera and game:GetService("Workspace").CurrentCamera.ViewportSize.Y) or 720)
+
+        -- Desvanece después
+        TweenService:Create(seg, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
+        task.delay(0.3, function() if seg and seg.Parent then seg:Destroy() end end)
+    end
+end
+
+-- TITULOS
+local title = Instance.new("TextLabel", bg)
+title.Size = UDim2.new(0,400,0,70)
+title.Position = UDim2.new(0.5,-200,0.42,-60)
+title.BackgroundTransparency = 1
+title.Text = ""
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 54
+title.TextColor3 = Color3.fromRGB(200,255,255)
+title.ZIndex = 2
+
+local sub = Instance.new("TextLabel", bg)
+sub.Size = UDim2.new(0,400,0,30)
+sub.Position = UDim2.new(0.5,-200,0.42,5)
+sub.BackgroundTransparency = 1
+sub.Text = "scripts"
+sub.Font = Enum.Font.Gotham
+sub.TextSize = 18
+sub.TextColor3 = Color3.fromRGB(160,220,220)
+sub.ZIndex = 2
+
+-- FLOAT ANIMATION PARA TEXTOS
+task.spawn(function()
+    while title.Parent do
+        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = title.Position + UDim2.new(0,0,0,-8)}):Play()
+        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = sub.Position + UDim2.new(0,0,0,-8)}):Play()
+        task.wait(2)
+        TweenService:Create(title, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = title.Position + UDim2.new(0,0,0,8)}):Play()
+        TweenService:Create(sub, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Position = sub.Position + UDim2.new(0,0,0,8)}):Play()
+        task.wait(2)
+    end
+end)
+
+-- LOADING BAR (ABAJO)
+local barBG = Instance.new("Frame", bg)
+barBG.Size = UDim2.new(0,460,0,12)
+barBG.Position = UDim2.new(0.5,-230,0.72,0)
+barBG.BackgroundColor3 = Color3.fromRGB(30,40,50)
+barBG.BorderSizePixel = 0
+barBG.ZIndex = 2
+barBG.ClipsDescendants = true -- <<< muy importante: evita que la linea se "escape"
+Instance.new("UICorner", barBG)
+
+-- BARRA DE LLENADO REAL (progreso)
+local barFill = Instance.new("Frame", barBG)
+barFill.Size = UDim2.new(0,0,1,0)
+barFill.BackgroundColor3 = Color3.fromRGB(55,95,140)
+barFill.BorderSizePixel = 0
+Instance.new("UICorner", barFill)
+
+-- SHIMMER LINE (SIEMPRE DENTRO DE barBG)
+local shimmer = Instance.new("Frame", barBG)
+shimmer.Size = UDim2.new(0.25,0,1,0) -- 25% del ancho de la barra
+shimmer.Position = UDim2.new(-0.25,0,0,0)
+shimmer.BackgroundColor3 = Color3.fromRGB(150,255,255)
+shimmer.BorderSizePixel = 0
+Instance.new("UICorner", shimmer)
+shimmer.ZIndex = 3
+
+-- Texto porcentaje
+local percent = Instance.new("TextLabel", bg)
+percent.Size = UDim2.new(0,200,0,20)
+percent.Position = UDim2.new(0.5,-100,0.76,0)
+percent.BackgroundTransparency = 1
+percent.Text = "0%"
+percent.Font = Enum.Font.Gotham
+percent.TextSize = 14
+percent.TextColor3 = Color3.fromRGB(150,150,200)
+percent.ZIndex = 2
+
+-- SKIP BUTTON (ABAJO DERECHA)
+local skip = Instance.new("TextButton", bg)
+skip.Size = UDim2.new(0,90,0,32)
+skip.Position = UDim2.new(1,-110,1,-50)
+skip.Text = "SKIP"
+skip.Font = Enum.Font.GothamBold
+skip.TextSize = 14
+skip.TextColor3 = Color3.new(1,1,1)
+skip.BackgroundColor3 = Color3.fromRGB(60,60,60)
+skip.BorderSizePixel = 0
+skip.ZIndex = 4
+Instance.new("UICorner", skip)
+
+local closed = false
+local function closeSplash()
+    if closed then return end
+    closed = true
+    -- fade blur y GUI
+    TweenService:Create(blur, TweenInfo.new(0.35), {Size = 0}):Play()
+    -- fade gui elements (rápido)
+    for _, v in pairs(bg:GetDescendants()) do
+        if v:IsA("TextLabel") or v:IsA("TextButton") then
+            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {TextTransparency = 1}):Play() end)
+        elseif v:IsA("Frame") then
+            pcall(function() TweenService:Create(v, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play() end)
+        end
+    end
+    task.wait(0.36)
+    if blur and blur.Parent then blur:Destroy() end
+    if gui and gui.Parent then gui:Destroy() end
+end
+
+skip.MouseButton1Click:Connect(closeSplash)
+
+-- ANIMACION DEL SHIMMER (dentro de la barra; no puede escaparse por ClipsDescendants)
+local shimmerTweenTime = 1.1
+local shimmerTweenInfo = TweenInfo.new(shimmerTweenTime, Enum.EasingStyle.Linear)
+
+local shimmerLoop = task.spawn(function()
+    while shimmer.Parent and not closed do
+        -- from left outside to right outside of barBG's coordinates, but clipped by barBG
+        shimmer.Position = UDim2.new(-shimmer.Size.X.Scale, 0, 0, 0)
+        local targetPos = UDim2.new(1, 0, 0, 0)
+        local tw = TweenService:Create(shimmer, shimmerTweenInfo, {Position = targetPos})
+        tw:Play()
+        local ok, err = pcall(function() tw.Completed:Wait() end)
+        if not ok then break end
+        task.wait(0.05)
+    end
+end)
+
+-- RAYOS LOOP
+local lightningLoop = task.spawn(function()
+    while gui.Parent and not closed do
+        spawnLightning()
+        task.wait(math.random(12,20)/100) -- 0.12 - 0.20s
+    end
+end)
+
+-- CARGA (simulada): llena la barra y actualiza porcentaje
+for i = 1, 100 do
+    if closed then break end
+    local scale = i / 100
+    barFill.Size = UDim2.new(scale, 0, 1, 0)
+    percent.Text = tostring(i) .. "%"
+    task.wait(0.035)
+end
+
+-- AL FINAL: mini explosiones antes de cerrar
+if not closed then
+    local function miniExplosionAt(xScale)
+        local circ = Instance.new("Frame", bg)
+        circ.AnchorPoint = Vector2.new(0.5, 1)
+        circ.Position = UDim2.new(xScale, 0, 1, -18) -- justo encima del borde inferior
+        circ.Size = UDim2.new(0,12,0,12)
+        circ.BackgroundColor3 = Color3.fromRGB(140,255,255)
+        circ.BorderSizePixel = 0
+        local uic = Instance.new("UICorner", circ)
+        uic.CornerRadius = UDim.new(1,0)
+
+        -- expand & fade
+        TweenService:Create(circ, TweenInfo.new(0.35, Enum.EasingStyle.Quad), {
+            Size = UDim2.new(0,140,0,140),
+            BackgroundTransparency = 1,
+            Position = UDim2.new(xScale, 0, 1, -70)
+        }):Play()
+
+        task.delay(0.36, function()
+            if circ and circ.Parent then circ:Destroy() end
+        end)
+    end
+
+    -- dispara varias mini explosiones a lo largo de la parte baja (alineadas con la barra)
+    local n = 4
+    for k = 1, n do
+        local x = 0.5 - 230/460 + ( (k-1) * (460/(n-1)) ) / 460 -- mapea 0..460 a 0..1 centrado en la barra
+        x = math.clamp(x, 0.05, 0.95)
+        miniExplosionAt(x)
+        task.wait(0.14)
+    end
+
+    task.wait(0.45)
+end
+
+-- CERRAR SPLASH
+closeSplash()
+
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local is_script_active = true
+
+-- ================= CONFIG GLOBAL =================
+local currentTheme = {Main = Color3.fromRGB(15,15,18), Acc = Color3.fromRGB(0,255,255)}
+local farming_enabled = false
+local autoclick_enabled = false
+local farm_distance = 7
+local farm_mode = "Above"
+local ui_toggle_key = Enum.KeyCode.RightControl
+local is_binding = false
+local is_minimized = false
+local key_farm = Enum.KeyCode.K
+local key_click = Enum.KeyCode.L
+
+-- ================= RUTAS Y DATA =================
+local MobsFolder = Workspace:WaitForChild("Mobs")
+local availableMobs = {}
+local selected_mob = "None"
+local target_part = nil
+
+local function RefreshMobList()
+    local newList = {}
+    local seen = {}
+    for _, island in ipairs(MobsFolder:GetChildren()) do
+        for _, mob in ipairs(island:GetChildren()) do
+            if mob:IsA("Model") and mob:FindFirstChildOfClass("Humanoid") then
+                if not seen[mob.Name] then
+                    table.insert(newList, mob.Name)
+                    seen[mob.Name] = true
+                end
+            end
+        end
+    end
+    table.sort(newList)
+    availableMobs = newList
+end
+
+-- ================= GUI BASE =================
+local pGui = player:WaitForChild("PlayerGui")
+if pGui:FindFirstChild("player_gui") then pGui.player_gui:Destroy() end
+
+local sg = Instance.new("ScreenGui", pGui); sg.Name = "player_gui"; sg.ResetOnSpawn = false
+
+local main = Instance.new("Frame", sg)
+main.Size = UDim2.new(0, 540, 0, 440)
+main.Position = UDim2.new(0.5, -270, 0.5, -220)
+main.BackgroundColor3 = currentTheme.Main
+main.BackgroundTransparency = 0.35
+main.Active = true
+main.Draggable = true
+main.ClipsDescendants = true
+Instance.new("UICorner", main)
+
+local neonStroke = Instance.new("UIStroke", main)
+neonStroke.Color = currentTheme.Acc
+neonStroke.Thickness = 2
+neonStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- Header
+local titleMain = Instance.new("TextLabel", main)
+titleMain.Size = UDim2.new(0, 200, 0, 25)
+titleMain.Position = UDim2.new(0, 15, 0, 5)
+titleMain.Text = ""
+titleMain.TextColor3 = currentTheme.Acc
+titleMain.Font = Enum.Font.GothamBold
+titleMain.TextSize = 18
+titleMain.BackgroundTransparency = 1
+titleMain.TextXAlignment = Enum.TextXAlignment.Left
+
+local titleSub = Instance.new("TextLabel", main)
+titleSub.Size = UDim2.new(0, 200, 0, 15)
+titleSub.Position = UDim2.new(0, 15, 0, 22)
+titleSub.Text = "Jood Piece"
+titleSub.TextColor3 = Color3.fromRGB(200, 200, 200)
+titleSub.Font = Enum.Font.Gotham
+titleSub.TextSize = 11
+titleSub.BackgroundTransparency = 1
+titleSub.TextXAlignment = Enum.TextXAlignment.Left
+
+-- ================= ANTI AFK =================
+local antiAfkFrame = Instance.new("Frame", main)
+antiAfkFrame.Size = UDim2.new(1, -30, 0, 30)
+antiAfkFrame.Position = UDim2.new(0, 15, 0, 45)
+antiAfkFrame.BackgroundTransparency = 1
+
+local antiAfkLabel = Instance.new("TextLabel", antiAfkFrame)
+antiAfkLabel.Size = UDim2.new(1, 0, 1, 0)
+antiAfkLabel.BackgroundTransparency = 1
+antiAfkLabel.Text = "Anti Afk: Activate "
+antiAfkLabel.TextColor3 = Color3.new(1,1,1)
+antiAfkLabel.Font = Enum.Font.GothamBold
+antiAfkLabel.TextSize = 16
+antiAfkLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local antiAfkDot = Instance.new("TextLabel", antiAfkFrame)
+antiAfkDot.Size = UDim2.new(0, 20, 0, 30)
+antiAfkDot.Position = UDim2.new(1, -25, 0, 0)
+antiAfkDot.BackgroundTransparency = 1
+antiAfkDot.Text = "◉"
+antiAfkDot.TextColor3 = Color3.fromRGB(0, 255, 100)
+antiAfkDot.Font = Enum.Font.GothamBold
+antiAfkDot.TextSize = 22
+antiAfkDot.TextXAlignment = Enum.TextXAlignment.Right
+
+task.spawn(function()
+    while is_script_active do
+        antiAfkDot.TextTransparency = 0
+        task.wait(0.6)
+        antiAfkDot.TextTransparency = 0.7
+        task.wait(0.6)
+    end
+end)
+
+player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+-- Buttons: Close & Minimize
+local closeBtn = Instance.new("TextButton", main)
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.Text = "X"
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+Instance.new("UICorner", closeBtn)
+
+local miniBtn = Instance.new("TextButton", main)
+miniBtn.Size = UDim2.new(0, 30, 0, 30)
+miniBtn.Position = UDim2.new(1, -70, 0, 5)
+miniBtn.Text = "-"
+miniBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+miniBtn.TextColor3 = Color3.new(1,1,1)
+miniBtn.Font = Enum.Font.GothamBold
+miniBtn.TextSize = 20
+Instance.new("UICorner", miniBtn)
+
+closeBtn.MouseButton1Click:Connect(function() is_script_active = false; sg:Destroy() end)
+miniBtn.MouseButton1Click:Connect(function()
+    is_minimized = not is_minimized
+    main:TweenSize(is_minimized and UDim2.new(0, 540, 0, 45) or UDim2.new(0, 540, 0, 440), "Out", "Quad", 0.3, true)
+end)
+
+-- Sidebar
+local sidebar = Instance.new("Frame", main)
+sidebar.Size = UDim2.new(0, 120, 1, -60)
+sidebar.Position = UDim2.new(0, 5, 0, 85)
+sidebar.BackgroundTransparency = 1
+Instance.new("UIListLayout", sidebar).Padding = UDim.new(0, 5)
+
+local container = Instance.new("Frame", main)
+container.Size = UDim2.new(1, -140, 1, -100)
+container.Position = UDim2.new(0, 130, 0, 90)
+container.BackgroundTransparency = 1
+
+local pAuto = Instance.new("Frame", container); pAuto.Size = UDim2.new(1,0,1,0); pAuto.BackgroundTransparency = 1; pAuto.Visible = true
+local pCfg = Instance.new("Frame", container); pCfg.Size = UDim2.new(1,0,1,0); pCfg.BackgroundTransparency = 1; pCfg.Visible = false
+
+-- ================= PESTAÑA: AUTO FARM =================
+local scrollAuto = Instance.new("ScrollingFrame", pAuto)
+scrollAuto.Size = UDim2.new(1,0,1,0)
+scrollAuto.BackgroundTransparency = 1
+scrollAuto.ScrollBarThickness = 4
+
+local tLayout = Instance.new("UIListLayout", scrollAuto); tLayout.Padding = UDim.new(0, 10)
+
+local tFarm = Instance.new("TextButton", scrollAuto)
+tFarm.Size = UDim2.new(0.95, 0, 0, 45)
+tFarm.Text = "AUTO FARM: OFF [K]"
+tFarm.BackgroundColor3 = Color3.fromRGB(35,35,40)
+tFarm.BackgroundTransparency = 0.3
+tFarm.TextColor3 = Color3.new(1,1,1)
+tFarm.Font = Enum.Font.GothamBold
+tFarm.TextSize = 15
+Instance.new("UICorner", tFarm)
+
+local tClick = Instance.new("TextButton", scrollAuto)
+tClick.Size = UDim2.new(0.95, 0, 0, 45)
+tClick.Text = "AUTO CLICK: OFF [L]"
+tClick.BackgroundColor3 = Color3.fromRGB(35,35,40)
+tClick.BackgroundTransparency = 0.3
+tClick.TextColor3 = Color3.new(1,1,1)
+tClick.Font = Enum.Font.GothamBold
+tClick.TextSize = 15
+Instance.new("UICorner", tClick)
+
+-- Studs Control
+local studsFrame = Instance.new("Frame", scrollAuto); studsFrame.Size = UDim2.new(0.95, 0, 0, 50); studsFrame.BackgroundTransparency = 1
+local studsLabel = Instance.new("TextLabel", studsFrame); studsLabel.Size = UDim2.new(0.6, 0, 1, 0); studsLabel.Text = "Farm Distance (Wheel):"; studsLabel.TextColor3 = Color3.new(1,1,1); studsLabel.Font = Enum.Font.Gotham; studsLabel.TextSize = 14; studsLabel.BackgroundTransparency = 1; studsLabel.TextXAlignment = Enum.TextXAlignment.Left
+local studsVal = Instance.new("TextBox", studsFrame); studsVal.Size = UDim2.new(0.35, 0, 0.8, 0); studsVal.Position = UDim2.new(0.6, 5, 0.1, 0); studsVal.Text = tostring(farm_distance); studsVal.BackgroundColor3 = Color3.fromRGB(30,30,35); studsVal.BackgroundTransparency = 0.3; studsVal.TextColor3 = currentTheme.Acc; studsVal.Font = Enum.Font.GothamBold; studsVal.TextSize = 16; Instance.new("UICorner", studsVal)
+
+studsVal.FocusLost:Connect(function()
+    local val = tonumber(studsVal.Text)
+    if val then farm_distance = math.clamp(val, 1, 20); studsVal.Text = tostring(farm_distance)
+    else studsVal.Text = tostring(farm_distance) end
+end)
+
+studsFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseWheel then
+        farm_distance = math.clamp(farm_distance + (input.Position.Z > 0 and 1 or -1), 1, 20)
+        studsVal.Text = tostring(farm_distance)
+    end
+end)
+
+-- ================= DROPDOWN + BOTÓN REFRESH =================
+local function createDrop(parent, text, getItemsFunc, callback)
+    local b = Instance.new("TextButton", parent)
+    b.Size = UDim2.new(0.95,0,0,40)
+    b.Text = text
+    b.BackgroundColor3 = Color3.fromRGB(30,30,35)
+    b.BackgroundTransparency = 0.3
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 14
+    Instance.new("UICorner", b)
+
+    local s = Instance.new("ScrollingFrame", parent)
+    s.Size = UDim2.new(0.95,0,0,150)
+    s.Visible = false
+    s.BackgroundColor3 = Color3.fromRGB(20,20,25)
+    s.BackgroundTransparency = 0.3
+    s.ZIndex = 5
+    Instance.new("UIListLayout", s)
+    s.ScrollBarThickness = 4
+
+    b.MouseButton1Click:Connect(function()
+        s.Visible = not s.Visible
+        if s.Visible then
+            for _, v in ipairs(s:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+            for _, val in ipairs(getItemsFunc()) do
+                local btn = Instance.new("TextButton", s)
+                btn.Size = UDim2.new(1,0,0,35)
+                btn.Text = val
+                btn.BackgroundColor3 = Color3.fromRGB(35,35,40)
+                btn.BackgroundTransparency = 0.3
+                btn.TextColor3 = Color3.new(1,1,1)
+                btn.ZIndex = 6
+                btn.TextSize = 13
+                btn.MouseButton1Click:Connect(function() 
+                    b.Text = btn.Text
+                    s.Visible = false
+                    callback(val) 
+                end)
+            end
+        end
+    end)
+    return b
+end
+
+-- Dropdown de enemigos
+local enemyDrop = createDrop(scrollAuto, "Select Enemy", function() return availableMobs end, function(val) 
+    selected_mob = val
+    target_part = nil 
+end)
+
+-- Botón Refresh List (nuevo)
+local refreshBtn = Instance.new("TextButton", scrollAuto)
+refreshBtn.Size = UDim2.new(0.95, 0, 0, 40)
+refreshBtn.Text = "🔄 Refresh Mob List"
+refreshBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+refreshBtn.BackgroundTransparency = 0.3
+refreshBtn.TextColor3 = currentTheme.Acc
+refreshBtn.Font = Enum.Font.GothamBold
+refreshBtn.TextSize = 14
+Instance.new("UICorner", refreshBtn)
+
+refreshBtn.MouseButton1Click:Connect(function()
+    RefreshMobList()
+    -- Actualiza el texto del dropdown actual
+    enemyDrop.Text = "Select Enemy"
+    selected_mob = "None"
+    target_part = nil
+    -- Pequeña animación de feedback
+    refreshBtn.Text = "✅ List Updated!"
+    task.wait(1.5)
+    refreshBtn.Text = "🔄 Refresh Mob List"
+end)
+
+-- Dropdown de modo
+createDrop(scrollAuto, "Mode: Above", function() return {"Above", "Below", "Behind"} end, function(val) farm_mode = val end)
+
+-- ================= PESTAÑA: CONFIG =================
+local keyBtn = Instance.new("TextButton", pCfg)
+keyBtn.Size = UDim2.new(1,0,0,50)
+keyBtn.Text = "Toggle Menu: " .. ui_toggle_key.Name
+keyBtn.BackgroundColor3 = Color3.fromRGB(35,35,40)
+keyBtn.BackgroundTransparency = 0.3
+keyBtn.TextColor3 = currentTheme.Acc
+keyBtn.Font = Enum.Font.GothamBold
+keyBtn.TextSize = 16
+Instance.new("UICorner", keyBtn)
+
+keyBtn.MouseButton1Click:Connect(function() is_binding = true; keyBtn.Text = "Press a key..." end)
+
+-- ================= CORE LOGIC =================
+task.spawn(function()
+    while is_script_active do
+        RefreshMobList()
+        task.wait(5)
+    end
+end)
+
+-- (El resto del script se mantiene igual)
+RunService.Stepped:Connect(function()
+    if not is_script_active or not farming_enabled then return end
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+   
+    for _, part in pairs(char:GetChildren()) do if part:IsA("BasePart") then part.CanCollide = false end end
+    if not target_part or not target_part.Parent or not target_part.Parent:FindFirstChildOfClass("Humanoid") or target_part.Parent:FindFirstChildOfClass("Humanoid").Health <= 0 then
+        target_part = nil
+        local dist = math.huge
+        for _, island in ipairs(MobsFolder:GetChildren()) do
+            local mobModel = island:FindFirstChild(selected_mob)
+            if mobModel and mobModel:IsA("Model") then
+                local mHrp = mobModel:FindFirstChild("HumanoidRootPart") or mobModel:FindFirstChildWhichIsA("BasePart")
+                local hum = mobModel:FindFirstChildOfClass("Humanoid")
+                if mHrp and hum and hum.Health > 0 then
+                    local d = (hrp.Position - mHrp.Position).Magnitude
+                    if d < dist then dist = d; target_part = mHrp end
+                end
+            end
+        end
+    end
+    if target_part then
+        local offset = Vector3.new(0, farm_distance, 0)
+        if farm_mode == "Below" then offset = Vector3.new(0, -farm_distance, 0)
+        elseif farm_mode == "Behind" then offset = target_part.CFrame.LookVector * -farm_distance end
+       
+        hrp.CFrame = CFrame.lookAt(target_part.Position + offset, target_part.Position)
+        hrp.Velocity = Vector3.new(0,0,0)
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(i, p)
+    if not is_script_active then return end
+    if is_binding then 
+        ui_toggle_key = i.KeyCode
+        keyBtn.Text = "Toggle Menu: "..i.KeyCode.Name
+        is_binding = false
+        return 
+    end
+    if not p then
+        if i.KeyCode == key_farm then farming_enabled = not farming_enabled
+        elseif i.KeyCode == key_click then autoclick_enabled = not autoclick_enabled
+        elseif i.KeyCode == ui_toggle_key then main.Visible = not main.Visible end
+       
+        tFarm.Text = farming_enabled and "AUTO FARM: ON [K]" or "AUTO FARM: OFF [K]"
+        tFarm.BackgroundColor3 = farming_enabled and currentTheme.Acc or Color3.fromRGB(35,35,40)
+        tClick.Text = autoclick_enabled and "AUTO CLICK: ON [L]" or "AUTO CLICK: OFF [L]"
+        tClick.BackgroundColor3 = autoclick_enabled and currentTheme.Acc or Color3.fromRGB(35,35,40)
+    end
+end)
+
+task.spawn(function()
+    while is_script_active do
+        if autoclick_enabled then
+            VirtualInputManager:SendMouseButtonEvent(0,0,0,true,game,0)
+            task.wait(0.01)
+            VirtualInputManager:SendMouseButtonEvent(0,0,0,false,game,0)
+        end
+        task.wait(0.05)
+    end
+end)
+
+-- Navigation
+local function nav(b, f)
+    b.MouseButton1Click:Connect(function()
+        pAuto.Visible = false
+        pCfg.Visible = false
+        f.Visible = true
+        for _, x in ipairs(sidebar:GetChildren()) do 
+            if x:IsA("TextButton") then x.TextColor3 = Color3.new(1,1,1) end 
+        end
+        b.TextColor3 = currentTheme.Acc
+    end)
+end
+
+local bA = Instance.new("TextButton", sidebar)
+bA.Size = UDim2.new(1,0,0,45)
+bA.Text = "AutoFarm"
+bA.TextColor3 = currentTheme.Acc
+bA.Font = Enum.Font.GothamBold
+bA.TextSize = 15
+bA.BackgroundTransparency = 1
+nav(bA, pAuto)
+
+local bC = Instance.new("TextButton", sidebar)
+bC.Size = UDim2.new(1,0,0,45)
+bC.Text = "Config"
+bC.TextColor3 = Color3.new(1,1,1)
+bC.Font = Enum.Font.GothamBold
+bC.TextSize = 15
+bC.BackgroundTransparency = 1
+nav(bC, pCfg)
+
+RefreshMobList()
