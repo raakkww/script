@@ -1,0 +1,988 @@
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local Table1 = Workspace:WaitForChild("Tables"):WaitForChild("Table1")
+local HitTrajectory = Table1:WaitForChild("Guides"):WaitForChild("HitTrajectory")
+local BallsFolder = Table1:WaitForChild("Balls")
+local CueBall = BallsFolder:WaitForChild("Cue")
+
+local state = {
+	enabled = true,
+	bounces = 1,
+	thickness = 0.02,
+	color = Color3.fromRGB(255, 255, 255),
+	objectColor = Color3.fromRGB(91, 106, 245),
+	aimLineColor = Color3.fromRGB(80, 230, 255),
+	aimLineMultiplier = 2.0,
+	suggestions = false,
+	suggestionColor = Color3.fromRGB(80, 230, 120),
+	maxSuggestions = 3,
+	maxCutAngleDeg = 75,
+	maxSegmentLength = 30,
+}
+
+local vizFolder = Instance.new("Folder")
+vizFolder.Name = "TrajectoryViz"
+vizFolder.Parent = Workspace.CurrentCamera
+
+local linePool: {BasePart} = {}
+local activeLines: {BasePart} = {}
+
+local function makeLine(): BasePart
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Material = Enum.Material.Neon
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	return p
+end
+
+local function getLine(): BasePart
+	local line = table.remove(linePool) or makeLine()
+	line.Parent = vizFolder
+	table.insert(activeLines, line)
+	return line
+end
+
+local ghostPool: {BasePart} = {}
+local activeGhosts: {BasePart} = {}
+
+local function makeGhost(): BasePart
+	local g = Instance.new("Part")
+	g.Shape = Enum.PartType.Ball
+	g.Size = Vector3.new(CueBall.Size.X, CueBall.Size.X, CueBall.Size.X)
+	g.Anchored = true
+	g.CanCollide = false
+	g.CanQuery = false
+	g.CanTouch = false
+	g.Material = Enum.Material.ForceField
+	g.Transparency = 0.4
+	return g
+end
+
+local function showGhost(pos: Vector3, color: Color3?)
+	local g = table.remove(ghostPool) or makeGhost()
+	g.Color = color or state.color
+	g.Position = pos
+	g.Parent = vizFolder
+	table.insert(activeGhosts, g)
+end
+
+local function clearGhosts()
+	for _, g in ipairs(activeGhosts) do
+		g.Parent = nil
+		table.insert(ghostPool, g)
+	end
+	table.clear(activeGhosts)
+end
+
+local function clearLines()
+	for _, line in ipairs(activeLines) do
+		line.Parent = nil
+		table.insert(linePool, line)
+	end
+	table.clear(activeLines)
+	clearGhosts()
+end
+
+local function drawSegment(from: Vector3, to: Vector3, color: Color3?, thickness: number?)
+	local dir = to - from
+	local dist = dir.Magnitude
+	if dist < 1e-3 then return end
+	local line = getLine()
+	local t = thickness or state.thickness
+	line.Size = Vector3.new(t, t, dist)
+	line.CFrame = CFrame.lookAt((from + to) / 2, to)
+	line.Color = color or state.color
+end
+
+local function buildRaycastParams(): RaycastParams
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local exclude: {Instance} = { HitTrajectory, vizFolder, BallsFolder }
+	local guides = Table1:FindFirstChild("Guides")
+	if guides then table.insert(exclude, guides) end
+	local sights = Table1:FindFirstChild("Sights")
+	if sights then table.insert(exclude, sights) end
+	local cueStick = Table1:FindFirstChild("CueStick")
+	if cueStick then table.insert(exclude, cueStick) end
+	local pockets = Table1:FindFirstChild("Pockets")
+	if pockets then table.insert(exclude, pockets) end
+	if LocalPlayer.Character then table.insert(exclude, LocalPlayer.Character) end
+	params.FilterDescendantsInstances = exclude
+	return params
+end
+
+local function findFirstBallInPath(origin: Vector3, direction: Vector3, maxDist: number): (BasePart?, number)
+	local cueR = CueBall.Size.X / 2
+	local best: BasePart? = nil
+	local bestT = math.huge
+
+	for _, b in ipairs(BallsFolder:GetChildren()) do
+		if b:IsA("BasePart") and b ~= CueBall then
+			local bR = b.Size.X / 2
+			local sumR = cueR + bR
+			local T = Vector3.new(b.Position.X, origin.Y, b.Position.Z)
+			local v = origin - T
+			local vd = v:Dot(direction)
+			local disc = vd * vd - (v:Dot(v) - sumR * sumR)
+			if disc >= 0 then
+				local t = -vd - math.sqrt(disc)
+				if t > 0 and t < maxDist and t < bestT then
+					best = b
+					bestT = t
+				end
+			end
+		end
+	end
+	return best, bestT
+end
+
+local function simulateRails(origin: Vector3, direction: Vector3, bouncesLeft: number, color: Color3?, radius: number?)
+	local r = radius or (CueBall.Size.X / 2)
+	local params = buildRaycastParams()
+	for _ = 1, bouncesLeft + 1 do
+		local result = Workspace:Raycast(origin, direction * state.maxSegmentLength, params)
+		if result then
+			local fn = Vector3.new(result.Normal.X, 0, result.Normal.Z)
+			if fn.Magnitude < 1e-4 then break end
+			fn = fn.Unit
+
+			local hitPos = Vector3.new(result.Position.X, origin.Y, result.Position.Z) + fn * r
+			drawSegment(origin, hitPos, color)
+
+			direction = direction - 2 * direction:Dot(fn) * fn
+			direction = Vector3.new(direction.X, 0, direction.Z)
+			if direction.Magnitude < 1e-4 then break end
+			direction = direction.Unit
+
+			origin = hitPos + direction * 1e-3
+		else
+			drawSegment(origin, origin + direction * state.maxSegmentLength, color)
+			break
+		end
+	end
+end
+
+local function getPockets(playY: number): {Vector3}
+	local pockets = Table1:FindFirstChild("Pockets")
+	local list: {Vector3} = {}
+	if pockets then
+		for _, p in ipairs(pockets:GetChildren()) do
+			if p:IsA("BasePart") then
+				table.insert(list, Vector3.new(p.Position.X, playY, p.Position.Z))
+			end
+		end
+	end
+	return list
+end
+
+local function isPathClear(from: Vector3, to: Vector3, movingRadius: number, ignore: {BasePart}): boolean
+	local seg = to - from
+	local segLen = seg.Magnitude
+	if segLen < 1e-4 then return true end
+	local segDir = seg / segLen
+
+	for _, b in ipairs(BallsFolder:GetChildren()) do
+		if b:IsA("BasePart") then
+			local skip = false
+			for _, ig in ipairs(ignore) do
+				if b == ig then skip = true; break end
+			end
+			if not skip then
+				local bR = b.Size.X / 2
+				local bPos = Vector3.new(b.Position.X, from.Y, b.Position.Z)
+				local toB = bPos - from
+				local t = toB:Dot(segDir)
+				if t > 0 and t < segLen then
+					local closest = from + segDir * t
+					local distToCenter = (bPos - closest).Magnitude
+					if distToCenter < (movingRadius + bR) then
+						return false
+					end
+				end
+			end
+		end
+	end
+	return true
+end
+
+type Shot = {
+	ball: BasePart,
+	ballPos: Vector3,
+	ghostPos: Vector3,
+	pocketPos: Vector3,
+	cutAngle: number,
+	difficulty: number,
+}
+
+local function computeBestShots(playY: number): {Shot}
+	local cuePos = Vector3.new(CueBall.Position.X, playY, CueBall.Position.Z)
+	local cueR = CueBall.Size.X / 2
+	local pockets = getPockets(playY)
+	local maxAngle = math.rad(state.maxCutAngleDeg)
+
+	local bestPerBall: {[BasePart]: Shot} = {}
+
+	for _, ball in ipairs(BallsFolder:GetChildren()) do
+		if ball:IsA("BasePart") and ball ~= CueBall then
+			local ballPos = Vector3.new(ball.Position.X, playY, ball.Position.Z)
+			local bR = ball.Size.X / 2
+
+			for _, pocketPos in ipairs(pockets) do
+				local toPocket = pocketPos - ballPos
+				if toPocket.Magnitude > 1e-4 then
+					local toPocketDir = toPocket.Unit
+
+					local ghostPos = ballPos - toPocketDir * (cueR + bR)
+
+					local cueToGhost = ghostPos - cuePos
+					if cueToGhost.Magnitude > 1e-4 then
+						local cueDir = cueToGhost.Unit
+						local cosAngle = math.clamp(cueDir:Dot(toPocketDir), -1, 1)
+						local cutAngle = math.acos(cosAngle)
+
+						if cutAngle < maxAngle then
+
+							if isPathClear(cuePos, ghostPos, cueR, {CueBall, ball})
+								and isPathClear(ballPos, pocketPos, bR, {ball}) then
+
+								local totalDist = cueToGhost.Magnitude + toPocket.Magnitude
+								local difficulty = (cutAngle / maxAngle) * 0.7 + (totalDist / 10) * 0.3
+
+								local current = bestPerBall[ball]
+								if not current or difficulty < current.difficulty then
+									bestPerBall[ball] = {
+										ball = ball,
+										ballPos = ballPos,
+										ghostPos = ghostPos,
+										pocketPos = pocketPos,
+										cutAngle = cutAngle,
+										difficulty = difficulty,
+									}
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local shots: {Shot} = {}
+	for _, s in pairs(bestPerBall) do table.insert(shots, s) end
+	table.sort(shots, function(a, b) return a.difficulty < b.difficulty end)
+
+	local top: {Shot} = {}
+	for i = 1, math.min(state.maxSuggestions, #shots) do
+		table.insert(top, shots[i])
+	end
+	return top
+end
+
+local function renderSuggestions(playY: number)
+	if not state.suggestions then return end
+	local shots = computeBestShots(playY)
+	local cuePos = Vector3.new(CueBall.Position.X, playY, CueBall.Position.Z)
+	local thinThickness = state.thickness * 0.6
+
+	for i, shot in ipairs(shots) do
+
+		local tint = shot.difficulty < 0.4 and state.suggestionColor
+			or Color3.new(state.suggestionColor.R * 0.85, state.suggestionColor.G * 0.85, state.suggestionColor.B * 0.85)
+
+		local line1 = getLine()
+		local d1 = shot.ghostPos - cuePos
+		local dist1 = d1.Magnitude
+		if dist1 > 1e-3 then
+			line1.Size = Vector3.new(thinThickness, thinThickness, dist1)
+			line1.CFrame = CFrame.lookAt((cuePos + shot.ghostPos) / 2, shot.ghostPos)
+			line1.Color = tint
+		end
+
+		showGhost(shot.ghostPos, tint)
+
+		local line2 = getLine()
+		local d2 = shot.pocketPos - shot.ballPos
+		local dist2 = d2.Magnitude
+		if dist2 > 1e-3 then
+			line2.Size = Vector3.new(thinThickness, thinThickness, dist2)
+			line2.CFrame = CFrame.lookAt((shot.ballPos + shot.pocketPos) / 2, shot.pocketPos)
+			line2.Color = tint
+		end
+	end
+end
+
+local function computeTrajectory()
+	clearLines()
+	if not state.enabled then return end
+
+	local playY = HitTrajectory.Position.Y
+	local origin = Vector3.new(HitTrajectory.Position.X, playY, HitTrajectory.Position.Z)
+	local lookV = HitTrajectory.CFrame.LookVector
+	local direction = Vector3.new(lookV.X, 0, lookV.Z)
+	if direction.Magnitude < 1e-4 then return end
+	direction = direction.Unit
+
+	drawSegment(origin, origin + direction * state.maxSegmentLength,
+		state.aimLineColor, state.thickness * state.aimLineMultiplier)
+
+	simulateRails(origin, direction, state.bounces)
+
+	local hitBall, tBall = findFirstBallInPath(origin, direction, state.maxSegmentLength)
+	local railResult = Workspace:Raycast(origin, direction * state.maxSegmentLength, buildRaycastParams())
+	local tRail = if railResult then (railResult.Position - origin).Magnitude else math.huge
+
+	if hitBall and tBall < tRail then
+		local ghostCenter = origin + direction * tBall
+		local targetCenter = Vector3.new(hitBall.Position.X, playY, hitBall.Position.Z)
+		showGhost(ghostCenter)
+
+		local loc = targetCenter - ghostCenter
+		if loc.Magnitude >= 1e-4 then
+			loc = loc.Unit
+
+			simulateRails(targetCenter, loc, state.bounces, state.objectColor, hitBall.Size.X / 2)
+
+			local cueAfter = direction - direction:Dot(loc) * loc
+			if cueAfter.Magnitude > 1e-3 then
+				cueAfter = Vector3.new(cueAfter.X, 0, cueAfter.Z).Unit
+				simulateRails(ghostCenter, cueAfter, state.bounces)
+			end
+		end
+	end
+
+	renderSuggestions(playY)
+end
+
+local C = {
+	BG        = Color3.fromRGB(14, 16, 22),
+	PANEL     = Color3.fromRGB(20, 22, 29),
+	ROW       = Color3.fromRGB(28, 31, 40),
+	ROW_HOVER = Color3.fromRGB(36, 40, 52),
+	BORDER    = Color3.fromRGB(45, 50, 64),
+	TEXT      = Color3.fromRGB(232, 234, 240),
+	TEXT_DIM  = Color3.fromRGB(136, 145, 168),
+	SECTION   = Color3.fromRGB(100, 110, 130),
+	ACCENT    = Color3.fromRGB(91, 106, 245),
+	SUCCESS   = Color3.fromRGB(80, 230, 120),
+	CYAN      = Color3.fromRGB(80, 230, 255),
+	DANGER    = Color3.fromRGB(215, 75, 90),
+}
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "TrajectoryHUD"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.IgnoreGuiInset = true
+gui.Parent = PlayerGui
+
+local win = Instance.new("Frame")
+win.Name = "Window"
+win.Size = UDim2.new(0, 306, 0, 490)
+win.Position = UDim2.new(0, 24, 0.5, -245)
+win.BackgroundColor3 = C.BG
+win.BorderSizePixel = 0
+win.Active = true
+win.Parent = gui
+
+local winCorner = Instance.new("UICorner")
+winCorner.CornerRadius = UDim.new(0, 12)
+winCorner.Parent = win
+
+local winStroke = Instance.new("UIStroke")
+winStroke.Color = C.BORDER
+winStroke.Thickness = 1
+winStroke.Transparency = 0.4
+winStroke.Parent = win
+
+local accent = Instance.new("Frame")
+accent.Size = UDim2.new(0, 3, 0, 60)
+accent.Position = UDim2.new(0, 0, 0, 18)
+accent.BackgroundColor3 = C.CYAN
+accent.BorderSizePixel = 0
+accent.Parent = win
+
+local accentCorner = Instance.new("UICorner")
+accentCorner.CornerRadius = UDim.new(1, 0)
+accentCorner.Parent = accent
+
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 52)
+header.BackgroundTransparency = 1
+header.Parent = win
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(0, 120, 0, 18)
+title.Position = UDim2.new(0, 20, 0, 20)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.Text = "TRAJECTORY"
+title.TextColor3 = C.TEXT
+title.TextSize = 12
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = header
+
+local pill = Instance.new("Frame")
+pill.Size = UDim2.new(0, 62, 0, 18)
+pill.Position = UDim2.new(0, 138, 0, 20)
+pill.BackgroundColor3 = C.ROW
+pill.BorderSizePixel = 0
+pill.Parent = header
+
+local pillCorner = Instance.new("UICorner")
+pillCorner.CornerRadius = UDim.new(1, 0)
+pillCorner.Parent = pill
+
+local statusDot = Instance.new("Frame")
+statusDot.Size = UDim2.new(0, 6, 0, 6)
+statusDot.Position = UDim2.new(0, 7, 0.5, -3)
+statusDot.BackgroundColor3 = C.SUCCESS
+statusDot.BorderSizePixel = 0
+statusDot.Parent = pill
+
+local statusDotCorner = Instance.new("UICorner")
+statusDotCorner.CornerRadius = UDim.new(1, 0)
+statusDotCorner.Parent = statusDot
+
+local statusText = Instance.new("TextLabel")
+statusText.Size = UDim2.new(1, -20, 1, 0)
+statusText.Position = UDim2.new(0, 18, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Font = Enum.Font.GothamBold
+statusText.Text = "ACTIVE"
+statusText.TextColor3 = C.TEXT
+statusText.TextSize = 9
+statusText.TextXAlignment = Enum.TextXAlignment.Left
+statusText.Parent = pill
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 26, 0, 26)
+closeBtn.Position = UDim2.new(1, -36, 0, 16)
+closeBtn.BackgroundColor3 = C.ROW
+closeBtn.BorderSizePixel = 0
+closeBtn.Text = ""
+closeBtn.AutoButtonColor = false
+closeBtn.Parent = header
+
+local closeBtnCorner = Instance.new("UICorner")
+closeBtnCorner.CornerRadius = UDim.new(0, 7)
+closeBtnCorner.Parent = closeBtn
+
+for i = 1, 2 do
+	local line = Instance.new("Frame")
+	line.Name = "Diag" .. i
+	line.Size = UDim2.new(0, 11, 0, 1.5)
+	line.Position = UDim2.new(0.5, -5.5, 0.5, -0.75)
+	line.BackgroundColor3 = C.TEXT_DIM
+	line.BorderSizePixel = 0
+	line.Rotation = (i == 1) and 45 or -45
+	line.Parent = closeBtn
+end
+
+closeBtn.MouseEnter:Connect(function()
+	TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = C.DANGER}):Play()
+	for _, ch in ipairs(closeBtn:GetChildren()) do
+		if ch:IsA("Frame") then
+			TweenService:Create(ch, TweenInfo.new(0.15), {BackgroundColor3 = C.TEXT}):Play()
+		end
+	end
+end)
+closeBtn.MouseLeave:Connect(function()
+	TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = C.ROW}):Play()
+	for _, ch in ipairs(closeBtn:GetChildren()) do
+		if ch:IsA("Frame") then
+			TweenService:Create(ch, TweenInfo.new(0.15), {BackgroundColor3 = C.TEXT_DIM}):Play()
+		end
+	end
+end)
+closeBtn.MouseButton1Click:Connect(function() win.Visible = false end)
+
+do
+	local dragging, startMouse, startPos
+	header.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			startMouse = input.Position
+			startPos = win.Position
+		end
+	end)
+	header.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch) then
+			local d = input.Position - startMouse
+			win.Position = UDim2.new(
+				startPos.X.Scale, startPos.X.Offset + d.X,
+				startPos.Y.Scale, startPos.Y.Offset + d.Y)
+		end
+	end)
+end
+
+local hDiv = Instance.new("Frame")
+hDiv.Size = UDim2.new(1, -40, 0, 1)
+hDiv.Position = UDim2.new(0, 20, 0, 54)
+hDiv.BackgroundColor3 = C.BORDER
+hDiv.BackgroundTransparency = 0.5
+hDiv.BorderSizePixel = 0
+hDiv.Parent = win
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -40, 1, -110)
+content.Position = UDim2.new(0, 20, 0, 64)
+content.BackgroundTransparency = 1
+content.Parent = win
+
+local layout = Instance.new("UIListLayout")
+layout.FillDirection = Enum.FillDirection.Vertical
+layout.Padding = UDim.new(0, 8)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = content
+
+local function makeSection(text: string): Frame
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 16)
+	row.BackgroundTransparency = 1
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0, 70, 1, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.GothamBold
+	lbl.Text = string.upper(text)
+	lbl.TextColor3 = C.SECTION
+	lbl.TextSize = 9
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = row
+
+	local deco = Instance.new("Frame")
+	deco.Size = UDim2.new(1, -76, 0, 1)
+	deco.Position = UDim2.new(0, 76, 0.5, 0)
+	deco.BackgroundColor3 = C.BORDER
+	deco.BackgroundTransparency = 0.7
+	deco.BorderSizePixel = 0
+	deco.Parent = row
+
+	return row
+end
+
+local function makeToggle(labelText: string, initial: boolean, cb: (boolean) -> ()): Frame
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 38)
+	row.BackgroundColor3 = C.ROW
+	row.BorderSizePixel = 0
+
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 8)
+	c.Parent = row
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = C.BORDER
+	stroke.Thickness = 1
+	stroke.Transparency = 0.65
+	stroke.Parent = row
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -70, 1, 0)
+	lbl.Position = UDim2.new(0, 14, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.GothamMedium
+	lbl.Text = labelText
+	lbl.TextColor3 = C.TEXT
+	lbl.TextSize = 12
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = row
+
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(0, 40, 0, 20)
+	track.Position = UDim2.new(1, -52, 0.5, -10)
+	track.BackgroundColor3 = initial and C.ACCENT or C.BORDER
+	track.BorderSizePixel = 0
+	track.Parent = row
+
+	local tc = Instance.new("UICorner")
+	tc.CornerRadius = UDim.new(1, 0)
+	tc.Parent = track
+
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.Position = initial and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+	knob.BackgroundColor3 = C.TEXT
+	knob.BorderSizePixel = 0
+	knob.Parent = track
+
+	local kc = Instance.new("UICorner")
+	kc.CornerRadius = UDim.new(1, 0)
+	kc.Parent = knob
+
+	local val = initial
+	local function render()
+		TweenService:Create(track, TweenInfo.new(0.2, Enum.EasingStyle.Quart),
+			{BackgroundColor3 = val and C.ACCENT or C.BORDER}):Play()
+		TweenService:Create(knob, TweenInfo.new(0.2, Enum.EasingStyle.Quart),
+			{Position = val and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)}):Play()
+	end
+
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, 0, 1, 0)
+	btn.BackgroundTransparency = 1
+	btn.Text = ""
+	btn.AutoButtonColor = false
+	btn.Parent = row
+
+	btn.MouseButton1Click:Connect(function()
+		val = not val
+		render()
+		cb(val)
+	end)
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = C.ROW_HOVER}):Play()
+	end)
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = C.ROW}):Play()
+	end)
+
+	return row
+end
+
+local function makeSlider(labelText: string, min: number, max: number, initial: number,
+	step: number, fmt: string, cb: (number) -> ()): Frame
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 52)
+	row.BackgroundColor3 = C.ROW
+	row.BorderSizePixel = 0
+
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 8)
+	c.Parent = row
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = C.BORDER
+	stroke.Thickness = 1
+	stroke.Transparency = 0.65
+	stroke.Parent = row
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -80, 0, 18)
+	lbl.Position = UDim2.new(0, 14, 0, 7)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.GothamMedium
+	lbl.Text = labelText
+	lbl.TextColor3 = C.TEXT
+	lbl.TextSize = 12
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = row
+
+	local valBadge = Instance.new("Frame")
+	valBadge.Size = UDim2.new(0, 58, 0, 20)
+	valBadge.Position = UDim2.new(1, -72, 0, 6)
+	valBadge.BackgroundColor3 = C.BG
+	valBadge.BorderSizePixel = 0
+	valBadge.Parent = row
+
+	local vbc = Instance.new("UICorner")
+	vbc.CornerRadius = UDim.new(0, 5)
+	vbc.Parent = valBadge
+
+	local valLbl = Instance.new("TextLabel")
+	valLbl.Size = UDim2.new(1, 0, 1, 0)
+	valLbl.BackgroundTransparency = 1
+	valLbl.Font = Enum.Font.Code
+	valLbl.Text = string.format(fmt, initial)
+	valLbl.TextColor3 = C.CYAN
+	valLbl.TextSize = 11
+	valLbl.Parent = valBadge
+
+	local bar = Instance.new("Frame")
+	bar.Size = UDim2.new(1, -28, 0, 4)
+	bar.Position = UDim2.new(0, 14, 0, 36)
+	bar.BackgroundColor3 = C.BG
+	bar.BorderSizePixel = 0
+	bar.Parent = row
+
+	local bc = Instance.new("UICorner")
+	bc.CornerRadius = UDim.new(1, 0)
+	bc.Parent = bar
+
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new((initial - min) / (max - min), 0, 1, 0)
+	fill.BackgroundColor3 = C.ACCENT
+	fill.BorderSizePixel = 0
+	fill.Parent = bar
+
+	local fc = Instance.new("UICorner")
+	fc.CornerRadius = UDim.new(1, 0)
+	fc.Parent = fill
+
+	local sliderKnob = Instance.new("Frame")
+	sliderKnob.Size = UDim2.new(0, 10, 0, 10)
+	sliderKnob.Position = UDim2.new((initial - min) / (max - min), -5, 0.5, -5)
+	sliderKnob.BackgroundColor3 = C.TEXT
+	sliderKnob.BorderSizePixel = 0
+	sliderKnob.ZIndex = 2
+	sliderKnob.Parent = bar
+
+	local skc = Instance.new("UICorner")
+	skc.CornerRadius = UDim.new(1, 0)
+	skc.Parent = sliderKnob
+
+	local click = Instance.new("TextButton")
+	click.Size = UDim2.new(1, 0, 1, 24)
+	click.Position = UDim2.new(0, 0, 0, -12)
+	click.BackgroundTransparency = 1
+	click.Text = ""
+	click.Parent = bar
+
+	local dragging = false
+	local function updateFrom(x: number)
+		local relX = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+		local value = min + relX * (max - min)
+		if step > 0 then
+			value = math.floor(value / step + 0.5) * step
+		end
+		value = math.clamp(value, min, max)
+		local norm = (value - min) / (max - min)
+		TweenService:Create(fill, TweenInfo.new(0.08),
+			{Size = UDim2.new(norm, 0, 1, 0)}):Play()
+		TweenService:Create(sliderKnob, TweenInfo.new(0.08),
+			{Position = UDim2.new(norm, -5, 0.5, -5)}):Play()
+		valLbl.Text = string.format(fmt, value)
+		cb(value)
+	end
+
+	click.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			updateFrom(input.Position.X)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch) then
+			updateFrom(input.Position.X)
+		end
+	end)
+
+	return row
+end
+
+local function makeColorPicker(labelText: string, colors: {Color3}, initial: Color3, cb: (Color3) -> ()): Frame
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 58)
+	row.BackgroundColor3 = C.ROW
+	row.BorderSizePixel = 0
+
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 8)
+	c.Parent = row
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = C.BORDER
+	stroke.Thickness = 1
+	stroke.Transparency = 0.65
+	stroke.Parent = row
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -20, 0, 18)
+	lbl.Position = UDim2.new(0, 14, 0, 7)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.GothamMedium
+	lbl.Text = labelText
+	lbl.TextColor3 = C.TEXT
+	lbl.TextSize = 12
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = row
+
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(1, -28, 0, 24)
+	container.Position = UDim2.new(0, 14, 0, 28)
+	container.BackgroundTransparency = 1
+	container.Parent = row
+
+	local cl = Instance.new("UIListLayout")
+	cl.FillDirection = Enum.FillDirection.Horizontal
+	cl.Padding = UDim.new(0, 7)
+	cl.Parent = container
+
+	local selectedRing: UIStroke? = nil
+
+	for _, col in ipairs(colors) do
+		local sw = Instance.new("TextButton")
+		sw.Size = UDim2.new(0, 32, 0, 24)
+		sw.BackgroundColor3 = col
+		sw.BorderSizePixel = 0
+		sw.Text = ""
+		sw.AutoButtonColor = false
+		sw.Parent = container
+
+		local sc = Instance.new("UICorner")
+		sc.CornerRadius = UDim.new(0, 6)
+		sc.Parent = sw
+
+		local ring = Instance.new("UIStroke")
+		ring.Color = C.TEXT
+		ring.Thickness = 2
+		ring.Transparency = (col == initial) and 0 or 1
+		ring.Parent = sw
+		if col == initial then selectedRing = ring end
+
+		sw.MouseButton1Click:Connect(function()
+			if selectedRing then
+				TweenService:Create(selectedRing, TweenInfo.new(0.15), {Transparency = 1}):Play()
+			end
+			selectedRing = ring
+			TweenService:Create(ring, TweenInfo.new(0.15), {Transparency = 0}):Play()
+			cb(col)
+		end)
+	end
+
+	return row
+end
+
+local footer = Instance.new("Frame")
+footer.Size = UDim2.new(1, -40, 0, 38)
+footer.Position = UDim2.new(0, 20, 1, -44)
+footer.BackgroundTransparency = 1
+footer.Parent = win
+
+local footerDiv = Instance.new("Frame")
+footerDiv.Size = UDim2.new(1, 0, 0, 1)
+footerDiv.Position = UDim2.new(0, 0, 0, 0)
+footerDiv.BackgroundColor3 = C.BORDER
+footerDiv.BackgroundTransparency = 0.5
+footerDiv.BorderSizePixel = 0
+footerDiv.Parent = footer
+
+local function makeKeyHint(key: string, label: string, xOffset: number)
+	local hint = Instance.new("Frame")
+	hint.Size = UDim2.new(0, 90, 0, 22)
+	hint.Position = UDim2.new(0, xOffset, 0.5, 2)
+	hint.BackgroundTransparency = 1
+	hint.Parent = footer
+
+	local kbd = Instance.new("Frame")
+	kbd.Size = UDim2.new(0, 20, 0, 20)
+	kbd.Position = UDim2.new(0, 0, 0.5, -10)
+	kbd.BackgroundColor3 = C.ROW
+	kbd.BorderSizePixel = 0
+	kbd.Parent = hint
+
+	local kbdCorner = Instance.new("UICorner")
+	kbdCorner.CornerRadius = UDim.new(0, 5)
+	kbdCorner.Parent = kbd
+
+	local kbdStroke = Instance.new("UIStroke")
+	kbdStroke.Color = C.BORDER
+	kbdStroke.Thickness = 1
+	kbdStroke.Transparency = 0.4
+	kbdStroke.Parent = kbd
+
+	local kLbl = Instance.new("TextLabel")
+	kLbl.Size = UDim2.new(1, 0, 1, 0)
+	kLbl.BackgroundTransparency = 1
+	kLbl.Font = Enum.Font.GothamBold
+	kLbl.Text = key
+	kLbl.TextColor3 = C.TEXT
+	kLbl.TextSize = 10
+	kLbl.Parent = kbd
+
+	local dLbl = Instance.new("TextLabel")
+	dLbl.Size = UDim2.new(1, -28, 1, 0)
+	dLbl.Position = UDim2.new(0, 28, 0, 0)
+	dLbl.BackgroundTransparency = 1
+	dLbl.Font = Enum.Font.GothamMedium
+	dLbl.Text = string.upper(label)
+	dLbl.TextColor3 = C.TEXT_DIM
+	dLbl.TextSize = 10
+	dLbl.TextXAlignment = Enum.TextXAlignment.Left
+	dLbl.Parent = hint
+end
+
+makeKeyHint("E", "Menu", 0)
+makeKeyHint("L", "Lines", 105)
+
+local sec1 = makeSection("Trajectory")
+sec1.LayoutOrder = 1; sec1.Parent = content
+
+local t1 = makeToggle("Prediction Enabled", state.enabled, function(v)
+	state.enabled = v
+	TweenService:Create(statusDot, TweenInfo.new(0.2),
+		{BackgroundColor3 = v and C.SUCCESS or C.TEXT_DIM}):Play()
+	statusText.Text = v and "ACTIVE" or "IDLE"
+	if not v then clearLines() else computeTrajectory() end
+end)
+t1.LayoutOrder = 2; t1.Parent = content
+
+local s1 = makeSlider("Rail Bounces", 1, 8, state.bounces, 1, "%d", function(v)
+	state.bounces = v
+	computeTrajectory()
+end)
+s1.LayoutOrder = 3; s1.Parent = content
+
+local sec2 = makeSection("Appearance")
+sec2.LayoutOrder = 4; sec2.Parent = content
+
+local s2 = makeSlider("Line Thickness", 0.02, 0.3, state.thickness, 0.01, "%.2f", function(v)
+	state.thickness = v
+	computeTrajectory()
+end)
+s2.LayoutOrder = 5; s2.Parent = content
+
+local cp = makeColorPicker("Line Color", {
+	Color3.fromRGB(255, 255, 255),
+	Color3.fromRGB(255, 100, 100),
+	Color3.fromRGB(100, 255, 140),
+	Color3.fromRGB(91, 106, 245),
+	Color3.fromRGB(255, 200, 80),
+	Color3.fromRGB(200, 130, 255),
+}, state.color, function(c)
+	state.color = c
+	computeTrajectory()
+end)
+cp.LayoutOrder = 6; cp.Parent = content
+
+local sec3 = makeSection("Assist")
+sec3.LayoutOrder = 7; sec3.Parent = content
+
+local t2 = makeToggle("Shot Suggestions", state.suggestions, function(v)
+	state.suggestions = v
+	computeTrajectory()
+end)
+t2.LayoutOrder = 8; t2.Parent = content
+
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.E then
+		win.Visible = not win.Visible
+	elseif input.KeyCode == Enum.KeyCode.L then
+		state.enabled = not state.enabled
+		if not state.enabled then clearLines() else computeTrajectory() end
+	end
+end)
+
+HitTrajectory:GetPropertyChangedSignal("CFrame"):Connect(computeTrajectory)
+
+CueBall:GetPropertyChangedSignal("Position"):Connect(computeTrajectory)
+
+computeTrajectory()
