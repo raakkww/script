@@ -1,0 +1,109 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+
+-- force max zoom
+local function setZoom()
+    player.CameraMaxZoomDistance = 1000
+end
+
+-- keep enforcing zoom (some games reset it)
+task.spawn(function()
+    while true do
+        setZoom()
+        task.wait(1)
+    end
+end)
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "RakeHealthGui"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 260, 0, 60)
+frame.Position = UDim2.new(0.5, -130, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+frame.BackgroundTransparency = 0.3
+frame.Active = true
+frame.Parent = gui
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 1, 0)
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.fromRGB(255, 60, 60)
+label.Font = Enum.Font.GothamBold
+label.TextScaled = true
+label.Text = "Rake: Searching..."
+label.Parent = frame
+
+-- drag system
+local dragging = false
+local dragInput, dragStart, startPos
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- find rake
+local function isPlayerCharacter(model)
+    return Players:GetPlayerFromCharacter(model) ~= nil
+end
+
+local function findRake()
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") and not isPlayerCharacter(obj) then
+            local humanoid = obj:FindFirstChildOfClass("Humanoid")
+            if humanoid and obj.Name:lower():find("rake") then
+                return humanoid, obj.Name
+            end
+        end
+    end
+    return nil, nil
+end
+
+-- update loop
+task.spawn(function()
+    while true do
+        local humanoid, name = findRake()
+
+        if humanoid then
+            label.Text = name .. " HP: " ..
+                math.floor(humanoid.Health) .. " / " ..
+                math.floor(humanoid.MaxHealth)
+        else
+            label.Text = "Rake: Not Found"
+        end
+
+        task.wait(1)
+    end
+end)
