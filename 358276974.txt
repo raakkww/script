@@ -1,0 +1,127 @@
+local plrs = game:GetService("Players")
+local run = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local lp = plrs.LocalPlayer
+local cam = workspace.CurrentCamera
+
+-- SETTINGS
+local enabled = true
+local showFov = true
+
+-- FOV CIRCLE
+local Fov = Drawing.new("Circle")
+Fov.Radius = 150
+Fov.Color = Color3.fromRGB(255, 255, 255)
+Fov.Thickness = 1.5
+Fov.Filled = false
+Fov.Visible = true
+
+local target = nil
+
+-- UI
+local gui = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
+gui.Name = "AimbotUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 180)
+frame.Position = UDim2.new(0, 50, 0, 200)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.Active = true
+frame.Draggable = true
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.Text = "Aimbot UI"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+
+-- Toggle Aimbot
+local toggleBtn = Instance.new("TextButton", frame)
+toggleBtn.Size = UDim2.new(1, -20, 0, 35)
+toggleBtn.Position = UDim2.new(0,10,0,40)
+toggleBtn.Text = "Aimbot: ON"
+
+toggleBtn.MouseButton1Click:Connect(function()
+    enabled = not enabled
+    toggleBtn.Text = "Aimbot: " .. (enabled and "ON" or "OFF")
+end)
+
+-- Toggle FOV
+local fovBtn = Instance.new("TextButton", frame)
+fovBtn.Size = UDim2.new(1, -20, 0, 35)
+fovBtn.Position = UDim2.new(0,10,0,80)
+fovBtn.Text = "FOV: ON"
+
+fovBtn.MouseButton1Click:Connect(function()
+    showFov = not showFov
+    Fov.Visible = showFov
+    fovBtn.Text = "FOV: " .. (showFov and "ON" or "OFF")
+end)
+
+-- Radius Box
+local radiusBox = Instance.new("TextBox", frame)
+radiusBox.Size = UDim2.new(1, -20, 0, 30)
+radiusBox.Position = UDim2.new(0,10,0,130)
+radiusBox.PlaceholderText = "FOV Radius (150)"
+
+radiusBox.FocusLost:Connect(function()
+    local num = tonumber(radiusBox.Text)
+    if num then
+        Fov.Radius = num
+    end
+end)
+
+-- AIMBOT LOGIC
+run.RenderStepped:Connect(function()
+    local mpos = uis:GetMouseLocation()
+    Fov.Position = mpos
+    
+    if not enabled then
+        target = nil
+        return
+    end
+    
+    local closest = nil
+    local shortest = Fov.Radius
+
+    for _, v in pairs(plrs:GetPlayers()) do
+        if v ~= lp and v.Character then
+            local head = v.Character:FindFirstChild("Head")
+            local hrp = v.Character:FindFirstChild("HumanoidRootPart")
+            local hum = v.Character:FindFirstChild("Humanoid")
+            
+            if head and hum and hum.Health > 0 then
+                local part = hrp or head
+                local pos, vis = cam:WorldToViewportPoint(part.Position)
+                
+                if vis and pos.Z > 0 then
+                    local d = (Vector2.new(pos.X, pos.Y) - mpos).Magnitude
+                    if d < shortest then
+                        shortest = d
+                        closest = head
+                    end
+                end
+            end
+        end
+    end
+    
+    target = closest
+end)
+
+-- BULLET MOD
+local BulletLib = require(game:GetService("ReplicatedStorage").Client.Libraries.Bullets)
+
+local oldSpread = BulletLib.GetSpreadAngle
+if oldSpread then
+    BulletLib.GetSpreadAngle = function(...)
+        return 0
+    end
+end
+
+local oldFire = BulletLib.Fire
+BulletLib.Fire = function(self, p1, p2, p3, origin, dir, ...)
+    if enabled and target then
+        dir = (target.Position - origin).Unit
+    end
+    return oldFire(self, p1, p2, p3, origin, dir, ...)
+end
