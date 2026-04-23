@@ -1,0 +1,123 @@
+repeat task.wait() until game:IsLoaded()
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "+1 Jump and Escape Brainrot",
+    LoadingTitle = "Loading...",
+    LoadingSubtitle = "Auto Steal",
+    ConfigurationSaving = {
+        Enabled = false
+    }
+})
+
+local Tab = Window:CreateTab("Main")
+
+-- ตัวแปร
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+local folder = workspace:WaitForChild("DropModelFolder")
+
+local delayTime = 0.2
+local autoSteal = false
+
+local returnCFrame = CFrame.new(-231.460022, 5.166060, 701.478760, 0.058908, 0, -0.998263, 0, 1, 0, 0.998263, 0, 0.058908)
+
+-- rarity ที่เลือก
+local selectedRarities = {}
+
+-- Dropdown (เรียงง่าย → ยาก)
+Tab:CreateDropdown({
+    Name = "Select Rarity",
+    Options = {
+        "Common",
+        "Uncommon",
+        "Rare",
+        "Epic",
+        "Legendary",
+        "Mythical",
+        "Ancient",
+        "Divine",
+        "Secret"
+    },
+    CurrentOption = {},
+    MultipleOptions = true,
+    Callback = function(options)
+        selectedRarities = {}
+
+        for _, v in pairs(options) do
+            selectedRarities[string.lower(v)] = true
+        end
+    end
+})
+
+-- Toggle
+Tab:CreateToggle({
+    Name = "Auto Steal",
+    CurrentValue = false,
+    Callback = function(value)
+        autoSteal = value
+    end
+})
+
+-- ฟังก์ชันหา rarity (รองรับ TextLabel + Value)
+local function getRarity(v)
+    local billboard = v:FindFirstChild("ModelSpawnBillboard", true)
+    if not billboard then return nil end
+
+    local rarityObj = billboard:FindFirstChild("rarity")
+    if not rarityObj then return nil end
+
+    local rarity
+
+    if rarityObj:IsA("TextLabel") then
+        rarity = rarityObj.Text
+    elseif rarityObj:IsA("StringValue") or rarityObj:IsA("IntValue") then
+        rarity = tostring(rarityObj.Value)
+    end
+
+    if rarity then
+        return string.lower(rarity:gsub("%s+", ""))
+    end
+end
+
+-- LOOP หลัก
+task.spawn(function()
+    while true do
+        if not autoSteal then
+            task.wait(0.1)
+            continue
+        end
+
+        for _, v in pairs(folder:GetChildren()) do
+            if not autoSteal then break end
+
+            local rarity = getRarity(v)
+
+            if rarity and selectedRarities[rarity] then
+                local prompt = v:FindFirstChildWhichIsA("ProximityPrompt", true)
+
+                if prompt then
+                    print("STEAL:", v.Name, rarity)
+
+                    hrp.CFrame = v:GetPivot()
+                    task.wait(delayTime)
+
+                    if not autoSteal then break end
+
+                    fireproximityprompt(prompt)
+                    task.wait(delayTime)
+
+                    if not autoSteal then break end
+
+                    hrp.CFrame = returnCFrame
+                    task.wait(delayTime)
+                end
+            end
+
+            task.wait(delayTime)
+        end
+    end
+end)
