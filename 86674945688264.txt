@@ -1,0 +1,70 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "1 Plank = $1/s",
+   LoadingTitle = "loading...",
+   LoadingSubtitle = "by gulucukroot",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "StepEventConfig", 
+      FileName = "RemoteConfig"
+   }
+})
+
+local Tab = Window:CreateTab("Main Settings", 4483362458) -- Main Tab
+
+local autoFarm = false
+local delayTime = 0.1
+local multiplier = 1
+
+-- Auto Remote Toggle
+local Toggle = Tab:CreateToggle({
+   Name = "Auto Fire Remote",
+   CurrentValue = false,
+   Flag = "AutoRemote",
+   Callback = function(Value)
+      autoFarm = Value
+      
+      if autoFarm then
+         task.spawn(function()
+            while autoFarm do
+               -- Multiplier döngüsü
+               for i = 1, multiplier do
+                  game:GetService("ReplicatedStorage"):WaitForChild("StepEvent"):FireServer()
+               end
+               
+               -- Delay süresi
+               task.wait(delayTime)
+            end
+         end)
+      end
+   end,
+})
+
+-- Delay Slider
+local SliderDelay = Tab:CreateSlider({
+   Name = "Delay",
+   Range = {0, 1},
+   Increment = 0.01,
+   Suffix = "s",
+   CurrentValue = 0.1,
+   Flag = "DelaySlider",
+   Callback = function(Value)
+      delayTime = Value
+   end,
+})
+
+-- Multiplier Slider
+local SliderMult = Tab:CreateSlider({
+   Name = "Multiplier",
+   Range = {1, 50},
+   Increment = 1,
+   Suffix = "x",
+   CurrentValue = 1,
+   Flag = "MultSlider",
+   Callback = function(Value)
+      multiplier = Value
+   end,
+})
+
+Rayfield:LoadConfiguration()
