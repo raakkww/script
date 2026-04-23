@@ -1,0 +1,236 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+ScreenGui.Name = "screen_gui"
+ScreenGui.ResetOnSpawn = false
+
+-- Smooth Tween Helper
+local function tween(obj, props, time)
+    local t = TweenService:Create(obj, TweenInfo.new(time or 0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), props)
+    t:Play()
+    return t
+end
+
+-- 1. LOADING ANIMATION
+local LoadFrame = Instance.new("Frame", ScreenGui)
+LoadFrame.Size = UDim2.new(1, 0, 1, 0)
+LoadFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+LoadFrame.ZIndex = 10
+
+local LoadText = Instance.new("TextLabel", LoadFrame)
+LoadText.Size = UDim2.new(1, 0, 1, 0)
+LoadText.Text = ""
+LoadText.TextColor3 = Color3.fromRGB(255, 160, 0)
+LoadText.Font = Enum.Font.Code
+LoadText.TextSize = 50
+LoadText.BackgroundTransparency = 1
+
+task.spawn(function()
+    task.wait(1)
+    tween(LoadText, {TextTransparency = 1}, 0.5)
+    local t = tween(LoadFrame, {BackgroundTransparency = 1}, 0.5)
+    t.Completed:Connect(function() LoadFrame:Destroy() end)
+end)
+
+-- 2. DRAGGABLE OPEN BUTTON
+local OpenBtn = Instance.new("TextButton", ScreenGui)
+OpenBtn.Size = UDim2.new(0, 100, 0, 35)
+OpenBtn.Position = UDim2.new(0, 10, 0.5, 0)
+OpenBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+OpenBtn.Text = "OPEN"
+OpenBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+OpenBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", OpenBtn)
+local btnStroke = Instance.new("UIStroke", OpenBtn)
+btnStroke.Color = Color3.fromRGB(255, 160, 0)
+btnStroke.Thickness = 1.5
+
+-- 3. MAIN UI FRAME
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 420, 0, 280)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -140)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Visible = false
+MainFrame.ClipsDescendants = true
+Instance.new("UICorner", MainFrame)
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(255, 160, 0)
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 18
+
+-- Sidebar
+local Sidebar = Instance.new("Frame", MainFrame)
+Sidebar.Size = UDim2.new(0, 100, 1, 0)
+Sidebar.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Instance.new("UICorner", Sidebar)
+
+-- Avatar Circle
+local Avatar = Instance.new("ImageLabel", Sidebar)
+Avatar.Size = UDim2.new(0, 60, 0, 60)
+Avatar.Position = UDim2.new(0.5, -30, 0, 10)
+Avatar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Avatar.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1, 0)
+
+-- Tab Buttons
+local function createTab(name, y)
+    local b = Instance.new("TextButton", Sidebar)
+    b.Size = UDim2.new(1, -10, 0, 35)
+    b.Position = UDim2.new(0, 5, 0, y)
+    b.Text = name
+    b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    b.TextColor3 = Color3.fromRGB(180, 180, 180)
+    b.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", b)
+    return b
+end
+
+local HomeBtn = createTab("HOME", 80)
+local MoreBtn = createTab("MORE", 120)
+local CredBtn = createTab("CREDITS", 160)
+
+-- Pages Container
+local Pages = Instance.new("Frame", MainFrame)
+Pages.Size = UDim2.new(1, -110, 1, -10)
+Pages.Position = UDim2.new(0, 105, 0, 5)
+Pages.BackgroundTransparency = 1
+
+local function createPage()
+    local f = Instance.new("Frame", Pages)
+    f.Size = UDim2.new(1, 0, 1, 0)
+    f.BackgroundTransparency = 1
+    f.Visible = false
+    return f
+end
+
+local HomeContent = createPage()
+local MoreContent = createPage()
+local CredContent = createPage()
+HomeContent.Visible = true
+
+-- HOME SECTION: Inf Jump & Speed
+local JumpBtn = Instance.new("TextButton", HomeContent)
+JumpBtn.Size = UDim2.new(1, -10, 0, 35)
+JumpBtn.Position = UDim2.new(0, 5, 0, 10)
+JumpBtn.Text = "Inf Jump: OFF"
+JumpBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+JumpBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+Instance.new("UICorner", JumpBtn)
+
+local SpeedInput = Instance.new("TextBox", HomeContent)
+SpeedInput.Size = UDim2.new(1, -10, 0, 35)
+SpeedInput.Position = UDim2.new(0, 5, 0, 55)
+SpeedInput.PlaceholderText = "Enter Speed (e.g. 50)"
+SpeedInput.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+SpeedInput.TextColor3 = Color3.fromRGB(200, 200, 200)
+Instance.new("UICorner", SpeedInput)
+
+-- MORE SECTION: Placeholder
+local MoreText = Instance.new("TextLabel", MoreContent)
+MoreText.Size = UDim2.new(1, 0, 1, 0)
+MoreText.Text = "WORKING ON IT...\n\nComing Soon:\nESP, Fly, Noclip"
+MoreText.TextColor3 = Color3.fromRGB(150, 150, 150)
+MoreText.BackgroundTransparency = 1
+MoreText.Font = Enum.Font.GothamBold
+
+-- CREDITS SECTION
+local CredText = Instance.new("TextLabel", CredContent)
+CredText.Size = UDim2.new(1, 0, 1, 0)
+CredText.Text = ""
+CredText.TextColor3 = Color3.fromRGB(200, 200, 200)
+CredText.BackgroundTransparency = 1
+CredText.Font = Enum.Font.GothamBold
+CredText.TextSize = 16
+
+-- FPS Counter
+local FPSLabel = Instance.new("TextLabel", Sidebar)
+FPSLabel.Size = UDim2.new(1, 0, 0, 30)
+FPSLabel.Position = UDim2.new(0, 0, 1, -30)
+FPSLabel.Text = "FPS: 60"
+FPSLabel.TextColor3 = Color3.fromRGB(255, 160, 0)
+FPSLabel.BackgroundTransparency = 1
+FPSLabel.Font = Enum.Font.Code
+
+--- LOGIC & FUNCTIONALITY ---
+
+-- Draggable Function
+local function makeDraggable(obj)
+    local dragging, dragStart, startPos
+    obj.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = obj.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function() dragging = false end)
+end
+
+makeDraggable(OpenBtn)
+makeDraggable(MainFrame)
+
+-- Toggle Menu
+OpenBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true; OpenBtn.Visible = false
+    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+    tween(MainFrame, {Size = UDim2.new(0, 420, 0, 280)}, 0.4)
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    local t = tween(MainFrame, {Size = UDim2.new(0, 0, 0, 0)}, 0.3)
+    t.Completed:Connect(function() MainFrame.Visible = false; OpenBtn.Visible = true end)
+end)
+
+-- Tab Switching
+local function show(p)
+    HomeContent.Visible = false; MoreContent.Visible = false; CredContent.Visible = false
+    p.Visible = true
+end
+HomeBtn.MouseButton1Click:Connect(function() show(HomeContent) end)
+MoreBtn.MouseButton1Click:Connect(function() show(MoreContent) end)
+CredBtn.MouseButton1Click:Connect(function() show(CredContent) end)
+
+-- FEATURES LOGIC
+local infJump = false
+JumpBtn.MouseButton1Click:Connect(function()
+    infJump = not infJump
+    JumpBtn.Text = infJump and "Inf Jump: ON" or "Inf Jump: OFF"
+    tween(JumpBtn, {BackgroundColor3 = infJump and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(35, 35, 35)}, 0.2)
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if infJump and LocalPlayer.Character then
+        local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+SpeedInput.FocusLost:Connect(function()
+    local val = tonumber(SpeedInput.Text)
+    if val and LocalPlayer.Character then
+        LocalPlayer.Character.Humanoid.WalkSpeed = val
+    end
+end)
+
+-- FPS Loop
+task.spawn(function()
+    while task.wait(0.5) do
+        local fps = math.floor(1/RunService.RenderStepped:Wait())
+        FPSLabel.Text = "FPS: "..fps
+    end
+end)
