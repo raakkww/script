@@ -1,0 +1,112 @@
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
+local ExecuteBtn = Instance.new("TextButton")
+local Title = Instance.new("TextLabel")
+
+ScreenGui.Name = "ExternalUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(1, -160, 0, 50)
+MainFrame.Size = UDim2.new(0, 140, 0, 45)
+
+UICorner.CornerRadius = UDim.new(0, 4)
+UICorner.Parent = MainFrame
+
+UIStroke.Color = Color3.fromRGB(45, 45, 45)
+UIStroke.Thickness = 1
+UIStroke.Parent = MainFrame
+
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 8, 0, 2)
+Title.Size = UDim2.new(1, -16, 0, 15)
+Title.Font = Enum.Font.Code
+Title.Text = ""
+Title.TextColor3 = Color3.fromRGB(180, 180, 180)
+Title.TextSize = 10
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+ExecuteBtn.Name = "ExecuteBtn"
+ExecuteBtn.Parent = MainFrame
+ExecuteBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+ExecuteBtn.Position = UDim2.new(0, 5, 0, 20)
+ExecuteBtn.Size = UDim2.new(1, -10, 0, 20)
+ExecuteBtn.Font = Enum.Font.Code
+ExecuteBtn.Text = "Perfect Kick"
+ExecuteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ExecuteBtn.TextSize = 11
+ExecuteBtn.AutoButtonColor = false
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 3)
+BtnCorner.Parent = ExecuteBtn
+
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+ExecuteBtn.MouseEnter:Connect(function()
+    TweenService:Create(ExecuteBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 35, 35)}):Play()
+end)
+
+ExecuteBtn.MouseLeave:Connect(function()
+    TweenService:Create(ExecuteBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
+end)
+
+local function RunFirst()
+    local Event = ReplicatedStorage.Shared.Packages.Network.rev_SPEED_UPDATE
+    firesignal(Event.OnClientEvent, 111)
+end
+
+local function RunSecond()
+    local Event = ReplicatedStorage.Shared.Packages.Network.rev_KickEvent
+    Event:FireServer(1)
+end
+
+RunFirst()
+
+ExecuteBtn.MouseButton1Click:Connect(function()
+    RunSecond()
+end)
