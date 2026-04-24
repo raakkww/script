@@ -1,0 +1,107 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+	Name = "Get +1 Skill Point Every Second",
+	LoadingTitle = "",
+	LoadingSubtitle = "",
+	ConfigurationSaving = {
+		Enabled = false
+	}
+})
+
+local Tab = Window:CreateTab("Main", 4483362458)
+
+local auraEnabled = false
+local auraRange = 50
+local fireRate = 0.2
+
+local projectileRemotes = {}
+for _, obj in ipairs(ReplicatedStorage:GetChildren()) do
+	if obj:IsA("RemoteEvent") and obj.Name:match("^FireMagicProjectile%d+$") then
+		table.insert(projectileRemotes, obj)
+	end
+end
+
+Tab:CreateToggle({
+	Name = "Enable Aura",
+	CurrentValue = false,
+	Callback = function(value)
+		auraEnabled = value
+	end
+})
+
+Tab:CreateSlider({
+	Name = "Range",
+	Range = {10, 200},
+	Increment = 5,
+	Suffix = "studs",
+	CurrentValue = 50,
+	Callback = function(value)
+		auraRange = value
+	end
+})
+
+Tab:CreateSlider({
+	Name = "Fire Rate",
+	Range = {0.05, 1},
+	Increment = 0.05,
+	Suffix = "sec",
+	CurrentValue = 0.2,
+	Callback = function(value)
+		fireRate = value
+	end
+})
+
+
+local function getEnemiesInRange(root)
+	local enemies = {}
+
+	for _, folder in ipairs(workspace:GetChildren()) do
+		if folder:IsA("Folder") then
+			for _, enemy in ipairs(folder:GetChildren()) do
+				if enemy:IsA("Model") and enemy:FindFirstChild("HumanoidRootPart") then
+					local dist = (enemy.HumanoidRootPart.Position - root.Position).Magnitude
+					if dist <= auraRange then
+						table.insert(enemies, enemy.HumanoidRootPart)
+					end
+				end
+			end
+		end
+	end
+
+	return enemies
+end
+
+local function run(character)
+	local root = character:WaitForChild("HumanoidRootPart")
+
+	while character.Parent do
+		if auraEnabled then
+			local enemies = getEnemiesInRange(root)
+
+			for _, enemyRoot in ipairs(enemies) do
+				local args = { enemyRoot.Position }
+
+				for _, remote in ipairs(projectileRemotes) do
+					remote:FireServer(unpack(args))
+				end
+			end
+		end
+
+		task.wait(fireRate)
+	end
+end
+
+if player.Character then
+	task.spawn(run, player.Character)
+end
+
+player.CharacterAdded:Connect(function(char)
+	task.wait(1)
+	task.spawn(run, char)
+end)
