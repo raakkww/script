@@ -1,0 +1,40 @@
+local ScreenGui = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local WinsButton = Instance.new("TextButton")
+local CoinsButton = Instance.new("TextButton")
+
+ScreenGui.Parent = game.CoreGui
+
+-- Frame
+Frame.Parent = ScreenGui
+Frame.Size = UDim2.new(0, 200, 0, 150)
+Frame.Position = UDim2.new(0.5, -100, 0.5, -75)
+Frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+
+-- Wins Button
+WinsButton.Parent = Frame
+WinsButton.Size = UDim2.new(1, -20, 0, 50)
+WinsButton.Position = UDim2.new(0, 10, 0, 10)
+WinsButton.Text = "Add Wins"
+
+-- Coins Button
+CoinsButton.Parent = Frame
+CoinsButton.Size = UDim2.new(1, -20, 0, 50)
+CoinsButton.Position = UDim2.new(0, 10, 0, 80)
+CoinsButton.Text = "Add Coins"
+
+-- Function Remote
+local remote = game:GetService("ReplicatedStorage")
+    :WaitForChild("Remote")
+    :WaitForChild("Event")
+    :WaitForChild("Race")
+    :WaitForChild("AddCoinsOrWins")
+
+-- Button events
+WinsButton.MouseButton1Click:Connect(function()
+    remote:FireServer(math.huge, "Wins")
+end)
+
+CoinsButton.MouseButton1Click:Connect(function()
+    remote:FireServer(math.huge, "Coins")
+end)
