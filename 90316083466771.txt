@@ -1,0 +1,132 @@
+local lp = game.Players.LocalPlayer
+local rs = game:GetService("RunService")
+local vdt = game.ReplicatedStorage:WaitForChild("VerdantRemotes")
+local resolve = vdt:FindFirstChild("VDT_Fishing.ResolveResult")
+local vim = game:GetService("VirtualInputManager")
+
+game:GetService("StarterGui"):SetCore("SendNotification", {
+	Title = "",
+	Text = "Enjoy it!",
+	Duration = 6
+})
+
+local helix = Instance.new("ScreenGui", game.CoreGui)
+local main = Instance.new("Frame", helix)
+main.Size = UDim2.new(0, 160, 0, 205)
+main.Position = UDim2.new(0.05, 0, 0.4, 0)
+main.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
+main.Active = true
+main.Draggable = true
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
+
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(150, 80, 255)
+stroke.Thickness = 1.5
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Text = ""
+title.TextColor3 = Color3.fromRGB(180, 100, 255)
+title.BackgroundTransparency = 1
+title.Font = "Code"
+title.TextSize = 14
+
+local hlx = Instance.new("TextButton", helix)
+hlx.Size = UDim2.new(0, 40, 0, 25)
+hlx.Position = UDim2.new(0.05, 0, 0.4, 210)
+hlx.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+hlx.Text = ""
+hlx.TextColor3 = Color3.fromRGB(180, 100, 255)
+hlx.Font = "Code"
+hlx.TextSize = 13
+hlx.Active = true
+hlx.Draggable = true
+Instance.new("UICorner", hlx)
+local hstroke = Instance.new("UIStroke", hlx)
+hstroke.Color = Color3.fromRGB(150, 80, 255)
+hstroke.Thickness = 1
+
+hlx.MouseButton1Click:Connect(function()
+	main.Visible = not main.Visible
+end)
+
+local list = Instance.new("UIListLayout", main)
+list.Padding = UDim.new(0, 5)
+list.HorizontalAlignment = "Center"
+list.SortOrder = "LayoutOrder"
+
+local cfg = {ac = false, fc = false, ae = false}
+
+local function btn(txt, f, order)
+	local b = Instance.new("TextButton", main)
+	b.Size = UDim2.new(0.9, 0, 0, 35)
+	b.Text = txt .. ": OFF"
+	b.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	b.TextColor3 = Color3.fromRGB(255, 255, 255)
+	b.Font = "SourceSansBold"
+	b.TextSize = 12
+	b.LayoutOrder = order
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
+	
+	b.MouseButton1Click:Connect(function()
+		cfg[f] = not cfg[f]
+		b.Text = txt .. (cfg[f] and ": ON" or ": OFF")
+		b.BackgroundColor3 = cfg[f] and Color3.fromRGB(80, 40, 180) or Color3.fromRGB(20, 20, 25)
+	end)
+end
+
+btn("Auto Minigame", "ac", 1)
+btn("Quick Catch", "fc", 2)
+btn("Auto Equip", "ae", 3)
+
+local close = Instance.new("TextButton", main)
+close.Size = UDim2.new(0.9, 0, 0, 30)
+close.Text = "Close UI"
+close.BackgroundColor3 = Color3.fromRGB(180, 20, 20)
+close.TextColor3 = Color3.fromRGB(255, 255, 255)
+close.Font = "SourceSansBold"
+close.TextSize = 12
+close.LayoutOrder = 4
+Instance.new("UICorner", close).CornerRadius = UDim.new(0, 5)
+close.MouseButton1Click:Connect(function() helix:Destroy() end)
+
+rs.RenderStepped:Connect(function()
+	if cfg.ac then
+		local gui = lp.PlayerGui:FindFirstChild("ReelBar")
+		if gui and gui.Enabled then
+			local h = gui.Holder.ReelGame.Holder
+			local bY, zY, zS = h.YourBar.AbsolutePosition.Y, h.OuterZone.AbsolutePosition.Y, h.OuterZone.AbsoluteSize.Y
+			if bY >= zY and bY <= (zY + zS) then
+				vim:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+				task.wait()
+				vim:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+			end
+		end
+	end
+end)
+
+task.spawn(function()
+	while task.wait(0.2) do
+		if cfg.fc and resolve then
+			local bar = lp.PlayerGui:FindFirstChild("ReelBar")
+			if bar and bar.Enabled then
+				resolve:FireServer(true)
+				task.wait(0.05)
+				resolve:FireServer(false)
+				bar.Enabled = false
+				local c = lp.Character
+				if c then
+					local t = c:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
+					if t then
+						t.Parent = lp.Backpack
+						if cfg.ae then
+							task.wait(0.15)
+							if c:FindFirstChild("Humanoid") then c.Humanoid:EquipTool(t) end
+						end
+					end
+				end
+			end
+		end
+	end
+end)
