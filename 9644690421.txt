@@ -1,0 +1,49 @@
+local function processTile(tile)
+    local children = tile:GetChildren()
+    
+    if #children > 2 and children[2]:IsA("TouchTransmitter") then
+        tile.Color = Color3.fromRGB(0, 255, 0)
+        print("Correct tile: " .. tile.Name)
+        return true
+    else 
+        tile.Color = Color3.fromRGB(255, 0, 0)
+        return false
+    end
+end
+
+local function Main()
+    for i = 1, 80 do
+        local glass = workspace.GlassTiles:FindFirstChild(tostring(i))
+        
+        if glass then
+            for _, tile in ipairs(glass:GetChildren()) do
+                processTile(tile)
+            end
+        end
+    end
+end
+
+local function checkForPurpleTiles()
+    for i = 1, 80 do
+        local glass = workspace.GlassTiles:FindFirstChild(tostring(i))
+        
+        if glass then
+            for _, tile in ipairs(glass:GetChildren()) do
+                if tile:IsA("BasePart") and tile.Color == Color3.fromRGB(121, 66, 179) then
+                    Main()
+                    return
+                end
+            end
+        end
+    end
+end
+
+
+Main()
+
+task.spawn(function()
+    while true do
+        task.wait(2)
+        checkForPurpleTiles()
+    end
+end)
