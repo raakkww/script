@@ -1,0 +1,64 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Hitbox Hub",
+    LoadingTitle = "Loading...",
+    LoadingSubtitle = "",
+    ConfigurationSaving = {Enabled = false},
+    KeySystem = false
+})
+
+local _G = {
+    HitboxEnabled = false,
+    HitboxSize = 15,
+    HitboxTransp = 0.5
+}
+
+local MainTab = Window:CreateTab("Main", "target")
+
+MainTab:CreateSection("Hitbox Settings")
+
+MainTab:CreateToggle({
+    Name = "Enable Hitbox",
+    CurrentValue = false,
+    Callback = function(v) _G.HitboxEnabled = v end,
+})
+
+MainTab:CreateSlider({
+    Name = "Size",
+    Range = {2, 100},
+    Increment = 1,
+    CurrentValue = 15,
+    Callback = function(v) _G.HitboxSize = v end,
+})
+
+MainTab:CreateSlider({
+    Name = "Transparency",
+    Range = {0, 1},
+    Increment = 0.1,
+    CurrentValue = 0.5,
+    Callback = function(v) _G.HitboxTransp = v end,
+})
+
+---
+
+--// CORE LOGIC
+game:GetService("RunService").RenderStepped:Connect(function()
+    for _, player in pairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer and player.Character then
+            local root = player.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                if _G.HitboxEnabled then
+                    root.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+                    root.Transparency = _G.HitboxTransp
+                    root.Color = Color3.fromRGB(255, 0, 0)
+                    root.Material = Enum.Material.Neon
+                    root.CanCollide = false
+                else
+                    root.Size = Vector3.new(2, 2, 1)
+                    root.Transparency = 0
+                end
+            end
+        end
+    end
+end)
