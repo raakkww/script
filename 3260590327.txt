@@ -1,0 +1,151 @@
+local UIS = game:GetService("UserInputService")
+
+local gui = script.Parent
+local main = gui:WaitForChild("MainFrame")
+local topBar = main:WaitForChild("TopBar")
+local content = main:WaitForChild("Content")
+
+-- ð§ FIX VISIBILITY ISSUE
+gui.Enabled = true
+main.Visible = true
+
+-- Tabs (pages)
+local tabs = {
+	Automation = content:WaitForChild("AutomationFrame"),
+	Interactive = content:WaitForChild("InteractiveFrame"),
+	Configuration = content:WaitForChild("ConfigurationFrame"),
+	Settings = content:WaitForChild("SettingsFrame")
+}
+
+-- Buttons
+local buttons = {
+	Automation = topBar:WaitForChild("Automation"),
+	Interactive = topBar:WaitForChild("Interactive"),
+	Configuration = topBar:WaitForChild("Configuration"),
+	Settings = topBar:WaitForChild("Settings")
+}
+
+local currentTab = "Automation"
+local guiOpen = true
+
+-- ð SWITCH TAB FUNCTION
+local function switchTab(tabName)
+	currentTab = tabName
+
+	for name, frame in pairs(tabs) do
+		frame.Visible = (name == tabName)
+	end
+
+	-- highlight active tab
+	for name, button in pairs(buttons) do
+		if name == tabName then
+			button.BackgroundTransparency = 0
+			button.TextTransparency = 0
+		else
+			button.BackgroundTransparency = 0.6
+			button.TextTransparency = 0.3
+		end
+	end
+end
+
+-- ð CONNECT TAB BUTTONS
+for name, button in pairs(buttons) do
+	button.MouseButton1Click:Connect(function()
+		switchTab(name)
+	end)
+end
+
+-- ð® TAB KEY TOGGLE GUI
+UIS.InputBegan:Connect(function(input, gp)
+	if gp then return end
+
+	if input.KeyCode == Enum.KeyCode.Tab then
+		guiOpen = not guiOpen
+		main.Visible = guiOpen
+	end
+end)
+
+-- =========================
+-- ð§© FEATURE CONTENT SETUP
+-- =========================
+
+-- AUTOMATION TAB
+local auto = tabs.Automation
+
+local autoLabel = Instance.new("TextLabel")
+autoLabel.Size = UDim2.new(1, 0, 0, 50)
+autoLabel.Text = "Automation Hub"
+autoLabel.Parent = auto
+
+local autoToggle = Instance.new("TextButton")
+autoToggle.Size = UDim2.new(0, 200, 0, 40)
+autoToggle.Position = UDim2.new(0, 10, 0, 60)
+autoToggle.Text = "Auto Score: OFF"
+autoToggle.Parent = auto
+
+local autoEnabled = false
+autoToggle.MouseButton1Click:Connect(function()
+	autoEnabled = not autoEnabled
+	autoToggle.Text = "Auto Score: " .. (autoEnabled and "ON" or "OFF")
+end)
+
+-- INTERACTIVE TAB
+local inter = tabs.Interactive
+
+local tpButton = Instance.new("TextButton")
+tpButton.Size = UDim2.new(0, 200, 0, 40)
+tpButton.Position = UDim2.new(0, 10, 0, 10)
+tpButton.Text = "Teleport Action"
+tpButton.Parent = inter
+
+tpButton.MouseButton1Click:Connect(function()
+	local char = game.Players.LocalPlayer.Character
+	if char and char:FindFirstChild("HumanoidRootPart") then
+		char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame + Vector3.new(0, 10, 0)
+	end
+end)
+
+-- CONFIGURATION TAB
+local config = tabs.Configuration
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(0, 200, 0, 30)
+speedLabel.Text = "Speed: 16"
+speedLabel.Parent = config
+
+local speed = 16
+
+local speedUp = Instance.new("TextButton")
+speedUp.Size = UDim2.new(0, 100, 0, 40)
+speedUp.Position = UDim2.new(0, 10, 0, 40)
+speedUp.Text = "+"
+speedUp.Parent = config
+
+speedUp.MouseButton1Click:Connect(function()
+	speed += 2
+	speedLabel.Text = "Speed: " .. speed
+
+	local char = game.Players.LocalPlayer.Character
+	if char and char:FindFirstChildOfClass("Humanoid") then
+		char.Humanoid.WalkSpeed = speed
+	end
+end)
+
+-- SETTINGS TAB
+local settings = tabs.Settings
+
+local resetButton = Instance.new("TextButton")
+resetButton.Size = UDim2.new(0, 200, 0, 40)
+resetButton.Position = UDim2.new(0, 10, 0, 10)
+resetButton.Text = "Reset Character"
+resetButton.Parent = settings
+
+resetButton.MouseButton1Click:Connect(function()
+	local char = game.Players.LocalPlayer.Character
+	if char and char:FindFirstChildOfClass("Humanoid") then
+		char:FindFirstChildOfClass("Humanoid").Health = 0
+	end
+end)
+
+-- DEFAULT TAB
+switchTab("Automation")
