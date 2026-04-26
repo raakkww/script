@@ -1,0 +1,193 @@
+-- [[ BODYCAM V22 ]] !!PRESS T FOR AIMBOT!!
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local Stats = game:GetService("Stats")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local AimbotAktif = false
+
+local AYARLAR = {
+    AimbotTusu = Enum.KeyCode.T,
+    FOV = 200,
+    HitboxSize = 5, -- KafalarÄ±n bÃ¼yÃ¼klÃ¼ÄÃ¼ (Standart 1'dir, 5 idealdir)
+    Colors = {
+        Hostile = Color3.fromRGB(255, 0, 0), 
+        Arrested = Color3.fromRGB(0, 255, 0), 
+        Player = Color3.fromRGB(0, 255, 255), 
+        Dead = Color3.fromRGB(100, 100, 100), 
+        Object = Color3.fromRGB(170, 0, 255)  
+    },
+    LootTags = {"Safe", "Money", "Cash", "Para", "Kasa", "Weapon", "Key", "Card"}
+}
+
+-- ð ï¸ EXECUTOR TESPÄ°TÄ°
+local function GetExecutor()
+    return (identifyexecutor and identifyexecutor()) or (getexecutorname and getexecutorname()) or "Unknown UNC"
+end
+
+-- âï¸ FULLBRIGHT
+local function SetFullbright()
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    Lighting.GlobalShadows = false
+    Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+end
+SetFullbright()
+
+-- ð UI & FOV
+local ScreenGui = Instance.new("ScreenGui", (gethui and gethui()) or game:GetService("CoreGui"))
+local StatFrame = Instance.new("Frame", ScreenGui)
+StatFrame.Size = UDim2.new(0, 200, 0, 120); StatFrame.Position = UDim2.new(0, 10, 0, 10)
+StatFrame.BackgroundColor3 = Color3.new(0, 0, 0); StatFrame.BackgroundTransparency = 0.5
+Instance.new("UICorner", StatFrame)
+
+local StatText = Instance.new("TextLabel", StatFrame)
+StatText.Size = UDim2.new(1, -10, 1, -10); StatText.Position = UDim2.new(0, 5, 0, 5)
+StatText.TextColor3 = Color3.new(1, 1, 1); StatText.TextSize = 11; StatText.Font = Enum.Font.Code; StatText.TextXAlignment = "Left"; StatText.RichText = true
+
+local FOVGui = Instance.new("Frame", ScreenGui)
+FOVGui.Size = UDim2.new(0, AYARLAR.FOV * 2, 0, AYARLAR.FOV * 2)
+FOVGui.AnchorPoint = Vector2.new(0.5, 0.5); FOVGui.BackgroundTransparency = 1
+local FOVStroke = Instance.new("UIStroke", FOVGui); FOVStroke.Color = Color3.new(1, 1, 1)
+Instance.new("UICorner", FOVGui).CornerRadius = UDim.new(1, 0)
+
+-- ð STATUS CHECKER
+local function GetStatus(model)
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    if not hum then return "DEAD", AYARLAR.Colors.Dead end
+    
+    local arrested = model:FindFirstChild("Handcuffed") or model:GetAttribute("Handcuffed") or 
+                     model:FindFirstChild("Arrested") or model:GetAttribute("Arrested") or
+                     model:FindFirstChild("Cuffed") or (model:FindFirstChild("Values") and model.Values:FindFirstChild("Cuffed"))
+    
+    if hum.Health <= 0 then return "DEAD", AYARLAR.Colors.Dead
+    elseif arrested then return "ARRESTED", AYARLAR.Colors.Arrested
+    else return "ALIVE", AYARLAR.Colors.Hostile end
+end
+
+-- ðï¸ ESP & HITBOX ENGINE
+local function ApplyESP(obj, name, color, isEntity)
+    if isEntity then
+        local head = obj:FindFirstChild("Head") or obj:FindFirstChild("HumanoidRootPart")
+        if not head then return end
+        
+        local status, sColor = GetStatus(obj)
+        local finalColor = (name == "PLAYER") and AYARLAR.Colors.Player or sColor
+        
+        -- Hitbox Expansion (Sadece CanlÄ± NPC'ler iÃ§in)
+        if name == "NPC" and status == "ALIVE" then
+            head.Size = Vector3.new(AYARLAR.HitboxSize, AYARLAR.HitboxSize, AYARLAR.HitboxSize)
+            head.Transparency = 0.7 -- KafayÄ± hafif Åeffaf yapar ki Ã¶nÃ¼nÃ¼ gÃ¶r
+            head.CanCollide = false
+        elseif status == "DEAD" or status == "ARRESTED" then
+            head.Size = Vector3.new(1, 1, 1) -- Normale dÃ¶ndÃ¼r
+            head.Transparency = 0
+        end
+
+        -- Billboard Tag
+        local tag = head:FindFirstChild("OmniTag")
+        if not tag then
+            tag = Instance.new("BillboardGui", head); tag.Name = "OmniTag"
+            tag.AlwaysOnTop = true; tag.Size = UDim2.new(0, 100, 0, 40); tag.StudsOffset = Vector3.new(0, 3, 0)
+            local tl = Instance.new("TextLabel", tag); tl.Name = "L"; tl.Size = UDim2.new(1,0,1,0); tl.BackgroundTransparency = 1; tl.TextSize = 10; tl.Font = Enum.Font.Code; tl.TextStrokeTransparency = 0
+        end
+        tag.L.Text = string.format("%s\n[%s]", name, status)
+        tag.L.TextColor3 = finalColor
+        
+        -- Highlight
+        local hl = obj:FindFirstChild("OmniHL") or Instance.new("Highlight", obj)
+        hl.Name = "OmniHL"; hl.FillColor = finalColor; hl.FillTransparency = 0.75; hl.DepthMode = "AlwaysOnTop"
+    else
+        -- Obje ESP
+        if not obj:FindFirstChild("OmniHL") then
+            local hl = Instance.new("Highlight", obj); hl.Name = "OmniHL"
+            hl.FillColor = AYARLAR.Colors.Object; hl.FillTransparency = 0.6; hl.DepthMode = "AlwaysOnTop"
+        end
+    end
+end
+
+-- ð¯ AIMBOT
+local function GetTarget()
+    local closest, dist = nil, AYARLAR.FOV
+    local mouse = UserInputService:GetMouseLocation()
+    
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v ~= LocalPlayer.Character then
+            local status, _ = GetStatus(v)
+            if status == "ALIVE" and not Players:GetPlayerFromCharacter(v) then
+                local head = v:FindFirstChild("Head")
+                if head then
+                    local pos, vis = Camera:WorldToViewportPoint(head.Position)
+                    if vis then
+                        local mag = (Vector2.new(pos.X, pos.Y) - mouse).Magnitude
+                        if mag < dist then dist = mag; closest = head end
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- ð« ACS MODS
+local function ModACS()
+    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if tool and tool:FindFirstChild("ACS_Settings") then
+        local success, v2 = pcall(require, tool.ACS_Settings)
+        if success and type(v2) == "table" then
+            v2.MinSpread = 0; v2.MaxSpread = 0
+            if v2.camRecoil then for i,v in pairs(v2.camRecoil) do v2.camRecoil[i] = {0,0} end end
+            if v2.gunRecoil then for i,v in pairs(v2.gunRecoil) do v2.gunRecoil[i] = {0,0} end end
+        end
+    end
+end
+
+-- ð RENDER LOOP
+RunService.RenderStepped:Connect(function(dt)
+    local mouse = UserInputService:GetMouseLocation()
+    FOVGui.Position = UDim2.new(0, mouse.X, 0, mouse.Y)
+    
+    StatText.Text = string.format(
+        "<font color='#00FFFF'>EXEC:</font> %s\n<font color='#FF00FF'>FPS:</font> %d\n<font color='#00FF00'>PING:</font> %dms\n<font color='#FFFF00'>AIMBOT:</font> %s\n<font color='#FFA500'>HITBOX:</font> %sx",
+        GetExecutor(), math.floor(1/dt), math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()), AimbotAktif and "ON" or "OFF", AYARLAR.HitboxSize
+    )
+
+    if AimbotAktif then
+        local t = GetTarget()
+        if t then Camera.CFrame = CFrame.new(Camera.CFrame.Position, t.Position) end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(i, g)
+    if not g and i.KeyCode == AYARLAR.AimbotTusu then
+        AimbotAktif = not AimbotAktif
+        FOVStroke.Color = AimbotAktif and Color3.new(1,0,0) or Color3.new(1,1,1)
+    end
+end)
+
+-- ð BACKGROUND TASKS
+task.spawn(function()
+    while true do
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if v:IsA("Model") and v:FindFirstChild("Humanoid") then
+                local p = Players:GetPlayerFromCharacter(v)
+                ApplyESP(v, p and "PLAYER" or "NPC", nil, true)
+            end
+            if v:IsA("BasePart") or v:IsA("Model") then
+                for _, tag in pairs(AYARLAR.LootTags) do
+                    if v.Name:find(tag) then ApplyESP(v, tag, nil, false) end
+                end
+            end
+            if _ % 300 == 0 then task.wait() end
+        end
+        pcall(ModACS)
+        task.wait(1.5)
+    end
+end)
+
+print("â BODYCAM INJECTED")
