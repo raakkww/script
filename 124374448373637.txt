@@ -1,0 +1,97 @@
+-- GUI Oluşturma
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local SelectButton = Instance.new("TextButton") -- Yeni Buton
+local FinishButton = Instance.new("TextButton")
+local UnloadButton = Instance.new("TextButton")
+
+-- Ayarlar
+ScreenGui.Name = "JobControlGUI"
+ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -100)
+MainFrame.Size = UDim2.new(0, 200, 0, 200) -- Boyutu biraz artırdım
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local MainCorner = Instance.new("UICorner", MainFrame)
+MainCorner.CornerRadius = UDim.new(0, 10)
+
+Title.Name = ""
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Finish Job %100"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+
+SelectButton.Name = "SelectButton"
+SelectButton.Parent = MainFrame
+SelectButton.BackgroundColor3 = Color3.fromRGB(45, 100, 150)
+SelectButton.Position = UDim2.new(0.1, 0, 0.25, 0)
+SelectButton.Size = UDim2.new(0.8, 0, 0.2, 0)
+SelectButton.Font = Enum.Font.GothamSemibold
+SelectButton.Text = "Select Job"
+SelectButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SelectButton.TextSize = 14
+Instance.new("UICorner", SelectButton).CornerRadius = UDim.new(0, 6)
+
+FinishButton.Name = "FinishButton"
+FinishButton.Parent = MainFrame
+FinishButton.BackgroundColor3 = Color3.fromRGB(45, 150, 45)
+FinishButton.Position = UDim2.new(0.1, 0, 0.5, 0)
+FinishButton.Size = UDim2.new(0.8, 0, 0.2, 0)
+FinishButton.Font = Enum.Font.GothamSemibold
+FinishButton.Text = "Finish Job"
+FinishButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+FinishButton.TextSize = 14
+Instance.new("UICorner", FinishButton).CornerRadius = UDim.new(0, 6)
+
+UnloadButton.Name = "UnloadButton"
+UnloadButton.Parent = MainFrame
+UnloadButton.BackgroundColor3 = Color3.fromRGB(150, 45, 45)
+UnloadButton.Position = UDim2.new(0.1, 0, 0.75, 0)
+UnloadButton.Size = UDim2.new(0.8, 0, 0.2, 0)
+UnloadButton.Font = Enum.Font.GothamSemibold
+UnloadButton.Text = "Unload"
+UnloadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+UnloadButton.TextSize = 14
+Instance.new("UICorner", UnloadButton).CornerRadius = UDim.new(0, 6)
+
+SelectButton.MouseButton1Click:Connect(function()
+    local args = {
+        "Hanger",
+        "Perfect"
+    }
+    local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("SelectJob", 5)
+    if remote then
+        remote:FireServer(unpack(args))
+        SelectButton.Text = "Job Selected!"
+        task.wait(1)
+        SelectButton.Text = "Select Best Job"
+    end
+end)
+
+
+FinishButton.MouseButton1Click:Connect(function()
+    local args = {
+        1,
+        25599583
+    }
+    local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RequestJobComplete", 5)
+    if remote then
+        remote:FireServer(unpack(args))
+        FinishButton.Text = "Job Completed!"
+        task.wait(1)
+        FinishButton.Text = "Finish Job"
+    end
+end)
+UnloadButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
