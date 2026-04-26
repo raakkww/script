@@ -1,0 +1,28 @@
+local UIS = game:GetService("UserInputService")
+local p = game.Players.LocalPlayer
+local RS = game:GetService("ReplicatedStorage")
+
+local h = workspace.Interiors.Offices[tostring(p.UserId)].Items.Hardware
+local store = RS.Remotes.Server.Software.Store
+local complete = RS.Remotes.Server.CompletePlayerCodingProgram
+local bubble = RS.Remotes.Server.PopProgrammingBubble
+
+local run = false
+
+UIS.InputBegan:Connect(function(i,gp)
+    if gp or i.KeyCode ~= Enum.KeyCode.L then return end
+    run = not run
+    print("Farm:", run and "ON" or "OFF")
+
+    while run do
+        for _,v in ipairs(h:GetDescendants()) do
+            if v.Name=="Pc" and v:IsA("Model") then
+                local id = v:GetAttribute("Id")
+                if id then pcall(store.InvokeServer,store,id) task.wait(.1) end
+            end
+        end
+        pcall(complete.InvokeServer,complete)
+        bubble:FireServer("3")
+        task.wait(.5)
+    end
+end)
