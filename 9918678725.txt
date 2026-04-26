@@ -1,0 +1,104 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local Window = WindUI:CreateWindow({Title="Skateboard for Brainrots",Size=UDim2.fromOffset(580,420),Position=UDim2.fromOffset(200,200),Theme="Dark"})
+
+local State = {AutoCollect=false,HideNotifs=false,AutoGrabBrainrots=false,SelectedRarities={"All"}}
+local NotifConnection = nil
+
+local AutomationTab = Window:Tab({Title="Automation",Icon="bot"})
+
+-- auto collect by firing touch interest
+AutomationTab:Toggle({Title="Auto Collect",Value=false,Callback=function(v)
+    State.AutoCollect=v
+    if v then
+        task.spawn(function()
+            while State.AutoCollect do
+                local plot = LocalPlayer:GetAttribute("Plot")
+                if plot then
+                    local pPath = Workspace:FindFirstChild("Required") and Workspace.Required:FindFirstChild("Plots") and Workspace.Required.Plots:FindFirstChild(tostring(plot))
+                    local collector = pPath and pPath:FindFirstChild("Slots") and pPath.Slots:FindFirstChild("1") and pPath.Slots["1"]:FindFirstChild("Collector") and pPath.Slots["1"].Collector:FindFirstChild("TouchInterest")
+                    if collector and collector.Parent then
+                        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") or LocalPlayer.Character:FindFirstChildWhichIsA("BasePart")
+                        if hrp then
+                            firetouchinterest(hrp,collector.Parent,0)
+                            firetouchinterest(hrp,collector.Parent,1)
+                        end
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+end})
+
+-- notif deleter thing
+AutomationTab:Toggle({Title="Hide Notifs",Value=false,Callback=function(v)
+    State.HideNotifs=v
+    if v then
+        local mainGui = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("MainGui") and LocalPlayer.PlayerGui.MainGui:FindFirstChild("Ignore")
+        if mainGui then
+            for _,c in ipairs(mainGui:GetChildren()) do
+                if c.Name=="CashTemplate" then c:Destroy() end
+            end
+            NotifConnection = mainGui.ChildAdded:Connect(function(c)
+                if c.Name=="CashTemplate" then c:Destroy() end
+            end)
+        end
+    else
+        if NotifConnection then
+            NotifConnection:Disconnect()
+            NotifConnection=nil
+        end
+    end
+end})
+
+AutomationTab:Divider()
+
+-- rarities dropdown
+local Rarities = {"All","Common","Uncommon","Rare","Epic","Legendary","Mythic","Cosmic","Secret","Celestial","Divine","OG"}
+AutomationTab:Dropdown({Title="Brainrot Rarities",Icon="sparkles",Multi=true,Values=Rarities,Value={"All"},Callback=function(v) State.SelectedRarities=v end})
+
+-- auto grab brainrots toggle
+AutomationTab:Toggle({Title="Auto Grab Brainrots",Value=false,Callback=function(v)
+    State.AutoGrabBrainrots=v
+    if v then
+        task.spawn(function()
+            while State.AutoGrabBrainrots do
+                local bf = Workspace:FindFirstChild("Required") and Workspace.Required:FindFirstChild("Brainrots")
+                if bf then
+                    local allSel = false
+                    for _,r in ipairs(State.SelectedRarities) do if r=="All" then allSel=true break end end
+                    for _,brainrot in ipairs(bf:GetChildren()) do
+                        if not State.AutoGrabBrainrots then break end
+                        local rarity = brainrot:GetAttribute("Rarity")
+                        if rarity and (allSel or (function() for _,r in ipairs(State.SelectedRarities) do if r==rarity then return true end end return false end)()) then
+                            local hitbox = brainrot:FindFirstChild("Hitbox")
+                            local prompt = hitbox and hitbox:FindFirstChild("BrainrotPrompt")
+                            if prompt then
+                                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                if hrp and hitbox and hitbox:IsA("BasePart") then
+                                    hrp.CFrame = CFrame.new(hitbox.Position+Vector3.new(0,5,0))
+                                    task.wait(0.15)
+                                    prompt.RequiresLineOfSight=false
+                                    fireproximityprompt(prompt)
+                                    task.wait(0.2)
+                                    local fl = Workspace:FindFirstChild("Required") and Workspace.Required:FindFirstChild("FinishLine")
+                                    local ft = fl and fl:FindFirstChild("TouchInterest")
+                                    if ft and ft.Parent then
+                                        firetouchinterest(hrp,ft.Parent,0)
+                                        firetouchinterest(hrp,ft.Parent,1)
+                                    end
+                                    task.wait(0.4)
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+end})
