@@ -1,0 +1,515 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris = game:GetService("Debris")
+
+local SENTINEL_NAME = "AutoPB_Singleton_Sentinel"
+local GUI_NAME = "AutoPB_TargetSystem_GUI"
+local HIGHLIGHT_NAME = "PB_Target_Highlight"
+
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+if not LocalPlayer then return end
+
+local Mouse = LocalPlayer:GetMouse()
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local ClientScript = script
+-- it's broken after die ))
+
+
+local function cleanupOldScript(oldSentinel)
+    print(" [SINGLETON] Old script detected. Starting cleanup...")
+    
+    local oldGUI = PlayerGui:FindFirstChild(GUI_NAME) 
+    if oldGUI then
+        oldGUI:Destroy()
+        print(" [CLEANUP] Destroyed old GUI.")
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild(HIGHLIGHT_NAME) then
+            player.Character:FindFirstChild(HIGHLIGHT_NAME):Destroy()
+            print(" [CLEANUP] Removed old Target Highlight from " .. player.Name)
+        end
+    end
+
+    if oldSentinel and oldSentinel.Value and oldSentinel.Value:IsA("LocalScript") then
+         Debris:AddItem(oldSentinel.Value, 0)
+         print(" [CLEANUP] Attempted to destroy old script object.")
+    end
+
+    oldSentinel:Destroy()
+    print(" [CLEANUP] Destroyed old Sentinel.")
+end
+
+local existingSentinel = ReplicatedStorage:FindFirstChild(SENTINEL_NAME)
+
+if existingSentinel then
+    cleanupOldScript(existingSentinel)
+end
+
+local newSentinel = Instance.new("ObjectValue")
+newSentinel.Name = SENTINEL_NAME
+newSentinel.Value = ClientScript
+newSentinel.Parent = ReplicatedStorage 
+print(" [SINGLETON] New Sentinel created. Script is now the active instance.")
+
+getgenv().Settings = {
+    ["Enabled"] = true,
+    ["TargetName"] = "None"
+}
+
+-- ÑÐ°Ð´Ð¸ÑÑÑ
+local TARGET_SOUND_RADIUS = 8
+local GLOBAL_SOUND_RADIUS = 100 
+
+local camera = workspace.CurrentCamera 
+local ReplicatedStorageSounds = game.ReplicatedStorage:FindFirstChild("Sounds")
+
+local soundNameCache = {}
+if ReplicatedStorageSounds then
+    for _, sound in ipairs(ReplicatedStorageSounds:GetChildren()) do
+        if sound:IsA("Sound") and sound.SoundId then
+            soundNameCache[sound.SoundId] = sound.Name
+        end
+    end
+else
+    print(" [WARNING] Folder 'Sounds' not found in ReplicatedStorage. Using ID-based list only.")
+end
+
+local Targeting = {
+    TargetCharacter = nil,
+    TargetHighlight = nil
+}
+
+local function setTarget(character)
+    if Targeting.TargetHighlight and Targeting.TargetHighlight.Parent then
+        Targeting.TargetHighlight:Destroy()
+        Targeting.TargetHighlight = nil
+    end
+
+    if character and character:IsA("Model") and character:FindFirstChildOfClass("Humanoid") then
+        Targeting.TargetCharacter = character
+        getgenv().Settings.TargetName = character.Name
+        
+        local highlight = Instance.new("Highlight")
+        highlight.Name = HIGHLIGHT_NAME
+        highlight.OutlineColor = Color3.new(0, 0.4, 1)
+        highlight.FillTransparency = 1
+        highlight.OutlineTransparency = 0
+        highlight.Parent = character
+        Targeting.TargetHighlight = highlight
+
+        print(string.format(" [TARGET] New target set: %s. Sound listener activated within %.1f studs.", character.Name, TARGET_SOUND_RADIUS))
+    else
+        Targeting.TargetCharacter = nil
+        getgenv().Settings.TargetName = "None"
+        print(" [TARGET] Target cleared.")
+    end
+    
+    if getgenv().StatusLabel then
+        getgenv().StatusLabel.Text = "Target: " .. getgenv().Settings.TargetName .. " (N+Click)"
+    end
+end
+
+-- ==========================================
+-- ÐÐÐÐÐÐÐÐÐ Ð¤Ð£ÐÐÐ¦ÐÐ¯ ÐÐ£Ð§ÐÐÐÐÐ ÐÐÐÐ¡ÐÐ (ÐÐ ÐÐÐÐ¯ÐÐ ÐÐ¡Ð¢ÐÐÐ¬ÐÐÐ)
+-- ==========================================
+local function raycastForPlayer(mousePosition)
+    local camera = workspace.CurrentCamera
+    local unitRay = camera:ScreenPointToRay(mousePosition.X, mousePosition.Y)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character} -- Ð¸Ð³Ð½Ð¾ÑÐ¸ÑÑÐµÐ¼ ÑÐµÐ±Ñ
+    local raycastResult = workspace:Raycast(unitRay.Origin, unitRay.Direction * 500, raycastParams)
+    
+    if raycastResult then
+        local hitPart = raycastResult.Instance
+        local character = hitPart:FindFirstAncestorOfClass("Model")
+        if character and character:FindFirstChildOfClass("Humanoid") then
+            local player = Players:GetPlayerFromCharacter(character)
+            if player and player ~= LocalPlayer then
+                return character
+            end
+        end
+    end
+    return nil
+end
+
+-- ==========================================
+-- ÐÐÐÐÐÐÐÐ«Ð ÐÐÐ ÐÐÐÐ¢Ð§ÐÐ (Ð¢ÐÐÐ¬ÐÐ ÐÐÐÐÐÐÐÐ ÐÐ£Ð§)
+-- ==========================================
+local function handleInput(input, gameProcessedEvent)
+    if UserInputService:IsKeyDown(Enum.KeyCode.N) and input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessedEvent then
+        -- Ð¡Ð½Ð°ÑÐ°Ð»Ð° Ð¿ÑÑÐ°ÐµÐ¼ÑÑ Ð½Ð°Ð¹ÑÐ¸ Ð¸Ð³ÑÐ¾ÐºÐ° Ð»ÑÑÐ¾Ð¼ (Ð¿ÑÐ¾ÑÐ°ÐµÑ Ð¿ÑÐ¾Ð¼Ð°ÑÐ¸)
+        local targetChar = raycastForPlayer(Vector2.new(Mouse.X, Mouse.Y))
+        
+        -- ÐÑÐ»Ð¸ Ð»ÑÑÐ¾Ð¼ Ð½Ðµ Ð½Ð°ÑÐ»Ð¸ â Ð¿ÑÐ¾Ð±ÑÐµÐ¼ ÑÑÐ°ÑÑÐ¹ ÑÐ¿Ð¾ÑÐ¾Ð± (Ð¿ÑÑÐ¼Ð¾Ð¹ ÐºÐ»Ð¸Ðº Ð¿Ð¾ Ð¼Ð¾Ð´ÐµÐ»Ð¸)
+        if not targetChar then
+            local clickedObj = Mouse.Target
+            if clickedObj then
+                targetChar = clickedObj:FindFirstAncestorOfClass("Model")
+                local player = targetChar and Players:GetPlayerFromCharacter(targetChar)
+                if not (targetChar and targetChar:FindFirstChildOfClass("Humanoid") and player and player ~= LocalPlayer) then
+                    targetChar = nil
+                end
+            end
+        end
+        
+        setTarget(targetChar)
+    end
+end
+
+UserInputService.InputBegan:Connect(handleInput)
+
+local function createGUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = GUI_NAME
+    ScreenGui.Parent = PlayerGui
+
+    local Frame = Instance.new("Frame")
+    Frame.Name = "MainFrame"
+    Frame.Size = UDim2.new(0, 200, 0, 100)
+    Frame.Position = UDim2.new(0.1, 0, 0.1, 0)
+    Frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    Frame.BackgroundTransparency = 0.35
+    Frame.BorderSizePixel = 1
+    Frame.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+    Frame.Parent = ScreenGui
+    Frame.Active = true
+    Frame.Draggable = false
+
+    local Title = Instance.new("TextLabel")
+    Title.Text = "Auto PB - Target System"
+    Title.Size = UDim2.new(1, 0, 0, 20)
+    Title.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    Title.BackgroundTransparency = 0.2
+    Title.TextColor3 = Color3.new(1, 1, 1)
+    Title.Font = Enum.Font.SourceSansBold
+    Title.TextSize = 16
+    Title.Parent = Frame
+    Title.Active = true
+
+    local ToggleButton = Instance.new("TextButton")
+    ToggleButton.Name = "ToggleButton"
+    ToggleButton.Size = UDim2.new(1, 0, 0, 40)
+    ToggleButton.Position = UDim2.new(0, 0, 0, 20)
+    ToggleButton.Font = Enum.Font.SourceSansBold
+    ToggleButton.TextSize = 18
+    ToggleButton.Parent = Frame
+    
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Name = "StatusLabel"
+    StatusLabel.Size = UDim2.new(1, 0, 0, 20)
+    StatusLabel.Position = UDim2.new(0, 0, 0, 60)
+    StatusLabel.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+    StatusLabel.BackgroundTransparency = 0.5
+    StatusLabel.TextColor3 = Color3.new(1, 1, 1)
+    StatusLabel.Font = Enum.Font.SourceSans
+    StatusLabel.TextSize = 14
+    StatusLabel.Text = "Target: None (N+Click)"
+    StatusLabel.Parent = Frame
+
+    getgenv().StatusLabel = StatusLabel
+
+    local function updateToggleButton()
+        if getgenv().Settings.Enabled then
+            ToggleButton.Text = "AUTO-PB: Enabled"
+            ToggleButton.BackgroundColor3 = Color3.new(0, 0.8, 0)
+        else
+            ToggleButton.Text = "AUTO-PB: Disabled"
+            ToggleButton.BackgroundColor3 = Color3.new(0.8, 0, 0)
+        end
+    end
+
+    ToggleButton.MouseButton1Click:Connect(function()
+        getgenv().Settings.Enabled = not getgenv().Settings.Enabled
+        updateToggleButton() 
+        print(string.format(" [GUI] Auto-PB %s.", getgenv().Settings.Enabled and "enabled" or "disabled"))
+    end)
+    
+    local dragging = false
+    local dragStartPos
+    local frameStartPos
+    
+    local function startDrag()
+        dragging = true
+        dragStartPos = Vector2.new(Mouse.X, Mouse.Y)
+        frameStartPos = Vector2.new(Frame.Position.X.Offset, Frame.Position.Y.Offset)
+        Mouse.Icon = "rbxasset://SystemCursors/PointingHand"
+    end
+    
+    local function stopDrag()
+        dragging = false
+        Mouse.Icon = ""
+    end
+    
+    Title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            startDrag()
+        end
+    end)
+    
+    Title.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            stopDrag()
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = Vector2.new(Mouse.X, Mouse.Y) - dragStartPos
+            Frame.Position = UDim2.new(0, frameStartPos.X + delta.X, 0, frameStartPos.Y + delta.Y)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and dragging then
+            stopDrag()
+        end
+    end)
+    
+    RunService.Heartbeat:Connect(function()
+        if Frame.Position then
+            local viewportSize = camera.ViewportSize 
+            local frameSize = Frame.AbsoluteSize
+            
+            local x = math.clamp(Frame.Position.X.Offset, 0, viewportSize.X - frameSize.X)
+            local y = math.clamp(Frame.Position.Y.Offset, 0, viewportSize.Y - frameSize.Y)
+            
+            if x ~= Frame.Position.X.Offset or y ~= Frame.Position.Y.Offset then
+                Frame.Position = UDim2.new(0, x, 0, y)
+            end
+        end
+    end)
+
+    updateToggleButton()
+end
+
+createGUI()
+
+local Attacks = {
+    ["Kick Barrage"] = {"Parry", 0.05},
+    ["HeavySwing"] = {"Parry", 0.05},
+    ["Erasure"] = {"Parry", 0.05},
+    ["Propeller Charge Voiceline"] = {"Parry", 0.05},
+    ["Second Erasure"] = {"Block", 0.05},
+    ["Sticky Fingers Finisher"] = {"Parry", 0.35},
+    ["King Crimson Chop"] = {"Parry", 0.35},
+    ["Gun_Shot1"] = {"Block", 0.15},
+    ["Pull"] = {"Block", 0.45},
+    ["Star Finger Voiceline"] = {"Block", 0.15},
+    ["Throw Knife"] = {"Block", 0.05},
+    ["Nail Shots"] = {"Custom", 0.05},
+    ["Clash_Knock"] = {"Block", 0.05},
+    ["Heavy_Charge"] = {"Parry", 0.35},
+    ["Sword_Clash"] = {"Block", 0.05},
+    ["Vine Trap"] = {"Block", 0.05},
+    ["Acidic Spew"] = {"Block", 0.05},
+    ["Snap Ignis"] = {"Block", 0.05},
+    ["Stand Heavy Punch"] = {"Parry", 0.35},
+    ["Extend Arm"] = {"Block", 0.05},
+    ["Chip1"] = {"Block", 0.05},
+    ["Chip2"] = {"Block", 0.05},
+    ["Chip3"] = {"Block", 0.05},
+    ["Disc"] = {"Parry", 0.35},
+    ["Propeller Charge"] = {"Parry", 0.35},
+    ["Marionette Control"] = {"Block", 0.05},
+    ["Owl Slash"] = {"Block", 0.05},
+    ["Skull Crusher"] = {"Block", 0.6},
+    ["Skull Crusher2"] = {"Block", 0.65}, 
+    ["Platinum Slam"] = {"Parry", 0.05},
+    ["KnifeDraw"] = {"Custom", 0.25},
+    ["Startup"] = {"Parry", 0.05},
+    ["Rod_Hooked"] = {"Parry", 0.15},
+    ["Stab1"] = {"Block", 0.05},
+    ["Stab2"] = {"Block", 0.05},
+    ["Stab3"] = {"Block", 0.05},
+    ["HeavyIndicator"] = {"Parry", 0.45},
+    ["Whip"] = {"Block", 0.05},
+    ["Chomp"] = {"Parry", 0.25},
+    ["The World Kick Barrage"] = {"Parry", 0.05},
+    ["ElectricExpolsion2"] = {"Block", 0.05},
+    ["GunFire"] = {"Block", 0.05},
+    ["Scary Monsters Bite"] = {"Parry", 0.25},
+    ["Almighty Push"] = {"Block", 0.05},
+    ["Surface Inversion Punch"] = {"Block", 0.05},
+    ["Gravitational Shift"] = {"Block", 0.05},
+    ["D4C Love Train Finisher"] = {"Parry", 0.35},
+    ["D4C Finisher"] = {"Parry", 0.35},
+    ["Tusk ACT 4 Finisher"] = {"Parry", 0.35},
+    ["Gold Experience Finisher"] = {"Parry", 0.35},
+    ["Gold Experience Requiem Finisher"] = {"Parry", 0.35},
+    ["Scary Monsters Finisher"] = {"Parry", 0.35},
+    ["White Album Finisher"] = {"Parry", 0.35},
+    ["Star Platinum Finisher"] = {"Parry", 0.35},
+    ["Star Platinum: The World Finisher"] = {"Parry", 0.35},
+    ["King Crimson Finisher"] = {"Parry", 0.35},
+    ["King Crimson Requiem Finisher"] = {"Parry", 0.35},
+    ["Crazy Diamond Finisher"] = {"Parry", 0.35},
+    ["The World Alternate Universe Finisher"] = {"Parry", 0.35},
+    ["The World Finisher"] = {"Parry", 0.45},
+    ["The World Finisher2"] = {"Parry", 0.45},
+    ["Purple Haze Finisher"] = {"Parry", 0.35},
+    ["Hermit Purple Finisher"] = {"Parry", 0.35},
+    ["Tusk ACT 4 Finisher2"] = {"Parry", 0.35},
+    ["The World Over Heaven Finisher"] = {"Parry", 0.35},
+    ["Reality Overwriting Punch"] = {"Parry", 0.35},
+    ["Tusk ACT 4 Finisher3"] = {"Parry", 0.35},
+    ["Made in Heaven Finisher"] = {"Parry", 0.35},
+    ["Enraged Fury"] = {"Parry", 0.05},
+    ["Air_Swoosh"] = {"Block", 0.05},
+    ["Whitesnake Finisher"] = {"Parry", 0.40},
+    ["C-Moon Finisher"] = {"Parry", 0.35},
+    ["Surface Inversion Punch Voiceline"] = {"Parry", 0.35},
+    ["Uppercut to The Moon"] = {"Parry", 0.35},
+    ["Red Hot Chili Pepper Finisher"] = {"Parry", 0.35},
+    ["Multi Shot"] = {"Block", 0.05},
+    ["Prone Shot"] = {"Block", 0.05},
+    ["Six Pistols Finisher"] = {"Parry", 0.45},
+    ["Soft & Wet Finisher"] = {"Parry", 0.45},
+    ["Soft & Wet: Go Beyond Finisher"] = {"Parry", 0.45},
+    ["Crossfire Hurricane"] = {"Custom", 0.05},
+    ["Erasure_Voiceline"] = {"Parry", 0.35},
+    ["Floor Zipper Uppercut"] = {"Block", 0.05},
+    ["Liver Shot"] = {"Block", 0.15},
+    ["Ora Kicks"] = {"Parry", 0.15},
+    ["Shinei Voiceline"] = {"Parry", 0.15},
+    ["Shinei Teleport"] = {"Parry", 0.15},
+    ["Rod Slap"] = {"Parry", 0.45},
+    ["Shovel1"] = {"Parry", 0.05},
+    ["Kicks Barrage"] = {"Parry", 0.05},
+    ["Stone Free Finisher"] = {"Parry", 0.35},
+    ["Gold Experience Kick Barrage"] = {"Parry", 0.05},
+    ["SwordSwing1"] = {"Block", 0.05},
+    ["SwordSwing2"] = {"Block", 0.05},
+    ["Million Pricks"] = {"Block", 0.05},
+    ["Cycle Slash"] = {"Block", 0.05},
+    ["Crossfire"] = {"Custom", 0.05},
+    ["elctric_discharge_loop"] = {"Block", 0.05},
+    ["electric_discharge_shoot"] = {"Block", 0.05},
+    ["electric_flash"] = {"Custom", 0.05},
+    ["Scatter"] = {"Block", 0.05},
+    ["PilotCharge"] = {"Block", 0.05},
+    ["StringGrab"] = {"Block", 0.05},
+    ["String Throw"] = {"Block", 0.05},
+    ["Windup2"] = {"Block", 0.05},
+    ["Windup"] = {"Block", 0.05},
+    ["lightning_jabs"] = {"Custom", 0.15}
+}
+
+local CustomAttacksByID = {
+    ["rbxassetid://10753436529"] = {"Parry", 0.15},
+    ["rbxassetid://4687574632"] = {"Custom", 0.05},
+    ["rbxassetid://13845768473"] = {"Parry", 0.15},
+    ["rbxassetid://12334554476"] = {"Parry", 0.35},
+    ["rbxassetid://13897602335"] = {"Block", 0.15},
+    ["rbxassetid://10459101670"] = {"Block", 0.5},
+    ["rbxassetid://10459032476"] = {"Block", 0.15},
+    ["rbxassetid://10459028117"] = {"Block", 0.15},
+    ["rbxassetid://3431454184"] = {"Block", 0.15},
+    ["rbxassetid://10459027531"] = {"Block", 0.15},
+    ["rbxassetid://15613699755"] = {"Parry", 0.15}, 
+    ["rbxassetid://121642578626001"] = {"Block", 0.15},
+    ["rbxassetid://12313264575"] = {"Block", 0.35},
+    ["rbxassetid://12313369552"] = {"Block", 0.35},
+    ["rbxassetid://13845769000"] = {"Block", 0.35},
+    ["rbxassetid://13894215945"] = {"Block", 0.35},
+    ["rbxassetid://13845768136"] = {"Block", 0.35},
+    ["rbxassetid://11876873155"] = {"Block", 0.35},
+    ["rbxassetid://4751215000"] = {"Block", 0.25},
+    ["rbxassetid://12313925985"] = {"Parry", 0.45}, 
+    ["rbxassetid://117664508869390"] = {"Block", 0.45},
+    ["rbxassetid://12610431977"] = {"Block", 0.45},
+    ["rbxassetid://12313611186"] = {"Block", 0.45}, 
+    ["rbxassetid://115584836099306"] = {"Parry", 0.20}
+}
+
+local GlobalAttacksByID = {
+    ["rbxassetid://4895303479"] = {"Parry", 0.15} 
+}
+
+local function checkSound(soundID)
+    local global_data = GlobalAttacksByID[soundID]
+    if global_data then
+        local global_move_name = "GLOBAL_ATTACK_" .. soundID 
+        if not Attacks[global_move_name] then Attacks[global_move_name] = global_data end
+        return global_move_name
+    end
+
+    local custom_data = CustomAttacksByID[soundID]
+    if custom_data then
+        local custom_move_name = "ID_ATTACK_" .. soundID 
+        if not Attacks[custom_move_name] then Attacks[custom_move_name] = custom_data end
+        return custom_move_name
+    end
+
+    return soundNameCache[soundID]
+end
+
+local function get_sound_source_position(sound_object)
+    local parent = sound_object.Parent
+    if not parent then return nil end
+    if parent:IsA("BasePart") then return parent.Position end
+    local character_model = parent:IsA("Model") and parent
+    if character_model then
+        local root = character_model:FindFirstChild("HumanoidRootPart")
+        if root and root:IsA("BasePart") then return root.Position end
+    end
+    return nil
+end
+
+local function checkPBMove(move)
+    if not getgenv().Settings.Enabled then return end
+    local Character = LocalPlayer.Character
+    local remote = Character and Character:FindFirstChild("RemoteEvent")
+    if not Character or not remote then return end
+    local attack_data = Attacks[move]
+    if not attack_data then return end
+    local delay_time = attack_data[2] 
+    
+    task.wait(delay_time)
+    remote:FireServer("StartBlocking")
+    task.wait(0.3) 
+    remote:FireServer("StopBlocking")
+end
+
+local function addPBWatcher()
+    game.Workspace.DescendantAdded:Connect(function(child)
+        if not getgenv().Settings.Enabled or not child:IsA("Sound") then return end
+        if child.SoundId == "rbxassetid://5056859332" and LocalPlayer.Character then
+            local remote = LocalPlayer.Character:FindFirstChild("RemoteEvent")
+            if remote then remote:FireServer("StopBlocking") end
+            return
+        end
+
+        local move_name = checkSound(child.SoundId)
+        if not move_name then return end
+
+        local source_pos = get_sound_source_position(child)
+        if not source_pos then return end
+        
+        local player_root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not player_root then return end
+        
+        local is_global_attack = GlobalAttacksByID[child.SoundId] ~= nil
+        if is_global_attack then
+            local distance_to_player = (player_root.Position - source_pos).magnitude
+            if distance_to_player <= GLOBAL_SOUND_RADIUS then
+                checkPBMove(move_name)
+            end
+        else
+            local target_char = Targeting.TargetCharacter
+            if not target_char then return end
+            local target_root = target_char:FindFirstChild("HumanoidRootPart")
+            if not target_root then return end
+            local distance_to_target = (target_root.Position - source_pos).magnitude
+            if distance_to_target <= TARGET_SOUND_RADIUS then
+                checkPBMove(move_name)
+            end
+        end
+    end)
+end
+
+addPBWatcher()
+print(" [SYSTEM] Script fully initialized and running.")
