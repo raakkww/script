@@ -1,0 +1,227 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local is_script_active = true
+
+-- ================= CONFIGURACIÓN GLOBAL =================
+local currentTheme = {
+    Main = Color3.fromRGB(15, 15, 18),
+    Acc = Color3.fromRGB(0, 255, 255),
+    Text = Color3.fromRGB(255, 255, 255)
+}
+
+local farming_enabled = false
+local nearest_farming_enabled = false
+local autoclick_enabled = false
+local auto_abilities_enabled = false
+local farm_distance = 7
+local farm_method = "Above" -- Above, Below, Behind
+
+local ui_toggle_key = Enum.KeyCode.RightControl
+local is_binding = false
+local is_minimized = false
+
+-- Keybinds
+local key_farm = Enum.KeyCode.K
+local key_nearest = Enum.KeyCode.M
+local key_click = Enum.KeyCode.L
+local key_abilities = Enum.KeyCode.J
+
+-- Variables de Estado
+local target_part = nil
+local selected_mob_data = nil
+
+-- ================= DATA DE ENEMIGOS =================
+local EnemyNpcs = Workspace:WaitForChild("Game"):WaitForChild("EnemyNpcs")
+local islandPaths = {
+    EnemyNpcs:WaitForChild("island1"), EnemyNpcs:WaitForChild("island2"),
+    EnemyNpcs:WaitForChild("island3"), EnemyNpcs:WaitForChild("island4"),
+    EnemyNpcs:WaitForChild("island5"), EnemyNpcs:WaitForChild("island6"),
+    EnemyNpcs:WaitForChild("island7")
+}
+
+local mobData = {
+    {Display = "Luffey (50-100)", Name = "Luffey", Spawn = Vector3.new(437.667, 3.674, 54.448)},
+    {Display = "Raylee (100-250)", Name = "Raylee", Spawn = Vector3.new(634.455, 12.853, 5.710)},
+    {Display = "Zoru (250-500)", Name = "Zoru", Spawn = Vector3.new(208.050, 10.797, -774.955)},
+    {Display = "Meehawk (500-750)", Name = "Meehawk", Spawn = Vector3.new(251.529, 10.924, -637.924)},
+    {Display = "Whitebard (750-1000)", Name = "Whitebard", Spawn = Vector3.new(1099.729, 3.680, -588.730)},
+    {Display = "Blackbard (1000-1500)", Name = "Blackbard", Spawn = Vector3.new(1219.159, 4.826, -651.656)},
+    {Display = "Kaydo (1500-2000)", Name = "Kaydo", Spawn = Vector3.new(-520.809, 11.968, -300.601)},
+    {Display = "Shonks (2000-3000)", Name = "Shonks", Spawn = Vector3.new(-705.441, 11.278, -319.838)},
+    {Display = "Ulqeeora (3000-4000)", Name = "Ulqeeora", Spawn = Vector3.new(38.371, 11.231, 732.826)},
+    {Display = "Grimmjaw (4000-5000)", Name = "Grimmjaw", Spawn = Vector3.new(282.358, 6.715, 788.733)},
+    {Display = "Tojee (5500)", Name = "Tojee", Spawn = Vector3.new(1221.768, 17.054, 925.602)},
+    {Display = "Mahogara (6000)", Name = "Mahogara", Spawn = Vector3.new(1341.346, 25.459, 969.529)},
+    {Display = "Robyn (6500)", Name = "Robyn", Spawn = Vector3.new(267.220, 6.692, -1675.884)},
+    {Display = "Aokeejee (7500)", Name = "Aokeejee", Spawn = Vector3.new(315.537, 7.319, -1814.212)}
+}
+
+-- ================= INTERFAZ GRÁFICA =================
+local pGui = player:WaitForChild("PlayerGui")
+if pGui:FindFirstChild("GV27") then pGui.GV27:Destroy() end
+
+local sg = Instance.new("ScreenGui", pGui); sg.Name = "GV27"; sg.ResetOnSpawn = false
+local main = Instance.new("Frame", sg); main.Size = UDim2.new(0, 560, 0, 480); main.Position = UDim2.new(0.5, -280, 0.5, -240)
+main.BackgroundColor3 = currentTheme.Main; main.BackgroundTransparency = 0.2; main.Active = true; Instance.new("UICorner", main); main.ClipsDescendants = true
+local neonStroke = Instance.new("UIStroke", main); neonStroke.Color = currentTheme.Acc; neonStroke.Thickness = 1.5
+
+local title = Instance.new("TextLabel", main); title.Size = UDim2.new(1, 0, 0, 30); title.Position = UDim2.new(0, 20, 0, 10); title.Text = ""; title.TextColor3 = currentTheme.Acc; title.Font = Enum.Font.GothamBold; title.TextSize = 22; title.BackgroundTransparency = 1; title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Botones Control
+local closeBtn = Instance.new("TextButton", main); closeBtn.Size = UDim2.new(0, 30, 0, 30); closeBtn.Position = UDim2.new(1, -40, 0, 10); closeBtn.Text = "X"; closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50); closeBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", closeBtn)
+local miniBtn = Instance.new("TextButton", main); miniBtn.Size = UDim2.new(0, 30, 0, 30); miniBtn.Position = UDim2.new(1, -80, 0, 10); miniBtn.Text = "-"; miniBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50); miniBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", miniBtn)
+
+closeBtn.MouseButton1Click:Connect(function() is_script_active = false; farming_enabled = false; nearest_farming_enabled = false; sg:Destroy() end)
+miniBtn.MouseButton1Click:Connect(function() 
+    is_minimized = not is_minimized
+    main:TweenSize(is_minimized and UDim2.new(0, 560, 0, 50) or UDim2.new(0, 560, 0, 480), "Out", "Quad", 0.3, true)
+end)
+
+-- Arrastre fluido
+local dragging, dragInput, dragStart, startPos
+main.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; dragStart = input.Position; startPos = main.Position; input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end) end end)
+main.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end end)
+UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart; main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+
+-- Sidebar & Container
+local sidebar = Instance.new("Frame", main); sidebar.Size = UDim2.new(0, 130, 1, -60); sidebar.Position = UDim2.new(0, 10, 0, 50); sidebar.BackgroundTransparency = 1; Instance.new("UIListLayout", sidebar).Padding = UDim.new(0, 5)
+local container = Instance.new("Frame", main); container.Size = UDim2.new(1, -160, 1, -70); container.Position = UDim2.new(0, 150, 0, 60); container.BackgroundTransparency = 1
+local pAuto = Instance.new("ScrollingFrame", container); pAuto.Size = UDim2.new(1,0,1,0); pAuto.BackgroundTransparency = 1; pAuto.ScrollBarThickness = 2; Instance.new("UIListLayout", pAuto).Padding = UDim.new(0, 10)
+
+-- ================= LÓGICA DE MOVIMIENTO MEJORADA =================
+local function dropNextToEnemy()
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp and target_part then
+        hrp.Velocity = Vector3.zero
+        hrp.CFrame = target_part.CFrame * CFrame.new(0, 2, 4) -- Teleport al lado
+        for _, p in pairs(char:GetChildren()) do if p:IsA("BasePart") then p.CanCollide = true end end
+    end
+    target_part = nil
+end
+
+local function toggleSpecificFarm()
+    farming_enabled = not farming_enabled
+    if nearest_farming_enabled and farming_enabled then nearest_farming_enabled = false end
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if farming_enabled and hrp and selected_mob_data then
+        hrp.CFrame = CFrame.new(selected_mob_data.Spawn) + Vector3.new(0, farm_distance, 0)
+    elseif not farming_enabled then dropNextToEnemy() end
+end
+
+local function toggleNearestFarm()
+    nearest_farming_enabled = not nearest_farming_enabled
+    if farming_enabled and nearest_farming_enabled then farming_enabled = false end
+    if not nearest_farming_enabled then dropNextToEnemy() end
+end
+
+-- ================= CREACIÓN DE BOTONES =================
+local function createToggle(parent, text, key, onClick)
+    local b = Instance.new("TextButton", parent); b.Size = UDim2.new(0.95, 0, 0, 40); b.Text = text .. ": OFF ["..key.Name.."]"
+    b.BackgroundColor3 = Color3.fromRGB(30,30,35); b.BackgroundTransparency = 0.2; b.TextColor3 = Color3.new(1,1,1); b.Font = Enum.Font.GothamBold; Instance.new("UICorner", b)
+    b.MouseButton1Click:Connect(onClick)
+    return b
+end
+
+local tFarm = createToggle(pAuto, "FARM SELECTED", key_farm, toggleSpecificFarm)
+local tNear = createToggle(pAuto, "FARM NEAREST", key_nearest, toggleNearestFarm)
+
+-- Botón de Método de Farm
+local mthBtn = Instance.new("TextButton", pAuto); mthBtn.Size = UDim2.new(0.95, 0, 0, 40); mthBtn.Text = "Method: Above"; mthBtn.BackgroundColor3 = Color3.fromRGB(30,35,45); mthBtn.TextColor3 = currentTheme.Acc; mthBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", mthBtn)
+mthBtn.MouseButton1Click:Connect(function()
+    if farm_method == "Above" then farm_method = "Below"
+    elseif farm_method == "Below" then farm_method = "Behind"
+    else farm_method = "Above" end
+    mthBtn.Text = "Method: " .. farm_method
+end)
+
+local tClick = createToggle(pAuto, "AUTO CLICK", key_click, function() autoclick_enabled = not autoclick_enabled end)
+local tAbil = createToggle(pAuto, "AUTO ABILITIES", key_abilities, function() auto_abilities_enabled = not auto_abilities_enabled end)
+
+-- Selector de Enemigo
+local dropBtn = Instance.new("TextButton", pAuto); dropBtn.Size = UDim2.new(0.95, 0, 0, 40); dropBtn.Text = "Target: None"; dropBtn.BackgroundColor3 = Color3.fromRGB(25,25,30); dropBtn.TextColor3 = currentTheme.Acc; dropBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", dropBtn)
+local dropS = Instance.new("ScrollingFrame", pAuto); dropS.Size = UDim2.new(0.95,0,0,120); dropS.Visible = false; dropS.CanvasSize = UDim2.new(0,0,3,0); Instance.new("UIListLayout", dropS)
+
+dropBtn.MouseButton1Click:Connect(function() dropS.Visible = not dropS.Visible end)
+for _, data in ipairs(mobData) do
+    local b = Instance.new("TextButton", dropS); b.Size = UDim2.new(1,0,0,30); b.Text = data.Display; b.BackgroundColor3 = Color3.fromRGB(35,35,40); b.TextColor3 = Color3.new(1,1,1)
+    b.MouseButton1Click:Connect(function() selected_mob_data = data; dropBtn.Text = "Target: "..data.Name; dropS.Visible = false; target_part = nil end)
+end
+
+-- ================= NÚCLEO DE FARMECO & NOCLIP =================
+RunService.Stepped:Connect(function()
+    if not is_script_active then return end
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local is_f = farming_enabled or nearest_farming_enabled
+    if is_f then for _, p in pairs(char:GetChildren()) do if p:IsA("BasePart") then p.CanCollide = false end end end
+
+    -- Update UI
+    tFarm.Text = "FARM SELECTED" .. (farming_enabled and ": ON [K]" or ": OFF [K]"); tFarm.TextColor3 = farming_enabled and currentTheme.Acc or Color3.new(1,1,1)
+    tNear.Text = "FARM NEAREST" .. (nearest_farming_enabled and ": ON [M]" or ": OFF [M]"); tNear.TextColor3 = nearest_farming_enabled and currentTheme.Acc or Color3.new(1,1,1)
+    tClick.Text = "AUTO CLICK" .. (autoclick_enabled and ": ON [L]" or ": OFF [L]"); tClick.TextColor3 = autoclick_enabled and currentTheme.Acc or Color3.new(1,1,1)
+    tAbil.Text = "AUTO ABILITIES" .. (auto_abilities_enabled and ": ON [J]" or ": OFF [J]"); tAbil.TextColor3 = auto_abilities_enabled and currentTheme.Acc or Color3.new(1,1,1)
+
+    if not is_f then return end
+
+    if not target_part or not target_part.Parent or not target_part.Parent:FindFirstChildOfClass("Humanoid") or target_part.Parent:FindFirstChildOfClass("Humanoid").Health <= 0 then
+        target_part = nil
+        local dMax = math.huge
+        for _, island in ipairs(islandPaths) do
+            for _, mob in ipairs(island:GetChildren()) do
+                if mob:IsA("Model") and (nearest_farming_enabled or (farming_enabled and selected_mob_data and string.find(mob.Name, selected_mob_data.Name))) then
+                    local mHrp = mob:FindFirstChild("HumanoidRootPart") or mob:FindFirstChildWhichIsA("BasePart")
+                    local hum = mob:FindFirstChildOfClass("Humanoid")
+                    if mHrp and hum and hum.Health > 0 then
+                        local d = (hrp.Position - mHrp.Position).Magnitude
+                        if d < dMax then dMax = d; target_part = mHrp end
+                    end
+                end
+            end
+        end
+    end
+
+    if target_part then
+        local offset = Vector3.new(0, farm_distance, 0)
+        if farm_method == "Below" then offset = Vector3.new(0, -farm_distance, 0)
+        elseif farm_method == "Behind" then offset = target_part.CFrame.LookVector * -farm_distance end
+        
+        hrp.CFrame = CFrame.lookAt(target_part.Position + offset, target_part.Position)
+        hrp.Velocity = Vector3.zero
+    end
+end)
+
+-- Hotkeys & Bucle
+UserInputService.InputBegan:Connect(function(i, p)
+    if not p then
+        if i.KeyCode == key_farm then toggleSpecificFarm()
+        elseif i.KeyCode == key_nearest then toggleNearestFarm()
+        elseif i.KeyCode == key_click then autoclick_enabled = not autoclick_enabled
+        elseif i.KeyCode == key_abilities then auto_abilities_enabled = not auto_abilities_enabled
+        elseif i.KeyCode == ui_toggle_key then main.Visible = not main.Visible end
+    end
+end)
+
+task.spawn(function()
+    while is_script_active do
+        if autoclick_enabled then VirtualInputManager:SendMouseButtonEvent(0,0,0,true,game,0); task.wait(0.01); VirtualInputManager:SendMouseButtonEvent(0,0,0,false,game,0) end
+        if auto_abilities_enabled then
+            for _, k in ipairs({Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.G}) do
+                VirtualInputManager:SendKeyEvent(true, k, false, game); task.wait(0.05); VirtualInputManager:SendKeyEvent(false, k, false, game)
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- Navegación & Anti-AFK
+local function nav(n, f) local b = Instance.new("TextButton", sidebar); b.Size = UDim2.new(1,0,0,40); b.Text = n; b.BackgroundTransparency = 1; b.TextColor3 = Color3.new(1,1,1); b.Font = Enum.Font.GothamBold; b.MouseButton1Click:Connect(f) end
+nav("AutoFarm", function() pAuto.Visible = true end)
+task.spawn(function() local vu = game:GetService("VirtualUser"); player.Idled:Connect(function() vu:CaptureController(); vu:ClickButton2(Vector2.new()) end) end)
