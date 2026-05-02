@@ -1,0 +1,4 @@
+local args = {
+	"Tutorial/CollectApple"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Network"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
