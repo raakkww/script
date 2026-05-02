@@ -1,0 +1,127 @@
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local player = game.Players.LocalPlayer
+
+local FINAL_POS = Vector3.new(2.28, 579.00, -287.70)
+local CurrentSpeed = 20 -- Senin için hesapladığımız güvenli hız (7 dk için)
+local Flying = false
+local IsMinimized = false
+local MainHeight = 300 -- Menünün tam boyutu
+
+local ScreenGui = Instance.new("ScreenGui", (gethui and gethui()) or game:GetService("CoreGui"))
+ScreenGui.Name = "KernelPremiumV10"
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 250, 0, MainHeight)
+MainFrame.Position = UDim2.new(0.5, -125, 0.4, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true -- Küçültme animasyonu için şart
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Color = Color3.fromRGB(170, 0, 255)
+MainStroke.Thickness = 2
+
+local TitleBar = Instance.new("Frame", MainFrame)
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.BorderSizePixel = 0
+Instance.new("UICorner", TitleBar)
+
+local TitleText = Instance.new("TextLabel", TitleBar)
+TitleText.Size = UDim2.new(1, -70, 1, 0)
+TitleText.Position = UDim2.new(0, 12, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "SPIRAL PARKOUR V1"
+TitleText.TextColor3 = Color3.new(1, 1, 1)
+TitleText.Font = Enum.Font.Code; TitleText.TextSize = 13; TitleText.TextXAlignment = "Left"
+
+local function CreateHeaderBtn(text, pos, hoverColor)
+    local btn = Instance.new("TextButton", TitleBar)
+    btn.Size = UDim2.new(0, 25, 0, 25)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.Code; btn.TextSize = 14
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    -- Hover Efektleri (Animasyonlu)
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = hoverColor}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+    end)
+    
+    return btn
+end
+
+local CloseBtn = CreateHeaderBtn("X", UDim2.new(1, -32, 0, 5), Color3.fromRGB(200, 50, 50))
+local MinimizeBtn = CreateHeaderBtn("-", UDim2.new(1, -62, 0, 5), Color3.fromRGB(170, 0, 255))
+
+MinimizeBtn.Activated:Connect(function()
+    IsMinimized = not IsMinimized
+    local targetHeight = IsMinimized and 35 or MainHeight
+    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.QuartOut), {Size = UDim2.new(0, 250, 0, targetHeight)}):Play()
+    MinimizeBtn.Text = IsMinimized and "+" or "-"
+end)
+
+CloseBtn.Activated:Connect(function() ScreenGui:Destroy() end)
+
+local ContentFrame = Instance.new("Frame", MainFrame)
+ContentFrame.Size = UDim2.new(1, 0, 1, -35)
+ContentFrame.Position = UDim2.new(0, 0, 0, 35)
+ContentFrame.BackgroundTransparency = 1
+
+local function CreateMainBtn(text, yPos, color)
+    local b = Instance.new("TextButton", ContentFrame)
+    b.Size = UDim2.new(0, 230, 0, 35); b.Position = UDim2.new(0, 10, 0, yPos)
+    b.BackgroundColor3 = Color3.fromRGB(30, 30, 30); b.Text = text; b.TextColor3 = color
+    b.Font = Enum.Font.Code; b.TextSize = 11; Instance.new("UICorner", b)
+    return b
+end
+
+local AutoBtn = CreateMainBtn("FINISH WITH CHECKPOINTS", 15, Color3.new(0, 1, 0))
+local InstantBtn = CreateMainBtn("⚡ INSTANT FINAL TP", 60, Color3.new(0, 1, 1))
+local TweenBtn = CreateMainBtn("✈️ TWEEN TO FINAL", 105, Color3.fromRGB(170, 0, 255))
+
+local SliderLabel = Instance.new("TextLabel", ContentFrame)
+SliderLabel.Size = UDim2.new(1, 0, 0, 20); SliderLabel.Position = UDim2.new(0, 0, 0, 160)
+SliderLabel.Text = "TWEEN SPEED: " .. CurrentSpeed; SliderLabel.TextColor3 = Color3.new(1,1,1); SliderLabel.BackgroundTransparency = 1; SliderLabel.Font = Enum.Font.Code; SliderLabel.TextSize = 11
+
+local SliderBack = Instance.new("Frame", ContentFrame)
+SliderBack.Size = UDim2.new(0, 210, 0, 4); SliderBack.Position = UDim2.new(0.5, -105, 0, 195)
+SliderBack.BackgroundColor3 = Color3.fromRGB(45, 45, 45); SliderBack.BorderSizePixel = 0; Instance.new("UICorner", SliderBack)
+
+local SliderFill = Instance.new("Frame", SliderBack)
+SliderFill.Size = UDim2.new((CurrentSpeed-10)/190, 0, 1, 0); SliderFill.BackgroundColor3 = Color3.fromRGB(170, 0, 255); Instance.new("UICorner", SliderFill)
+
+local SliderBtn = Instance.new("TextButton", SliderFill)
+SliderBtn.Size = UDim2.new(0, 14, 0, 14); SliderBtn.AnchorPoint = Vector2.new(0.5, 0.5); SliderBtn.Position = UDim2.new(1, 0, 0.5, 0); SliderBtn.Text = ""; Instance.new("UICorner", SliderBtn).CornerRadius = UDim.new(1,0)
+
+local function GetRoot() return player.Character and player.Character:FindFirstChild("HumanoidRootPart") end
+
+AutoBtn.Activated:Connect(function()
+    if Flying then Flying = false return end
+    Flying = true; AutoBtn.Text = "STOP BOT"; AutoBtn.TextColor3 = Color3.new(1,0,0)
+    task.spawn(function()
+    end)
+end)
+
+local drag, start, mpos
+TitleBar.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = true; start = MainFrame.Position; mpos = i.Position end end)
+UserInputService.InputChanged:Connect(function(i) if drag and i.UserInputType == Enum.UserInputType.MouseMovement then local delta = i.Position - mpos; MainFrame.Position = UDim2.new(start.X.Scale, start.X.Offset + delta.X, start.Y.Scale, start.Y.Offset + delta.Y) end end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end end)
+
+local isSliding = false
+SliderBtn.MouseButton1Down:Connect(function() isSliding = true end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then isSliding = false end end)
+UserInputService.InputChanged:Connect(function(i)
+    if isSliding and i.UserInputType == Enum.UserInputType.MouseMovement then
+        local p = math.clamp((UserInputService:GetMouseLocation().X - SliderBack.AbsolutePosition.X) / SliderBack.AbsoluteSize.X, 0, 1)
+        SliderFill.Size = UDim2.new(p, 0, 1, 0); CurrentSpeed = math.floor(10 + (p * 190)); SliderLabel.Text = "TWEEN SPEED: " .. CurrentSpeed
+    end
+end)
+
+print("✅ Script Injected")
