@@ -1,0 +1,22 @@
+local url = "https://pastebin.com/xeCLTRmT"  
+
+local function loadScript()
+    local request = (syn and syn.request) or (http and http.request) or (request) or (fluxus and fluxus.request)
+    if not request then
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title="Error", Text="No HTTP request", Duration=5})
+        return
+    end
+    local resp = request({Url = url, Method = "GET"})
+    if resp and resp.Body then
+        local fn, err = loadstring(resp.Body)
+        if fn then
+            fn()
+        else
+            game:GetService("StarterGui"):SetCore("SendNotification", {Title="Load Error", Text=tostring(err), Duration=5})
+        end
+    else
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title="HTTP Error", Text="Failed to fetch", Duration=5})
+    end
+end
+
+loadScript()
