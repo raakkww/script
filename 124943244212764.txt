@@ -1,0 +1,81 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- // Variables (Fixed Syntax)
+_G.AutoCollect = false
+_G.CollectDelay = 1
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- Added a slight wait to ensure the remote is actually there
+local remotes = ReplicatedStorage:WaitForChild("__remotes", 5)
+local collectRemote = remotes and remotes:WaitForChild("TycoonService", 5):WaitForChild("CollectMoneyTS", 5)
+
+-- // Main Window
+local Window = Rayfield:CreateWindow({
+   Name = "Penthouse Tycoon Auto Collect",
+   LoadingTitle = "Loading",
+   LoadingSubtitle = "",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "LaScripts",
+      FileName = "TycoonConfig"
+   },
+   KeySystem = false,
+})
+
+-- // Tabs
+local MainTab = Window:CreateTab("Automation", 4483362458)
+local DiscordTab = Window:CreateTab("Discord", 4483362458)
+
+-- // Auto-Collect Logic
+local function startAutoCollect()
+    task.spawn(function()
+        while _G.AutoCollect do
+            if collectRemote then
+                pcall(function()
+                    collectRemote:FireServer()
+                end)
+            end
+            task.wait(_G.CollectDelay)
+        end
+    end)
+end
+
+-- // Automation Tab Elements
+MainTab:CreateSection("Money Management")
+
+MainTab:CreateToggle({
+   Name = "Auto-Collect Money",
+   CurrentValue = false,
+   Flag = "CollectToggle",
+   Callback = function(Value)
+      _G.AutoCollect = Value
+      if Value then
+          startAutoCollect()
+          Rayfield:Notify({
+             Title = "Auto-Collect Enabled",
+             Content = "Collecting money every " .. _G.CollectDelay .. "s",
+             Duration = 3,
+             Image = 4483362458,
+          })
+      end
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "Collection Delay (Seconds)",
+   Range = {0.1, 10},
+   Increment = 0.1,
+   Suffix = "s",
+   CurrentValue = 1,
+   Flag = "DelaySlider",
+   Callback = function(Value)
+      _G.CollectDelay = Value
+   end,
+})
+
+Rayfield:Notify({
+   Title = "Script Loaded",
+   Content = "Tycoon Auto-Collect is ready.",
+   Duration = 5,
+   Image = 4483362458,
+})
