@@ -4,7 +4,7 @@ local Window = Rayfield:CreateWindow({
    Name = "Dive Down",
    Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
    LoadingTitle = "Rayfield Interface Suite",
-   LoadingSubtitle = "by Zayn",
+   LoadingSubtitle = "",
    ShowText = "Zcript", -- for mobile users to unhide Rayfield, change if you'd like
    Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
 
@@ -31,8 +31,8 @@ local Window = Rayfield:CreateWindow({
 
 
 Rayfield:Notify({
-   Title = "Made by Zayn",
-   Content = "Script is free and keyless!",
+   Title = "",
+   Content = "",
    Duration = 4,
    Image = 4483362458,
 })
