@@ -1,0 +1,606 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- ============ SETTINGS ============
+local Settings = {
+    AutoFarm = false,
+    AutoArrest = false,
+    Autopilot = false,
+    Fly = false,
+    FlySpeed = 50,
+    HitboxExtender = false,
+    HitboxSize = 15,
+    ESP = true,
+    SpeedMod = 24,
+    JumpMod = 70,
+    GodMode = false,
+    AntiArrest = false,
+    Keybinds = {
+        ToggleUI = "Insert",
+        Fly = "F",
+        AutoArrest = "R",
+        AutoFarm = "G",
+        GodMode = "H",
+        Noclip = "X",
+        CycleTeleport = "T",
+        HitboxExtender = "B",
+        AntiArrest = "Y",
+    },
+    UIEnabled = true,
+}
+
+-- ============ STATE ============
+local State = {
+    flyConn = nil,
+    noclipConn = nil,
+    godModeCharConn = nil,
+    lastArrestTime = 0,
+    arrestCooldown = 0.4,
+    farmCooldown = 0.25,
+    lastFarmTime = 0,
+    teleportIndex = 1,
+    cachedArrestRemotes = nil,
+    antiArrestHooked = false,
+    originalHitboxes = {},      -- stores { [part] = originalSize, [part] = originalTransparency }
+}
+
+-- Teleport points (update coordinates for your game)
+local TeleportPoints = {
+    {name = "Prison",     cf = CFrame.new(0, 50, 0)},
+    {name = "Escape",     cf = CFrame.new(100, 50, 200)},
+    {name = "Safe Zone",  cf = CFrame.new(-50, 10, -50)},
+    {name = "Gun Shop",   cf = CFrame.new(200, 10, 100)},
+    {name = "Police HQ",  cf = CFrame.new(-100, 10, 50)},
+}
+
+-- ============ UTILITY ============
+local function getRoot(player)
+    local char = player and player.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
+end
+
+local function getHumanoid(player)
+    local char = player and player.Character
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local function isCriminal(player)
+    if player.Team and player.Team.Name == "Criminals" then return true end
+    local ls = player:FindFirstChild("leaderstats")
+    if ls then
+        local wanted = ls:FindFirstChild("Wanted")
+        if wanted and wanted:IsA("ValueBase") then
+            if type(wanted.Value) == "number" and wanted.Value > 0 then return true end
+            if type(wanted.Value) == "boolean" and wanted.Value then return true end
+        end
+    end
+    return false
+end
+
+local function getNearestCriminal()
+    local myRoot = getRoot(LP)
+    if not myRoot then return nil, math.huge end
+    local closest, closestDist = nil, math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LP then continue end
+        local hum = getHumanoid(p)
+        if not hum or hum.Health <= 0 then continue end
+        if not isCriminal(p) then continue end
+        local root = getRoot(p)
+        if not root then continue end
+        local dist = (root.Position - myRoot.Position).Magnitude
+        if dist < closestDist then
+            closestDist = dist
+            closest = p
+        end
+    end
+    return closest, closestDist
+end
+
+-- ============ AUTO ARREST ============
+local function fireArrest()
+    pcall(function()
+        local char = LP.Character
+        if not char then return end
+        local tool = char:FindFirstChild("Handcuffs") or char:FindFirstChild("ArrestTool") or char:FindFirstChild("Taser")
+        if tool and tool:IsA("Tool") then
+            tool:Activate()
+            return
+        end
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.delay(0.05, function()
+            vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end)
+    end)
+end
+
+local function autoArrest()
+    if not Settings.AutoArrest or not Settings.UIEnabled then return end
+    local now = tick()
+    if now - State.lastArrestTime < State.arrestCooldown then return end
+    local target, dist = getNearestCriminal()
+    if not target or dist > 15 then return end
+    local hum = getHumanoid(target)
+    if not hum or hum.Health <= 0 then return end
+    fireArrest()
+    State.lastArrestTime = now
+end
+
+local function autoFarm()
+    if not Settings.AutoFarm or not Settings.UIEnabled then return end
+    local now = tick()
+
+    if Settings.Autopilot then
+        local target, dist = getNearestCriminal()
+        if target and dist > 8 then
+            local hum = getHumanoid(LP)
+            local targetRoot = getRoot(target)
+            if hum and targetRoot then
+                hum:MoveTo(targetRoot.Position)
+            end
+        end
+    end
+
+    if now - State.lastFarmTime < State.farmCooldown then return end
+    local target, dist = getNearestCriminal()
+    if target and dist <= 15 then
+        fireArrest()
+        State.lastFarmTime = now
+        State.lastArrestTime = now
+    end
+end
+
+-- ============ FLY & NOCLIP (shared) ============
+local function setNoclip(enabled)
+    if enabled then
+        if not State.noclipConn then
+            State.noclipConn = RunService.Stepped:Connect(function()
+                if not (Settings.Fly or State.noclipConnEnabled) then return end
+                local char = LP.Character
+                if not char then return end
+                for _, p in ipairs(char:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = false end
+                end
+            end)
+        end
+        State.noclipConnEnabled = true
+    else
+        if State.noclipConn then
+            State.noclipConn:Disconnect()
+            State.noclipConn = nil
+        end
+        State.noclipConnEnabled = false
+        local char = LP.Character
+        if char then
+            for _, p in ipairs(char:GetDescendants()) do
+                if p:IsA("BasePart") and p.CanCollide == false then
+                    p.CanCollide = true
+                end
+            end
+        end
+    end
+end
+
+local function enableFly(enabled)
+    if enabled and not State.flyConn then
+        State.flyConn = RunService.RenderStepped:Connect(function()
+            if not Settings.Fly then return end
+            local char = LP.Character
+            if not char then return end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = true
+                hum:ChangeState(Enum.HumanoidStateType.Physics)
+            end
+
+            local dir = Vector3.zero
+            local fwd = Camera.CFrame.LookVector
+            local rgt = Camera.CFrame.RightVector
+            if UIS:IsKeyDown(Enum.KeyCode.W) then dir += fwd end
+            if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= fwd end
+            if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= rgt end
+            if UIS:IsKeyDown(Enum.KeyCode.D) then dir += rgt end
+            if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.yAxis end
+            if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
+            if dir.Magnitude > 0 then dir = dir.Unit end
+            root.Velocity = dir * Settings.FlySpeed
+        end)
+        setNoclip(true)
+    elseif not enabled then
+        if State.flyConn then
+            State.flyConn:Disconnect()
+            State.flyConn = nil
+        end
+        local char = LP.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+            end
+        end
+        -- Only disable noclip if standalone noclip isn't active
+        if not State.standaloneNoclip then setNoclip(false) end
+    end
+end
+
+-- ============ HITBOX EXTENDER (target only) ============
+local function updateHitboxes()
+    if not Settings.HitboxExtender then
+        -- Restore original sizes and transparency
+        for part, data in pairs(State.originalHitboxes) do
+            pcall(function()
+                if part and part.Parent then
+                    part.Size = data.size
+                    part.Transparency = data.transparency
+                end
+            end)
+        end
+        for k in pairs(State.originalHitboxes) do State.originalHitboxes[k] = nil end
+        return
+    end
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LP then continue end
+        local char = p.Character
+        if not char then continue end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then continue end
+
+        if not State.originalHitboxes[root] then
+            State.originalHitboxes[root] = {
+                size = root.Size,
+                transparency = root.Transparency,
+            }
+        end
+        root.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+        root.Transparency = 0.7
+    end
+end
+
+-- ============ TELEPORT ============
+local function teleportTo(pointOrIndex)
+    local cf
+    if type(pointOrIndex) == "number" then
+        local tp = TeleportPoints[pointOrIndex]
+        if tp then cf = tp.cf end
+    elseif type(pointOrIndex) == "string" then
+        for _, tp in ipairs(TeleportPoints) do
+            if tp.name:lower() == pointOrIndex:lower() then cf = tp.cf; break end
+        end
+    elseif typeof(pointOrIndex) == "CFrame" then
+        cf = pointOrIndex
+    end
+    if not cf then return end
+    local root = getRoot(LP)
+    if root then root.CFrame = cf end
+end
+
+local function cycleTeleport()
+    teleportTo(State.teleportIndex)
+    State.teleportIndex = (State.teleportIndex % #TeleportPoints) + 1
+end
+
+-- ============ GOD MODE ============
+local function applyGodMode(char)
+    if not Settings.GodMode then return end
+    task.defer(function()
+        task.wait(0.3)
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum and Settings.GodMode then
+            hum.MaxHealth = math.huge
+            hum.Health = math.huge
+            hum.BreakJointsOnDeath = false
+        end
+    end)
+end
+
+local function setupGodMode()
+    if State.godModeCharConn then
+        State.godModeCharConn:Disconnect()
+        State.godModeCharConn = nil
+    end
+    if Settings.GodMode then
+        State.godModeCharConn = LP.CharacterAdded:Connect(applyGodMode)
+        if LP.Character then applyGodMode(LP.Character) end
+    end
+end
+
+-- ============ ANTI-ARREST (with remote caching and re-hook) ============
+local function cacheArrestRemotes()
+    if State.cachedArrestRemotes then return State.cachedArrestRemotes end
+    local remotes = {}
+    local function search(container)
+        for _, obj in ipairs(container:GetChildren()) do
+            if obj:IsA("RemoteEvent") and obj.Name:lower():find("arrest") then
+                table.insert(remotes, obj)
+            elseif obj:IsA("RemoteFunction") and obj.Name:lower():find("arrest") then
+                table.insert(remotes, obj)
+            elseif obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                -- Any remote with "cuff" or "arrest" in name
+                local n = obj.Name:lower()
+                if n:find("cuff") or n:find("arrest") then
+                    table.insert(remotes, obj)
+                end
+            end
+            search(obj)
+        end
+    end
+    search(game)
+    State.cachedArrestRemotes = remotes
+    return remotes
+end
+
+local function applyAntiArrestHooks()
+    local remotes = cacheArrestRemotes()
+    for _, remote in ipairs(remotes) do
+        pcall(function()
+            if remote:IsA("RemoteEvent") then
+                remote.OnClientEvent:Connect(function() return end)
+            elseif remote:IsA("RemoteFunction") then
+                local old = remote.OnClientInvoke
+                remote.OnClientInvoke = function(...) return nil end
+            end
+        end)
+    end
+    State.antiArrestHooked = true
+end
+
+local function refreshAntiArrest()
+    if Settings.AntiArrest then
+        if not State.antiArrestHooked then
+            applyAntiArrestHooks()
+        end
+    else
+        State.antiArrestHooked = false
+        -- No need to unhook, just stop attribute setting (handled in heartbeat)
+    end
+end
+
+-- ============ ESP ============
+local espObjects = {}
+
+local function getOrCreateESP(player)
+    if espObjects[player] then return espObjects[player] end
+    local obj = {
+        box = {Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line")},
+        tracer = Drawing.new("Line"),
+        text = Drawing.new("Text"),
+    }
+    for _, l in ipairs(obj.box) do
+        l.Thickness = 1; l.Transparency = 1; l.Visible = false
+    end
+    obj.tracer.Thickness = 1; obj.tracer.Transparency = 1; obj.tracer.Visible = false
+    obj.text.Size = 14; obj.text.Center = false; obj.text.Outline = true; obj.text.Visible = false
+    espObjects[player] = obj
+    return obj
+end
+
+local function hideESP(obj)
+    for _, l in ipairs(obj.box) do l.Visible = false end
+    obj.tracer.Visible = false
+    obj.text.Visible = false
+end
+
+local function removeESP(player)
+    local obj = espObjects[player]
+    if not obj then return end
+    for _, l in ipairs(obj.box) do l:Remove() end
+    if obj.tracer then obj.tracer:Remove() end
+    if obj.text then obj.text:Remove() end
+    espObjects[player] = nil
+end
+
+local function updateESP()
+    if not Settings.ESP or not Settings.UIEnabled then
+        for _, obj in pairs(espObjects) do hideESP(obj) end
+        return
+    end
+
+    local active = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LP then continue end
+        local char = p.Character
+        if not char then continue end
+        local root = char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
+        if not root then continue end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
+
+        active[p] = true
+        local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+        local obj = getOrCreateESP(p)
+
+        if not onScreen then hideESP(obj); goto continue end
+
+        local head = char:FindFirstChild("Head")
+        local headWorld = head and (head.Position + Vector3.new(0, 0.5, 0)) or (root.Position + Vector3.new(0, 2, 0))
+        local footWorld = root.Position - Vector3.new(0, 3, 0)
+        local headSP = Camera:WorldToViewportPoint(headWorld)
+        local footSP = Camera:WorldToViewportPoint(footWorld)
+        local h = math.abs(headSP.Y - footSP.Y)
+        local w = h * 0.55
+        local cx = pos.X
+        local left, right = cx - w/2, cx + w/2
+        local top, bottom = headSP.Y, footSP.Y
+
+        local col
+        if isCriminal(p) then
+            col = Color3.fromRGB(255, 60, 60)
+        elseif p.Team and p.Team.Name:lower():find("police") then
+            col = Color3.fromRGB(60, 140, 255)
+        else
+            col = Color3.fromRGB(200, 200, 200)
+        end
+
+        -- Box
+        local corners = {
+            {Vector2.new(left, top), Vector2.new(right, top)},
+            {Vector2.new(right, top), Vector2.new(right, bottom)},
+            {Vector2.new(right, bottom), Vector2.new(left, bottom)},
+            {Vector2.new(left, bottom), Vector2.new(left, top)},
+        }
+        for i, seg in ipairs(corners) do
+            obj.box[i].From = seg[1]; obj.box[i].To = seg[2]
+            obj.box[i].Color = col; obj.box[i].Visible = true
+        end
+
+        -- Tracer
+        obj.tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+        obj.tracer.To = Vector2.new(pos.X, pos.Y)
+        obj.tracer.Color = Color3.new(1, 1, 1)
+        obj.tracer.Visible = true
+
+        -- Text
+        local dist = math.floor((root.Position - Camera.CFrame.Position).Magnitude)
+        local status = isCriminal(p) and "CRIMINAL" or "CIVIL"
+        local hp = string.format("%d/%d", math.floor(hum.Health), math.floor(hum.MaxHealth))
+        obj.text.Text = string.format("%s [%s]\nHP: %s | %dm", p.Name, status, hp, dist)
+        obj.text.Position = Vector2.new(left, top - 30)
+        obj.text.Color = col
+        obj.text.Visible = true
+
+        ::continue::
+    end
+
+    for p, obj in pairs(espObjects) do
+        if not active[p] then
+            hideESP(obj)
+            if not p or not p.Parent then removeESP(p) end
+        end
+    end
+end
+
+-- ============ UI ============
+local uiObjects = {}
+local function createUI()
+    local bg = Drawing.new("Square")
+    bg.Filled = true; bg.Color = Color3.fromRGB(10, 10, 15)
+    bg.Transparency = 0.85; bg.Size = Vector2.new(380, 200)
+    bg.Position = Vector2.new(10, 10); bg.Visible = false
+
+    local border = Drawing.new("Square")
+    border.Filled = false; border.Color = Color3.fromRGB(255, 180, 0)
+    border.Thickness = 2; border.Size = Vector2.new(380, 200)
+    border.Position = Vector2.new(10, 10); border.Visible = false
+
+    local title = Drawing.new("Text")
+    title.Text = "Riot City Prison Escape"
+    title.Size = 17; title.Color = Color3.fromRGB(255, 200, 50)
+    title.Position = Vector2.new(20, 16); title.Outline = true; title.Visible = false
+
+    local status = Drawing.new("Text")
+    status.Size = 13; status.Color = Color3.new(1, 1, 1)
+    status.Position = Vector2.new(20, 40); status.Outline = true; status.Visible = false
+
+    uiObjects = {bg = bg, border = border, title = title, status = status}
+end
+
+local function updateUI()
+    if not uiObjects.bg then createUI() end
+    local v = Settings.UIEnabled
+    for _, obj in pairs(uiObjects) do obj.Visible = v end
+    if not v then return end
+
+    local nextTP = TeleportPoints[State.teleportIndex]
+    uiObjects.status.Text = string.format(
+        "Farm: %s | Arrest: %s | Pilot: %s\nFly: %s (%d) | Noclip: %s\nHitbox: %s (%d) | God: %s | Anti-Arrest: %s\nSpeed: %d | Jump: %d | ESP: %s\nNext TP [T]: %s | Y=AntiArrest",
+        Settings.AutoFarm and "ON" or "OFF",
+        Settings.AutoArrest and "ON" or "OFF",
+        Settings.Autopilot and "ON" or "OFF",
+        Settings.Fly and "ON" or "OFF", Settings.FlySpeed,
+        (State.noclipConnEnabled and "ON" or "OFF"),
+        Settings.HitboxExtender and "ON" or "OFF", Settings.HitboxSize,
+        Settings.GodMode and "ON" or "OFF",
+        Settings.AntiArrest and "ON" or "OFF",
+        Settings.SpeedMod, Settings.JumpMod,
+        Settings.ESP and "ON" or "OFF",
+        nextTP and nextTP.name or "None"
+    )
+end
+
+-- ============ KEYBINDS ============
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    local k = input.KeyCode.Name
+
+    if k == Settings.Keybinds.ToggleUI then
+        Settings.UIEnabled = not Settings.UIEnabled
+    elseif k == Settings.Keybinds.Fly then
+        Settings.Fly = not Settings.Fly
+        enableFly(Settings.Fly)
+    elseif k == Settings.Keybinds.AutoArrest then
+        Settings.AutoArrest = not Settings.AutoArrest
+    elseif k == Settings.Keybinds.AutoFarm then
+        Settings.AutoFarm = not Settings.AutoFarm
+        Settings.Autopilot = Settings.AutoFarm
+    elseif k == Settings.Keybinds.GodMode then
+        Settings.GodMode = not Settings.GodMode
+        setupGodMode()
+    elseif k == Settings.Keybinds.CycleTeleport then
+        cycleTeleport()
+    elseif k == Settings.Keybinds.HitboxExtender then
+        Settings.HitboxExtender = not Settings.HitboxExtender
+    elseif k == Settings.Keybinds.Noclip then
+        if not Settings.Fly then
+            if State.noclipConnEnabled then
+                setNoclip(false)
+                State.standaloneNoclip = false
+            else
+                setNoclip(true)
+                State.standaloneNoclip = true
+            end
+        end
+    elseif k == Settings.Keybinds.AntiArrest then
+        Settings.AntiArrest = not Settings.AntiArrest
+        refreshAntiArrest()
+    end
+end)
+
+-- ============ MAIN LOOPS ============
+createUI()
+setupGodMode()
+refreshAntiArrest()
+enableFly(Settings.Fly)
+
+RunService.RenderStepped:Connect(function()
+    updateESP()
+    autoArrest()
+    autoFarm()
+    updateUI()
+end)
+
+RunService.Heartbeat:Connect(function()
+    local hum = getHumanoid(LP)
+    if hum then
+        if hum.WalkSpeed ~= Settings.SpeedMod then hum.WalkSpeed = Settings.SpeedMod end
+        if hum.JumpPower ~= Settings.JumpMod then hum.JumpPower = Settings.JumpMod end
+        if Settings.GodMode then
+            if hum.Health ~= math.huge then hum.Health = math.huge end
+            if hum.MaxHealth ~= math.huge then hum.MaxHealth = math.huge end
+        end
+    end
+
+    updateHitboxes()
+
+    if Settings.AntiArrest and LP.Character then
+        LP.Character:SetAttribute("Arrestable", false)
+        -- Brute-force any "Arrestable" object in character
+        for _, obj in pairs(LP.Character:GetChildren()) do
+            if obj.Name:lower():find("arrest") and (obj:IsA("BoolValue") or obj:IsA("NumberValue") or obj:IsA("StringValue")) then
+                pcall(function() obj.Value = false end)
+            end
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(removeESP)
+
+print("Riot City Prison Escape loaded | INS=UI | F=Fly | R=Arrest | G=Farm | H=God | T=TP | B=Hitbox | X=Noclip | Y=AntiArrest")
