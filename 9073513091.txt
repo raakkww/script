@@ -1,0 +1,25 @@
+--NO M1 COOLDOWN
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local CombatFolder = ReplicatedStorage.Assets.Modules.CombatData
+
+for _, moduleScript in ipairs(CombatFolder:GetChildren()) do
+    if moduleScript:IsA("ModuleScript") then
+        local success, data = pcall(require, moduleScript)
+
+        if success and type(data) == "table" then
+            for attackName, attack in pairs(data) do
+                if type(attack) == "table" then
+                    if attack.M1CD then
+                        attack.M1CD = 0.1
+                    end
+                end
+            end
+
+            print("Modified:", moduleScript.Name)
+        else
+            warn("Failed to require:", moduleScript.Name)
+        end
+    end
+end
