@@ -1,0 +1,353 @@
+-- === SERVICES ===
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local LocalPlayer = Players.LocalPlayer
+
+-- === GLOBAL VARIABLES ===
+_G.AutoFarmEnabled = false
+
+-- === SAFE GUI PARENT ===
+local guiParent = (gethui and gethui()) or game:GetService("CoreGui")
+if not pcall(function() local a = guiParent.Name end) then
+    guiParent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- Clean previous versions
+if guiParent:FindFirstChild("ThiAezWDScript") then
+    guiParent.ThiAezWDScript:Destroy()
+end
+
+-- === INTERFACE ===
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ThiAezWDScript"
+ScreenGui.Parent = guiParent
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BackgroundTransparency = 0.2
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -140)
+MainFrame.Size = UDim2.new(0, 320, 0, 260)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Text = "  "
+Title.TextColor3 = Color3.fromRGB(0, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 22
+Title.Parent = MainFrame
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 14)
+
+-- Minimize Button
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 32, 0, 32)
+MinBtn.Position = UDim2.new(0.78, 0, 0, 4)
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 20
+MinBtn.Parent = MainFrame
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position = UDim2.new(0.89, 0, 0, 4)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 18
+CloseBtn.Parent = MainFrame
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8410)
+
+-- Separator
+local Sep = Instance.new("Frame")
+Sep.Size = UDim2.new(0.9, 0, 0, 2)
+Sep.Position = UDim2.new(0.05, 0, 0.16, 0)
+Sep.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+Sep.BorderSizePixel = 0
+Sep.Parent = MainFrame
+
+-- Status
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(0.9, 0, 0, 22)
+StatusText.Position = UDim2.new(0.05, 0, 0.19, 0)
+StatusText.BackgroundTransparency = 1
+StatusText.Text = "STATUS: OFF"
+StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
+StatusText.Font = Enum.Font.GothamBold
+StatusText.TextSize = 14
+StatusText.Parent = MainFrame
+
+-- Progress bar
+local BarBg = Instance.new("Frame")
+BarBg.Size = UDim2.new(0.85, 0, 0, 8)
+BarBg.Position = UDim2.new(0.075, 0, 0.28, 0)
+BarBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+BarBg.BorderSizePixel = 0
+BarBg.Parent = MainFrame
+Instance.new("UICorner", BarBg).CornerRadius = UDim.new(0, 4)
+
+local BarFill = Instance.new("Frame")
+BarFill.Size = UDim2.new(0, 0, 1, 0)
+BarFill.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+BarFill.BorderSizePixel = 0
+BarFill.Parent = BarBg
+Instance.new("UICorner", BarFill).CornerRadius = UDim.new(0, 4)
+
+-- Info
+local Info = Instance.new("TextLabel")
+Info.Size = UDim2.new(0.9, 0, 0, 35)
+Info.Position = UDim2.new(0.05, 0, 0.33, 0)
+Info.BackgroundTransparency = 1
+Info.Text = "Pattern: Up → Left ↔ Right (Loop)\nSpeed: 500 | Anti-AFK: Enabled"
+Info.TextColor3 = Color3.fromRGB(180, 180, 180)
+Info.Font = Enum.Font.GothamSemibold
+Info.TextSize = 11
+Info.TextWrapped = true
+Info.Parent = MainFrame
+
+-- Toggle Button
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.85, 0, 0, 45)
+ToggleBtn.Position = UDim2.new(0.075, 0, 0.48, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleBtn.Text = "AUTOFARM: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+ToggleBtn.Font = Enum.Font.GothamBlack
+ToggleBtn.TextSize = 18
+ToggleBtn.Parent = MainFrame
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
+
+-- Warning
+local Warning = Instance.new("TextLabel")
+Warning.Size = UDim2.new(0.9, 0, 0, 18)
+Warning.Position = UDim2.new(0.05, 0, 0.65, 0)
+Warning.BackgroundTransparency = 1
+Warning.Text = "Get in a car and then activate"
+Warning.TextColor3 = Color3.fromRGB(255, 50, 50)
+Warning.Font = Enum.Font.GothamSemibold
+Warning.TextSize = 11
+Warning.Parent = MainFrame
+
+-- Footer "Wheelie District script"
+local Footer = Instance.new("TextLabel")
+Footer.Size = UDim2.new(0.9, 0, 0, 18)
+Footer.Position = UDim2.new(0.05, 0, 0.74, 0)
+Footer.BackgroundTransparency = 1
+Footer.Text = "Wheelie District script"
+Footer.TextColor3 = Color3.fromRGB(120, 120, 120)
+Footer.Font = Enum.Font.Gotham
+Footer.TextSize = 10
+Footer.Parent = MainFrame
+
+local Version = Instance.new("TextLabel")
+Version.Size = UDim2.new(0.9, 0, 0, 16)
+Version.Position = UDim2.new(0.05, 0, 0.80, 0)
+Version.BackgroundTransparency = 1
+Version.Text = "v3.1 | Fly Farm + Anti-AFK"
+Version.TextColor3 = Color3.fromRGB(80, 80, 80)
+Version.Font = Enum.Font.Gotham
+Version.TextSize = 9
+Version.Parent = MainFrame
+
+-- === HELPER FUNCTIONS ===
+
+local function getCar()
+    local char = LocalPlayer.Character
+    if not char then return nil, nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return nil, nil end
+    local seat = hum.SeatPart
+    if not seat then return nil, nil end
+    return seat.Parent, seat
+end
+
+local function cleanBodyMovers(seat)
+    if not seat then return end
+    for _, child in pairs(seat:GetChildren()) do
+        if child:IsA("BodyGyro") or child:IsA("BodyVelocity") then
+            child:Destroy()
+        end
+    end
+end
+
+-- === ANTI-AFK ===
+local antiAfkConn = nil
+local function startAntiAfk()
+    antiAfkConn = LocalPlayer.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new(0, 0))
+    end)
+end
+
+local function stopAntiAfk()
+    if antiAfkConn then
+        antiAfkConn:Disconnect()
+        antiAfkConn = nil
+    end
+end
+
+-- === MAIN LOGIC ===
+local flySpeed = 500
+local ascendSpeed = 250 -- slower for controlled ascent
+
+local function runAutoFarm()
+    task.spawn(function()
+        while _G.AutoFarmEnabled do
+            local car, seat = getCar()
+            
+            -- If not in a car, wait
+            if not car or not seat then
+                StatusText.Text = "STATUS: WAITING FOR CAR..."
+                StatusText.TextColor3 = Color3.fromRGB(255, 200, 0)
+                BarFill.Size = UDim2.new(0.2, 0, 1, 0)
+                BarFill.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+                task.wait(1)
+                continue
+            end
+            
+            -- Clean old body movers
+            cleanBodyMovers(seat)
+            
+            -- Unanchor entire car
+            for _, part in pairs(car:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Anchored = false
+                end
+            end
+            
+            -- Create movers
+            local bg = Instance.new("BodyGyro", seat)
+            local bv = Instance.new("BodyVelocity", seat)
+            bg.P = 9e4
+            bg.D = 2000
+            bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            
+            local hasAscended = false
+            
+            -- Flight loop while in the SAME car
+            while _G.AutoFarmEnabled do
+                local currentCar, currentSeat = getCar()
+                if currentSeat ~= seat then
+                    break -- Left the car or changed cars
+                end
+                
+                if not hasAscended then
+                    -- PHASE 1: ASCEND (only once per car)
+                    StatusText.Text = "STATUS: ASCENDING..."
+                    StatusText.TextColor3 = Color3.fromRGB(100, 255, 255)
+                    BarFill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+                    BarFill.Size = UDim2.new(0.3, 0, 1, 0)
+                    
+                    bg.CFrame = CFrame.new(seat.Position, seat.Position + Vector3.new(0, 1, 0))
+                    bv.Velocity = Vector3.new(0, ascendSpeed, 0)
+                    task.wait(2.5)
+                    hasAscended = true
+                else
+                    -- PHASE 2: LEFT
+                    if not _G.AutoFarmEnabled then break end
+                    local checkCar, checkSeat = getCar()
+                    if checkSeat ~= seat then break end
+                    
+                    StatusText.Text = "STATUS: LEFT →"
+                    StatusText.TextColor3 = Color3.fromRGB(255, 255, 100)
+                    BarFill.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+                    BarFill.Size = UDim2.new(0.5, 0, 1, 0)
+                    
+                    bg.CFrame = CFrame.new(seat.Position, seat.Position + Vector3.new(-1, 0, 0))
+                    bv.Velocity = Vector3.new(-flySpeed, 0, 0)
+                    task.wait(1.5)
+                    
+                    -- PHASE 3: RIGHT
+                    if not _G.AutoFarmEnabled then break end
+                    checkCar, checkSeat = getCar()
+                    if checkSeat ~= seat then break end
+                    
+                    StatusText.Text = "STATUS: ← RIGHT"
+                    StatusText.TextColor3 = Color3.fromRGB(100, 255, 100)
+                    BarFill.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+                    BarFill.Size = UDim2.new(1, 0, 1, 0)
+                    
+                    bg.CFrame = CFrame.new(seat.Position, seat.Position + Vector3.new(1, 0, 0))
+                    bv.Velocity = Vector3.new(flySpeed, 0, 0)
+                    task.wait(1.5)
+                end
+            end
+            
+            -- Cleanup on car exit or disable
+            cleanBodyMovers(seat)
+            if car then
+                for _, part in pairs(car:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.Anchored = false
+                    end
+                end
+            end
+            
+            task.wait(0.5)
+        end
+        
+        -- Final status
+        StatusText.Text = "STATUS: OFF"
+        StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        BarFill.Size = UDim2.new(0, 0, 1, 0)
+    end)
+end
+
+-- === BUTTONS ===
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    _G.AutoFarmEnabled = not _G.AutoFarmEnabled
+    
+    if _G.AutoFarmEnabled then
+        ToggleBtn.Text = "AUTOFARM: ON"
+        ToggleBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+        startAntiAfk()
+        runAutoFarm()
+    else
+        ToggleBtn.Text = "AUTOFARM: OFF"
+        ToggleBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+        stopAntiAfk()
+    end
+end)
+
+-- Minimize
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        MainFrame:TweenSize(UDim2.new(0, 320, 0, 40), "Out", "Quad", 0.3, true)
+        for _, child in pairs(MainFrame:GetChildren()) do
+            if child ~= Title and child ~= MinBtn and child ~= CloseBtn and child:IsA("GuiObject") then
+                child.Visible = false
+            end
+        end
+    else
+        MainFrame:TweenSize(UDim2.new(0, 320, 0, 260), "Out", "Quad", 0.3, true)
+        for _, child in pairs(MainFrame:GetChildren()) do
+            if child:IsA("GuiObject") then
+                child.Visible = true
+            end
+        end
+    end
+end)
+
+-- Close
+CloseBtn.MouseButton1Click:Connect(function()
+    _G.AutoFarmEnabled = false
+    stopAntiAfk()
+    task.wait(0.6)
+    ScreenGui:Destroy()
+end)
