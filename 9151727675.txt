@@ -1,0 +1,411 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local Events = ReplicatedStorage:WaitForChild("Events", 10)
+local ShowUpgradeScreen = Events:WaitForChild("ShowUpgradeScreen", 10)
+local SelectUpgrade = Events:WaitForChild("SelectUpgrade", 10)
+local RerollUpgrade = Events:WaitForChild("RerollUpgrade", 10)
+local SkipUpgrade = Events:WaitForChild("SkipUpgrade", 10)
+local RequestLootCollection = Events:WaitForChild("RequestLootCollection", 10)
+
+local player = Players.LocalPlayer
+
+-- ================================
+-- HIT REMOTES (always on)
+-- ================================
+local hitRemotes = {
+    { name = "Hammer",         id = "RequestHammerHit" },
+    { name = "Thunder Hammer", id = "RequestThunderHammerHit" },
+    { name = "Shadow",         id = "RequestShadowHit" },
+    { name = "Shadow Pulse",   id = "RequestShadowPulse" },
+    { name = "Voice Shout",    id = "RequestVoiceShoutHit" },
+    { name = "Doom Echo",      id = "RequestDoomEchoHit" },
+}
+
+for _, r in ipairs(hitRemotes) do
+    local ok, remote = pcall(function() return Events:WaitForChild(r.id, 5) end)
+    r.remote = ok and remote or nil
+end
+
+-- ================================
+-- PRIORITY TIERS (order matters)
+-- ================================
+local tierLimitPower  = { "InfinitePower" }
+local tierEvolves     = { "ThunderHammer", "Supernova", "DoomEcho" }
+local tierPriWeapons  = { "Hammer", "ShadowOrbit", "VoiceAmplifier" }
+local tierOther       = { "Shuriken", "SunAura", "CritChance", "XPMultiplier", "CursedSkull", "MaxHealth", "DamageMultiplier" }
+local tierLimitSpeed  = { "InfiniteHaste" }
+
+local allTiers = {
+    { label = "Limit Break: Power", ids = tierLimitPower },
+    { label = "Evolve",             ids = tierEvolves },
+    { label = "Priority Weapon",    ids = tierPriWeapons },
+    { label = "Build Item",         ids = tierOther },
+    { label = "Limit Break: Speed", ids = tierLimitSpeed },
+}
+
+local function findInTier(upgrades, ids)
+    local matches = {}
+    for _, upgrade in ipairs(upgrades) do
+        if type(upgrade) == "table" then
+            for _, id in ipairs(ids) do
+                if upgrade.ID == id then
+                    table.insert(matches, upgrade)
+                end
+            end
+        end
+    end
+    -- Sort by lowest level within tier
+    table.sort(matches, function(a, b)
+        return (a.Level or 0) < (b.Level or 0)
+    end)
+    return matches
+end
+
+local function getGold()
+    local ok, val = pcall(function() return player.leaderstats.Gold.Value end)
+    return ok and val or 0
+end
+
+local function getRerollCost()
+    local ok, label = pcall(function()
+        return player.PlayerGui.UpgradeScreen.MainContainer.Footer.RollButton.TextLabel.Text
+    end)
+    if not ok then return math.huge end
+    local numStr = label:match("%d+")
+    return numStr and tonumber(numStr) or math.huge
+end
+
+-- ================================
+-- GUI HELPERS
+-- ================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MasterGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player.PlayerGui
+
+local function makeCorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 10)
+    c.Parent = parent
+    return c
+end
+
+local function makeFrame(parent, size, pos)
+    local f = Instance.new("Frame")
+    f.Size = size
+    f.Position = pos
+    f.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    f.BorderSizePixel = 0
+    f.Active = true
+    f.Draggable = true
+    f.Parent = parent
+    makeCorner(f)
+    return f
+end
+
+local function makeTitle(parent, text)
+    local t = Instance.new("TextLabel")
+    t.Size = UDim2.new(1, 0, 0, 38)
+    t.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    t.BorderSizePixel = 0
+    t.Text = text
+    t.TextColor3 = Color3.fromRGB(255, 200, 0)
+    t.TextSize = 15
+    t.Font = Enum.Font.GothamBold
+    t.Parent = parent
+    makeCorner(t)
+    return t
+end
+
+local function makeLabel(parent, text, size, pos, color, fontSize)
+    local l = Instance.new("TextLabel")
+    l.Size = size
+    l.Position = pos
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.TextColor3 = color or Color3.fromRGB(180, 180, 180)
+    l.TextSize = fontSize or 13
+    l.Font = Enum.Font.Gotham
+    l.TextWrapped = true
+    l.Parent = parent
+    return l
+end
+
+local function makeButton(parent, text, size, pos)
+    local b = Instance.new("TextButton")
+    b.Size = size
+    b.Position = pos
+    b.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    b.BorderSizePixel = 0
+    b.Text = text
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.TextSize = 13
+    b.Font = Enum.Font.GothamBold
+    b.Parent = parent
+    makeCorner(b, 6)
+    return b
+end
+
+local function setToggle(btn, on)
+    btn.Text = on and "ON" or "OFF"
+    btn.BackgroundColor3 = on and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(50, 50, 50)
+end
+
+local function makeDivider(parent, yPos)
+    local d = Instance.new("Frame")
+    d.Size = UDim2.new(1, -20, 0, 1)
+    d.Position = UDim2.new(0, 10, 0, yPos)
+    d.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    d.BorderSizePixel = 0
+    d.Parent = parent
+end
+
+-- ================================
+-- AUTO HIT WINDOW
+-- ================================
+local hitFrame = makeFrame(screenGui, UDim2.new(0, 260, 0, 320), UDim2.new(0, 20, 0.5, -280))
+makeTitle(hitFrame, "⚔️ Auto Hit (Always On)")
+makeLabel(hitFrame, "🟢 Running for all 6 weapons", UDim2.new(1,-20,0,20), UDim2.new(0,10,0,44), Color3.fromRGB(100,255,100), 12)
+
+local yOff = 70
+for _, r in ipairs(hitRemotes) do
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -20, 0, 30)
+    row.Position = UDim2.new(0, 10, 0, yOff)
+    row.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    row.BorderSizePixel = 0
+    row.Parent = hitFrame
+    makeCorner(row, 6)
+    makeLabel(row, "✅  " .. r.name, UDim2.new(1,-10,1,0), UDim2.new(0,10,0,0), Color3.fromRGB(200,200,200), 13)
+    yOff = yOff + 36
+end
+
+-- ================================
+-- LOOT ALL WINDOW
+-- ================================
+local lootFrame = makeFrame(screenGui, UDim2.new(0, 260, 0, 110), UDim2.new(0, 20, 0.5, 60))
+makeTitle(lootFrame, "💰 Loot All")
+local lootCountLabel = makeLabel(lootFrame, "Loot: 0", UDim2.new(1,0,0,22), UDim2.new(0,0,0,42), Color3.fromRGB(180,180,180), 13)
+local lootBtn = makeButton(lootFrame, "Enable", UDim2.new(0,220,0,30), UDim2.new(0.5,-110,0,72))
+
+-- ================================
+-- AUTO UPGRADE PICKER WINDOW (merged with limit break)
+-- ================================
+local pickerFrame = makeFrame(screenGui, UDim2.new(0, 280, 0, 210), UDim2.new(0, 300, 0.5, -280))
+makeTitle(pickerFrame, "🎯 Auto Upgrade Picker")
+
+local pickerStatusLabel = makeLabel(pickerFrame, "Status: OFF", UDim2.new(1,-20,0,22), UDim2.new(0,10,0,44), Color3.fromRGB(180,180,180), 14)
+makeDivider(pickerFrame, 70)
+
+local pickerTierLabel  = makeLabel(pickerFrame, "Tier: —", UDim2.new(1,-20,0,22), UDim2.new(0,10,0,76), Color3.fromRGB(255,200,0), 14)
+local pickerActionLabel = makeLabel(pickerFrame, "Action: Waiting...", UDim2.new(1,-20,0,22), UDim2.new(0,10,0,100), Color3.fromRGB(180,180,180), 13)
+local pickerLastLabel  = makeLabel(pickerFrame, "Last picked: None", UDim2.new(1,-20,0,22), UDim2.new(0,10,0,124), Color3.fromRGB(120,120,120), 13)
+
+makeDivider(pickerFrame, 150)
+
+local pickerGoldLabel = makeLabel(pickerFrame, "Gold: 0  |  Reroll: ?", UDim2.new(1,-20,0,20), UDim2.new(0,10,0,156), Color3.fromRGB(255,180,0), 12)
+local pickerBtn = makeButton(pickerFrame, "Enable", UDim2.new(0,240,0,32), UDim2.new(0.5,-120,0,174))
+
+-- ================================
+-- TITAN DODGE WINDOW
+-- ================================
+local titanFrame = makeFrame(screenGui, UDim2.new(0, 260, 0, 130), UDim2.new(0, 300, 0.5, -50))
+makeTitle(titanFrame, "🧟 Titan Zombie Dodge")
+local titanStatusLabel = makeLabel(titanFrame, "Status: OFF  |  G to toggle", UDim2.new(1,-20,0,22), UDim2.new(0,10,0,44), Color3.fromRGB(180,180,180), 13)
+local titanLastLabel = makeLabel(titanFrame, "Last: Idle", UDim2.new(1,-20,0,20), UDim2.new(0,10,0,68), Color3.fromRGB(120,120,120), 13)
+local titanBtn = makeButton(titanFrame, "Enable", UDim2.new(0,220,0,30), UDim2.new(0.5,-110,0,94))
+
+-- ================================
+-- MAIN LOOP
+-- ================================
+local lootEnabled = false
+local titanEnabled = false
+local SAFE_DISTANCE = 50
+local angle = 0
+
+local function getTitanZombies()
+    local titans = {}
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if enemiesFolder then
+        for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+            if enemy:IsA("Model") and enemy.Name:lower():find("titan zombie") then
+                local hrp = enemy:FindFirstChild("HumanoidRootPart")
+                if hrp then table.insert(titans, hrp) end
+            end
+        end
+    end
+    return titans
+end
+
+task.spawn(function()
+    while true do
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+        -- Auto Hit always on
+        local enemies = {}
+        local enemiesFolder = workspace:FindFirstChild("Enemies")
+        if enemiesFolder then
+            for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+                if enemy:IsA("Model") and enemy:FindFirstChild("Humanoid") then
+                    table.insert(enemies, enemy)
+                end
+            end
+        end
+        if #enemies > 0 then
+            for _, r in ipairs(hitRemotes) do
+                if r.remote then
+                    pcall(function() r.remote:FireServer(enemies) end)
+                end
+            end
+        end
+
+        -- Loot
+        if lootEnabled and hrp then
+            local lootFolder = workspace:FindFirstChild("Loot")
+            if lootFolder then
+                local items = lootFolder:GetChildren()
+                lootCountLabel.Text = "Loot: " .. #items
+                for _, loot in ipairs(items) do
+                    if loot:IsA("BasePart") then
+                        loot.CFrame = hrp.CFrame
+                    elseif loot:IsA("Model") then
+                        local root = loot.PrimaryPart or loot:FindFirstChildWhichIsA("BasePart")
+                        if root then loot:SetPrimaryPartCFrame(hrp.CFrame) end
+                    end
+                    pcall(function() RequestLootCollection:FireServer(loot) end)
+                end
+            end
+        else
+            local lootFolder = workspace:FindFirstChild("Loot")
+            lootCountLabel.Text = "Loot: " .. (lootFolder and #lootFolder:GetChildren() or 0)
+        end
+
+        -- Titan Orbit
+        if titanEnabled and hrp then
+            local titans = getTitanZombies()
+            if #titans > 0 then
+                local target = titans[1]
+                local closestDist = math.huge
+                for _, t in ipairs(titans) do
+                    local d = (hrp.Position - t.Position).Magnitude
+                    if d < closestDist then closestDist = d target = t end
+                end
+                angle = (angle + 30) % 360
+                local rad = math.rad(angle)
+                local tp = target.Position
+                hrp.CFrame = CFrame.new(Vector3.new(
+                    tp.X + SAFE_DISTANCE * math.cos(rad),
+                    hrp.Position.Y,
+                    tp.Z + SAFE_DISTANCE * math.sin(rad)
+                ))
+                titanLastLabel.Text = "Orbiting: " .. target.Parent.Name
+                titanLastLabel.TextColor3 = Color3.fromRGB(255,150,50)
+            else
+                titanLastLabel.Text = "Last: No titans nearby"
+                titanLastLabel.TextColor3 = Color3.fromRGB(120,120,120)
+            end
+        end
+
+        task.wait(0.05)
+    end
+end)
+
+-- ================================
+-- AUTO UPGRADE PICKER (with limit break merged in)
+-- ================================
+local pickerEnabled = false
+local pickerConnection = nil
+
+local function onUpgradeScreen(upgrades)
+    if type(upgrades) ~= "table" then return end
+
+    local gold = getGold()
+    local cost = getRerollCost()
+    pickerGoldLabel.Text = "Gold: " .. gold .. "  |  Reroll: " .. (cost == math.huge and "?" or cost .. "G")
+
+    -- Go through each tier in order
+    for _, tier in ipairs(allTiers) do
+        local matches = findInTier(upgrades, tier.ids)
+        if #matches > 0 then
+            local pick = matches[1]
+            SelectUpgrade:FireServer(pick.ID)
+            pickerTierLabel.Text = "Tier: " .. tier.label
+            pickerTierLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+            pickerActionLabel.Text = "Action: Selected ✅"
+            pickerActionLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+            pickerLastLabel.Text = "Last: " .. pick.ID .. " (Lv " .. (pick.Level or 1) .. ")"
+            pickerLastLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
+            return
+        end
+    end
+
+    -- Nothing found in any tier
+    if cost ~= math.huge and gold >= cost then
+        RerollUpgrade:FireServer()
+        pickerTierLabel.Text = "Tier: —"
+        pickerTierLabel.TextColor3 = Color3.fromRGB(255,200,0)
+        pickerActionLabel.Text = "Action: Rerolled 🔄"
+        pickerActionLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+        pickerLastLabel.Text = "Last: Rerolled (" .. cost .. "G)"
+        pickerLastLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+    else
+        SkipUpgrade:FireServer()
+        pickerTierLabel.Text = "Tier: —"
+        pickerTierLabel.TextColor3 = Color3.fromRGB(180,80,80)
+        pickerActionLabel.Text = "Action: Skipped ⏭️"
+        pickerActionLabel.TextColor3 = Color3.fromRGB(180, 80, 80)
+        pickerLastLabel.Text = "Last: Skipped (no gold)"
+        pickerLastLabel.TextColor3 = Color3.fromRGB(180, 80, 80)
+    end
+end
+
+pickerBtn.MouseButton1Click:Connect(function()
+    pickerEnabled = not pickerEnabled
+    setToggle(pickerBtn, pickerEnabled)
+    pickerStatusLabel.Text = pickerEnabled and "Status: ON" or "Status: OFF"
+    pickerStatusLabel.TextColor3 = pickerEnabled and Color3.fromRGB(100,255,100) or Color3.fromRGB(180,180,180)
+    if not pickerEnabled then
+        pickerActionLabel.Text = "Action: Waiting..."
+        pickerActionLabel.TextColor3 = Color3.fromRGB(180,180,180)
+        pickerTierLabel.Text = "Tier: —"
+        pickerTierLabel.TextColor3 = Color3.fromRGB(255,200,0)
+    end
+    if pickerEnabled then
+        pickerConnection = ShowUpgradeScreen.OnClientEvent:Connect(onUpgradeScreen)
+    else
+        if pickerConnection then pickerConnection:Disconnect() pickerConnection = nil end
+    end
+end)
+
+-- ================================
+-- LOOT TOGGLE
+-- ================================
+lootBtn.MouseButton1Click:Connect(function()
+    lootEnabled = not lootEnabled
+    setToggle(lootBtn, lootEnabled)
+end)
+
+-- ================================
+-- TITAN TOGGLE
+-- ================================
+local function toggleTitan()
+    titanEnabled = not titanEnabled
+    setToggle(titanBtn, titanEnabled)
+    titanStatusLabel.Text = titanEnabled and "Status: ON  |  G to toggle" or "Status: OFF  |  G to toggle"
+    titanStatusLabel.TextColor3 = titanEnabled and Color3.fromRGB(100,255,100) or Color3.fromRGB(180,180,180)
+    if not titanEnabled then
+        titanLastLabel.Text = "Last: Idle"
+        titanLastLabel.TextColor3 = Color3.fromRGB(120,120,120)
+    end
+end
+
+titanBtn.MouseButton1Click:Connect(toggleTitan)
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.G then toggleTitan() end
+end)
+
+print("[Master GUI] Loaded!")
