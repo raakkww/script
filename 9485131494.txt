@@ -1,0 +1,57 @@
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+
+local running = false
+local player = game.Players.LocalPlayer
+
+local function Notify(Title, Text, Duration)
+	StarterGui:SetCore("SendNotification", {
+		Title = Title,
+		Text = Text or "",
+		Duration = Duration or 3
+	})
+end
+
+-- start bericht
+Notify("Loaded", "Press E to toggle script", 5)
+
+UIS.InputBegan:Connect(function(input, gp)
+	if gp then return end
+
+	if input.KeyCode == Enum.KeyCode.E then
+		running = not running
+
+		if running then
+			print("On!")
+			Notify("On!", "Script enabled", 3)
+		else
+			print("Off!")
+			Notify("Off!", "Script disabled", 3)
+		end
+	end
+end)
+
+task.spawn(function()
+	while true do
+		task.wait()
+		if running then
+			local character = player.Character
+			if not character then continue end
+
+			local humanoid = character:FindFirstChild("Humanoid")
+			local root = character:FindFirstChild("HumanoidRootPart")
+			if humanoid and root and humanoid.Health > 0 then
+				root.CFrame = CFrame.new(
+					-5.63876893e-06, 2, -9076,
+					0, 0, 1,
+					0, 1, 0,
+					-1, 0, 0
+				)
+						game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RequestRebirth"):FireServer("free")
+
+				RS.Remotes.StepTaken:FireServer(math.huge)
+			end
+		end
+	end
+end)
