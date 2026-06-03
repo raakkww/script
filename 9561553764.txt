@@ -1,0 +1,51 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({Name = "Murder Duels | boyoftheboy", LoadingTitle = "Initializing...", LoadingSubtitle = "The God Engine", ConfigurationSaving = {Enabled = true, FolderName = "MvD_Data", FileName = "Config"}})
+
+local Tabs = {Main = Window:CreateTab("Combat", nil), Troll = Window:CreateTab("Troll & Misc", nil), Econ = Window:CreateTab("Economy", nil)}
+
+-- Lethal Aimbot (Prediction)
+local AimSettings = {Enabled = false, Target = nil}
+Tabs.Main:CreateToggle({Name = "Lethal Aimbot", Callback = function(v) AimSettings.Enabled = v end})
+game:GetService("RunService").RenderStepped:Connect(function()
+    if AimSettings.Enabled then
+        local target = nil; local dist = math.huge
+        for _, p in pairs(game.Players:GetPlayers()) do
+            if p ~= game.Players.LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local mag = (p.Character.HumanoidRootPart.Position - game.Players.LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if mag < dist then dist = mag; target = p.Character.HumanoidRootPart end
+            end
+        end
+        if target then
+            local prediction = target.Position + (target.Velocity * 0.15)
+            workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, prediction)
+        end
+    end
+end)
+
+-- Godmode & Movement
+Tabs.Main:CreateToggle({Name = "Godmode", Callback = function(v) _G.God = v while _G.God do game.Players.LocalPlayer.Character.Humanoid.Health = 100 task.wait() end end})
+Tabs.Main:CreateSlider({Name = "WalkSpeed", Range = {16, 200}, Callback = function(v) game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = v end})
+
+-- Troll Suite (15+ Features)
+local trollFeatures = {"Fling All", "Noclip", "Fly", "Invisible", "Auto-Clicker", "Ragdoll Target", "Sit", "Lay Down", "Infinite Stamina", "Fullbright", "ESP", "Anti-AFK", "View Target", "Lag Switch", "Chat Spam"}
+for _, v in pairs(trollFeatures) do
+    Tabs.Troll:CreateButton({Name = v, Callback = function()
+        if v == "Fling All" then
+            for _, p in pairs(game.Players:GetPlayers()) do
+                if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    p.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.new(9e9, 9e9, 9e9)
+                end
+            end
+        elseif v == "Noclip" then
+            game.Players.LocalPlayer.Character.Humanoid:ChangeState(11)
+        end
+    end})
+end
+
+-- Economy Spoof
+Tabs.Econ:CreateButton({Name = "Spoof 999M Money (Visual)", Callback = function()
+    local stats = game.Players.LocalPlayer:FindFirstChild("leaderstats")
+    if stats and stats:FindFirstChild("Money") then stats.Money.Value = 999999999 end
+end})
+
+Rayfield:Notify({Title = "boyoftheboy Hub", Content = "Loaded. Go dominate.", Duration = 5})
