@@ -1,0 +1,257 @@
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoFarmHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
+
+-- Shadow
+local Shadow = Instance.new("Frame")
+Shadow.Size = UDim2.fromScale(0.3, 0.35)
+Shadow.Position = UDim2.fromScale(0.35, 0.3)
+Shadow.BackgroundColor3 = Color3.fromRGB(0,0,0)
+Shadow.BackgroundTransparency = 0.75
+Shadow.BorderSizePixel = 0
+Shadow.Parent = ScreenGui
+
+Instance.new("UICorner", Shadow).CornerRadius = UDim.new(0,18)
+
+-- Main Window
+local Main = Instance.new("Frame")
+Main.Size = UDim2.fromScale(0.3,0.35)
+Main.Position = UDim2.fromScale(0.34,0.28)
+Main.BackgroundColor3 = Color3.fromRGB(28,28,35)
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0,18)
+Corner.Parent = Main
+
+local Stroke = Instance.new("UIStroke")
+Stroke.Color = Color3.fromRGB(80,80,100)
+Stroke.Thickness = 1.5
+Stroke.Parent = Main
+
+-- Top Bar
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1,0,0,40)
+TopBar.BackgroundColor3 = Color3.fromRGB(38,38,48)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = Main
+
+local TopCorner = Instance.new("UICorner")
+TopCorner.CornerRadius = UDim.new(0,18)
+TopCorner.Parent = TopBar
+
+local Fix = Instance.new("Frame")
+Fix.Size = UDim2.new(1,0,0.5,0)
+Fix.Position = UDim2.new(0,0,0.5,0)
+Fix.BackgroundColor3 = TopBar.BackgroundColor3
+Fix.BorderSizePixel = 0
+Fix.Parent = TopBar
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1,-90,1,0)
+Title.Position = UDim2.new(0,12,0,0)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextColor3 = Color3.fromRGB(255,255,255)
+Title.Text = "AutoFarm Hub"
+Title.Parent = TopBar
+
+-- Minimize Button
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0,28,0,28)
+MinBtn.Position = UDim2.new(1,-70,0.5,-14)
+MinBtn.Text = "−"
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 18
+MinBtn.TextColor3 = Color3.new(1,1,1)
+MinBtn.BackgroundColor3 = Color3.fromRGB(220,170,0)
+MinBtn.Parent = TopBar
+
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(1,0)
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0,28,0,28)
+CloseBtn.Position = UDim2.new(1,-35,0.5,-14)
+CloseBtn.Text = "✕"
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 14
+CloseBtn.TextColor3 = Color3.new(1,1,1)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200,60,60)
+CloseBtn.Parent = TopBar
+
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1,0)
+
+-- Content Area
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1,-20,1,-60)
+Content.Position = UDim2.new(0,10,0,50)
+Content.BackgroundTransparency = 1
+Content.Parent = Main
+
+-- Autofarm Button
+local Toggle = Instance.new("TextButton")
+Toggle.Size = UDim2.new(1,0,0,40)
+Toggle.BackgroundColor3 = Color3.fromRGB(55,55,70)
+Toggle.Text = "Autofarm: OFF"
+Toggle.Font = Enum.Font.GothamBold
+Toggle.TextColor3 = Color3.new(1,1,1)
+Toggle.TextSize = 14
+Toggle.Parent = Content
+
+Instance.new("UICorner", Toggle).CornerRadius = UDim.new(0,10)
+
+-- Coin Icon
+local Coin = Instance.new("Frame")
+Coin.Size = UDim2.new(0,18,0,18)
+Coin.Position = UDim2.new(0,10,0.5,-9)
+Coin.BackgroundColor3 = Color3.fromRGB(255,215,0)
+Coin.BorderSizePixel = 0
+Coin.Parent = Toggle
+
+local CoinCorner = Instance.new("UICorner")
+CoinCorner.CornerRadius = UDim.new(1,0)
+CoinCorner.Parent = Coin
+
+local CoinStroke = Instance.new("UIStroke")
+CoinStroke.Color = Color3.fromRGB(220,180,0)
+CoinStroke.Thickness = 2
+CoinStroke.Parent = Coin
+
+local CoinCenter = Instance.new("Frame")
+CoinCenter.Size = UDim2.new(0.45,0,0.45,0)
+CoinCenter.Position = UDim2.new(0.275,0,0.275,0)
+CoinCenter.BackgroundColor3 = Color3.fromRGB(255,235,120)
+CoinCenter.BorderSizePixel = 0
+CoinCenter.Parent = Coin
+
+local CoinCenterCorner = Instance.new("UICorner")
+CoinCenterCorner.CornerRadius = UDim.new(1,0)
+CoinCenterCorner.Parent = CoinCenter
+-- Autofarm Logic
+local Enabled = false
+
+Toggle.MouseButton1Click:Connect(function()
+	Enabled = not Enabled
+
+	if Enabled then
+		Toggle.Text = "🪙 Autofarm: ON"
+		Toggle.BackgroundColor3 = Color3.fromRGB(50,170,90)
+
+		task.spawn(function()
+			while Enabled do
+				local Character = Player.Character
+				local Root = Character and Character:FindFirstChild("HumanoidRootPart")
+
+				local CoinsFolder = workspace:FindFirstChild("Coins")
+
+				if Root and CoinsFolder then
+					local CoinParts = {}
+
+					for _, Object in ipairs(CoinsFolder:GetChildren()) do
+						if Object:IsA("BasePart") then
+							table.insert(CoinParts, Object)
+						end
+					end
+
+					if #CoinParts > 0 then
+						local RandomCoin = CoinParts[math.random(1, #CoinParts)]
+
+						Root.CFrame = RandomCoin.CFrame + Vector3.new(0, 3, 0)
+					end
+				end
+
+				task.wait(0.25)
+			end
+		end)
+	else
+		Toggle.Text = "🪙 Autofarm: OFF"
+		Toggle.BackgroundColor3 = Color3.fromRGB(55,55,70)
+	end
+end)
+
+-- Minimize
+local Minimized = false
+
+MinBtn.MouseButton1Click:Connect(function()
+	Minimized = not Minimized
+
+	Content.Visible = not Minimized
+
+	if Minimized then
+		Main.Size = UDim2.new(
+			Main.Size.X.Scale,
+			Main.Size.X.Offset,
+			0,
+			40
+		)
+	else
+		Main.Size = UDim2.fromScale(0.3,0.35)
+	end
+end)
+
+-- Close
+CloseBtn.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy()
+end)
+
+-- Dragging (PC + Mobile)
+local Dragging = false
+local DragStart
+local StartPos
+
+local function Update(Input)
+	local Delta = Input.Position - DragStart
+
+	Main.Position = UDim2.new(
+		StartPos.X.Scale,
+		StartPos.X.Offset + Delta.X,
+		StartPos.Y.Scale,
+		StartPos.Y.Offset + Delta.Y
+	)
+
+	Shadow.Position = UDim2.new(
+		StartPos.X.Scale,
+		StartPos.X.Offset + Delta.X + 5,
+		StartPos.Y.Scale,
+		StartPos.Y.Offset + Delta.Y + 5
+	)
+end
+
+TopBar.InputBegan:Connect(function(Input)
+	if Input.UserInputType == Enum.UserInputType.MouseButton1
+	or Input.UserInputType == Enum.UserInputType.Touch then
+
+		Dragging = true
+		DragStart = Input.Position
+		StartPos = Main.Position
+
+		Input.Changed:Connect(function()
+			if Input.UserInputState == Enum.UserInputState.End then
+				Dragging = false
+			end
+		end)
+	end
+end)
+
+UIS.InputChanged:Connect(function(Input)
+	if Dragging and (
+		Input.UserInputType == Enum.UserInputType.MouseMovement
+		or Input.UserInputType == Enum.UserInputType.Touch
+	) then
+		Update(Input)
+	end
+end)
