@@ -1,0 +1,868 @@
+-- =====================================================
+--  PART 1: Demonology – Window, UI, Helpers
+-- =====================================================
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "HHub",
+    Folder = "HHub",
+    Icon = "solar:ghost-bold",
+    OpenButton = {
+        Title = "Open HHub",
+        CornerRadius = UDim.new(1, 0),
+        StrokeThickness = 3,
+        Enabled = true,
+        Draggable = true,
+        OnlyMobile = false,
+        Scale = 0.6,
+        Color = ColorSequence.new(Color3.fromHex("#30FF6A"), Color3.fromHex("#e7ff2f")),
+    },
+    Topbar = { Height = 44, ButtonsType = "Mac" },
+})
+
+-- Toggle button
+local player = game.Players.LocalPlayer
+local toggleGui = Instance.new("ScreenGui")
+toggleGui.Name = "HHubToggle"
+toggleGui.Parent = player:WaitForChild("PlayerGui")
+toggleGui.ResetOnSpawn = false
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 45, 0, 45)
+toggleBtn.Position = UDim2.new(0, 20, 0.5, 0)
+toggleBtn.Text = "H"
+toggleBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleBtn.TextSize = 18
+toggleBtn.BackgroundColor3 = Color3.fromRGB(20,20,20)
+toggleBtn.AutoButtonColor = true
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1,0)
+toggleBtn.Parent = toggleGui
+
+local dragging = false
+local dragStart, startPos
+toggleBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = toggleBtn.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local isOpen = true
+toggleBtn.MouseButton1Click:Connect(function()
+    if isOpen then Window:Close() else Window:Open() end
+    isOpen = not isOpen
+end)
+
+-- =====================================================
+--  Services & State
+-- =====================================================
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Events = ReplicatedStorage:WaitForChild("Events")
+local Lighting = game:GetService("Lighting")
+local PS = game:GetService("Players")
+local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+
+local IsEscapeHunt = false
+local AutoSpiritBoxToggle = false
+local ItemEspToggle = false
+local PlayersEspToggle = false
+local EvidenceEspToggle = false
+local FullBrightToggle = false
+local LightToggleStatus = false
+local CheckSpeedNum = 1
+
+local itemEspList = {}
+local evidenceEspList = {}
+local ghostBillboard = nil
+local ghostHighlight = nil
+
+local speedNumbers = {0,5,10,16,20,30,40,50,80,100}
+local speedIndex = 4
+local checkSpeedNumbers = {0,0.1,0.2,0.5,1,1.5,2,5,10}
+local checkIndex = 5
+
+-- =====================================================
+--  Dynamic Getters (fixes nil on startup)
+-- =====================================================
+local function GetGhost()
+    return workspace:FindFirstChild("Ghost")
+end
+
+local function GetRooms()
+    local map = workspace:FindFirstChild("Map")
+    return map and map:FindFirstChild("Rooms")
+end
+
+-- =====================================================
+--  Helper Functions
+-- =====================================================
+local function CheckInventory(ItemName)
+    for _, obj in ipairs(player.PlayerGui.Hotbar.Slots:GetChildren()) do
+        if obj:IsA("Frame") and string.find(string.lower(obj.Name), "invslot") and obj.ItemName.Text == ItemName then
+            return true, tonumber(obj.Name:match("%d+"))
+        end
+    end
+    return false, nil
+end
+
+local function FindItem(ItemName)
+    for _, v in pairs(workspace.Items:GetChildren()) do
+        if v:IsA("Model") and v:GetAttribute("ItemName") == ItemName then
+            return true, v
+        end
+    end
+    return false, nil
+end
+
+local function ActiveItem()
+    local char = player.Character
+    if char then
+        for _, v in pairs(char:GetChildren()) do
+            if (v:IsA("Model") or tonumber(v.Name)) and v:GetAttribute("Enabled") ~= true and v:FindFirstChild("Handle") then
+                Events.ToggleItemState:FireServer(v)
+                return true, v
+            end
+        end
+    end
+    return false, nil
+end
+
+local function EquipItem(SlotNum)
+    Events.RequestItemEquip:FireServer("InvSlot" .. tostring(SlotNum))
+end
+
+local function PickupItem(Model)
+    Events.RequestItemPickup:FireServer(Model)
+end
+
+local function DropItem(SlotNum)
+    Events.RequestItemDrop:FireServer("InvSlot" .. tostring(SlotNum))
+end
+
+local function TpOutside()
+    pcall(function()
+        local pegboard = workspace:WaitForChild("Map"):WaitForChild("Rooms"):WaitForChild("Base Camp"):WaitForChild("Pegboard")
+        local union = pegboard:FindFirstChild("Union")
+        local char = player.Character or player.CharacterAdded:Wait()
+        if union and char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = union.CFrame + Vector3.new(0, 3, 0)
+        end
+    end)
+end
+
+local function FireSpiritBox()
+    local questions = {
+        "Are you far away?", "Are you near?", "Where are you?", "What do you want?",
+        "When did you cross over?", "Are you in the room with me?", "Do you want us to leave?",
+        "When did you pass away?", "What is your goal?", "Why are you here?",
+        "How long ago did you die?", "Is there a ghost here?"
+    }
+    Events.AskSpiritBoxFromUI:FireServer(questions[math.random(1, #questions)])
+end
+
+-- Evidence checkers
+local function CheckHandprints()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and (obj.Name == "Handprint1" or obj.Name == "Footprint1") then return true end
+    end
+    return false
+end
+
+local function CheckGhostOrb()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name == "GhostOrb" then return true end
+    end
+    return false
+end
+
+local function CheckEMF()
+    local level = 0
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Folder") and obj.Name == "Indicators" then
+            for _, v in pairs(obj:GetChildren()) do
+                if v:IsA("BasePart") and v.Material == Enum.Material.Neon then
+                    local lvl = tonumber(v.Name)
+                    if lvl and lvl > level then level = lvl end
+                end
+            end
+        end
+    end
+    return level
+end
+
+local function CheckWither()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name == "Petals" and obj.Color == Color3.new(0,0,0) then return true end
+    end
+    return false
+end
+
+local function CheckGhostWriting()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Decal") then
+            local model = obj:FindFirstAncestorWhichIsA("Model")
+            if model and model:GetAttribute("ItemName") == "Spirit Book" and obj.Texture ~= "" then return true end
+        end
+    end
+    return false
+end
+
+local function CheckSpiritBox()
+    local ok, text = pcall(function()
+        return player.PlayerGui.Subtitles.Holder.TextLabel.Text
+    end)
+    return ok and #text:gsub("%s+", "") >= 3
+end
+
+-- ESP functions
+local function CreateGhostESP()
+    local ghost = GetGhost()
+    if not ghost then return end
+    if ghostBillboard then ghostBillboard:Destroy() end
+    if ghostHighlight then ghostHighlight:Destroy() end
+
+    ghostBillboard = Instance.new("BillboardGui")
+    ghostBillboard.Name = "HeliosGhostBill"
+    ghostBillboard.Parent = game:GetService("CoreGui")
+    ghostBillboard.Adornee = ghost
+    ghostBillboard.Size = UDim2.new(0, 60, 0, 60)
+    ghostBillboard.AlwaysOnTop = true
+    local label = Instance.new("TextLabel", ghostBillboard)
+    label.Size = UDim2.new(1,0,1,0)
+    label.BackgroundTransparency = 1
+    label.Text = "Ghost"
+    label.TextColor3 = Color3.fromRGB(255,0,0)
+    label.TextScaled = true
+
+    ghostHighlight = Instance.new("Highlight")
+    ghostHighlight.Parent = ghost
+    ghostHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    ghostHighlight.OutlineColor = Color3.fromRGB(255,0,0)
+    ghostHighlight.FillTransparency = 0.5
+end
+
+local function UpdateItemEsp()
+    for _, v in pairs(itemEspList) do pcall(function() v:Destroy() end) end
+    itemEspList = {}
+    if not ItemEspToggle then return end
+    for _, v in pairs(workspace.Items:GetChildren()) do
+        if v:IsA("Model") and v:GetAttribute("ItemName") then
+            local bill = Instance.new("BillboardGui")
+            bill.Parent = game:GetService("CoreGui")
+            bill.Adornee = v
+            bill.Size = UDim2.new(0, 100, 0, 40)
+            bill.AlwaysOnTop = true
+            local lbl = Instance.new("TextLabel", bill)
+            lbl.Size = UDim2.new(1,0,1,0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = v:GetAttribute("ItemName")
+            lbl.TextColor3 = Color3.fromRGB(255,170,0)
+            lbl.TextScaled = true
+            table.insert(itemEspList, bill)
+        end
+    end
+end
+
+local function UpdateEvidenceEsp()
+    for _, v in pairs(evidenceEspList) do pcall(function() v:Destroy() end) end
+    evidenceEspList = {}
+    if not EvidenceEspToggle then return end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and (obj.Name == "Handprint1" or obj.Name == "Footprint1") then
+            local bill = Instance.new("BillboardGui")
+            bill.Parent = game:GetService("CoreGui")
+            bill.Adornee = obj
+            bill.Size = UDim2.new(0, 100, 0, 40)
+            bill.AlwaysOnTop = true
+            local lbl = Instance.new("TextLabel", bill)
+            lbl.Size = UDim2.new(1,0,1,0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = "Evidence"
+            lbl.TextColor3 = Color3.fromRGB(255,255,0)
+            lbl.TextScaled = true
+            table.insert(evidenceEspList, bill)
+        end
+    end
+    local orb = workspace:FindFirstChild("GhostOrb")
+    if orb then
+        local bill = Instance.new("BillboardGui")
+        bill.Parent = game:GetService("CoreGui")
+        bill.Adornee = orb
+        bill.Size = UDim2.new(0, 60, 0, 60)
+        bill.AlwaysOnTop = true
+        local lbl = Instance.new("TextLabel", bill)
+        lbl.Size = UDim2.new(1,0,1,0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = "Ghost Orb"
+        lbl.TextColor3 = Color3.fromRGB(255,255,0)
+        lbl.TextScaled = true
+        table.insert(evidenceEspList, bill)
+    end
+end
+
+local function UpdatePlayersEsp()
+    for _, plr in pairs(PS:GetPlayers()) do
+        if plr.Character then
+            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local bill = hrp:FindFirstChild("HeliosPlrBil")
+                local high = hrp:FindFirstChild("HeliosPlrEsp")
+                if PlayersEspToggle then
+                    if not bill then
+                        bill = Instance.new("BillboardGui")
+                        bill.Name = "HeliosPlrBil"
+                        bill.Parent = hrp
+                        bill.Size = UDim2.new(0, 100, 0, 40)
+                        bill.AlwaysOnTop = true
+                        local lbl = Instance.new("TextLabel", bill)
+                        lbl.Size = UDim2.new(1,0,1,0)
+                        lbl.BackgroundTransparency = 1
+                        lbl.Text = plr.DisplayName
+                        lbl.TextColor3 = Color3.fromRGB(0,170,255)
+                        lbl.TextScaled = true
+                    end
+                    if not high then
+                        high = Instance.new("Highlight")
+                        high.Name = "HeliosPlrEsp"
+                        high.Parent = hrp
+                        high.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                        high.OutlineColor = Color3.fromRGB(0,170,255)
+                        high.FillTransparency = 1
+                    end
+                    bill.Enabled = true
+                    high.Enabled = true
+                else
+                    if bill then bill:Destroy() end
+                    if high then high:Destroy() end
+                end
+            end
+        end
+    end
+end
+
+local function UpdateFullBright()
+    if FullBrightToggle then
+        Lighting.Ambient = Color3.new(1,1,1)
+        Lighting.OutdoorAmbient = Color3.new(1,1,1)
+        Lighting.Brightness = 3
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 100000
+        for _, obj in ipairs(Lighting:GetChildren()) do
+            if obj:IsA("FogEffect") or obj:IsA("BloomEffect") or obj:IsA("BlurEffect") then
+                obj.Enabled = false
+            end
+        end
+    else
+        Lighting.Ambient = Color3.new(0,0,0)
+        Lighting.OutdoorAmbient = Color3.new(0,0,0)
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = true
+        Lighting.FogEnd = 1000
+        for _, obj in ipairs(Lighting:GetChildren()) do
+            if obj:IsA("FogEffect") or obj:IsA("BloomEffect") or obj:IsA("BlurEffect") then
+                obj.Enabled = true
+            end
+        end
+    end
+end
+
+print("Part 1 loaded. Paste Part 2 now.")
+-- ========== END OF PART 1 ==========
+-- =====================================================
+--  PART 2: Demonology – UI & Callbacks
+-- =====================================================
+local demonologyTab = Window:Tab({ Title = "Demonology", Icon = "solar:ghost-bold", IconColor = Color3.fromRGB(255,80,80), Border = true })
+
+local SpiritBoxLast = 0
+
+-- Get Ghost Info
+demonologyTab:Button({
+    Title = "Get Ghost Info",
+    Justify = "Center",
+    Color = Color3.fromRGB(100,200,100),
+    Callback = function()
+        local ghost = GetGhost()
+        local info = {}
+        if ghost then
+            info.hunting = ghost:GetAttribute("Hunting") or false
+            info.favRoom = ghost:GetAttribute("FavoriteRoom") or "?"
+            info.age = ghost:GetAttribute("Age") or "?"
+            info.gender = ghost:GetAttribute("Gender") or "?"
+            info.currentRoom = ghost:GetAttribute("CurrentRoom") or "?"
+        end
+        local msg = ghost and string.format(
+            "Ghost: %s | Age: %s | Fav room: %s\nCurrent room: %s | Hunting: %s\n\nHandprints: %s\nGhost Orb: %s\nEMF Level: %d\nWither: %s\nGhost Writing: %s\nSpirit Box: %s",
+            info.gender, info.age, info.favRoom,
+            info.currentRoom, tostring(info.hunting),
+            CheckHandprints() and "Yes" or "No",
+            CheckGhostOrb() and "Yes" or "No",
+            CheckEMF(),
+            CheckWither() and "Yes" or "No",
+            CheckGhostWriting() and "Yes" or "No",
+            CheckSpiritBox() and "Yes" or "No"
+        ) or "Not in a match or ghost not found."
+        WindUI:Notify({
+            Title = "Ghost Info & Evidence",
+            Content = msg,
+            Duration = 10,
+            Type = ghost and "info" or "error"
+        })
+    end,
+})
+demonologyTab:Space()
+
+demonologyTab:Section({ Title = "Actions", TextSize = 14 })
+
+-- Ghost ESP
+local ghostEspOn = false
+demonologyTab:Button({
+    Title = "Ghost ESP",
+    Justify = "Center",
+    Color = Color3.fromRGB(200,100,100),
+    Callback = function()
+        if ghostEspOn then
+            if ghostBillboard then ghostBillboard:Destroy() ghostBillboard = nil end
+            if ghostHighlight then ghostHighlight:Destroy() ghostHighlight = nil end
+            ghostEspOn = false
+            WindUI:Notify({ Title = "Ghost ESP", Content = "Disabled", Duration = 2 })
+        else
+            CreateGhostESP()
+            ghostEspOn = true
+            WindUI:Notify({ Title = "Ghost ESP", Content = "Enabled", Duration = 2 })
+        end
+    end,
+})
+demonologyTab:Space()
+
+-- Escape Hunt
+demonologyTab:Toggle({
+    Title = "Escape Hunt",
+    Desc = "Teleports outside when hunt starts",
+    Callback = function(v)
+        IsEscapeHunt = v
+    end,
+})
+demonologyTab:Space()
+
+-- Place Stuff Near Ghost
+demonologyTab:Button({
+    Title = "Place stuffs near ghost",
+    Justify = "Center",
+    Color = Color3.fromRGB(100,100,200),
+    Callback = function()
+        local ghost = GetGhost()
+        if not ghost then
+            WindUI:Notify({ Title = "Place Stuff", Content = "Ghost not found", Duration = 2, Type = "error" })
+            return
+        end
+        if ghost:GetAttribute("Hunting") then
+            WindUI:Notify({ Title = "Place Stuff", Content = "Ghost is hunting!", Duration = 2, Type = "error" })
+            return
+        end
+        local char = player.Character
+        if not char then return end
+
+        char:PivotTo(ghost:GetPivot())
+        task.wait(0.1)
+
+        -- Drop anything currently held
+        for i = 1, 3 do
+            EquipItem(1)
+            task.wait(0.2)
+            DropItem(1)
+            task.wait(0.2)
+        end
+
+        -- Collect all available items
+        local allItems = {}
+        for _, v in pairs(workspace.Items:GetChildren()) do
+            if v:IsA("Model") and v:GetAttribute("ItemName") then
+                local has, _ = CheckInventory(v:GetAttribute("ItemName"))
+                if not has then
+                    table.insert(allItems, v)
+                end
+            end
+        end
+
+        -- Pick up and drop in batches of 3
+        local batch = 0
+        for _, v in ipairs(allItems) do
+            PickupItem(v)
+            task.wait(0.35)
+            batch = batch + 1
+            if batch >= 3 then
+                task.wait(0.2)
+                for i = 1, 3 do
+                    EquipItem(1)
+                    task.wait(0.2)
+                    DropItem(1)
+                    task.wait(0.2)
+                end
+                batch = 0
+            end
+        end
+
+        -- Drop any remaining
+        if batch > 0 then
+            for i = 1, batch do
+                EquipItem(1)
+                task.wait(0.2)
+                DropItem(1)
+                task.wait(0.2)
+            end
+        end
+
+        TpOutside()
+        WindUI:Notify({ Title = "Place Stuff", Content = "All items placed near ghost", Duration = 2 })
+    end,
+})
+demonologyTab:Space()
+
+-- Turn On Fuse
+demonologyTab:Button({
+    Title = "Turn on fuse",
+    Justify = "Center",
+    Color = Color3.fromRGB(100,100,200),
+    Callback = function()
+        Events.ToggleFuseBox:FireServer()
+        WindUI:Notify({ Title = "Fuse", Content = "Toggled", Duration = 2 })
+    end,
+})
+demonologyTab:Space()
+
+-- Auto Spirit Box
+demonologyTab:Toggle({
+    Title = "Auto spirit box",
+    Desc = "Automatically uses spirit box near ghost",
+    Callback = function(v)
+        AutoSpiritBoxToggle = v
+        if v then
+            task.spawn(function()
+                while AutoSpiritBoxToggle do
+                    local ghost = GetGhost()
+                    local char = player.Character
+                    if ghost and char then
+                        if ghost:GetAttribute("Hunting") ~= true then
+                            char:PivotTo(ghost:GetPivot() * CFrame.new(0, 0, 10))
+                            if tick() - SpiritBoxLast > 0.5 then
+                                SpiritBoxLast = tick()
+                                local has, slot = CheckInventory("Spirit Box")
+                                if not has then
+                                    EquipItem(1)
+                                    task.wait(0.2)
+                                    DropItem(1)
+                                    task.wait(0.2)
+                                    local found, model = FindItem("Spirit Box")
+                                    if found then
+                                        PickupItem(model)
+                                        task.wait(0.35)
+                                        has, slot = CheckInventory("Spirit Box")
+                                        if has then
+                                            EquipItem(slot)
+                                            task.wait(0.35)
+                                            ActiveItem()
+                                            task.wait(0.5)
+                                            FireSpiritBox()
+                                        end
+                                    end
+                                else
+                                    EquipItem(slot)
+                                    task.wait(0.35)
+                                    ActiveItem()
+                                    task.wait(0.35)
+                                    FireSpiritBox()
+                                end
+                            end
+                        else
+                            TpOutside()
+                        end
+                    end
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+demonologyTab:Space()
+
+-- Take Ghost Photo
+demonologyTab:Button({
+    Title = "Take a photo of ghost",
+    Justify = "Center",
+    Color = Color3.fromRGB(100,100,200),
+    Callback = function()
+        local ghost = GetGhost()
+        if not ghost then
+            WindUI:Notify({ Title = "Photo", Content = "Ghost not found", Duration = 2, Type = "error" })
+            return
+        end
+        local has, slot = CheckInventory("Photo Camera")
+        if not has then
+            EquipItem(1)
+            task.wait(0.2)
+            DropItem(1)
+            task.wait(0.2)
+            local found, model = FindItem("Photo Camera")
+            if found then
+                PickupItem(model)
+                task.wait(0.5)
+                has, slot = CheckInventory("Photo Camera")
+            end
+        end
+        if has then
+            EquipItem(slot)
+            task.wait(0.3)
+            pcall(function()
+                Events.TakePhotoWithCamera:FireServer(
+                    workspace.CurrentCamera.CFrame,
+                    { Stars = 3, Type = "Ghost", Object = ghost, Reward = 24 }
+                )
+            end)
+            WindUI:Notify({ Title = "Photo", Content = "Ghost photo taken!", Duration = 2 })
+        else
+            WindUI:Notify({ Title = "Photo", Content = "No camera found", Duration = 2, Type = "error" })
+        end
+    end,
+})
+demonologyTab:Space()
+
+-- Check Speed
+local checkSpeedBtn
+checkSpeedBtn = demonologyTab:Button({
+    Title = "Check speed: 1s",
+    Justify = "Center",
+    Color = Color3.fromRGB(100,100,200),
+    Callback = function()
+        checkIndex = checkIndex % #checkSpeedNumbers + 1
+        CheckSpeedNum = checkSpeedNumbers[checkIndex]
+        checkSpeedBtn:SetTitle("Check speed: " .. CheckSpeedNum .. "s")
+    end,
+})
+demonologyTab:Space()
+
+-- Toggle All Lights
+demonologyTab:Toggle({
+    Title = "Toggle all lights",
+    Desc = "Turns all room lights on or off",
+    Callback = function(v)
+        local rooms = GetRooms()
+        if not rooms then
+            WindUI:Notify({ Title = "Lights", Content = "Map not loaded yet", Duration = 2, Type = "error" })
+            return
+        end
+        LightToggleStatus = v
+        for _, room in pairs(rooms:GetChildren()) do
+            if room:GetAttribute("LightsOn") ~= LightToggleStatus then
+                Events.UseLightSwitch:FireServer(room)
+            end
+        end
+    end,
+})
+demonologyTab:Space()
+
+demonologyTab:Section({ Title = "Utilities", TextSize = 14 })
+
+-- Item ESP
+demonologyTab:Toggle({
+    Title = "Item ESP",
+    Desc = "Shows all items on the map",
+    Callback = function(v)
+        ItemEspToggle = v
+        if v then
+            task.spawn(function()
+                while ItemEspToggle do
+                    UpdateItemEsp()
+                    task.wait(2)
+                end
+                UpdateItemEsp()
+            end)
+        else
+            UpdateItemEsp()
+        end
+    end,
+})
+demonologyTab:Space()
+
+-- Speed
+local speedBtn
+speedBtn = demonologyTab:Button({
+    Title = "Speed: 16",
+    Justify = "Center",
+    Color = Color3.fromRGB(100,100,200),
+    Callback = function()
+        speedIndex = speedIndex % #speedNumbers + 1
+        local newSpeed = speedNumbers[speedIndex]
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = newSpeed
+        end
+        speedBtn:SetTitle("Speed: " .. newSpeed)
+    end,
+})
+demonologyTab:Space()
+
+-- Infinite Yield
+demonologyTab:Button({
+    Title = "Load Infinite Yield",
+    Justify = "Center",
+    Color = Color3.fromRGB(100,100,200),
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    end,
+})
+demonologyTab:Space()
+
+-- Full Bright
+demonologyTab:Toggle({
+    Title = "Full bright",
+    Desc = "Removes all darkness and fog",
+    Callback = function(v)
+        FullBrightToggle = v
+        UpdateFullBright()
+    end,
+})
+demonologyTab:Space()
+
+-- Take 3 Stars Photo
+demonologyTab:Button({
+    Title = "Take 3 stars photo",
+    Justify = "Center",
+    Color = Color3.fromRGB(100,100,200),
+    Callback = function()
+        local ghost = GetGhost()
+        if ghost and ghost:GetAttribute("Hunting") then
+            WindUI:Notify({ Title = "3 Stars", Content = "Ghost is hunting!", Duration = 2, Type = "error" })
+            return
+        end
+        local has, slot = CheckInventory("Photo Camera")
+        if not has then
+            EquipItem(1)
+            task.wait(0.2)
+            DropItem(1)
+            task.wait(0.2)
+            local found, model = FindItem("Photo Camera")
+            if found then
+                PickupItem(model)
+                task.wait(0.5)
+                has, slot = CheckInventory("Photo Camera")
+            end
+        end
+        if not has then
+            WindUI:Notify({ Title = "3 Stars", Content = "No camera", Duration = 2, Type = "error" })
+            return
+        end
+        EquipItem(slot)
+        task.wait(0.3)
+        local function AlreadyTaken(obj) return obj:GetAttribute("HeliosAlreadyTaken") == true end
+        local function SetTaken(obj) obj:SetAttribute("HeliosAlreadyTaken", true) end
+        local item, itemType = nil, nil
+        for _, v in pairs(workspace.Items:GetChildren()) do
+            if v:GetAttribute("DisplayName") == "Burnt Cross" and not AlreadyTaken(v) then
+                SetTaken(v)
+                item = v
+                itemType = "BurntCross"
+                player.Character.HumanoidRootPart.CFrame = v:GetPivot() * CFrame.new(0,1,0)
+                break
+            end
+        end
+        if not item then
+            for _, v in pairs(workspace.Interactables:GetChildren()) do
+                if v:GetAttribute("PhotoRewardAvailable") and not AlreadyTaken(v) then
+                    SetTaken(v)
+                    item = v
+                    itemType = "Interaction"
+                    player.Character.HumanoidRootPart.CFrame = v:GetPivot() * CFrame.new(0,1,0)
+                    break
+                end
+            end
+        end
+        if item then
+            pcall(function()
+                Events.TakePhotoWithCamera:FireServer(
+                    workspace.CurrentCamera.CFrame,
+                    { Stars = 3, Type = itemType, Object = item, Reward = (itemType == "BurntCross" and 12 or 8) }
+                )
+            end)
+            WindUI:Notify({ Title = "3 Stars", Content = "Photo taken!", Duration = 2 })
+        else
+            WindUI:Notify({ Title = "3 Stars", Content = "No object found", Duration = 2, Type = "error" })
+        end
+        TpOutside()
+    end,
+})
+demonologyTab:Space()
+
+-- Players ESP
+demonologyTab:Toggle({
+    Title = "Players ESP",
+    Desc = "Shows all players",
+    Callback = function(v)
+        PlayersEspToggle = v
+        if v then
+            task.spawn(function()
+                while PlayersEspToggle do
+                    UpdatePlayersEsp()
+                    task.wait(1)
+                end
+                UpdatePlayersEsp()
+            end)
+        else
+            UpdatePlayersEsp()
+        end
+    end,
+})
+demonologyTab:Space()
+
+-- Evidence ESP
+demonologyTab:Toggle({
+    Title = "Handprints, Orb ESP",
+    Desc = "Shows evidence locations",
+    Callback = function(v)
+        EvidenceEspToggle = v
+        if v then
+            task.spawn(function()
+                while EvidenceEspToggle do
+                    UpdateEvidenceEsp()
+                    task.wait(2)
+                end
+                UpdateEvidenceEsp()
+            end)
+        else
+            UpdateEvidenceEsp()
+        end
+    end,
+})
+demonologyTab:Space()
+
+-- =====================================================
+--  Background Listeners
+-- =====================================================
+workspace.DescendantAdded:Connect(function(desc)
+    if IsEscapeHunt and desc:IsA("Sound") and desc.Name == "Hunt" then
+        TpOutside()
+    end
+end)
+
+RS.Heartbeat:Connect(function()
+    if ghostEspOn then
+        local ghost = GetGhost()
+        if ghost and (not ghostHighlight or not ghostHighlight.Parent) then
+            CreateGhostESP()
+        end
+    end
+end)
+
+print("Demonology fully loaded!")
+-- ========== END OF PART 2 ==========
