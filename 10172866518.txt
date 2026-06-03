@@ -1,0 +1,5 @@
+while wait(0.001)do local args = {
+	"Start"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Cash"):FireServer(unpack(args))
+end
