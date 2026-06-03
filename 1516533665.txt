@@ -1,0 +1,36 @@
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer
+
+local clicking = false
+local keysFolder
+local mouse = lp:GetMouse()
+local usingMap
+
+while task.wait(0.1) do
+    usingMap = nil
+    for _, map in pairs(workspace:GetChildren()) do
+        if map.Name == "House" or map.Name == "Station" or map.Name == "Gallery" or map.Name == "Forest" or map.Name == "School" or map.Name == "Hospital" or map.Name =="Carnival" or map.Name == "City" or map.Name == "Mall" or map.Name =="Plant" then
+            usingMap = map
+        end
+    end
+    if usingMap then
+        keysFolder = nil
+        for _, key in pairs(workspace:GetDescendants()) do
+            if key:FindFirstChild("ClickDetector") then
+                keysFolder = key.Parent
+            end
+        end
+    end
+    if keysFolder then
+        if mouse.Target then
+            if mouse.Target:IsDescendantOf(keysFolder) and not clicking then
+                clicking = true
+                task.spawn(function()
+                    mouse1click()
+                    task.wait(1)
+                    clicking = false
+                end)
+            end
+        end
+    end
+end
