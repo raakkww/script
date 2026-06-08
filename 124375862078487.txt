@@ -1,0 +1,81 @@
+local players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local remotes = replicatedStorage:WaitForChild("Remotes", 5)
+local crashedRemote = remotes and remotes:WaitForChild("Crashed", 5)
+
+local function freePlayer()
+    local character = localPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.SeatPart then
+            humanoid.Sit = false
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                task.wait(0.1)
+                rootPart.CFrame = rootPart.CFrame + Vector3.new(0, 5, 0)
+            end
+        end
+    end
+end
+
+if crashedRemote then
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        
+        if self == crashedRemote and method == "FireServer" then
+            if args[1] == true then
+                task.spawn(freePlayer)
+                return nil
+            end
+        end
+        
+        return oldNamecall(self, ...)
+    end)
+    
+    print("")
+else
+    warn("Crashed Remote not found.")
+endlocal players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local remotes = replicatedStorage:WaitForChild("Remotes", 5)
+local crashedRemote = remotes and remotes:WaitForChild("Crashed", 5)
+
+local function freePlayer()
+    local character = localPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.SeatPart then
+            humanoid.Sit = false
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                task.wait(0.1)
+                rootPart.CFrame = rootPart.CFrame + Vector3.new(0, 5, 0)
+            end
+        end
+    end
+end
+
+if crashedRemote then
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        
+        if self == crashedRemote and method == "FireServer" then
+            if args[1] == true then
+                task.spawn(freePlayer)
+                return nil
+            end
+        end
+        
+        return oldNamecall(self, ...)
+    end)
+    
+    print("")
+else
+    warn("Crashed Remote not found.")
+end
