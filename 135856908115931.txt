@@ -1,0 +1,262 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local TargetGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
+if not TargetGui then return end
+if TargetGui:FindFirstChild("ScreenH") then TargetGui.ScreenH:Destroy() end
+
+-- Colores
+local COLOR_MENU = Color3.fromRGB(180, 0, 255)
+local COLOR_ESP = Color3.fromRGB(200, 50, 255)
+
+local FondoOscuro = Color3.fromRGB(8, 7, 18)
+local FondoTarjetas = Color3.fromRGB(15, 14, 28)
+local FondoBotones = Color3.fromRGB(22, 20, 38)
+local TextoColor = Color3.fromRGB(240, 240, 255)
+local TextoApagado = Color3.fromRGB(130, 120, 170)
+
+-- Configs
+_G.HitboxMod = false
+_G.HitboxInvisible = false
+_G.HitboxSize = 20
+_G.MVSChams = false
+_G.MVSNames = false
+_G.MVSTracers = false
+_G.MVSHealth = false
+_G.WeaponESP = false
+_G.SilentAim = false
+_G.Wallbang = false
+_G.RemoveWalls = false
+_G.Noclip = false
+_G.SpeedHack = false
+_G.InfiniteJump = false
+_G.FlyHack = false
+
+-- ====================== GUI ======================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ScreenH"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = TargetGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 480, 0, 650)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -325)
+MainFrame.BackgroundColor3 = FondoOscuro
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(90, 30, 120)
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 110, 0, 38)
+ToggleButton.Position = UDim2.new(0.02, 0, 0.12, 0)
+ToggleButton.BackgroundColor3 = FondoTarjetas
+ToggleButton.Text = ""
+ToggleButton.TextColor3 = COLOR_MENU
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.TextSize = 13
+ToggleButton.Parent = ScreenGui
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", ToggleButton).Color = COLOR_MENU
+
+ToggleButton.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
+
+-- TopBar
+local TopBar = Instance.new("Frame", MainFrame)
+TopBar.Size = UDim2.new(1,0,0,40)
+TopBar.BackgroundTransparency = 1
+
+local Title = Instance.new("TextLabel", TopBar)
+Title.Size = UDim2.new(0,350,1,0)
+Title.Position = UDim2.new(0,15,0,0)
+Title.BackgroundTransparency = 1
+Title.Text = ""
+Title.TextColor3 = TextoColor
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+
+-- Tabs
+local TabBar = Instance.new("Frame", MainFrame)
+TabBar.Size = UDim2.new(1,-20,0,35)
+TabBar.Position = UDim2.new(0,10,0,45)
+TabBar.BackgroundTransparency = 1
+
+local Pages = Instance.new("Frame", MainFrame)
+Pages.Size = UDim2.new(1,-20,1,-100)
+Pages.Position = UDim2.new(0,10,0,85)
+Pages.BackgroundTransparency = 1
+
+local TabCombat = Instance.new("ScrollingFrame")
+local TabVisuals = Instance.new("ScrollingFrame")
+local TabMovement = Instance.new("ScrollingFrame")
+local TabBypass = Instance.new("ScrollingFrame")
+local TabExtra = Instance.new("ScrollingFrame")
+
+local function SetupTab(t)
+    t.Size = UDim2.new(1,0,1,0)
+    t.BackgroundTransparency = 1
+    t.Visible = false
+    t.CanvasSize = UDim2.new(0,0,0,1600)
+    t.ScrollBarThickness = 6
+    t.ScrollBarImageColor3 = COLOR_MENU
+    t.Parent = Pages
+end
+
+SetupTab(TabCombat) SetupTab(TabVisuals) SetupTab(TabMovement) SetupTab(TabBypass) SetupTab(TabExtra)
+TabCombat.Visible = true
+
+-- Crear Tabs
+local tabs = {
+    {Name = "ð¯ HITBOX", Frame = TabCombat, X = 0},
+    {Name = "ðï¸ VISUAL", Frame = TabVisuals, X = 85},
+    {Name = "â¡ MOVE", Frame = TabMovement, X = 175},
+    {Name = "ð ï¸ BYPASS", Frame = TabBypass, X = 260},
+    {Name = "â¨ EXTRA", Frame = TabExtra, X = 355}
+}
+
+for _, t in ipairs(tabs) do
+    local btn = Instance.new("TextButton", TabBar)
+    btn.Size = UDim2.new(0,80,1,0)
+    btn.Position = UDim2.new(0, t.X, 0, 0)
+    btn.BackgroundColor3 = FondoTarjetas
+    btn.Text = t.Name
+    btn.TextColor3 = COLOR_MENU
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+
+    btn.MouseButton1Click:Connect(function()
+        TabCombat.Visible = false
+        TabVisuals.Visible = false
+        TabMovement.Visible = false
+        TabBypass.Visible = false
+        TabExtra.Visible = false
+        t.Frame.Visible = true
+    end)
+end
+
+local function AddToggle(parent, text, y, var)
+    local card = Instance.new("Frame", parent)
+    card.Size = UDim2.new(1,-12,0,42)
+    card.Position = UDim2.new(0,6,0, y*48 - 45)
+    card.BackgroundColor3 = FondoTarjetas
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0,8)
+
+    local lbl = Instance.new("TextLabel", card)
+    lbl.Size = UDim2.new(0.7,0,1,0)
+    lbl.Position = UDim2.new(0,12,0,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = TextoColor
+    lbl.Font = Enum.Font.GothamSemibold
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local sw = Instance.new("TextButton", card)
+    sw.Size = UDim2.new(0,48,0,24)
+    sw.Position = UDim2.new(1,-60,0,9)
+    sw.BackgroundColor3 = FondoBotones
+    sw.Text = ""
+    Instance.new("UICorner", sw).CornerRadius = UDim.new(1,0)
+    local stroke = Instance.new("UIStroke", sw)
+
+    local circ = Instance.new("Frame", sw)
+    circ.Size = UDim2.new(0,18,0,18)
+    circ.Position = UDim2.new(0,3,0,3)
+    circ.BackgroundColor3 = TextoApagado
+    Instance.new("UICorner", circ).CornerRadius = UDim.new(1,0)
+
+    local function upd()
+        if _G[var] then
+            sw.BackgroundColor3 = COLOR_MENU
+            circ.Position = UDim2.new(1,-21,0,3)
+            circ.BackgroundColor3 = TextoColor
+            stroke.Color = COLOR_MENU
+        else
+            sw.BackgroundColor3 = FondoBotones
+            circ.Position = UDim2.new(0,3,0,3)
+            circ.BackgroundColor3 = TextoApagado
+            stroke.Color = Color3.fromRGB(55,50,85)
+        end
+    end
+    upd()
+    sw.MouseButton1Click:Connect(function() _G[var] = not _G[var] upd() end)
+end
+
+-- ==================== OPCIONES ====================
+AddToggle(TabCombat, "ð¥ Modificar Hitboxes", 1, "HitboxMod")
+AddToggle(TabCombat, "ð» Hitbox Invisible", 2, "HitboxInvisible")
+
+AddToggle(TabVisuals, "ð¥ Chams", 1, "MVSChams")
+AddToggle(TabVisuals, "ð·ï¸ Names", 2, "MVSNames")
+AddToggle(TabVisuals, "ð Tracers", 3, "MVSTracers")
+AddToggle(TabVisuals, "â¤ï¸ Health", 4, "MVSHealth")
+AddToggle(TabVisuals, "ð« Weapon ESP (Armas Visuales)", 5, "WeaponESP")
+
+AddToggle(TabMovement, "ð Speed Hack", 1, "SpeedHack")
+AddToggle(TabMovement, "ð¦ Infinite Jump", 2, "InfiniteJump")
+AddToggle(TabMovement, "ð§± Noclip", 3, "Noclip")
+AddToggle(TabMovement, "ð Fly Hack", 4, "FlyHack")
+
+AddToggle(TabBypass, "ð Silent Aim", 1, "SilentAim")
+AddToggle(TabBypass, "ð  Wallbang", 2, "Wallbang")
+AddToggle(TabBypass, "ð Remove Walls (solo paredes)", 3, "RemoveWalls")
+
+-- ====================== LOGIC ======================
+RunService.RenderStepped:Connect(function()
+    -- Remove Walls (mejorado)
+    if _G.RemoveWalls then
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") and v.CanCollide then
+                local n = v.Name:lower()
+                if not (n:find("floor") or n:find("baseplate") or n:find("terrain") or v.Position.Y < 20) then
+                    v.CanCollide = false
+                    v.Transparency = 0.8
+                end
+            end
+        end
+    end
+
+    -- Hitbox
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = p.Character.HumanoidRootPart
+            if _G.HitboxMod then
+                hrp.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+                hrp.Transparency = _G.HitboxInvisible and 1 or 0.6
+                hrp.Color = COLOR_ESP
+                hrp.CanCollide = false
+            end
+        end
+    end
+
+    -- Weapon ESP
+    if _G.WeaponESP then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("Tool") or obj.Name:lower():find("gun") or obj.Name:lower():find("weapon") then
+                local hl = obj:FindFirstChild("WeaponHighlight") or Instance.new("Highlight", obj)
+                hl.Name = "WeaponHighlight"
+                hl.FillColor = Color3.fromRGB(0, 255, 100)
+                hl.FillTransparency = 0.4
+            end
+        end
+    end
+
+    -- Chams
+    if _G.MVSChams then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character then
+                local hl = p.Character:FindFirstChild("LitleHighlight") or Instance.new("Highlight", p.Character)
+                hl.Name = "LitleHighlight"
+                hl.FillColor = COLOR_ESP
+            end
+        end
+    end
+end)
+
+print("Todas las opciones visibles + Weapon ESP")
