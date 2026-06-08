@@ -1,0 +1,226 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ScreenH"
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local MainPanel = Instance.new("Frame")
+MainPanel.Size = UDim2.new(0, 170, 0, 275)
+MainPanel.Position = UDim2.new(0.05, 0, 0.2, 0)
+MainPanel.BackgroundColor3 = Color3.fromRGB(25, 35, 25)
+MainPanel.BorderSizePixel = 0
+MainPanel.Active = true
+MainPanel.Draggable = true
+MainPanel.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = MainPanel
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = ""
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundColor3 = Color3.fromRGB(40, 55, 40)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 14
+Title.Parent = MainPanel
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 12)
+TitleCorner.Parent = Title
+
+local function crearBotonCamp(texto, posicion, colorFondo)
+    local Boton = Instance.new("TextButton")
+    Boton.Size = UDim2.new(0, 150, 0, 32)
+    Boton.Position = posicion
+    Boton.Text = texto
+    Boton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Boton.BackgroundColor3 = colorFondo
+    Boton.Font = Enum.Font.SourceSansBold
+    Boton.TextSize = 11
+    Boton.Parent = MainPanel
+    
+    local BotonCorner = Instance.new("UICorner")
+    BotonCorner.CornerRadius = UDim.new(0, 6)
+    BotonCorner.Parent = Boton
+    return Boton
+end
+
+local BtnEmote = crearBotonCamp("ðº EMOTE GLOBAL (FE)", UDim2.new(0, 10, 0, 40), Color3.fromRGB(0, 120, 255))
+local BtnESP = crearBotonCamp("ð ESP CAMP STATUES: OFF", UDim2.new(0, 10, 0, 75), Color3.fromRGB(255, 50, 50))
+local BtnNoclip = crearBotonCamp("ð§± NOCLIP (OBBIES): OFF", UDim2.new(0, 10, 0, 110), Color3.fromRGB(255, 50, 50))
+local BtnSpeed = crearBotonCamp("â¡ CAMP SPEED: NORMAL", UDim2.new(0, 10, 0, 145), Color3.fromRGB(120, 50, 180))
+local BtnClicker = crearBotonCamp("ð±ï¸ AUTO-CLICKER: OFF", UDim2.new(0, 10, 0, 180), Color3.fromRGB(200, 120, 0))
+
+local Footnote = Instance.new("TextLabel")
+Footnote.Size = UDim2.new(1, 0, 0, 45)
+Footnote.Position = UDim2.new(0, 0, 0, 225)
+Footnote.Text = "Evita activar Speed alto\npara no causar Day Restart."
+Footnote.TextColor3 = Color3.fromRGB(200, 200, 200)
+Footnote.BackgroundTransparency = 1
+Footnote.Font = Enum.Font.SourceSansItalic
+Footnote.TextSize = 10
+Footnote.Parent = MainPanel
+
+
+-- 2. SISTEMAS Y CONFIGURACIONES AGREGADAS
+
+local animTrack = nil
+local bailando = false
+BtnEmote.MouseButton1Click:Connect(function()
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+    if not animator then return end
+    if not bailando then
+        bailando = true
+        BtnEmote.Text = "â DETENER EMOTE"
+        BtnEmote.BackgroundColor3 = Color3.fromRGB(180, 80, 0)
+        local Animation = Instance.new("Animation")
+        Animation.AnimationId = "rbxassetid://148840371"
+        animTrack = animator:LoadAnimation(Animation)
+        animTrack.Priority = Enum.AnimationPriority.Action
+        animTrack.Looped = true
+        animTrack:Play()
+    else
+        bailando = false
+        BtnEmote.Text = "ðº EMOTE GLOBAL (FE)"
+        BtnEmote.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+        if animTrack then animTrack:Stop() end
+    end
+end)
+
+local espActivo = false
+local function buscarItemsCamp()
+    if not espActivo then return end
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        -- Filtros especÃ­ficos de la actualizaciÃ³n de Camp
+        if obj.Name == "Statue" or obj.Name == "SafetyStatue" or obj.Name == "Bag" or obj.Name == "Coin" or obj.Name == "Token" then
+            if (obj:IsA("BasePart") or obj:IsA("Model")) and not obj:FindFirstChild("CampESP") then
+                local Highlight = Instance.new("Highlight")
+                Highlight.Name = "CampESP"
+                Highlight.FillColor = Color3.fromRGB(0, 255, 255) -- Cyan brillante para resaltar en el bosque verde
+                Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                Highlight.FillOpacity = 0.35
+                Highlight.Parent = obj
+            end
+        end
+    end
+end
+
+BtnESP.MouseButton1Click:Connect(function()
+    espActivo = not espActivo
+    if espActivo then
+        BtnESP.Text = "ð ESP CAMP STATUES: ON"
+        BtnESP.BackgroundColor3 = Color3.fromRGB(0, 160, 70)
+        buscarItemsCamp()
+    else
+        BtnESP.Text = "ð ESP CAMP STATUES: OFF"
+        BtnESP.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            local esp = obj:FindFirstChild("CampESP")
+            if esp then esp:Destroy() end
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(4) do
+        if espActivo then buscarItemsCamp() end
+    end
+end)
+
+local noclipActivo = false
+RunService.Stepped:Connect(function()
+    if noclipActivo and character then
+        for _, parte in pairs(character:GetDescendants()) do
+            if parte:IsA("BasePart") then parte.CanCollide = false end
+        end
+    end
+end)
+
+BtnNoclip.MouseButton1Click:Connect(function()
+    noclipActivo = not noclipActivo
+    if noclipActivo then
+        BtnNoclip.Text = "ð§± NOCLIP (OBBIES): ON"
+        BtnNoclip.BackgroundColor3 = Color3.fromRGB(0, 160, 70)
+    else
+        BtnNoclip.Text = "ð§± NOCLIP (OBBIES): OFF"
+        BtnNoclip.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    end
+end)
+
+local velocidades = {16, 24, 32}
+local indiceVelocidad = 1
+
+BtnSpeed.MouseButton1Click:Connect(function()
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    indiceVelocidad = indiceVelocidad + 1
+    if indiceVelocidad > #velocidades then indiceVelocidad = 1 end
+    
+    local nuevaVelocidad = velocidades[indiceVelocidad]
+    humanoid.WalkSpeed = nuevaVelocidad
+    
+    if nuevaVelocidad == 16 then
+        BtnSpeed.Text = "â¡ CAMP SPEED: NORMAL"
+        BtnSpeed.BackgroundColor3 = Color3.fromRGB(120, 50, 180)
+    elseif nuevaVelocidad == 24 then
+        BtnSpeed.Text = "â¡ CAMP SPEED: BOOST (SAFE)"
+        BtnSpeed.BackgroundColor3 = Color3.fromRGB(0, 160, 150)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    indiceVelocidad = indiceVelocidad + 1
+    if indiceVelocidad > #velocidades then indiceVelocidad = 1 end
+    
+    local nuevaVelocidad = velocidades[indiceVelocidad]
+    humanoid.WalkSpeed = nuevaVelocidad
+    
+    if nuevaVelocidad == 16 then
+        BtnSpeed.Text = "â¡ CAMP SPEED: NORMAL"
+        BtnSpeed.BackgroundColor3 = Color3.fromRGB(120, 50, 180)
+    elseif nuevaVelocidad == 24 then
+        BtnSpeed.Text = "â¡ CAMP SPEED: BOOST (SAFE)"
+        BtnSpeed.BackgroundColor3 = Color3.fromRGB(0, 160, 150)
+    else
+        BtnSpeed.Text = "â¡ CAMP SPEED: RUSH (FAST)"
+        BtnSpeed.BackgroundColor3 = Color3.fromRGB(220, 0, 100)
+    end
+end)
+
+local clickerActivo = false
+BtnClicker.MouseButton1Click:Connect(function()
+    clickerActivo = not clickerActivo
+    if clickerActivo then
+        BtnClicker.Text = "ð±ï¸ AUTO-CLICKER: ON"
+        BtnClicker.BackgroundColor3 = Color3.fromRGB(0, 160, 70)
+    else
+        BtnClicker.Text = "ð±ï¸ AUTO-CLICKER: OFF"
+        BtnClicker.BackgroundColor3 = Color3.fromRGB(200, 120, 0)
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.05)
+        if clickerActivo then
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+        end
+    end
+end)
+
+player.CharacterAdded:Connect(function(newChar) 
+    character = newChar 
+    task.wait(1)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then humanoid.WalkSpeed = velocidades[indiceVelocidad] end
+end)
