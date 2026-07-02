@@ -1,0 +1,47 @@
+-- Server Script inside the Tool
+
+local tool = script.Parent
+local DAMAGE = 20
+local KNOCKBACK_FORCE = 150 -- Increase for stronger knockback
+
+tool.Activated:Connect(function()
+	local character = tool.Parent
+	local humanoid = character:FindFirstChild("Humanoid")
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+	if not humanoid or not rootPart then
+		return
+	end
+
+	-- Create hitbox
+	local hitbox = Instance.new("Part")
+	hitbox.Size = Vector3.new(8, 8, 8)
+	hitbox.Transparency = 1
+	hitbox.CanCollide = false
+	hitbox.Anchored = true
+	hitbox.CFrame = rootPart.CFrame * CFrame.new(0, 0, -5)
+	hitbox.Parent = workspace
+
+	local hitPlayers = {}
+
+	hitbox.Touched:Connect(function(hit)
+		local enemyCharacter = hit.Parent
+		local enemyHumanoid = enemyCharacter and enemyCharacter:FindFirstChild("Humanoid")
+		local enemyRoot = enemyCharacter and enemyCharacter:FindFirstChild("HumanoidRootPart")
+
+		if enemyHumanoid and enemyRoot and enemyCharacter ~= character and not hitPlayers[enemyCharacter] then
+			hitPlayers[enemyCharacter] = true
+
+			-- Damage
+			enemyHumanoid:TakeDamage(DAMAGE)
+
+			-- Knockback
+			local direction = (enemyRoot.Position - rootPart.Position).Unit
+			enemyRoot.AssemblyLinearVelocity = direction * KNOCKBACK_FORCE + Vector3.new(0, 50, 0)
+		end
+	end)
+
+	-- Remove hitbox after a short duration
+	task.wait(0.2)
+	hitbox:Destroy()
+end)
