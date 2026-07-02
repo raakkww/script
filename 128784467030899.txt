@@ -1,0 +1,738 @@
+
+
+--// ═══ SERVICES ═══
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+--// ═══ RAYFIELD ═══
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "",
+    LoadingTitle = "",
+    LoadingSubtitle = "",
+    Theme = "AmberGlow",
+    ToggleUIKeybind = "K",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SlimHub",
+        FileName = "Config"
+    }
+})
+
+--// ═══ REMOTES ═══
+local NukeRemotes = ReplicatedStorage:WaitForChild("NukeRemotes")
+local PickUpRemote = NukeRemotes:WaitForChild("PickUp")
+local MergeRequestRemote = NukeRemotes:WaitForChild("MergeRequest")
+local DropRemote = NukeRemotes:WaitForChild("Drop")
+local PurchaseUpgradeRemote = NukeRemotes:WaitForChild("PurchaseUpgrade")
+local HoldStarted = NukeRemotes:WaitForChild("HoldStarted")
+local HoldEnded = NukeRemotes:WaitForChild("HoldEnded")
+
+--// ═══ VARIÁVEIS DE ESTADO ═══
+local state = {
+    isHolding = false,
+    holdingNuke = nil,
+    holdingTier = nil,
+    busy = false,
+    lastScan = 0,
+    scanCount = 0,
+    mergedCount = 0,
+    pickedCount = 0,
+    droppedCount = 0,
+    holdTimer = 0,       -- Timestamp de quando começou a segurar
+    forceDropped = false, -- Já foi forçado a dropar? (evita loop)
+}
+
+--// ═══ VARIÁVEIS DE ESTADO DOS TOGGLES ═══
+-- Rayfield.Flags sempre retorna tabela (truthy), NUNCA use para condicionais
+local autoSequenceEnabled = false
+local autoUpgradeAllEnabled = false
+local autoUpgradeEnabled = {
+    TIER = false,
+    LOCKBASE = false,
+    MAX = false
+}
+
+--// ═══ CONFIG ═══
+local CONFIG = {
+    SCAN_INTERVAL = 0.2,
+    PICKUP_RADIUS = 100,
+    MERGE_RADIUS = 15,
+    BUSY_DELAY = 0.2,
+    TP_OFFSET = 5,
+    HOLD_TIMEOUT = 2.0,   -- Se ficar 2s segurando sem fazer merge → Drop
+}
+
+--// ═══ FUNÇÕES AUXILIARES ═══
+local cachedNukesFolder = nil
+
+local function findMyNukesFolder()
+    if cachedNukesFolder and cachedNukesFolder.Parent then
+        return cachedNukesFolder
+    end
+    cachedNukesFolder = nil
+
+    local Bases = Workspace:FindFirstChild("Bases")
+    if not Bases then return nil end
+
+    for _, base in ipairs(Bases:GetChildren()) do
+        local Nukes = base:FindFirstChild("Nukes")
+        if Nukes then
+            for _, nuke in ipairs(Nukes:GetChildren()) do
+                if nuke:GetAttribute("OwnerUserId") == player.UserId then
+                    cachedNukesFolder = Nukes
+                    return Nukes
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- Helper: pega o número do nuke pelo OverheadNuke.TextLabel
+-- Se nuke for número (ID), retorna tostring dele como fallback
+local function getNukeNumber(nuke)
+    if type(nuke) ~= "userdata" then
+        return tostring(nuke)
+    end
+    local overhead = nuke:FindFirstChild("OverheadNuke")
+    if overhead then
+        local textLabel = overhead:FindFirstChild("TextLabel")
+        if textLabel then
+            return textLabel.Text
+        end
+    end
+    return nil
+end
+
+-- Helper: verifica se existe par para um nuke (outro nuke com o mesmo número no chão)
+local function hasPair(nuke, nukesFolder)
+    if not nuke or not nukesFolder then return false end
+    local myNumber = getNukeNumber(nuke)
+    if not myNumber then return false end
+
+    for _, other in ipairs(nukesFolder:GetChildren()) do
+        if other:IsA("BasePart") and other ~= nuke then
+            local otherState = other:GetAttribute("State")
+            if otherState == "floor" or otherState == "based" then
+                if getNukeNumber(other) == myNumber then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Eventos do servidor
+HoldStarted.OnClientEvent:Connect(function(nukeInstance)
+    state.isHolding = true
+    state.holdingNuke = nukeInstance
+
+    -- Proteção: se nukeInstance for número (ID do asset), não chama GetAttribute
+    if type(nukeInstance) == "userdata" then
+        local s, err = pcall(function()
+            state.holdingTier = nukeInstance:GetAttribute("Tier")
+        end)
+        if not s then
+            state.holdingTier = nil
+        end
+    else
+        state.holdingTier = nil
+    end
+
+    state.holdTimer = os.clock()
+    state.forceDropped = false
+end)
+
+HoldEnded.OnClientEvent:Connect(function()
+    state.isHolding = false
+    state.holdingNuke = nil
+    state.holdingTier = nil
+    state.forceDropped = false
+end)
+
+-- Helper: força um drop do nuke atual
+local function forceDrop()
+    if not state.isHolding or state.forceDropped then return end
+    state.forceDropped = true
+    state.droppedCount = state.droppedCount + 1
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        DropRemote:FireServer(root.CFrame)
+        local heldNumber = getNukeNumber(state.holdingNuke) or "?"
+        addLog(string.format("⏰ Drop timeout #%d: Nuke nº%s (2s sem ação)", state.droppedCount, heldNumber))
+    end
+    state.isHolding = false
+    state.holdingNuke = nil
+    state.holdingTier = nil
+    state.busy = false
+end
+
+--// ═══ LOGS (definido ANTES para evitar nil) ═══
+local LogParagraph = nil
+
+local function addLog(message)
+    if not LogParagraph then return end
+    local ok, err = pcall(function()
+        local currentContent = LogParagraph.Content or ""
+        local lines = {}
+        for line in currentContent:gmatch("[^\r\n]+") do
+            table.insert(lines, line)
+        end
+        if #lines >= 20 then
+            table.remove(lines, 1)
+        end
+        table.insert(lines, "[" .. os.date("%H:%M:%S") .. "] " .. message)
+        LogParagraph:Set({
+            Title = "Histórico de Ações",
+            Content = table.concat(lines, "\n")
+        })
+    end)
+    return ok
+end
+
+--// ═══ FUNÇÃO DE TELEPORTE ═══
+local function teleportTo(position)
+    local Character = player.Character
+    local root = Character and Character:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.new(position + Vector3.new(0, CONFIG.TP_OFFSET, 0))
+        task.wait(0.1) -- Pequeno delay para o servidor processar
+    end
+end
+
+--// ═══ FUNÇÃO PRINCIPAL ═══
+-- Lógica completa loop:
+-- 1. Se estiver segurando e não tem par → Drop
+-- 2. Se tiver 2+ nukes mesmo nome → TP até o primeiro → PickUp → TP até o segundo → Merge
+-- 3. Loop infinito
+local function performSequence()
+    if state.busy then return end
+
+    local nukesFolder = findMyNukesFolder()
+    if not nukesFolder then return end
+
+    local Character = player.Character
+    local root = Character and Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    -- Coletar nukes no chão, agrupados pelo NÚMERO (OverheadNuke.TextLabel)
+    local floorNukes = {}
+    for _, nuke in ipairs(nukesFolder:GetChildren()) do
+        if nuke:IsA("BasePart") then
+            local nukeState = nuke:GetAttribute("State")
+            if nukeState == "floor" or nukeState == "based" then
+                local dx = nuke.Position.X - root.Position.X
+                local dz = nuke.Position.Z - root.Position.Z
+                local dist = math.sqrt(dx * dx + dz * dz)
+
+                if dist <= CONFIG.PICKUP_RADIUS then
+                    -- Usa o NÚMERO do OverheadNuke.TextLabel como chave
+                    local numero = getNukeNumber(nuke)
+                    if numero then
+                        if not floorNukes[numero] then
+                            floorNukes[numero] = {}
+                        end
+                        table.insert(floorNukes[numero], {
+                            instance = nuke,
+                            dist = dist,
+                        })
+                    end
+                end
+            end
+        end
+    end
+
+    -- ═══ CENÁRIO 1: Está segurando um nuke ═══
+    if state.isHolding then
+        local heldNumber = getNukeNumber(state.holdingNuke)
+        local pairExists = false
+
+        if heldNumber and floorNukes[heldNumber] then
+            for _, nukeData in ipairs(floorNukes[heldNumber]) do
+                if nukeData.instance ~= state.holdingNuke then
+                    pairExists = true
+                    break
+                end
+            end
+        end
+
+        if not pairExists then
+            -- ═══ DROP: solta o nuke onde está ═══
+            state.busy = true
+            state.droppedCount = state.droppedCount + 1
+            local dropCFrame = root.CFrame
+            DropRemote:FireServer(dropCFrame)
+            addLog(string.format("Drop #%d: Nuke nº%s (sem par)", state.droppedCount, heldNumber or "?"))
+
+            task.wait(CONFIG.BUSY_DELAY)
+            state.busy = false
+        end
+        return
+    end
+
+    -- ═══ CENÁRIO 2: Tem 2+ nukes com o mesmo NÚMERO no chão ═══
+    for numero, nukeGroup in pairs(floorNukes) do
+        if #nukeGroup >= 2 then
+            table.sort(nukeGroup, function(a, b)
+                return a.dist < b.dist
+            end)
+
+            local targetNuke = nukeGroup[1].instance
+            local mergeTarget = nukeGroup[2].instance
+
+            state.busy = true
+            state.pickedCount = state.pickedCount + 1
+
+            -- ═══ PASSO 1: TP até o primeiro nuke ═══
+            addLog(string.format("TP nº%s (dist: %.1f)", numero, nukeGroup[1].dist))
+            teleportTo(targetNuke.Position)
+            task.wait(0.15)
+
+            -- ═══ PASSO 2: PickUp ═══
+            PickUpRemote:FireServer(targetNuke)
+            addLog(string.format("PickUp #%d: Nuke nº%s", state.pickedCount, numero))
+
+            -- ═══ PASSO 3: Aguardar segurar ═══
+            task.spawn(function()
+                local timeout = os.clock() + 2
+                while not state.isHolding and os.clock() < timeout do
+                    task.wait(0.05)
+                end
+
+                if state.isHolding then
+                    task.wait(CONFIG.BUSY_DELAY)
+
+                    -- ═══ PASSO 4: TP até o segundo nuke (merge target) ═══
+                    if mergeTarget and mergeTarget.Parent then
+                        addLog(string.format("TP até %s para merge", mergeTarget.Name))
+                        teleportTo(mergeTarget.Position)
+                        task.wait(0.15)
+
+                        -- ═══ PASSO 5: Merge ═══
+                        state.mergedCount = state.mergedCount + 1
+                        MergeRequestRemote:FireServer(mergeTarget)
+                        addLog(string.format("Merge #%d: Nuke nº%s", state.mergedCount, numero))
+                    else
+                        addLog("Falha no merge: alvo sumiu")
+                    end
+                else
+                    addLog("Falha no pickup: timeout")
+                end
+
+                task.wait(CONFIG.BUSY_DELAY)
+                state.busy = false
+            end)
+
+            return -- Apenas uma sequência por scan
+        end
+    end
+end
+
+--// ═══ UI: MAIN ═══
+local TabMain = Window:CreateTab("Main", "home")
+local SectionStatus = TabMain:CreateSection("Status do Bot")
+
+local StatusLabel = TabMain:CreateLabel(
+    "⏳ Aguardando...",
+    "circle",
+    Color3.fromRGB(255, 255, 0),
+    false
+)
+
+local StatsLabel = TabMain:CreateLabel(
+    "PickUps: 0 | Merges: 0",
+    "info",
+    Color3.fromRGB(200, 200, 200),
+    false
+)
+
+local SectionInfo = TabMain:CreateSection("Informações")
+
+local ParagraphInfo = TabMain:CreateParagraph({
+    Title = "⚡ SLIM HUB - CHAD",
+    Content = [[Hub de automação TOTAL para Nuke Game.
+
+▶ LOOP COMPLETO:
+1. Se estiver segurando um nuke
+   e NÃO tiver par → DROP (solta)
+2. Se tiver 2+ nukes MESMO NOME →
+   TP → PickUp → TP → Merge
+3. Repete infinitamente
+
+▶ SEQUÊNCIA DE MERGE:
+1. TP até o primeiro nuke
+2. PickUp (pega)
+3. TP até o segundo nuke (carregando)
+4. Merge (une)
+
+Toggle UI: Pressione K]]
+})
+
+--// ═══ UI: CONFIG ═══
+local TabConfig = Window:CreateTab("Config", "settings")
+local SectionMain = TabConfig:CreateSection("Configurações Gerais")
+
+local ToggleAutoSequence = TabConfig:CreateToggle({
+    Name = "Auto Sequência (PickUp → Merge)",
+    CurrentValue = false,
+    Flag = "AutoSequence",
+    Callback = function(Value)
+        autoSequenceEnabled = Value -- ⭐ USA VARIÁVEL LOCAL
+        local ok = pcall(function()
+            if Value then
+                StatusLabel:Set("✅ Auto Sequência ATIVA", "check-circle", Color3.fromRGB(0, 255, 0), false)
+            else
+                StatusLabel:Set("⏸️ Auto Sequência PAUSADA", "pause-circle", Color3.fromRGB(255, 255, 0), false)
+                state.busy = false
+            end
+        end)
+        addLog(Value and "Auto Sequência ATIVADA" or "Auto Sequência PAUSADA")
+    end,
+})
+
+local SliderScanInterval = TabConfig:CreateSlider({
+    Name = "Intervalo de Scan",
+    Range = {0.05, 2.0},
+    Increment = 0.05,
+    Suffix = "s",
+    CurrentValue = CONFIG.SCAN_INTERVAL,
+    Flag = "ScanInterval",
+    Callback = function(Value)
+        CONFIG.SCAN_INTERVAL = Value
+    end,
+})
+
+local SliderPickupRadius = TabConfig:CreateSlider({
+    Name = "Raio de PickUp",
+    Range = {5, 100},
+    Increment = 5,
+    Suffix = " studs",
+    CurrentValue = CONFIG.PICKUP_RADIUS,
+    Flag = "PickupRadius",
+    Callback = function(Value)
+        CONFIG.PICKUP_RADIUS = Value
+    end,
+})
+
+local SliderHoldTimeout = TabConfig:CreateSlider({
+    Name = "Drop Timeout (segundos)",
+    Range = {0.5, 10.0},
+    Increment = 0.5,
+    Suffix = "s",
+    CurrentValue = CONFIG.HOLD_TIMEOUT,
+    Flag = "HoldTimeout",
+    Callback = function(Value)
+        CONFIG.HOLD_TIMEOUT = Value
+    end,
+})
+
+local ButtonRunNow = TabConfig:CreateButton({
+    Name = "⚡ Executar Scan Manual",
+    Callback = function()
+        if state.busy then
+            Rayfield:Notify({ Title = "Ocupado", Content = "Aguardando sequência atual...", Duration = 2 })
+            return
+        end
+        performSequence()
+        Rayfield:Notify({ Title = "Scan Manual", Content = "Scan executado!", Duration = 2 })
+    end,
+})
+
+local DividerStats = TabConfig:CreateDivider()
+local SectionStats = TabConfig:CreateSection("Estatísticas")
+
+local ButtonResetStats = TabConfig:CreateButton({
+    Name = "🔄 Resetar Estatísticas",
+    Callback = function()
+        state.pickedCount = 0
+        state.mergedCount = 0
+        StatsLabel:Set("PickUps: 0 | Merges: 0", "info", Color3.fromRGB(200, 200, 200), false)
+        addLog("Estatísticas resetadas")
+    end,
+})
+
+--// ═══ KEYBIND ═══
+local KeybindScanAll = TabMain:CreateKeybind({
+    Name = "Scan Manual (PickUp + Merge)",
+    CurrentKeybind = "V",
+    HoldToInteract = false,
+    Flag = "ScanKeybind",
+    Callback = function()
+        if state.busy then
+            Rayfield:Notify({ Title = "Ocupado", Content = "Aguardando sequência atual...", Duration = 2 })
+            return
+        end
+        performSequence()
+        Rayfield:Notify({ Title = "Scan Manual", Content = "Sequência executada!", Duration = 2 })
+    end,
+})
+
+--// ═══ TAB LOGS ═══
+local TabLogs = Window:CreateTab("Logs", "file-text")
+local SectionLogs = TabLogs:CreateSection("Histórico de Ações")
+
+LogParagraph = TabLogs:CreateParagraph({
+    Title = "Logs",
+    Content = "Aguardando ações..."
+})
+
+--// ═══ VARIÁVEIS DE UPGRADE ═══
+local upgradeState = {
+    cash = 0,
+    upgrades = {},
+    lastDebug = 0,
+}
+local upgradeTypes = { "TIER", "LOCKBASE", "MAX" }
+
+-- Função para tentar converter valor numérico (suporta BigNum, tabela, string, number)
+local function toNumber(val)
+    if type(val) == "number" then return val end
+    if type(val) == "string" then return tonumber(val) or 0 end
+    -- BigNum pode ser tabela com campo "value" ou só uma tabela
+    if type(val) == "table" then
+        if val.value then return tonumber(val.value) or 0 end
+        -- Tenta converter a primeira campo numérico
+        for _, v in pairs(val) do
+            if type(v) == "number" then return v end
+        end
+        return 0
+    end
+    return 0
+end
+
+-- Escuta atualizações de estado do servidor
+local StateUpdate = NukeRemotes:WaitForChild("StateUpdate")
+StateUpdate.OnClientEvent:Connect(function(data)
+    if data and data.cash then
+        upgradeState.cash = data.cash
+    end
+    if data and data.upgrades then
+        upgradeState.upgrades = data.upgrades
+        -- Debug: print a estrutura
+        print("[SlimHub] StateUpdate recebido. Upgrades:")
+        for k, v in pairs(upgradeState.upgrades) do
+            print(string.format("  %s -> maxed=%s, cost=%s", k, tostring(v.maxed), tostring(v.cost)))
+        end
+    end
+end)
+
+-- Função para comprar um upgrade
+local function buyUpgrade(upgradeType)
+    PurchaseUpgradeRemote:FireServer(upgradeType)
+    addLog(string.format("🛒 Upgrade enviado: %s", upgradeType))
+end
+
+-- Loop de auto upgrade — SEMPRE tenta comprar se toggle ativo
+-- (deixa o servidor validar se tem dinheiro suficiente)
+local lastUpgradeScan = 0
+local function performUpgradeScan()
+    local isAllEnabled = autoUpgradeAllEnabled
+    for _, utype in ipairs(upgradeTypes) do
+        if autoUpgradeEnabled[utype] or isAllEnabled then
+            local upg = upgradeState.upgrades[utype]
+            if upg and not upg.maxed then
+                print("[SlimHub] Auto buying:", utype)
+                buyUpgrade(utype)
+                task.wait(0.3)
+                return -- Uma compra por scan, servidor atualiza estado
+            end
+        end
+    end
+end
+
+--// ═══ UI: UPGRADES ═══
+local TabUpgrades = Window:CreateTab("Upgrades", "trending-up")
+local SectionBuy = TabUpgrades:CreateSection("Auto Buy Upgrades")
+
+local UpgradeStatusLabel = TabUpgrades:CreateLabel(
+    "Auto Upgrade: DESLIGADO",
+    "circle",
+    Color3.fromRGB(255, 100, 100),
+    false
+)
+
+local ToggleAutoUpgrade = TabUpgrades:CreateToggle({
+    Name = "Auto Buy ALL (compra tudo que puder)",
+    CurrentValue = false,
+    Flag = "AutoUpgrade_ALL",
+    Callback = function(Value)
+        autoUpgradeAllEnabled = Value -- ⭐ USA VARIÁVEL LOCAL
+        local ok = pcall(function()
+            if Value then
+                UpgradeStatusLabel:Set("✅ Auto Upgrade ATIVO", "check-circle", Color3.fromRGB(0, 255, 0), false)
+            else
+                UpgradeStatusLabel:Set("⏸️ Auto Upgrade PAUSADO", "pause-circle", Color3.fromRGB(255, 255, 0), false)
+            end
+        end)
+        addLog(Value and "Auto Upgrade ALL ATIVADO" or "Auto Upgrade PAUSADO")
+    end,
+})
+
+local DividerUpgrades = TabUpgrades:CreateDivider()
+local SectionTypes = TabUpgrades:CreateSection("Upgrades Específicos")
+
+local upgradeToggles = {}
+for _, utype in ipairs(upgradeTypes) do
+    -- Captura o valor atual para uso no closure
+    local currentType = utype
+    local displayName = currentType:sub(1, 1) .. currentType:sub(2):lower()
+    local toggle = TabUpgrades:CreateToggle({
+        Name = string.format("Auto %s", displayName),
+        CurrentValue = false,
+        Flag = "AutoUpgrade_" .. currentType,
+        Callback = function(Value)
+            autoUpgradeEnabled[currentType] = Value -- ⭐ USA VARIÁVEL LOCAL
+            if Value then
+                -- Compra IMEDIATAMENTE ao ligar (como o botão manual)
+                buyUpgrade(currentType)
+                addLog(string.format("🛒 Auto %s comprado imediatamente", displayName))
+            else
+                addLog(string.format("⏸️ Auto %s PAUSADO", displayName))
+            end
+        end,
+    })
+    upgradeToggles[currentType] = toggle
+end
+
+local DividerManual = TabUpgrades:CreateDivider()
+local SectionManual = TabUpgrades:CreateSection("Compra Manual")
+
+local ButtonBuyTier = TabUpgrades:CreateButton({
+    Name = "🛒 Comprar TIER",
+    Callback = function()
+        buyUpgrade("TIER")
+    end,
+})
+
+local ButtonBuyLockBase = TabUpgrades:CreateButton({
+    Name = "🛒 Comprar LOCKBASE",
+    Callback = function()
+        buyUpgrade("LOCKBASE")
+    end,
+})
+
+local ButtonBuyMax = TabUpgrades:CreateButton({
+    Name = "🛒 Comprar MAX",
+    Callback = function()
+        buyUpgrade("MAX")
+    end,
+})
+
+--// ═══ LOOP PRINCIPAL ═══
+RunService.Heartbeat:Connect(function()
+    local now = os.clock()
+
+    -- ═══ TIMEOUT: Se está segurando por muito tempo → Drop
+    if state.isHolding and not state.forceDropped and not state.busy then
+        if now - state.holdTimer >= CONFIG.HOLD_TIMEOUT then
+            forceDrop()
+        end
+    end
+
+    if autoSequenceEnabled then
+        if now - state.lastScan >= CONFIG.SCAN_INTERVAL then
+            state.lastScan = now
+            state.scanCount = state.scanCount + 1
+            performSequence()
+        end
+    end
+
+    -- Auto Upgrade: verifica se ALL ou algum individual está ativo
+    local hasUpgradeEnabled = autoUpgradeAllEnabled
+    if not hasUpgradeEnabled then
+        for _, utype in ipairs(upgradeTypes) do
+            if autoUpgradeEnabled[utype] then
+                hasUpgradeEnabled = true
+                break
+            end
+        end
+    end
+    if hasUpgradeEnabled then
+        if now - lastUpgradeScan >= 1.0 then
+            lastUpgradeScan = now
+            performUpgradeScan()
+        end
+    end
+
+    if state.scanCount % 60 == 0 then
+        StatsLabel:Set(
+            string.format("PickUps: %d | Merges: %d", state.pickedCount, state.mergedCount),
+            "info",
+            Color3.fromRGB(200, 200, 200),
+            false
+        )
+    end
+end)
+--// ═══ FINALIZAR ═══
+Rayfield:LoadConfiguration()
+
+--// ═══ SINCRONIZAR VARIÁVEIS LOCAIS COM OS VALORES RESTAURADOS ═══
+-- LoadConfiguration restaura os valores nos toggles da UI, mas NÃO dispara os callbacks.
+-- Precisamos ler os valores dos Flags e atualizar as variáveis locais manualmente.
+local function syncFlagsToVariables()
+    -- Auto Sequência
+    local seqVal = Rayfield.Flags["AutoSequence"]
+    if type(seqVal) == "boolean" then
+        autoSequenceEnabled = seqVal
+    end
+
+    -- Auto Upgrade ALL
+    local allVal = Rayfield.Flags["AutoUpgrade_ALL"]
+    if type(allVal) == "boolean" then
+        autoUpgradeAllEnabled = allVal
+    end
+
+    -- Auto Upgrade individuais
+    for _, utype in ipairs(upgradeTypes) do
+        local flagVal = Rayfield.Flags["AutoUpgrade_" .. utype]
+        if type(flagVal) == "boolean" then
+            autoUpgradeEnabled[utype] = flagVal
+        end
+    end
+
+    -- Atualizar labels de status baseado nos valores reais
+    if autoSequenceEnabled then
+        pcall(function()
+            StatusLabel:Set("✅ Auto Sequência ATIVA", "check-circle", Color3.fromRGB(0, 255, 0), false)
+        end)
+    end
+
+    if autoUpgradeAllEnabled then
+        pcall(function()
+            UpgradeStatusLabel:Set("✅ Auto Upgrade ATIVO", "check-circle", Color3.fromRGB(0, 255, 0), false)
+        end)
+    end
+
+    -- Log dos valores sincronizados
+    print("[SlimHub] Flags sincronizadas:")
+    print("  autoSequenceEnabled =", autoSequenceEnabled)
+    print("  autoUpgradeAllEnabled =", autoUpgradeAllEnabled)
+    for _, utype in ipairs(upgradeTypes) do
+        print("  autoUpgradeEnabled[" .. utype .. "] =", autoUpgradeEnabled[utype])
+    end
+end
+
+syncFlagsToVariables()
+
+-- Logs iniciais
+    addLog("═══ SLIM HUB (by CHAD) ═══")
+addLog("Loop: TP → PickUp → TP(holding) → Merge")
+addLog("Se sem par → Drop e continua")
+addLog("Pressione K para toggle UI / V scan manual")
+
+-- Notificação
+Rayfield:Notify({
+    Title = "⚡ SLIM HUB Carregado!",
+    Content = "Feito por CHAD | Loop: TP → PickUp → TP → Merge",
+    Duration = 6
+})
+
+print("[SlimHub by CHAD] online")
