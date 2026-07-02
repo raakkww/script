@@ -1,0 +1,501 @@
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local VIM = game:GetService("VirtualInputManager")
+
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local CollectRemote = remotes:WaitForChild("CollectHeldPack")
+local CollectAllCardCash = remotes:WaitForChild("CollectAllCardCash")
+local PackReroll = remotes:WaitForChild("PackReroll")
+local PackPurchase = remotes:WaitForChild("PackPurchase")
+local EquipPackTool = remotes:WaitForChild("EquipPackTool")
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "",
+   LoadingTitle = "",
+   LoadingSubtitle = "",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false,
+})
+
+local SaveFile = getgenv()
+SaveFile.AutoCollect = false
+SaveFile.AutoRoll = false
+SaveFile.AutoGradeToken = false
+SaveFile.AutoOpenPacks = false
+SaveFile.AutoBuyPacks = false
+SaveFile.AutoPlace = false
+SaveFile.AutoGroundTokens = false
+
+local function normalizeRank(name)
+   if not name or name == "" then return "" end
+   return name:lower():gsub("%s+", "")
+end
+
+local allRarities = {"All", "Normal", "Gold", "Platinum", "Emerald", "Diamond", "Rainbow"}
+
+local rankList = {
+   "Princess", "Queen", "Matriarch", "Empress", "Seraph",
+   "Divine", "Celestial", "Goddess", "Valkyrie", "Archon",
+   "Eternal", "Radiant", "Rising Star",
+   "Ascendant", "Zenith", "Beyond"
+}
+
+local normalOnlyRanks = {
+   ascendant = true,
+   zenith = true,
+   beyond = true,
+}
+
+SaveFile.PackRarities = {}
+for _, rank in ipairs(rankList) do
+   local key = normalizeRank(rank)
+   SaveFile.PackRarities[key] = {
+      all = false, normal = false, gold = false,
+      platinum = false, emerald = false, diamond = false, rainbow = false,
+   }
+   if normalOnlyRanks[key] then
+      SaveFile.PackRarities[key]["normal"] = true
+   else
+      SaveFile.PackRarities[key]["rainbow"] = true
+   end
+end
+
+SaveFile.SelectedRanks = {}
+for _, rank in ipairs(rankList) do
+   SaveFile.SelectedRanks[normalizeRank(rank)] = false
+end
+
+local function getAPS()
+   local myPlot = Workspace.Map.PlotModels:FindFirstChild(Player.Name)
+   if not myPlot then return nil end
+   local systems = myPlot:FindFirstChild("Systems")
+   if not systems then return nil end
+   return systems:FindFirstChild("ActivePackStation")
+end
+
+local function getPlayerPlot()
+   local plotFolder = Workspace:WaitForChild("Map"):WaitForChild("PlotModels")
+   local userPlot = plotFolder:FindFirstChild(Player.Name)
+   if userPlot then
+      return userPlot:FindFirstChild("Base") or userPlot:FindFirstChildWhichIsA("BasePart")
+   end
+   return nil
+end
+
+local function collectToken(tokenPart)
+   if not (tokenPart and tokenPart.Parent) then return end
+   local character = Player.Character or Player.CharacterAdded:Wait()
+   local humanoid = character:WaitForChild("Humanoid")
+   local hrp = character:WaitForChild("HumanoidRootPart")
+
+   local attempts = 0
+   while tokenPart and tokenPart.Parent and attempts < 10 do
+      attempts += 1
+      hrp.CFrame = CFrame.new(tokenPart.Position + Vector3.new(0, 5, 5))
+      task.wait(0.3)
+      humanoid:MoveTo(tokenPart.Position)
+      local timeout = 3
+      local elapsed = 0
+      while tokenPart and tokenPart.Parent and elapsed < timeout do
+         task.wait(0.1)
+         elapsed += 0.1
+      end
+      if not (tokenPart and tokenPart.Parent) then
+         print("Collected!")
+         return
+      end
+   end
+   print("Gave up on token")
+end
+
+local function collectAllTokens()
+   local character = Player.Character or Player.CharacterAdded:Wait()
+   local hrp = character:WaitForChild("HumanoidRootPart")
+   local originalCFrame = hrp.CFrame
+   local systems = Workspace:FindFirstChild("Systems")
+   if not systems then return end
+
+   -- Ground tokens
+   local groundTokens = systems:FindFirstChild("GradeTokens")
+   if groundTokens then
+      for _, token in ipairs(groundTokens:GetChildren()) do
+         local tokenPart = token:FindFirstChild("GradeTokenPart")
+         if tokenPart and tokenPart.Parent then
+            print("Collecting ground token: " .. token.Name)
+            collectToken(tokenPart)
+         end
+      end
+   end
+
+   -- Obby tokens Easy/Medium/Hard
+   local obbyTokens = systems:FindFirstChild("GradeObbyTokens")
+   if obbyTokens then
+      for _, diffName in ipairs({"Easy", "Medium", "Hard"}) do
+         local diffFolder = obbyTokens:FindFirstChild(diffName)
+         if diffFolder then
+            for _, slot in ipairs(diffFolder:GetChildren()) do
+               local tokenPart = slot:FindFirstChild("GradeTokenPart")
+               if tokenPart and tokenPart.Parent then
+                  print("Collecting " .. diffName .. " obby token: " .. slot.Name)
+                  collectToken(tokenPart)
+               end
+            end
+         end
+      end
+   end
+
+   hrp.CFrame = originalCFrame
+   print("All tokens done!")
+   Rayfield:Notify({
+      Title = "Tokens",
+      Content = "All tokens collected!",
+      Duration = 3,
+      Image = 4483362458,
+   })
+end
+
+local MainTab = Window:CreateTab("Main", 4483362458)
+MainTab:CreateSection("Main")
+
+MainTab:CreateToggle({
+   Name = "Auto Collect Cash",
+   CurrentValue = false,
+   Flag = "AutoCollectFlag",
+   Callback = function(Value)
+      SaveFile.AutoCollect = Value
+      if SaveFile.AutoCollect then
+         task.spawn(function()
+            while SaveFile.AutoCollect do
+               CollectAllCardCash:FireServer()
+               task.wait(1)
+            end
+         end)
+      end
+   end,
+})
+
+MainTab:CreateButton({
+   Name = "Collect All Cash",
+   Callback = function()
+      CollectAllCardCash:FireServer()
+   end,
+})
+
+MainTab:CreateButton({
+   Name = "Collect All Tokens Now",
+   Callback = function()
+      task.spawn(collectAllTokens)
+   end,
+})
+
+MainTab:CreateToggle({
+   Name = "Auto Collect All Tokens",
+   CurrentValue = false,
+   Flag = "AutoAllTokensFlag",
+   Callback = function(Value)
+      SaveFile.AutoGroundTokens = Value
+      if SaveFile.AutoGroundTokens then
+         task.spawn(function()
+            while SaveFile.AutoGroundTokens do
+               collectAllTokens()
+               task.wait(300)
+            end
+         end)
+      end
+   end,
+})
+
+local AutoBuy = Window:CreateTab("AutoBuy", 4483362458)
+
+AutoBuy:CreateDropdown({
+   Name = "Select Active Packs",
+   Options = rankList,
+   CurrentOption = {},
+   MultipleOptions = true,
+   Flag = "RankDropdown",
+   Callback = function(Options)
+      for rank in pairs(SaveFile.SelectedRanks) do
+         SaveFile.SelectedRanks[rank] = false
+      end
+      for _, selectedName in ipairs(Options) do
+         SaveFile.SelectedRanks[normalizeRank(selectedName)] = true
+      end
+   end,
+})
+
+AutoBuy:CreateSection("Per-Pack Rarities")
+AutoBuy:CreateParagraph({
+   Title = "Presets:",
+   Content = "Princess to Rising Star = Rainbow. Ascendant, Zenith, Beyond = Normal only.",
+})
+
+for _, rank in ipairs(rankList) do
+   local key = normalizeRank(rank)
+   local defaultOption = normalOnlyRanks[key] and {"Normal"} or {"Rainbow"}
+   AutoBuy:CreateDropdown({
+      Name = rank .. " Rarities",
+      Options = allRarities,
+      CurrentOption = defaultOption,
+      MultipleOptions = true,
+      Flag = "Rarity_" .. key,
+      Callback = function(Options)
+         for rarity in pairs(SaveFile.PackRarities[key]) do
+            SaveFile.PackRarities[key][rarity] = false
+         end
+         for _, selected in ipairs(Options) do
+            SaveFile.PackRarities[key][normalizeRank(selected)] = true
+         end
+      end,
+   })
+end
+
+AutoBuy:CreateSection("Auto Controls")
+
+AutoBuy:CreateToggle({
+   Name = "Auto Roll Packs",
+   CurrentValue = false,
+   Flag = "AutoRollFlag",
+   Callback = function(Value)
+      SaveFile.AutoRoll = Value
+      if SaveFile.AutoRoll then
+         task.spawn(function()
+            while SaveFile.AutoRoll do
+               PackReroll:FireServer()
+               task.wait(3)
+            end
+         end)
+      end
+   end,
+})
+
+AutoBuy:CreateToggle({
+   Name = "Auto Buy Selected Packs",
+   CurrentValue = false,
+   Flag = "AutoBuyFlag",
+   Callback = function(Value)
+      SaveFile.AutoBuyPacks = Value
+      if SaveFile.AutoBuyPacks then
+         task.spawn(function()
+            local function findAndBuy(obj)
+               for _, v in ipairs(obj:GetChildren()) do
+                  if v.Name:find("ActivePack") then
+                     local frame = v:FindFirstChild("PackPriceBillboardGui")
+                        and v.PackPriceBillboardGui:FindFirstChild("Frame")
+                     local nameLabel = frame and frame:FindFirstChild("NameLabel")
+                     local variantLabel = frame and frame:FindFirstChild("VariantLabel")
+                     local itemRank = normalizeRank(nameLabel and nameLabel.Text or "")
+                     local itemRarity = normalizeRank(
+                        (variantLabel and variantLabel.Text ~= "" and variantLabel.Text) or "normal"
+                     )
+                     local packNum = tonumber(obj.Name:match("%d+"))
+                     if itemRank == "" then continue end
+                     if not packNum then continue end
+                     if not SaveFile.SelectedRanks[itemRank] then continue end
+                     local packRarities = SaveFile.PackRarities[itemRank]
+                     if not packRarities then continue end
+                     if packRarities["all"] or packRarities[itemRarity] then
+                        print("BUYING slot "..packNum.." | "..itemRank.." | "..itemRarity)
+                        PackPurchase:FireServer(packNum)
+                        task.wait(0.8)
+                     end
+                  end
+                  findAndBuy(v)
+               end
+            end
+
+            while SaveFile.AutoBuyPacks do
+               pcall(function()
+                  local aps = getAPS()
+                  if not aps then return end
+                  findAndBuy(aps)
+               end)
+               task.wait(1)
+            end
+         end)
+      end
+   end,
+})
+
+local AutoPlace = Window:CreateTab("AutoPlace", 4483362458)
+
+AutoPlace:CreateToggle({
+   Name = "Auto Open Ready Packs",
+   CurrentValue = false,
+   Flag = "AutoOpenFlag",
+   Callback = function(Value)
+      SaveFile.AutoOpenPacks = Value
+      if SaveFile.AutoOpenPacks then
+         task.spawn(function()
+            while SaveFile.AutoOpenPacks do
+               pcall(function()
+                  local myPlot = Workspace.Map.PlotModels:FindFirstChild(Player.Name)
+                  if not myPlot then return end
+                  local placedPacks = myPlot.Systems and myPlot.Systems:FindFirstChild("PlacedPacks")
+                  if not placedPacks then return end
+                  for _, pack in ipairs(placedPacks:GetChildren()) do
+                     local timerLabel = pack:FindFirstChild("PackModel")
+                        and pack.PackModel:FindFirstChild("PackTimerBillboardGui")
+                        and pack.PackModel.PackTimerBillboardGui:FindFirstChild("Frame")
+                        and pack.PackModel.PackTimerBillboardGui.Frame:FindFirstChild("TimerLabel")
+                     if timerLabel and timerLabel.Text == "Ready" then
+                        CollectRemote:FireServer(pack.Name)
+                        task.wait(0.1)
+                     end
+                  end
+               end)
+               task.wait(2)
+            end
+         end)
+      end
+   end,
+})
+
+local function getInventoryFromUI()
+   local hotbar = Player.PlayerGui:FindFirstChild("HotbarGui")
+   local mainFrame = hotbar and hotbar:FindFirstChild("MainFrame")
+   local items = {}
+   if not mainFrame then return items end
+   for _, obj in pairs(mainFrame:GetChildren()) do
+      if obj:IsA("TextButton") and obj.Visible then
+         local amountLabel = obj:FindFirstChild("AmountLabel")
+         local amount = 1
+         if amountLabel then
+            amount = tonumber(amountLabel.Text:gsub("%D", "")) or 1
+         end
+         local splitName = string.split(obj.Name, "_")
+         if splitName[1] and splitName[2] then
+            local pType = "_" .. splitName[2]
+            if pType == "_Normal" then pType = "Normal" end
+            table.insert(items, {Rank = splitName[1], Type = pType, Quantity = amount})
+         end
+      end
+   end
+   return items
+end
+
+local function equipAndPlace(rank, pType, position)
+   local character = Player.Character or Player.CharacterAdded:Wait()
+   local humanoid = character:WaitForChild("Humanoid")
+   local hrp = character:WaitForChild("HumanoidRootPart")
+   hrp.CFrame = CFrame.new(position + Vector3.new(0, 5, 0))
+   task.wait(0.1)
+   humanoid:UnequipTools()
+   EquipPackTool:FireServer(rank, pType)
+   local tool = nil
+   local start = tick()
+   while not tool and (tick() - start) < 1.2 do
+      tool = character:FindFirstChildOfClass("Tool") or Player.Backpack:FindFirstChildWhichIsA("Tool")
+      task.wait(0.05)
+   end
+   if tool then
+      if tool.Parent == Player.Backpack then humanoid:EquipTool(tool) end
+      tool:Activate()
+      local placementRemote = ReplicatedStorage.Remotes:FindFirstChild("PlaceItem")
+      if placementRemote then placementRemote:FireServer(tool.Name, position) end
+   end
+end
+
+AutoPlace:CreateToggle({
+   Name = "Auto Place Packs",
+   CurrentValue = false,
+   Flag = "AutoPlaceUI",
+   Callback = function(Value)
+      SaveFile.AutoPlace = Value
+      if SaveFile.AutoPlace then
+         task.spawn(function()
+            local plotBase = getPlayerPlot()
+            if not plotBase then return end
+            local size = plotBase.Size
+            local margin = 4
+            local minX, maxX = -(size.X/2)+margin, (size.X/2)-margin
+            local minZ, maxZ = -(size.Z/2)+margin, (size.Z/2)-margin
+            while SaveFile.AutoPlace do
+               local visibleItems = getInventoryFromUI()
+               if #visibleItems == 0 then task.wait(2) continue end
+               for _, data in pairs(visibleItems) do
+                  for i = 1, data.Quantity do
+                     if not SaveFile.AutoPlace then break end
+                     local targetPos = (plotBase.CFrame * CFrame.new(
+                        math.random(minX, maxX),
+                        (size.Y/2)+0.5,
+                        math.random(minZ, maxZ)
+                     )).Position
+                     equipAndPlace(data.Rank, data.Type, targetPos)
+                     task.wait(0.5)
+                  end
+                  if not SaveFile.AutoPlace then break end
+               end
+               task.wait(1)
+            end
+         end)
+      end
+   end,
+})
+
+local CreditsTab = Window:CreateTab("Credits", 4483362458)
+CreditsTab:CreateSection("Credits")
+CreditsTab:CreateLabel("Developer: PotatoIsCool", 4483362458, Color3.fromRGB(255, 255, 255), false)
+
+local AntiAfkEnabled = false
+local AntiAfkThread
+
+CreditsTab:CreateToggle({
+   Name = "Anti-AFK",
+   CurrentValue = false,
+   Flag = "AntiAfkFlag",
+   Callback = function(Value)
+      AntiAfkEnabled = Value
+      if AntiAfkThread then task.cancel(AntiAfkThread) AntiAfkThread = nil end
+      if AntiAfkEnabled then
+         AntiAfkThread = task.spawn(function()
+            while AntiAfkEnabled do
+               task.wait(300)
+               VIM:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+               task.wait(0.01)
+               VIM:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+            end
+         end)
+         Rayfield:Notify({Title = "Anti-AFK Active", Content = "Active.", Duration = 3, Image = 4483362458})
+      else
+         VIM:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+         Rayfield:Notify({Title = "Anti-AFK Disabled", Content = "Stopped.", Duration = 3, Image = 4483362458})
+      end
+   end,
+})
+
+local Themes = {
+   ["Default"]="Default",["Amber Glow"]="AmberGlow",["Amethyst"]="Amethyst",
+   ["Bloom"]="Bloom",["Dark Blue"]="DarkBlue",["Green"]="Green",
+   ["Light"]="Light",["Ocean"]="Ocean",["Serenity"]="Serenity"
+}
+local ThemeList = {}
+for name in pairs(Themes) do table.insert(ThemeList, name) end
+
+CreditsTab:CreateDropdown({
+   Name = "Select UI Theme",
+   Options = ThemeList,
+   CurrentOption = {"Default"},
+   MultipleOptions = false,
+   Flag = "ThemeSelector",
+   Callback = function(Option)
+      local themeId = Themes[Option[1]]
+      if themeId and Window then Window.ModifyTheme(themeId) end
+   end,
+})
+
+CreditsTab:CreateButton({
+   Name = "Destroy UI",
+   Callback = function()
+      SaveFile.AutoCollect = false
+      SaveFile.AutoRoll = false
+      SaveFile.AutoOpenPacks = false
+      SaveFile.AutoBuyPacks = false
+      SaveFile.AutoPlace = false
+      SaveFile.AutoGroundTokens = false
+      Rayfield:Destroy()
+   end
+})
