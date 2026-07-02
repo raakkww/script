@@ -1,0 +1,221 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+    Name = "",
+    LoadingTitle = "",
+    LoadingSubtitle = "",
+    ConfigurationSaving = { Enabled = false },
+    Discord = { Enabled = false },
+    KeySystem = false
+})
+
+local AutoFarmTab = Window:CreateTab("Auto Farm", "shopping-cart")
+local SettingsTab = Window:CreateTab("Settings", "settings")
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Find Player's Tycoon
+local Tycoon = (function()
+    for _, v in pairs(workspace:GetChildren()) do
+        if v:IsA("Folder") and v.Name:match("Tycoon%d") then
+            if v:FindFirstChild("Owner") and v.Owner.Value == LocalPlayer then
+                return v
+            end
+        end
+    end
+end)()
+
+if not Tycoon then
+    Rayfield:Notify({
+        Title = "Tycoon Error",
+        Content = "We couldn't find your Tycoon. Please claim one first!",
+        Duration = 5,
+        Image = "x-circle"
+    })
+    return
+end
+
+-- Variables
+local AutoBuy = false
+local AutoUpgrade = false
+local AutoFruit = false
+
+-- Functions
+local function GetBuyableButtons()
+    local buttons = {}
+    for _, obj in ipairs(Tycoon.Purchases:GetDescendants()) do
+        if obj:IsA("Model") then
+            local shown = obj:GetAttribute("Shown")
+            local purchased = obj:GetAttribute("Purchased")
+            if shown == true and purchased ~= true then
+                local button = obj:FindFirstChild("Button")
+                if button and button:IsA("BasePart") then
+                    table.insert(buttons, {Name = obj.Name, Button = button})
+                end
+            end
+        end
+    end
+    return buttons
+end
+
+local function BuyButton(buttonData)
+    local character = LocalPlayer.Character
+    if not character then return end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local button = buttonData.Button
+    pcall(function()
+        firetouchinterest(root, button, 0)
+        firetouchinterest(root, button, 1)
+    end)
+end
+
+local function AutoUpgradeMachines()
+    for _, obj in ipairs(Tycoon.Purchases:GetDescendants()) do
+        if obj:IsA("RemoteFunction") and obj.Name == "Upgrade" then
+            pcall(function()
+                for i = 1, 100 do
+                    obj:InvokeServer(i)
+                end
+            end)
+        end
+    end
+end
+
+-- Lemon Tree Handling
+local LemonTrees = {}
+
+local function AddLemonTree(obj)
+    if obj:IsA("Model") and obj.Name == "LemonTree" then
+        if not table.find(LemonTrees, obj) then
+            table.insert(LemonTrees, obj)
+        end
+    end
+end
+
+local function RemoveLemonTree(obj)
+    local index = table.find(LemonTrees, obj)
+    if index then table.remove(LemonTrees, index) end
+end
+
+-- Setup Lemon Trees
+for _, v in ipairs(workspace:GetDescendants()) do
+    AddLemonTree(v)
+end
+workspace.DescendantAdded:Connect(AddLemonTree)
+workspace.DescendantRemoving:Connect(RemoveLemonTree)
+
+local function CollectFruit(tree)
+    local character = LocalPlayer.Character
+    if not character then return end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    -- Disable collision
+    for _, part in ipairs(tree:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+
+    -- Teleport to tree
+    local cf = tree:GetPivot()
+    root.CFrame = cf + Vector3.new(0, 5, 0)
+
+    -- Click fruits
+    for _, obj in ipairs(tree:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name == "Fruit" then
+            local clickPart = obj:FindFirstChild("ClickPart")
+            if clickPart then
+                local clickDetector = clickPart:FindFirstChildOfClass("ClickDetector")
+                if clickDetector then
+                    task.wait(0.45)
+                    pcall(function()
+                        fireclickdetector(clickDetector)
+                    end)
+                end
+            end
+        end
+    end
+end
+
+-- Main Loops
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if AutoBuy then
+            local buttons = GetBuyableButtons()
+            for _, btn in ipairs(buttons) do
+                pcall(function() BuyButton(btn) end)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if AutoUpgrade then
+            pcall(AutoUpgradeMachines)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if AutoFruit then
+            for _, tree in ipairs(LemonTrees) do
+                if tree and tree.Parent then
+                    pcall(function() CollectFruit(tree) end)
+                end
+            end
+        end
+    end
+end)
+
+-- UI Elements
+AutoFarmTab:CreateSection("💸 Automation")
+AutoFarmTab:CreateToggle({
+    Name = "Auto Buy Tycoon Buttons",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoBuy = Value
+        Rayfield:Notify({Title = "Auto Buy", Content = Value and "Activated successfully." or "Deactivated.", Duration = 2})
+    end
+})
+
+AutoFarmTab:CreateToggle({
+    Name = "Auto Upgrade Machines",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoUpgrade = Value
+        Rayfield:Notify({Title = "Auto Upgrade", Content = Value and "Activated successfully." or "Deactivated.", Duration = 2})
+    end
+})
+
+AutoFarmTab:CreateSection("🍋 Harvesting")
+AutoFarmTab:CreateToggle({
+    Name = "Auto Collect Fruit",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoFruit = Value
+        Rayfield:Notify({Title = "Auto Fruit", Content = Value and "Activated successfully." or "Deactivated.", Duration = 2})
+    end
+})
+
+SettingsTab:CreateSection("UI Controls")
+SettingsTab:CreateButton({
+    Name = "Destroy UI",
+    Callback = function() Rayfield:Destroy() end
+})
+
+SettingsTab:CreateLabel("Script crafted for top performance by Rifa Hub.")
+
+Rayfield:Notify({
+    Title = "",
+    Content = "",
+    Duration = 5,
+    Image = "check"
+})
