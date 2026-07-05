@@ -11,18 +11,6 @@
     "easy card and cash collector\nfeatures instant tp token and auto buy cards\nperfect for farming",
     "teleport straight to tokens\nauto collect cash and automatically buy/collect cards\nenjoy the script"
   ],
-  "16480898254": [
-    "what the title says\nauto eat + grab\nand auto sell\nlit thats it oh and not included in the script but\nthis is the throw remote\nlocal event = game:getservice(\"players\").localplayer.character.events.throw\nevent:fireserver()\nthats it",
-    "features auto eat, auto grab, and auto sell\nincludes throw remote event fire logic\njust what the title says, simple as that",
-    "simple auto eat + grab and auto sell script\nalso includes the throw remote event trigger\nlit thats it, nothing more",
-    "automatically eat, grab, and sell everything\nfeatures the throw remote event string\njust follow what the title says and enjoy",
-    "auto eat and grab combined with auto sell\nincludes the localplayer throw remote event call\nthats all you need for this one",
-    "just auto eat, auto grab, and auto sell\nincludes throw remote event lines in description\nlit that is all it does",
-    "simple farming script\nauto grab and eat items then auto sell them\nthrow remote function provided in description",
-    "does exactly what the title says\nfeatures auto eat + grab and an automatic sell loop\nthrow remote event code included",
-    "fully automated eat, grab, and sell script\nincludes throw remote event code line\nnothing more nothing less",
-    "auto grab + eat combined with an auto sell function\nsimple script with throw remote event info\nenjoy"
-  ],
   "123468479998097": [
     "it has hitbox\nand insane knockback",
     "features hitbox expander\nand insane knockback power",
