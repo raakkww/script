@@ -1,0 +1,230 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local root = character:WaitForChild("HumanoidRootPart")
+local events = ReplicatedStorage:WaitForChild("RemoteEvents")
+local lootPickup = events:WaitForChild("LootPickup")
+local chestPickup = events:WaitForChild("ChestPickup")
+local open = events:WaitForChild("UnlockChest")
+local home = events:WaitForChild("TeleportHome")
+local helper = require(ReplicatedStorage:WaitForChild("HelperModule"))
+local multiplier = workspace:WaitForChild("OreMultPart"):WaitForChild("BillboardGui"):WaitForChild("Frame"):WaitForChild("MultText")
+local function OreMult() local n = tonumber((multiplier.Text or "1x"):match("[%d%.]+")); return n or 1 end
+local chestMenu = player:WaitForChild("PlayerGui"):WaitForChild("ChestGui"):WaitForChild("ChestInfo"):WaitForChild("UnlockMenu")
+local price = chestMenu:WaitForChild("PriceFrame"):WaitForChild("ItemPrice")
+local forceOpen = chestMenu:WaitForChild("UnlockButton"):WaitForChild("ForceOpenFrame")
+local cash = player:WaitForChild("PlayerGui"):WaitForChild("CurrencyGui"):WaitForChild("Frame"):WaitForChild("CashText")
+local suffixes = {K=1e3, M=1e6, B=1e9, T=1e12, Q=1e15}
+local function Parse(str)
+    if not str or str == "" then return 0 end
+    str = str:gsub("[$,]", ""):gsub("%s+", "")
+    local num, suffix = str:match("^([%d%.]+)([KMBTQkmbtq]?)$")
+    if not num then return 0 end
+    local n = tonumber(num) or 0
+    if suffix and suffix ~= "" then local s = suffixes[suffix:upper()]; if s then n = n * s end end
+    return n
+end
+local function affordable()
+    if forceOpen.Visible then return false end
+    local cost = Parse(price.Text)
+    if cost <= 0 then return false end
+    return Parse(cash.Text) >= cost
+end
+local mergeButton, buyButton, depositButton, collectButton = nil, nil, nil, nil
+local function buttons()
+    local plot = helper.findPlayersPlot(player)
+    if not plot then return end
+    local buttons = plot:FindFirstChild("Buttons")
+    if buttons then
+        local bm = buttons:FindFirstChild("ButtonMerge"); mergeButton = bm and bm:FindFirstChild("Button") or nil
+        local b25 = buttons:FindFirstChild("ButtonBuy25"); buyButton = b25 and b25:FindFirstChild("Button") or nil
+    end
+    local sell = plot:FindFirstChild("Sell")
+    if sell then
+        local dep = sell:FindFirstChild("DepositButton"); depositButton = dep and dep:FindFirstChild("Button") or nil
+        local col = sell:FindFirstChild("CollectButton"); collectButton = col and col:FindFirstChild("Button") or nil
+    end
+end
+local function buyPrice()
+    local plot = helper.findPlayersPlot(player)
+    if not plot then return math.huge end
+    local b25 = plot:FindFirstChild("Buttons") and plot.Buttons:FindFirstChild("ButtonBuy25")
+    if not b25 then return math.huge end
+    local label = b25:FindFirstChild("BillboardGui") and b25.BillboardGui:FindFirstChild("Frame") and b25.BillboardGui.Frame:FindFirstChild("PriceText")
+    if not label then return math.huge end
+    return Parse(label.Text)
+end
+local chestInterval, lootScanRate, mergeInterval = 0.5, 0.1, 0.3
+local buyInterval, depositInterval, collectInterval = 0.4, 0.4, 0.4
+local pickupBoxHalf = Vector3.new(2.5, 7.5, 2.5)
+local wideSize = Vector3.new(160, 30, 160)
+local enabled = true
+local lastChest, lastMerge, lastBuy, lastDeposit, lastCollect = 0, 0, 0, 0, 0
+local lootTimer, cooldown = 0, false
+local function refs()
+    character = player.Character
+    if not character then return false end
+    humanoid = character:FindFirstChildOfClass("Humanoid")
+    root = character:FindFirstChild("HumanoidRootPart")
+    return humanoid ~= nil and root ~= nil
+end
+local lootParams = OverlapParams.new(); lootParams.CollisionGroup = "Loot"
+local chestParams = OverlapParams.new(); chestParams.CollisionGroup = "Chests"
+local function merge(now)
+    if now - lastMerge < mergeInterval then return end
+    lastMerge = now
+    if not mergeButton or not mergeButton.Parent then buttons() end
+    if not mergeButton then return end
+    firetouchinterest(root, mergeButton, 1); firetouchinterest(root, mergeButton, 0)
+end
+local function deposit(now)
+    if now - lastDeposit < depositInterval then return end
+    lastDeposit = now
+    if OreMult() <= 1 then return end
+    if not depositButton or not depositButton.Parent then buttons() end
+    if not depositButton then return end
+    firetouchinterest(root, depositButton, 1); firetouchinterest(root, depositButton, 0)
+end
+local function collect(now)
+    if now - lastCollect < collectInterval then return end
+    lastCollect = now
+    if OreMult() <= 1 then return end
+    if not collectButton or not collectButton.Parent then buttons() end
+    if not collectButton then return end
+    firetouchinterest(root, collectButton, 1); firetouchinterest(root, collectButton, 0)
+end
+local function buy(now)
+    if now - lastBuy < buyInterval then return end
+    lastBuy = now
+    if player:GetAttribute("holdingChest") then return end
+    if not buyButton or not buyButton.Parent then buttons() end
+    if not buyButton then return end
+    if Parse(cash.Text) < buyPrice() then return end
+    firetouchinterest(root, buyButton, 1); firetouchinterest(root, buyButton, 0)
+end
+local function chest(now)
+    if now - lastChest < chestInterval then return end
+    lastChest = now
+    if not player:GetAttribute("holdingChest") then return end
+    if not affordable() then return end
+    open:FireServer()
+end
+local function loot(dt)
+    lootTimer = lootTimer + dt
+    if lootTimer < lootScanRate then return end
+    lootTimer = 0
+    if not root then return end
+    local boxCF = CFrame.new(root.Position)
+    local nearLoot = workspace:GetPartBoundsInBox(boxCF, pickupBoxHalf * 2, lootParams)
+    local nearChest = workspace:GetPartBoundsInBox(boxCF, pickupBoxHalf * 2, chestParams)
+    local wideLootParams = OverlapParams.new(); wideLootParams.CollisionGroup = "Loot"
+    local wideChestParams = OverlapParams.new(); wideChestParams.CollisionGroup = "Chests"
+    local wideLoot = workspace:GetPartBoundsInBox(boxCF, wideSize, wideLootParams)
+    local wideChest = workspace:GetPartBoundsInBox(boxCF, wideSize, wideChestParams)
+    local parts = {}
+    for _, p in ipairs(nearLoot) do parts[p] = true end
+    for _, p in ipairs(nearChest) do parts[p] = true end
+    for _, p in ipairs(wideLoot) do if not parts[p] then firetouchinterest(root, p, 1); firetouchinterest(root, p, 0); parts[p] = true end end
+    for _, p in ipairs(wideChest) do if not parts[p] then firetouchinterest(root, p, 1); firetouchinterest(root, p, 0); parts[p] = true end end
+    local tiers, foundChest = {}, nil
+    for part in pairs(parts) do
+        local lootTier = part:GetAttribute("LootTier")
+        if lootTier then
+            table.insert(tiers, lootTier)
+            local model = part.Parent
+            if model and model:IsA("Model") then model:Destroy() else part:Destroy() end
+        elseif not cooldown and not foundChest and not player:GetAttribute("holdingChest") then
+            local chestTier = part:GetAttribute("ChestTier")
+            if chestTier then
+                foundChest = "Chest" .. chestTier
+                local model = part.Parent
+                if model and model:IsA("Model") then model:Destroy() else part:Destroy() end
+            end
+        end
+    end
+    if #tiers > 0 then lootPickup:FireServer(tiers) end
+    if foundChest then chestPickup:FireServer(foundChest); cooldown = true; task.delay(0.9, function() cooldown = false end) end
+    if #tiers == 0 and not foundChest and not player:GetAttribute("holdingChest") then
+        if #workspace:GetPartBoundsInBox(boxCF, wideSize, wideLootParams) == 0 and #workspace:GetPartBoundsInBox(boxCF, wideSize, wideChestParams) == 0 then
+            home:FireServer()
+        end
+    end
+end
+RunService.Heartbeat:Connect(function(dt)
+    if not enabled then return end
+    if not refs() then return end
+    if humanoid.Health <= 0 then return end
+    local now = tick()
+    merge(now); loot(dt); deposit(now); collect(now); chest(now); buy(now)
+end)
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    root = newChar:WaitForChild("HumanoidRootPart")
+    mergeButton, buyButton, depositButton, collectButton = nil, nil, nil, nil
+end)
+
+local font = Font.new("rbxassetid://12187368625")
+local function new(class, parent, props)
+    local i = Instance.new(class, parent)
+    for k, v in pairs(props or {}) do i[k] = v end
+    return i
+end
+
+local frameW = 0.22036688
+local frameH = 0.05346968
+local gap     = 0.006
+local screenGui = new("ScreenGui", player:WaitForChild("PlayerGui"), {Name="StatusGui", ResetOnSpawn=false, DisplayOrder=999})
+local container = new("Frame", screenGui, {Name="Container", AnchorPoint=Vector2.new(1,1), Position=UDim2.new(1,0,1 - frameH - gap,0), Size=UDim2.new(frameW,0,frameH * 3,0), BackgroundTransparency=1, BorderSizePixel=0})
+local statusFrame = new("Frame", container, {Name="StatusFrame", AnchorPoint=Vector2.new(1,1), Position=UDim2.new(1,0,1,0), Size=UDim2.new(1,0,1,0), BackgroundTransparency=1, BorderSizePixel=0})
+Instance.new("UICorner", statusFrame).CornerRadius = UDim.new(0.5, 0)
+local function makeRow(labelText, rowIndex)
+    local yScale = (rowIndex - 0.5) / 3
+    local ySize  = 0.6 / 3
+    new("TextLabel", statusFrame, {AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.new(0.26635,0,yScale,0), Size=UDim2.new(0.4327,0,ySize,0), BackgroundTransparency=1, BorderSizePixel=0, FontFace=font, TextScaled=true, TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Center, TextColor3=Color3.fromRGB(0,0,0), TextTransparency=0.5, Text=labelText, ZIndex=5})
+    local val = new("TextLabel", statusFrame, {AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.new(0.7366,0,yScale,0), Size=UDim2.new(0.4794,0,ySize*1.133,0), BackgroundTransparency=1, BorderSizePixel=0, FontFace=font, TextScaled=true, TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Center, TextColor3=Color3.fromRGB(255,255,255), ZIndex=5})
+    new("UIStroke", val, {Color=Color3.fromRGB(0,0,0), Thickness=0.07, Transparency=0.3})
+    return val
+end
+local multLabel   = makeRow("Ore Mult:", 1)
+local statusLabel = makeRow("Status:",   2)
+local chestLabel  = makeRow("Chest:",    3)
+local toggleLabel = new("TextButton", statusFrame, {
+    AnchorPoint=Vector2.new(0.5,0), Position=UDim2.new(0.26635,0,(2-0.5)/3 + (0.6/3)/2,0),
+    Size=UDim2.new(0.4327,0,0.6/3*0.7,0),
+    BackgroundTransparency=1, BorderSizePixel=0,
+    FontFace=font, TextScaled=true,
+    TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Center,
+    TextColor3=Color3.fromRGB(255,255,255), TextTransparency=0.4,
+    Text="Enabled", ZIndex=6,
+})
+new("UIStroke", toggleLabel, {Color=Color3.fromRGB(0,0,0), Thickness=0.07, Transparency=0.3})
+local function toggle()
+    enabled = not enabled
+end
+toggleLabel.MouseButton1Click:Connect(toggle)
+RunService.Heartbeat:Connect(function()
+    local mult = OreMult()
+    local holding = player:GetAttribute("holdingChest")
+    multLabel.Text = string.format("%.1fx", mult)
+    if not enabled then
+        statusLabel.Text = "off"; statusLabel.TextColor3 = Color3.fromRGB(180,180,180)
+    elseif holding then
+        if affordable() then statusLabel.Text = "unlocking"; statusLabel.TextColor3 = Color3.fromRGB(255,255,255)
+        else statusLabel.Text = "waiting"; statusLabel.TextColor3 = Color3.fromRGB(255,200,60) end
+    elseif mult > 1 then
+        statusLabel.Text = "active"; statusLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    else
+        statusLabel.Text = "idle"; statusLabel.TextColor3 = Color3.fromRGB(255,200,60)
+    end
+    if holding then chestLabel.Text = "holding"; chestLabel.TextColor3 = Color3.fromRGB(255,200,60)
+    else chestLabel.Text = "none"; chestLabel.TextColor3 = Color3.fromRGB(255,255,255) end
+    if enabled then
+        toggleLabel.Text = "Enabled"; toggleLabel.TextColor3 = Color3.fromRGB(255,255,255); toggleLabel.TextTransparency = 0.4
+    else
+        toggleLabel.Text = "Disabled"; toggleLabel.TextColor3 = Color3.fromRGB(180,180,180); toggleLabel.TextTransparency = 0.2
+    end
+end)
