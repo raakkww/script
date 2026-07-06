@@ -1,0 +1,49 @@
+local plrs = game:GetService("Players")
+local uis = game:GetService("UserInputService")
+local rs = game:GetService("RunService")
+
+local lp = plrs.LocalPlayer
+local hb_size = Vector3.new(10, 10, 10)
+local state = false
+local loop = nil
+local cache = {}
+
+local function update()
+    for _, p in next, plrs:GetPlayers() do
+        if p ~= lp and p.Character then
+            local b = p.Character:FindFirstChild("Hitbox")
+            if b and b:IsA("BasePart") then
+                if not cache[p] then cache[p] = b.Size end
+                b.Size = hb_size
+                b.Transparency = 0.5
+                b.Color = Color3.fromRGB(255, 0, 0)
+                b.CanCollide = false
+            end
+        end
+    end
+end
+
+local function reset()
+    for p, s in next, cache do
+        if p.Character then
+            local b = p.Character:FindFirstChild("Hitbox")
+            if b then 
+                b.Size = s 
+                b.Transparency = 1
+            end
+        end
+    end
+    table.clear(cache)
+end
+
+uis.InputBegan:Connect(function(i, g)
+    if g or i.KeyCode ~= Enum.KeyCode.X then return end
+    
+    state = not state
+    if state then
+        loop = rs.RenderStepped:Connect(update)
+    else
+        if loop then loop:Disconnect() end
+        reset()
+    end
+end)
