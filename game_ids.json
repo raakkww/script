@@ -1,1 +1,26 @@
-{}
+{
+  "73814003954154": [
+    "as the very descriptive title goes, it farms for you.. woaa..\nthe only thing you have to do yourself until i update it is getting the upgrade for ore processing and claiming dailies\neverything else is (mostly) automated!",
+    "just like the title says, it farms completely for you\nyou only need to manually upgrade ore processing and claim daily rewards\nmostly automated gameplay",
+    "fully automated farming script that does everything for you\nmanually claim your dailies and upgrade ore processing until the next update\nenjoy the auto farm",
+    "an amazing script that farms for you automatically\nrequires manual ore processing upgrades and daily claims for now\neverything else is handled by the script",
+    "mostly automated script for easy progression\nfarms for you automatically from the start\njust make sure to upgrade ore processing and get your dailies manually",
+    "automatic farming system that works right away\nonly manual steps are ore processing upgrades and daily claims\nrest of the features are fully automated",
+    "it literally farms for you as described in the title\nsimple setup where everything else is mostly automated\njust do your dailies and ore processing upgrades yourself",
+    "op auto farm script that runs smoothly\nmanually handle your ore processing and daily rewards for now\n sit back and watch everything else get automated",
+    "automated farming solution to save your time\nfarms everything automatically except ore processing upgrades and daily claims\nexpect updates soon",
+    "features automated farm as stated in the title\nmostly automated except for claiming dailies and upgrading ore processing\nenjoy the easy grind"
+  ],
+  "110175021189594": [
+    "hitbox expander for ability arena\nu can change hitbox size and keybind key\nfeatures visual red hitbox color with 0.5 transparency and no collision\ntoggle state with x key using renderstepped loop and original size cache restore",
+    "ability arena hitbox expander script\ncustomizable hitbox size and custom keybind configuration\nautomatically changes enemy hitboxes to red and makes them semi transparent\nincludes safe clean up cache to reset hitboxes back to normal",
+    "expand enemy hitboxes easily in ability arena\nsupports custom hitbox size adjustments and user input keybinds\nvisualizes hitboxes in red color with collision disabled\nuses renderstepped connection for constant updates",
+    "hitbox expander tool designed for ability arena\nmodify the vector3 hitbox size and choose your preferred keybind\nturns hitboxes semi transparent red for easier targeting\ntoggle on and off anytime using the x key",
+    "features custom hitbox expander for ability arena gameplay\nchange your hitbox size settings and keybind easily\nsets enemy hitboxes to non collidable red boxes\nfeatures automatic size reset on toggle off",
+    "powerful hitbox expander script for ability arena players\nallows you to configure hitbox size values and keybind keys\nhighlights targets with a red transparent hitbox shape\nsmooth performance running on renderstepped update loop",
+    "ability arena script focusing on hitbox expansion features\nfully customizable hitbox vector3 size and active keybind bind\nmakes hitboxes visible with red coloring and transparency\nsafely caches original sizes for accurate resetting",
+    "simple yet effective hitbox expander for ability arena\nadjust hitbox size and toggle keybind to fit your needs\nforces enemy hitboxes to become large red transparent parts with no collision\nuses userinputservice to detect keybind triggers",
+    "expand target hitboxes instantly inside ability arena\ncustom hitbox size and changeable toggle keybind available\nrenders semi transparent red boxes over enemies with noclipping hitboxes\nclears cache and restores original sizes smoothly",
+    "ability arena hitbox expander hack\ncustom size parameters and keybind setup included in code\nvisualizes enlarged hitboxes in red with transparency enabled\ntoggle loop connection via renderstepped service"
+  ]
+}
