@@ -1,14 +1,1 @@
-{
-  "110175021189594": [
-    "hitbox expander for ability arena\nu can change hitbox size and keybind key\nfeatures visual red hitbox color with 0.5 transparency and no collision\ntoggle state with x key using renderstepped loop and original size cache restore",
-    "ability arena hitbox expander script\ncustomizable hitbox size and custom keybind configuration\nautomatically changes enemy hitboxes to red and makes them semi transparent\nincludes safe clean up cache to reset hitboxes back to normal",
-    "expand enemy hitboxes easily in ability arena\nsupports custom hitbox size adjustments and user input keybinds\nvisualizes hitboxes in red color with collision disabled\nuses renderstepped connection for constant updates",
-    "hitbox expander tool designed for ability arena\nmodify the vector3 hitbox size and choose your preferred keybind\nturns hitboxes semi transparent red for easier targeting\ntoggle on and off anytime using the x key",
-    "features custom hitbox expander for ability arena gameplay\nchange your hitbox size settings and keybind easily\nsets enemy hitboxes to non collidable red boxes\nfeatures automatic size reset on toggle off",
-    "powerful hitbox expander script for ability arena players\nallows you to configure hitbox size values and keybind keys\nhighlights targets with a red transparent hitbox shape\nsmooth performance running on renderstepped update loop",
-    "ability arena script focusing on hitbox expansion features\nfully customizable hitbox vector3 size and active keybind bind\nmakes hitboxes visible with red coloring and transparency\nsafely caches original sizes for accurate resetting",
-    "simple yet effective hitbox expander for ability arena\nadjust hitbox size and toggle keybind to fit your needs\nforces enemy hitboxes to become large red transparent parts with no collision\nuses userinputservice to detect keybind triggers",
-    "expand target hitboxes instantly inside ability arena\ncustom hitbox size and changeable toggle keybind available\nrenders semi transparent red boxes over enemies with noclipping hitboxes\nclears cache and restores original sizes smoothly",
-    "ability arena hitbox expander hack\ncustom size parameters and keybind setup included in code\nvisualizes enlarged hitboxes in red with transparency enabled\ntoggle loop connection via renderstepped service"
-  ]
-}
+{}
