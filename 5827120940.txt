@@ -1,0 +1,236 @@
+-- Global variables for stopping any previous instances
+if _G.RebornSwordmanUI then
+    _G.RebornSwordmanUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local MinimizeButton = Instance.new("TextButton")
+local ToggleButton = Instance.new("TextButton")
+local RebirthButton = Instance.new("TextButton")
+local WinButton = Instance.new("TextButton")
+local MessageLabel = Instance.new("TextLabel")
+local CreditLabel = Instance.new("TextLabel")
+
+local UICorner_Main = Instance.new("UICorner")
+local UICorner_Btn1 = Instance.new("UICorner")
+local UICorner_Btn2 = Instance.new("UICorner")
+local UICorner_Btn3 = Instance.new("UICorner")
+
+-- Properties & Safe Executor Injection
+ScreenGui.Name = "RebornAsSwordmanGUI"
+_G.RebornSwordmanUI = ScreenGui
+
+local success, targetParent = pcall(function()
+    return gethui() or game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+end)
+
+if success and targetParent then
+    ScreenGui.Parent = targetParent
+else
+    ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+end
+ScreenGui.ResetOnSpawn = false
+
+-- Main Frame Styling (Sized down slightly since Hatch is gone)
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
+MainFrame.Size = UDim2.new(0, 280, 0, 320)
+MainFrame.Active = true
+MainFrame.Draggable = true 
+MainFrame.ClipsDescendants = true 
+
+UICorner_Main.Parent = MainFrame
+
+-- Title Styling
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.BackgroundTransparency = 0.2 
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "  Reborn As Swordman"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16.000
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Minimize Button
+MinimizeButton.Name = "MinimizeButton"
+MinimizeButton.Parent = MainFrame
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+MinimizeButton.BackgroundTransparency = 0.4
+MinimizeButton.Position = UDim2.new(1, -45, 0, 5)
+MinimizeButton.Size = UDim2.new(0, 40, 0, 30)
+MinimizeButton.Font = Enum.Font.SourceSansBold
+MinimizeButton.Text = "-"
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.TextSize = 20.000
+
+local UICorner_Min = Instance.new("UICorner")
+UICorner_Min.CornerRadius = UDim.new(0, 6)
+UICorner_Min.Parent = MinimizeButton
+
+-- Auto Gain Strength Button
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = MainFrame
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) 
+ToggleButton.Position = UDim2.new(0.1, 0, 0.18, 0)
+ToggleButton.Size = UDim2.new(0.8, 0, 0, 35)
+ToggleButton.Font = Enum.Font.SourceSans
+ToggleButton.Text = "Auto Gain Strength: OFF"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 15.000
+
+UICorner_Btn1.Parent = ToggleButton
+
+-- Auto Rebirth Button
+RebirthButton.Name = "RebirthButton"
+RebirthButton.Parent = MainFrame
+RebirthButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) 
+RebirthButton.Position = UDim2.new(0.1, 0, 0.32, 0)
+RebirthButton.Size = UDim2.new(0.8, 0, 0, 35)
+RebirthButton.Font = Enum.Font.SourceSans
+RebirthButton.Text = "Auto Rebirth: OFF"
+RebirthButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+RebirthButton.TextSize = 15.000
+
+UICorner_Btn2.Parent = RebirthButton
+
+-- AutoWin Button
+WinButton.Name = "WinButton"
+WinButton.Parent = MainFrame
+WinButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70) 
+WinButton.Position = UDim2.new(0.1, 0, 0.46, 0)
+WinButton.Size = UDim2.new(0.8, 0, 0, 35)
+WinButton.Font = Enum.Font.SourceSans
+WinButton.Text = "AutoWin"
+WinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+WinButton.TextSize = 15.000
+
+UICorner_Btn3.Parent = WinButton
+
+-- Message Label
+MessageLabel.Name = "MessageLabel"
+MessageLabel.Parent = MainFrame
+MessageLabel.BackgroundTransparency = 1.000
+MessageLabel.Position = UDim2.new(0.05, 0, 0.60, 0)
+MessageLabel.Size = UDim2.new(0.9, 0, 0, 65)
+MessageLabel.Font = Enum.Font.SourceSans
+MessageLabel.Text = "Sorry! But this feature is patched by the devs. instead, gain enough strength using \"Auto Gain Strength\" and fight!"
+MessageLabel.TextColor3 = Color3.fromRGB(255, 255, 255) 
+MessageLabel.TextSize = 13.000
+MessageLabel.TextWrapped = true
+MessageLabel.TextTransparency = 1.000 
+
+-- Credit Label
+CreditLabel.Name = "CreditLabel"
+CreditLabel.Parent = MainFrame
+CreditLabel.BackgroundTransparency = 1.000
+CreditLabel.Position = UDim2.new(0, 0, 0.85, 0)
+CreditLabel.Size = UDim2.new(1, 0, 0, 30)
+CreditLabel.Font = Enum.Font.SourceSans
+CreditLabel.Text = ""
+CreditLabel.TextColor3 = Color3.fromRGB(255, 255, 255) 
+CreditLabel.TextSize = 13.000
+CreditLabel.TextWrapped = true
+
+---------------------------------------------------------
+-- Logic and Functionality
+---------------------------------------------------------
+local strengthToggled = false
+local rebirthToggled = false
+local messageDebounce = false
+local isMinimized = false
+
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local trainEvent = replicatedStorage:WaitForChild("Events"):WaitForChild("Game"):WaitForChild("Re_TrainPower")
+local rebirthEvent = replicatedStorage:WaitForChild("Events"):WaitForChild("Stats"):WaitForChild("Re_Rebirth")
+
+-- Rainbow Background Loop
+task.spawn(function()
+    local hue = 0
+    while true do
+        hue = hue + 0.005
+        if hue > 1 then hue = 0 end
+        pcall(function()
+            MainFrame.BackgroundColor3 = Color3.fromHSV(hue, 0.6, 0.5) 
+        end)
+        task.wait(0.03) 
+    end
+end)
+
+-- Background auto-farm loops
+task.spawn(function()
+    while true do
+        if strengthToggled then pcall(function() trainEvent:FireServer() end) end
+        task.wait(0.1) 
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if rebirthToggled then pcall(function() rebirthEvent:FireServer() end) end
+        task.wait(0.1)
+    end
+end)
+
+-- Minimize Button Functionality
+MinimizeButton.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        MainFrame:TweenSize(UDim2.new(0, 280, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
+        MinimizeButton.Text = "+"
+    else
+        MainFrame:TweenSize(UDim2.new(0, 280, 0, 320), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.3, true)
+        MinimizeButton.Text = "-"
+    end
+end)
+
+-- Strength Toggle Event
+ToggleButton.MouseButton1Click:Connect(function()
+    strengthToggled = not strengthToggled
+    if strengthToggled then
+        ToggleButton.Text = "Auto Gain Strength: ON"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50) 
+    else
+        ToggleButton.Text = "Auto Gain Strength: OFF"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) 
+    end
+end)
+
+-- Rebirth Toggle Event
+RebirthButton.MouseButton1Click:Connect(function()
+    rebirthToggled = not rebirthToggled
+    if rebirthToggled then
+        RebirthButton.Text = "Auto Rebirth: ON"
+        RebirthButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50) 
+    else
+        RebirthButton.Text = "Auto Rebirth: OFF"
+        RebirthButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) 
+    end
+end)
+
+-- AutoWin Patched Message Event
+WinButton.MouseButton1Click:Connect(function()
+    if messageDebounce or isMinimized then return end
+    messageDebounce = true
+    
+    for i = 1, 0, -0.1 do
+        MessageLabel.TextTransparency = i
+        task.wait(0.02)
+    end
+    MessageLabel.TextTransparency = 0
+    
+    task.wait(5)
+    
+    for i = 0, 1, 0.1 do
+        MessageLabel.TextTransparency = i
+        task.wait(0.02)
+    end
+    MessageLabel.TextTransparency = 1
+    
+    messageDebounce = false
+end)
