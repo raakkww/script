@@ -1,0 +1,201 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local RS = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local GunController = require(RS.Modules.Client.Controllers.GunController)
+
+local hf = hookfunction
+local nc = newcclosure or function(f) return f end
+local cf = clonefunction or function(f) return f end
+
+local cfg = {
+	enabled = true,
+	fov = 120,
+	maxDist = 2000,
+	wallbang = false,
+}
+
+local lockPos = nil
+local lockHead = nil
+local castDepth = 0
+
+local CameraPOV
+pcall(function()
+	CameraPOV = require(RS.Modules.Client.CameraPOV)
+end)
+
+local fovCircle = Drawing.new("Circle")
+fovCircle.Filled = false
+fovCircle.Thickness = 1
+fovCircle.Color = Color3.fromRGB(255, 255, 255)
+fovCircle.NumSides = 48
+
+local function getEyePos()
+	if CameraPOV and CameraPOV.GetEyePosition then
+		return CameraPOV.GetEyePosition()
+	end
+	local cam = workspace.CurrentCamera
+	return cam and cam.CFrame.Position
+end
+
+local function getFireOrigin()
+	local muzzle = GunController.GetMuzzleWorldCFrame and GunController:GetMuzzleWorldCFrame()
+	if muzzle then
+		return muzzle.Position
+	end
+	return getEyePos()
+end
+
+local function headAimPos(head)
+	return head.Position + Vector3.new(0, head.Size.Y * 0.15, 0)
+end
+
+if hf then
+	local getFD = GunController.GetFireDirection
+	if getFD then
+		local orig = cf(getFD)
+		hf(getFD, nc(function(self, ...)
+			if cfg.enabled and GunController.FireHeld and lockPos then
+				local origin = getFireOrigin()
+				if origin then
+					return (lockPos - origin).Unit
+				end
+			end
+			return orig(self, ...)
+		end))
+	end
+
+	local getAD = GunController.GetAimDirection
+	if getAD then
+		local origAD = cf(getAD)
+		hf(getAD, nc(function(self, ...)
+			if cfg.enabled and GunController.FireHeld and lockPos then
+				local origin = getFireOrigin()
+				if origin then
+					return (lockPos - origin).Unit
+				end
+			end
+			return origAD(self, ...)
+		end))
+	end
+
+	local ok, BC = pcall(require, RS.Modules.Client.Controllers.BulletController)
+	if ok and BC.Discharge then
+		local origDischarge = cf(BC.Discharge)
+		hf(BC.Discharge, nc(function(self, weaponName, eyePos, fireDir, muzzleCf, ...)
+			if cfg.enabled and GunController.FireHeld and lockPos then
+				local origin = muzzleCf and muzzleCf.Position or eyePos or getFireOrigin()
+				if origin then
+					fireDir = (lockPos - origin).Unit
+				end
+				castDepth += 1
+				local out = { origDischarge(self, weaponName, eyePos, fireDir, muzzleCf, ...) }
+				castDepth -= 1
+				return table.unpack(out)
+			end
+			return origDischarge(self, weaponName, eyePos, fireDir, muzzleCf, ...)
+		end))
+	end
+
+	local origRay = cf(workspace.Raycast)
+	hf(workspace.Raycast, nc(function(origin, direction, ...)
+		if cfg.wallbang and castDepth > 0 and lockHead and cfg.enabled and GunController.FireHeld then
+			local delta = lockPos - origin
+			local dist = delta.Magnitude
+			if dist > 0.01 and dist <= cfg.maxDist and direction.Magnitude > 0.001 then
+				if direction.Unit:Dot(delta.Unit) >= 0.25 then
+					return {
+						Instance = lockHead,
+						Position = lockPos,
+						Normal = -delta.Unit,
+						Distance = dist,
+						Material = lockHead.Material,
+					}
+				end
+			end
+		end
+		return origRay(origin, direction, ...)
+	end))
+
+	local okSU, SU = pcall(require, RS.Modules.Shared.SpreadUtil)
+	if okSU and SU.RandomConeDirection then
+		local origSpread = cf(SU.RandomConeDirection)
+		hf(SU.RandomConeDirection, nc(function(baseDir, ...)
+			if cfg.enabled and GunController.FireHeld and lockPos then
+				return baseDir
+			end
+			return origSpread(baseDir, ...)
+		end))
+	end
+end
+
+RunService.PreRender:Connect(function()
+	lockPos = nil
+	lockHead = nil
+
+	if not cfg.enabled then
+		fovCircle.Visible = false
+		return
+	end
+
+	local cam = workspace.CurrentCamera
+	if not cam then
+		return
+	end
+
+	local mid = cam.ViewportSize * 0.5
+	fovCircle.Position = mid
+	fovCircle.Radius = cfg.fov
+	fovCircle.Visible = true
+
+	local eye = getEyePos()
+	if not eye then
+		return
+	end
+
+	local mercPlayers = workspace:FindFirstChild("MercPlayers")
+	local closestHead, closestPx = nil, cfg.fov
+
+	for _, plr in Players:GetPlayers() do
+		if plr == LocalPlayer then
+			continue
+		end
+
+		local folder = mercPlayers and mercPlayers:FindFirstChild("MercHitboxes_" .. plr.Name)
+		if not folder or folder:GetAttribute("Dead") == true then
+			continue
+		end
+
+		local head = folder:FindFirstChild("Head")
+		if not head then
+			for _, part in folder:GetDescendants() do
+				if part:IsA("BasePart") and part.Name == "Head" then
+					head = part
+					break
+				end
+			end
+		end
+		if not head then
+			continue
+		end
+		if (head.Position - eye).Magnitude > cfg.maxDist then
+			continue
+		end
+
+		local v, onScreen = cam:WorldToViewportPoint(head.Position)
+		if not onScreen or v.Z <= 0 then
+			continue
+		end
+
+		local px = (Vector2.new(v.X, v.Y) - mid).Magnitude
+		if px < closestPx then
+			closestPx = px
+			closestHead = head
+		end
+	end
+
+	if closestHead then
+		lockHead = closestHead
+		lockPos = headAimPos(closestHead)
+	end
+end)
