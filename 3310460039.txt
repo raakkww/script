@@ -1,0 +1,35 @@
+if not getgenv then 
+    warn("Executor does not support getgenv! Script execution stopped") 
+    warn("I would also recommend changing your executor") 
+    warn("Cuz I think getgenv is necessary for all scripts.") 
+    return 
+end
+
+print("-----")
+print("[DEBUG] Started!")
+
+getgenv().StopScript = true -- false or true to enable/disable script!! 
+local seconds = 1 -- If < 1, script will scan 1 time!
+
+local function checkanddestroy()
+    local barry = workspace:FindFirstChild("Barry1") 
+    if barry then 
+        barry:Destroy() 
+        print("[DEBUG] Barry deleted!")
+    end
+end
+
+if seconds < 1 then
+    checkanddestroy()
+    print("[DEBUG] Single check completed. Script stopped.")
+    print("-----")
+else
+    task.spawn(function()
+        while not getgenv().StopScript do
+            checkanddestroy()
+            task.wait(seconds)
+        end
+        print("[DEBUG] Successfully stopped. Waiting for getgenv to be enabled...")
+        print("-----")
+    end)
+end
