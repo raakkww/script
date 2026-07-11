@@ -1,0 +1,207 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- CONFIGURATION
+local REBIRTH_DELAY = 1.5 -- Seconds between rebirths (lower = faster, but might kick)
+
+-- 1. AUTO WIN TARGET
+local modelPath = {"World2", "Stage4", "NormalWin"}
+local targetModel = workspace
+for _, name in ipairs(modelPath) do
+    targetModel = targetModel:FindFirstChild(name)
+    if not targetModel then break end
+end
+
+local function getTargetPart(model)
+    if not model then return nil end
+    if model.PrimaryPart then return model.PrimaryPart end
+    for _, child in pairs(model:GetChildren()) do
+        if child:IsA("BasePart") then return child end
+    end
+    return nil
+end
+
+local targetPart = getTargetPart(targetModel)
+
+-- 2. AUTO REBIRTH REMOTE
+local rebirthRemote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Rebirth")
+
+-- UI CREATION
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local HeaderBar = Instance.new("Frame")
+local TitleLabel = Instance.new("TextLabel")
+local WinButton = Instance.new("TextButton")
+local RebirthButton = Instance.new("TextButton")
+local StatusLabel = Instance.new("TextLabel")
+
+-- Styling
+ScreenGui.Name = "CleanHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 280, 0, 170)
+MainFrame.Position = UDim2.new(0.5, -140, 0.5, -85)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20) -- Dark Modern Background
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+-- Header (Draggable)
+HeaderBar.Name = "HeaderBar"
+HeaderBar.Size = UDim2.new(1, 0, 0, 35)
+HeaderBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+HeaderBar.BorderSizePixel = 0
+HeaderBar.Parent = MainFrame
+
+TitleLabel.Size = UDim2.new(1, 0, 1, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = ""
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 18
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = HeaderBar
+
+-- Auto Win Button
+WinButton.Name = "WinButton"
+WinButton.Size = UDim2.new(0, 250, 0, 45)
+WinButton.Position = UDim2.new(0.5, -125, 0.25, 0)
+WinButton.BackgroundColor3 = Color3.fromRGB(0, 140, 0)
+WinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+WinButton.Text = "▶ Start Auto Win"
+WinButton.Font = Enum.Font.GothamBold
+WinButton.TextSize = 16
+WinButton.Parent = MainFrame
+-- Rounded Corners
+local UICorner = Instance.new("UICorner") UICorner.CornerRadius = UDim.new(0, 8) UICorner.Parent = WinButton
+
+-- Auto Rebirth Button
+RebirthButton.Name = "RebirthButton"
+RebirthButton.Size = UDim2.new(0, 250, 0, 45)
+RebirthButton.Position = UDim2.new(0.5, -125, 0.55, 0)
+RebirthButton.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+RebirthButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+RebirthButton.Text = "▶ Start Auto Rebirth"
+RebirthButton.Font = Enum.Font.GothamBold
+RebirthButton.TextSize = 16
+RebirthButton.Parent = MainFrame
+local UICorner2 = Instance.new("UICorner") UICorner2.CornerRadius = UDim.new(0, 8) UICorner2.Parent = RebirthButton
+
+-- Status Label
+StatusLabel.Name = "StatusLabel"
+StatusLabel.Size = UDim2.new(1, 0, 0, 20)
+StatusLabel.Position = UDim2.new(0, 0, 1, -20)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+StatusLabel.Text = "Ready"
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 12
+StatusLabel.Parent = MainFrame
+
+-- DRAGGING LOGIC
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+HeaderBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+
+HeaderBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then update(input) end
+end)
+
+-- LOOP LOGIC
+local winActive = false
+local rebirthActive = false
+local winConn = nil
+
+-- Auto Win (Fast RenderStepped)
+local function startWin()
+    if winConn then winConn:Disconnect() end
+    winConn = RunService.RenderStepped:Connect(function()
+        if Character and HumanoidRootPart and targetPart then
+            HumanoidRootPart.CFrame = targetPart.CFrame * CFrame.new(0, 0.5, 0)
+        end
+    end)
+end
+
+-- Auto Rebirth
+local function startRebirth()
+    spawn(function()
+        while rebirthActive do
+            if rebirthRemote then
+                rebirthRemote:FireServer()
+                StatusLabel.Text = "Rebirth Fired!"
+            end
+            task.wait(REBIRTH_DELAY)
+            if not rebirthActive then break end
+        end
+    end)
+end
+
+-- BUTTON ACTIONS
+WinButton.MouseButton1Click:Connect(function()
+    winActive = not winActive
+    if winActive then
+        if not targetPart then
+            StatusLabel.Text = "Error: Win Model Not Found!"
+            winActive = false
+            return
+        end
+        WinButton.Text = "■ Stop Auto Win"
+        WinButton.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+        StatusLabel.Text = "Auto Win: ON (Max Speed)"
+        startWin()
+    else
+        WinButton.Text = "▶ Start Auto Win"
+        WinButton.BackgroundColor3 = Color3.fromRGB(0, 140, 0)
+        if not rebirthActive then StatusLabel.Text = "Ready" else StatusLabel.Text = "Rebirth: ON" end
+        if winConn then winConn:Disconnect() end
+    end
+end)
+
+RebirthButton.MouseButton1Click:Connect(function()
+    rebirthActive = not rebirthActive
+    if rebirthActive then
+        if not rebirthRemote then
+            StatusLabel.Text = "Error: Rebirth Remote Missing!"
+            rebirthActive = false
+            return
+        end
+        RebirthButton.Text = "■ Stop Auto Rebirth"
+        RebirthButton.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+        StatusLabel.Text = "Auto Rebirth: ON"
+        startRebirth()
+    else
+        RebirthButton.Text = "▶ Start Auto Rebirth"
+        RebirthButton.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+        if not winActive then StatusLabel.Text = "Ready" else StatusLabel.Text = "Auto Win: ON" end
+    end
+end)
+
+print("Clean Hub Loaded!")
