@@ -1,0 +1,394 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local aimbotEnabled = false
+local espEnabled = false
+local selectedPart = "Auto"
+local activeESPs = {} 
+
+local validTargets = {
+	["Bacteria"] = true,
+	["Captain"] = true,
+	["MonsterV1"] = true
+}
+
+local clickSoundId = "rbxassetid://876939830"
+local toggleOffSoundId = "rbxassetid://876939830"
+
+local function createSound(id)
+	local sound = Instance.new("Sound")
+	sound.SoundId = id
+	sound.Volume = 0.5
+	sound.Parent = Workspace
+	return sound
+end
+
+local sfxClick = createSound(clickSoundId)
+local sfxOff = createSound(toggleOffSoundId)
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ZikaHubSuite"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 220, 0, 250) 
+mainFrame.Position = UDim2.new(0.5, -110, 0.3, -125)
+mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 12)
+uiCorner.Parent = mainFrame
+
+local uiStroke = Instance.new("UIStroke")
+uiStroke.Thickness = 2
+uiStroke.Color = Color3.fromRGB(200, 200, 255)
+uiStroke.Parent = mainFrame
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(138, 43, 226)), 
+	ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 102, 255)),  
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 255, 255))   
+})
+gradient.Rotation = 45
+gradient.Parent = mainFrame
+
+local titleIcon = Instance.new("ImageLabel")
+titleIcon.Size = UDim2.new(0, 28, 0, 28)
+titleIcon.Position = UDim2.new(0, 10, 0, 6)
+titleIcon.BackgroundTransparency = 1
+titleIcon.Image = "rbxassetid://117390559169186"
+titleIcon.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -50, 0, 40)
+titleLabel.Position = UDim2.new(0, 44, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = ""
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 18
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = mainFrame
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 40, 0, 40)
+minimizeBtn.Position = UDim2.new(1, -45, 0, 0)
+minimizeBtn.BackgroundTransparency = 1
+minimizeBtn.Text = "−"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.TextSize = 22
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.Parent = mainFrame
+
+local aimbotBtn = Instance.new("TextButton")
+aimbotBtn.Size = UDim2.new(0, 190, 0, 38)
+aimbotBtn.Position = UDim2.new(0.5, -95, 0, 45)
+aimbotBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+aimbotBtn.BackgroundTransparency = 0.5
+aimbotBtn.Text = "AIMBOT: OFF"
+aimbotBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+aimbotBtn.TextSize = 14
+aimbotBtn.Font = Enum.Font.GothamBold
+aimbotBtn.Parent = mainFrame
+
+local btnCorner1 = Instance.new("UICorner")
+btnCorner1.CornerRadius = UDim.new(0, 6)
+btnCorner1.Parent = aimbotBtn
+
+local espBtn = Instance.new("TextButton")
+espBtn.Size = UDim2.new(0, 190, 0, 38)
+espBtn.Position = UDim2.new(0.5, -95, 0, 90)
+espBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+espBtn.BackgroundTransparency = 0.5
+espBtn.Text = "ESP: OFF"
+espBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+espBtn.TextSize = 14
+espBtn.Font = Enum.Font.GothamBold
+espBtn.Parent = mainFrame
+
+local btnCorner2 = Instance.new("UICorner")
+btnCorner2.CornerRadius = UDim.new(0, 6)
+btnCorner2.Parent = espBtn
+
+local partSectionLabel = Instance.new("TextLabel")
+partSectionLabel.Size = UDim2.new(0, 190, 0, 20)
+partSectionLabel.Position = UDim2.new(0.5, -95, 0, 138)
+partSectionLabel.BackgroundTransparency = 1
+partSectionLabel.Text = "SELECT AIM PART"
+partSectionLabel.TextColor3 = Color3.fromRGB(230, 230, 255)
+partSectionLabel.TextSize = 12
+partSectionLabel.Font = Enum.Font.GothamBold
+partSectionLabel.Parent = mainFrame
+
+local headBtn = Instance.new("TextButton")
+headBtn.Size = UDim2.new(0, 90, 0, 35)
+headBtn.Position = UDim2.new(0, 15, 0, 162)
+headBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+headBtn.BackgroundTransparency = 0.5
+headBtn.Text = "HEAD"
+headBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+headBtn.TextSize = 13
+headBtn.Font = Enum.Font.GothamBold
+headBtn.Parent = mainFrame
+
+local headCorner = Instance.new("UICorner")
+headCorner.CornerRadius = UDim.new(0, 6)
+headCorner.Parent = headBtn
+
+local torsoBtn = Instance.new("TextButton")
+torsoBtn.Size = UDim2.new(0, 90, 0, 35)
+torsoBtn.Position = UDim2.new(1, -105, 0, 162)
+torsoBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+torsoBtn.BackgroundTransparency = 0.5
+torsoBtn.Text = "TORSO"
+torsoBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+torsoBtn.TextSize = 13
+torsoBtn.Font = Enum.Font.GothamBold
+torsoBtn.Parent = mainFrame
+
+local torsoCorner = Instance.new("UICorner")
+torsoCorner.CornerRadius = UDim.new(0, 6)
+torsoCorner.Parent = torsoBtn
+
+local autoBtn = Instance.new("TextButton")
+autoBtn.Size = UDim2.new(0, 190, 0, 35)
+autoBtn.Position = UDim2.new(0.5, -95, 0, 204)
+autoBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+autoBtn.BackgroundTransparency = 0.5
+autoBtn.Text = "AUTO LOCK"
+autoBtn.TextColor3 = Color3.fromRGB(100, 255, 100) 
+autoBtn.TextSize = 13
+autoBtn.Font = Enum.Font.GothamBold
+autoBtn.Parent = mainFrame
+
+local autoCorner = Instance.new("UICorner")
+autoCorner.CornerRadius = UDim.new(0, 6)
+autoCorner.Parent = autoBtn
+
+RunService.RenderStepped:Connect(function(deltaTime)
+	gradient.Rotation = (gradient.Rotation + (deltaTime * 45)) % 360
+end)
+
+local dragging, dragInput, dragStart, startPos
+
+mainFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = mainFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+mainFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+local minimized = false
+minimizeBtn.MouseButton1Click:Connect(function()
+	sfxClick:Play()
+	minimized = not minimized
+	
+	local targetSize = minimized and UDim2.new(0, 220, 0, 40) or UDim2.new(0, 220, 0, 250)
+	local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(mainFrame, tweenInfo, {Size = targetSize}):Play()
+	
+	minimizeBtn.Text = minimized and "+" or "−"
+end)
+
+local function addTouchFeedback(button)
+	button.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.2}):Play()
+		end
+	end)
+	button.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.5}):Play()
+		end
+	end)
+end
+addTouchFeedback(aimbotBtn)
+addTouchFeedback(espBtn)
+addTouchFeedback(headBtn)
+addTouchFeedback(torsoBtn)
+addTouchFeedback(autoBtn)
+
+local function updatePartUI()
+	headBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+	torsoBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+	autoBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+	
+	if selectedPart == "Head" then
+		headBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
+	elseif selectedPart == "Torso" then
+		torsoBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
+	elseif selectedPart == "Auto" then
+		autoBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+	end
+end
+
+headBtn.MouseButton1Click:Connect(function() sfxClick:Play() selectedPart = "Head" updatePartUI() end)
+torsoBtn.MouseButton1Click:Connect(function() sfxClick:Play() selectedPart = "Torso" updatePartUI() end)
+autoBtn.MouseButton1Click:Connect(function() sfxClick:Play() selectedPart = "Auto" updatePartUI() end)
+
+local function targetLimbSelector(model)
+	local head = model:FindFirstChild("Head")
+	local torso = model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso") or model:FindFirstChild("HumanoidRootPart")
+	local root = model:FindFirstChild("HumanoidRootPart")
+
+	if selectedPart == "Head" then
+		return head or root
+	elseif selectedPart == "Torso" then
+		return torso or root
+	elseif selectedPart == "Auto" then
+		return head or torso or root
+	end
+	return root
+end
+
+local function getNearestTarget(currentCamera)
+	local nearestPart = nil
+	local shortestDistance = math.huge
+
+	for _, obj in pairs(Workspace:GetDescendants()) do
+		if validTargets[obj.Name] and obj:IsA("Model") then
+			local hrp = obj:FindFirstChild("HumanoidRootPart")
+			local humanoid = obj:FindFirstChildOfClass("Humanoid")
+			
+			if hrp and humanoid and humanoid.Health > 0 then
+				local distance = (hrp.Position - currentCamera.CFrame.Position).Magnitude
+				if distance < shortestDistance then
+					shortestDistance = distance
+					nearestPart = targetLimbSelector(obj)
+				end
+			end
+		end
+	end
+	return nearestPart
+end
+
+local function removeESP(obj)
+	if activeESPs[obj] then
+		if activeESPs[obj].Highlight then activeESPs[obj].Highlight:Destroy() end
+		if activeESPs[obj].Billboard then activeESPs[obj].Billboard:Destroy() end
+		activeESPs[obj] = nil
+	end
+end
+
+local function updateESP()
+	for _, obj in pairs(Workspace:GetDescendants()) do
+		if validTargets[obj.Name] and obj:IsA("Model") then
+			local humanoid = obj:FindFirstChildOfClass("Humanoid")
+			local hrp = obj:FindFirstChild("HumanoidRootPart")
+			
+			if espEnabled and humanoid and hrp and humanoid.Health > 0 then
+				if not activeESPs[obj] then
+					local highlight = Instance.new("Highlight")
+					highlight.FillColor = Color3.fromRGB(0, 255, 255)     
+					highlight.OutlineColor = Color3.fromRGB(138, 43, 226) 
+					highlight.FillTransparency = 0.4
+					highlight.OutlineTransparency = 0
+					highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+					highlight.Parent = obj
+					
+					local billboard = Instance.new("BillboardGui")
+					billboard.Size = UDim2.new(0, 140, 0, 30)
+					billboard.StudsOffset = Vector3.new(0, 3, 0) 
+					billboard.AlwaysOnTop = true
+					billboard.Parent = hrp
+					
+					local label = Instance.new("TextLabel")
+					label.Size = UDim2.new(1, 0, 1, 0)
+					label.BackgroundTransparency = 1
+					label.Text = obj.Name 
+					label.TextColor3 = Color3.fromRGB(255, 255, 255)
+					label.TextStrokeTransparency = 0 
+					label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+					label.Font = Enum.Font.GothamBold
+					label.TextSize = 13
+					label.Parent = billboard
+					
+					activeESPs[obj] = {Highlight = highlight, Billboard = billboard}
+				end
+			else
+				removeESP(obj)
+			end
+		end
+	end
+	
+	for obj, _ in pairs(activeESPs) do
+		if not obj or not obj.Parent then
+			activeESPs[obj] = nil
+		end
+	end
+end
+
+task.spawn(function()
+	while true do
+		updateESP()
+		task.wait(0.3) 
+	end
+end)
+
+aimbotBtn.MouseButton1Click:Connect(function()
+	aimbotEnabled = not aimbotEnabled
+	if aimbotEnabled then
+		sfxClick:Play()
+		aimbotBtn.Text = "AIMBOT: ON"
+		aimbotBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+	else
+		sfxOff:Play()
+		aimbotBtn.Text = "AIMBOT: OFF"
+		aimbotBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+	end
+end)
+
+espBtn.MouseButton1Click:Connect(function()
+	espEnabled = not espEnabled
+	if espEnabled then
+		sfxClick:Play()
+		espBtn.Text = "ESP: ON"
+		espBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+	else
+		sfxOff:Play()
+		espBtn.Text = "ESP: OFF"
+		espBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if aimbotEnabled then
+		local currentCamera = Workspace.CurrentCamera
+		if currentCamera then
+			local targetedLimb = getNearestTarget(currentCamera)
+			if targetedLimb then
+				currentCamera.CFrame = CFrame.lookAt(currentCamera.CFrame.Position, targetedLimb.Position)
+			end
+		end
+	end
+end)
