@@ -1,0 +1,6 @@
+while task.wait() do
+    game:GetService("ReplicatedStorage").Remotes.Bey.Shoot:InvokeServer(CFrame.new(-614.9287109375, 11.89316368103, 130.8487701416, -0.70099258422852, 4.9052211181788e-08, 0.71316856145859, 5.8163262650623e-08, 1, -1.1610431727149e-08, -0.71316856145859, 3.3341382987828e-08, -0.70099258422852))
+game:GetService("ReplicatedStorage").Remotes.Bey.UseSkill:InvokeServer()
+game:GetService("ReplicatedStorage").Remotes.Bey.Sub_UseSkill:InvokeServer()
+game:GetService("ReplicatedStorage").Remotes.BeyPack.ReciveTimeRewardCoins:InvokeServer()
+end
