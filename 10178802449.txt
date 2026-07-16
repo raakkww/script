@@ -1,0 +1,208 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- CONFIGURATION
+local clickRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Server"):WaitForChild("Click")
+local rebirthRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Server"):WaitForChild("Rebirth")
+local upgradeWalkRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Server"):WaitForChild("UpgradeWalkspeed")
+local upgradeSlotRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Server"):WaitForChild("UpgradeSlot")
+
+local toggleKey = Enum.KeyCode.T
+local clickDelay = 0
+local rebirthDelay = 2.0
+local upgradeDelay = 0.5
+
+-- STATE
+local isClicking, isRebirthing, isUpgrading = false, false, false
+local clickConn, rebirthConn, upgradeConn = nil, nil, nil
+local lastClick, lastRebirth, lastUpgrade = 0, 0, 0
+local upgradeToggle = true
+
+-- CREATE UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ZERO HUB"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 260, 0, 200)
+frame.Position = UDim2.new(0.5, -130, 0.5, -100)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+-- DRAGGABLE TITLE BAR
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0.15, 0)
+titleBar.BackgroundTransparency = 1
+titleBar.BorderSizePixel = 0
+titleBar.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 1, 0)
+title.BackgroundTransparency = 1
+title.Text = "Zero hub"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.Parent = titleBar
+
+-- Drag Logic
+local dragging = false
+local dragInput, mousePos, framePos
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        mousePos = input.Position
+        framePos = frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - mousePos
+        frame.Position = UDim2.new(
+            framePos.X.Scale,
+            framePos.X.Offset + delta.X,
+            framePos.Y.Scale,
+            framePos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Buttons
+local function createButton(text, pos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.45, 0, 0.2, 0)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.Parent = frame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+    return btn
+end
+
+local clickBtn = createButton("Auto Click: OFF", UDim2.new(0.025, 0, 0.2, 0))
+local rebirthBtn = createButton("Auto Rebirth: OFF", UDim2.new(0.525, 0, 0.2, 0))
+local upgradeBtn = createButton("Auto Upgrade: OFF", UDim2.new(0.275, 0, 0.45, 0))
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0.2, 0)
+statusLabel.Position = UDim2.new(0, 0, 0.75, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Status: Idle"
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 14
+statusLabel.Parent = frame
+
+-- FUNCTIONS
+local function toggleClick()
+    isClicking = not isClicking
+    clickBtn.BackgroundColor3 = isClicking and Color3.fromRGB(150,0,0) or Color3.fromRGB(0,100,0)
+    clickBtn.Text = isClicking and "Auto Click: ON" or "Auto Click: OFF"
+    if isClicking then
+        clickConn = RunService.Heartbeat:Connect(function()
+            if tick() - lastClick >= clickDelay then
+                lastClick = tick()
+                pcall(function() clickRemote:FireServer() end)
+            end
+        end)
+    else
+        if clickConn then clickConn:Disconnect() end
+    end
+    updateStatus()
+end
+
+local function toggleRebirth()
+    isRebirthing = not isRebirthing
+    rebirthBtn.BackgroundColor3 = isRebirthing and Color3.fromRGB(150,0,0) or Color3.fromRGB(0,100,0)
+    rebirthBtn.Text = isRebirthing and "Auto Rebirth: ON" or "Auto Rebirth: OFF"
+    if isRebirthing then
+        rebirthConn = RunService.Heartbeat:Connect(function()
+            if tick() - lastRebirth >= rebirthDelay then
+                lastRebirth = tick()
+                pcall(function() rebirthRemote:FireServer("Rebirth") end)
+            end
+        end)
+    else
+        if rebirthConn then rebirthConn:Disconnect() end
+    end
+    updateStatus()
+end
+
+local function toggleUpgrade()
+    isUpgrading = not isUpgrading
+    upgradeBtn.BackgroundColor3 = isUpgrading and Color3.fromRGB(150,0,0) or Color3.fromRGB(0,100,0)
+    upgradeBtn.Text = isUpgrading and "Auto Upgrade: ON" or "Auto Upgrade: OFF"
+    if isUpgrading then
+        upgradeConn = RunService.Heartbeat:Connect(function()
+            if tick() - lastUpgrade >= upgradeDelay then
+                lastUpgrade = tick()
+                pcall(function()
+                    local args = { "Cash" }
+                    if upgradeToggle then
+                        upgradeWalkRemote:FireServer(unpack(args))
+                    else
+                        upgradeSlotRemote:FireServer(unpack(args))
+                    end
+                    upgradeToggle = not upgradeToggle
+                end)
+            end
+        end)
+    else
+        if upgradeConn then upgradeConn:Disconnect() end
+    end
+    updateStatus()
+end
+
+local function updateStatus()
+    local states = {}
+    if isClicking then table.insert(states, "Clicking") end
+    if isRebirthing then table.insert(states, "Rebirthing") end
+    if isUpgrading then table.insert(states, "Upgrading") end
+    statusLabel.Text = #states > 0 and "Status: " .. table.concat(states, ", ") or "Status: Idle"
+    statusLabel.TextColor3 = #states > 0 and Color3.fromRGB(0,255,0) or Color3.fromRGB(200,200,200)
+end
+
+clickBtn.MouseButton1Click:Connect(toggleClick)
+rebirthBtn.MouseButton1Click:Connect(toggleRebirth)
+upgradeBtn.MouseButton1Click:Connect(toggleUpgrade)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == toggleKey then
+        frame.Visible = not frame.Visible
+    end
+end)
+
+player.AncestryChanged:Connect(function()
+    if clickConn then clickConn:Disconnect() end
+    if rebirthConn then rebirthConn:Disconnect() end
+    if upgradeConn then upgradeConn:Disconnect() end
+    screenGui:Destroy()
+end)
+
+print("Ultimate Trainer Loaded. Drag the title to move. Press 'T' to toggle UI.")
