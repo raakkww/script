@@ -1,0 +1,525 @@
+-- [[ FNAF Co-op Master Suite - All Sections Consolidated ]] --
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+
+if CoreGui:FindFirstChild("FNaF_Master_CoOp_UI") then
+    CoreGui.FNaF_Master_CoOp_UI:Destroy()
+end
+
+-- [[ Unified State Management ]] --
+local Flags = {
+    Fullbright = false,
+    TeammateESP = false,
+    CurrentGame = "FNaF 1" -- Active profile tracks: "FNaF 1", "FNaF 2", "FNaF 3", "FNaF 4", "FNaF 5", "FNaF 6", "Misc"
+}
+
+local GameESPStates = {
+    ["FNaF 1"] = false,
+    ["FNaF 2"] = false,
+    ["FNaF 3"] = false,
+    ["FNaF 4"] = false,
+    ["FNaF 5"] = false,
+    ["FNaF 6"] = false
+}
+
+local ActiveHighlights = {}
+local Fnaf3TrackedThreats = {} -- Movement baseline cache for FNaF 3
+
+local OriginalAmbient = Lighting.Ambient
+local OriginalOutdoorAmbient = Lighting.OutdoorAmbient
+local OriginalClockTime = Lighting.ClockTime
+
+-- [[ Configuration Tables ]] --
+local Fnaf1Configs = {
+    ["FreddyNPC"] = Color3.fromRGB(120, 65, 20),   -- Brown
+    ["BonnieNPC"] = Color3.fromRGB(40, 80, 230),  -- Blue
+    ["ChicaNPC"]  = Color3.fromRGB(40, 200, 40),  -- Green
+    ["FoxyNPC"]   = Color3.fromRGB(230, 30, 30)   -- Red
+}
+
+local Fnaf2Configs = {
+    ["ToyFreddyNPC"] = Color3.fromRGB(170, 90, 30),    -- Brown
+    ["ToyBonnieNPC"] = Color3.fromRGB(0, 160, 255),    -- Cyan
+    ["ToyChicaNPC"]  = Color3.fromRGB(255, 210, 0),    -- Bright Yellow
+    ["MangleNPC"]    = Color3.fromRGB(240, 240, 240),  -- White/Pink
+    ["FreddyNPC"]    = Color3.fromRGB(100, 50, 15),     -- Dark Brown
+    ["BonnieNPC"]    = Color3.fromRGB(50, 40, 120),     -- Dark Indigo
+    ["ChicaNPC"]     = Color3.fromRGB(180, 150, 10),    -- Dirty Yellow
+    ["FoxyNPC"]      = Color3.fromRGB(180, 25, 25),     -- Crimson
+    ["PuppetNPC"]       = Color3.fromRGB(130, 0, 180),  -- Purple
+    ["BalloonBoyNPC"]   = Color3.fromRGB(230, 100, 0),  -- Orange
+    ["GoldenFreddyNPC"] = Color3.fromRGB(235, 180, 20)   -- Gold
+}
+
+local Fnaf5Configs = {
+    ["baby"]      = Color3.fromRGB(230, 30, 30),
+    ["fred"]      = Color3.fromRGB(150, 80, 220),
+    ["foxy"]      = Color3.fromRGB(240, 140, 190),
+    ["ballora"]   = Color3.fromRGB(100, 180, 240),
+    ["ennard"]    = Color3.fromRGB(130, 130, 130),
+    ["yenndo"]    = Color3.fromRGB(210, 215, 220),
+    ["bon"]       = Color3.fromRGB(40, 110, 230),
+    ["bidy"]      = Color3.fromRGB(180, 140, 100),
+    ["reena"]     = Color3.fromRGB(210, 180, 140),
+    ["chica"]     = Color3.fromRGB(180, 160, 20),
+    ["bonnie"]    = Color3.fromRGB(35, 55, 140),
+    ["spring"]    = Color3.fromRGB(100, 130, 50),
+    ["puppet"]    = Color3.fromRGB(255, 255, 255)
+}
+
+local Fnaf4Configs = {
+    ["NightmareFreddyNPC"] = Color3.fromRGB(50, 50, 50),
+    ["NightmareBonnieNPC"] = Color3.fromRGB(35, 55, 140),
+    ["NightmareChicaNPC"]  = Color3.fromRGB(180, 160, 20),
+    ["NightmareFoxyNPC"]   = Color3.fromRGB(160, 30, 30),
+    ["FreddleNPC"]         = Color3.fromRGB(140, 90, 50),
+    ["FreddyNPC"]          = Color3.fromRGB(50, 50, 50),
+    ["BonnieNPC"]          = Color3.fromRGB(35, 55, 140),
+    ["ChicaNPC"]           = Color3.fromRGB(180, 160, 20),
+    ["FoxyNPC"]            = Color3.fromRGB(160, 30, 30)
+}
+
+local Fnaf6Configs = {
+    ["ScrapBabyNPC"]     = Color3.fromRGB(220, 40, 40),
+    ["MoltenFreddyNPC"]  = Color3.fromRGB(230, 110, 20),
+    ["ScraptrapNPC"]     = Color3.fromRGB(115, 130, 65),
+    ["AftonNPC"]         = Color3.fromRGB(115, 130, 65),
+    ["LeftyNPC"]         = Color3.fromRGB(45, 45, 45),
+    ["HelpyNPC"]         = Color3.fromRGB(230, 180, 240),
+    ["SecurityPuppetNPC"]= Color3.fromRGB(240, 240, 240),
+    ["CandyCadetNPC"]    = Color3.fromRGB(180, 50, 50),
+    ["ElChipNPC"]        = Color3.fromRGB(140, 90, 40),
+    ["MusicManNPC"]      = Color3.fromRGB(160, 160, 160),
+    ["BabyNPC"]          = Color3.fromRGB(220, 40, 40),
+    ["FreddyNPC"]        = Color3.fromRGB(230, 110, 20),
+    ["PuppetNPC"]        = Color3.fromRGB(240, 240, 240)
+}
+
+-- [[ UI Framework Construction ]] --
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FNaF_Master_CoOp_UI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 380, 0, 240)
+MainFrame.Position = UDim2.new(0.5, -190, 0.4, -120)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true 
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -100, 0, 35)
+Title.Position = UDim2.new(0, 12, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "FNaF Co-Op Master Suite"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 15
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
+
+local Tip = Instance.new("TextLabel")
+Tip.Size = UDim2.new(0, 150, 0, 20)
+Tip.Position = UDim2.new(1, -185, 0, 8)
+Tip.BackgroundTransparency = 1
+Tip.Text = "[R-Shift to toggle menu]"
+Tip.TextColor3 = Color3.fromRGB(140, 140, 145)
+Tip.TextSize = 11
+Tip.TextXAlignment = Enum.TextXAlignment.Right
+Tip.Font = Enum.Font.SourceSansItalic
+Tip.Parent = MainFrame
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 22, 0, 22)
+MinBtn.Position = UDim2.new(1, -28, 0, 7)
+MinBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.Text = "_"
+MinBtn.TextSize = 12
+MinBtn.Font = Enum.Font.SourceSansBold
+MinBtn.Parent = MainFrame
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 4)
+
+local OpenBtn = Instance.new("TextButton")
+OpenBtn.Size = UDim2.new(0, 90, 0, 30)
+OpenBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+OpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+OpenBtn.Text = "Open Suite"
+OpenBtn.TextSize = 13
+OpenBtn.Font = Enum.Font.SourceSansBold
+OpenBtn.Visible = false
+OpenBtn.Active = true
+OpenBtn.Draggable = true
+OpenBtn.Parent = ScreenGui
+Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(0, 6)
+
+-- Side Navigation Panel
+local NavFrame = Instance.new("Frame")
+NavFrame.Size = UDim2.new(0, 110, 1, -45)
+NavFrame.Position = UDim2.new(0, 10, 0, 35)
+NavFrame.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+NavFrame.BorderSizePixel = 0
+NavFrame.Parent = MainFrame
+Instance.new("UICorner", NavFrame).CornerRadius = UDim.new(0, 6)
+
+-- Central Content Panel
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, -140, 1, -45)
+ContentFrame.Position = UDim2.new(0, 130, 0, 35)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+local SectionTitle = Instance.new("TextLabel")
+SectionTitle.Size = UDim2.new(1, 0, 0, 25)
+SectionTitle.BackgroundTransparency = 1
+SectionTitle.Text = "Active Profile: FNaF 1"
+SectionTitle.TextColor3 = Color3.fromRGB(210, 210, 215)
+SectionTitle.TextSize = 14
+SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+SectionTitle.Font = Enum.Font.SourceSansBold
+SectionTitle.Parent = ContentFrame
+
+-- [[ Tab Layout Component Separation ]] --
+local GamePanel = Instance.new("Frame")
+GamePanel.Size = UDim2.new(1, 0, 1, -30)
+GamePanel.Position = UDim2.new(0, 0, 0, 30)
+GamePanel.BackgroundTransparency = 1
+GamePanel.Parent = ContentFrame
+
+local GameESPBtn = Instance.new("TextButton")
+GameESPBtn.Size = UDim2.new(1, 0, 0, 35)
+GameESPBtn.Position = UDim2.new(0, 0, 0, 5)
+GameESPBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+GameESPBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
+GameESPBtn.Font = Enum.Font.SourceSansBold
+GameESPBtn.TextSize = 14
+GameESPBtn.Text = "FNaF 1 ESP: OFF"
+GameESPBtn.Parent = GamePanel
+Instance.new("UICorner", GameESPBtn).CornerRadius = UDim.new(0, 6)
+
+local MiscPanel = Instance.new("Frame")
+MiscPanel.Size = UDim2.new(1, 0, 1, -30)
+MiscPanel.Position = UDim2.new(0, 0, 0, 30)
+MiscPanel.BackgroundTransparency = 1
+MiscPanel.Visible = false
+MiscPanel.Parent = ContentFrame
+
+local FullbrightBtn = Instance.new("TextButton")
+FullbrightBtn.Size = UDim2.new(1, 0, 0, 35)
+FullbrightBtn.Position = UDim2.new(0, 0, 0, 5)
+FullbrightBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+FullbrightBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
+FullbrightBtn.Font = Enum.Font.SourceSansBold
+FullbrightBtn.TextSize = 14
+FullbrightBtn.Text = "Global Fullbright: OFF"
+FullbrightBtn.Parent = MiscPanel
+Instance.new("UICorner", FullbrightBtn).CornerRadius = UDim.new(0, 6)
+
+local TeammateESPBtn = Instance.new("TextButton")
+TeammateESPBtn.Size = UDim2.new(1, 0, 0, 35)
+TeammateESPBtn.Position = UDim2.new(0, 0, 0, 48)
+TeammateESPBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+TeammateESPBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
+TeammateESPBtn.Font = Enum.Font.SourceSansBold
+TeammateESPBtn.TextSize = 14
+TeammateESPBtn.Text = "Teammate ESP: OFF"
+TeammateESPBtn.Parent = MiscPanel
+Instance.new("UICorner", TeammateESPBtn).CornerRadius = UDim.new(0, 6)
+
+-- [[ Tab Selector Controller Engine ]] --
+local NavButtons = {}
+local gameList = {"FNaF 1", "FNaF 2", "FNaF 3", "FNaF 4", "FNaF 5", "FNaF 6", "Misc"}
+
+local function UpdateMenuVisuals()
+    if Flags.CurrentGame == "Misc" then
+        SectionTitle.Text = "Miscellaneous Options"
+        GamePanel.Visible = false
+        MiscPanel.Visible = true
+        
+        FullbrightBtn.Text = "Global Fullbright: " .. (Flags.Fullbright and "ON" or "OFF")
+        FullbrightBtn.BackgroundColor3 = Flags.Fullbright and Color3.fromRGB(0, 140, 60) or Color3.fromRGB(45, 45, 50)
+        
+        TeammateESPBtn.Text = "Teammate ESP: " .. (Flags.TeammateESP and "ON" or "OFF")
+        TeammateESPBtn.BackgroundColor3 = Flags.TeammateESP and Color3.fromRGB(0, 140, 60) or Color3.fromRGB(45, 45, 50)
+    else
+        SectionTitle.Text = "Active Profile: " .. Flags.CurrentGame
+        MiscPanel.Visible = false
+        GamePanel.Visible = true
+        
+        local espState = GameESPStates[Flags.CurrentGame]
+        GameESPBtn.Text = Flags.CurrentGame .. " ESP: " .. (espState and "ON" or "OFF")
+        GameESPBtn.BackgroundColor3 = espState and Color3.fromRGB(0, 140, 60) or Color3.fromRGB(45, 45, 50)
+    end
+    
+    for gName, btn in pairs(NavButtons) do
+        if gName == Flags.CurrentGame then
+            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+            btn.TextColor3 = Color3.fromRGB(170, 170, 170)
+        end
+    end
+end
+
+for idx, gName in ipairs(gameList) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 22)
+    btn.Position = UDim2.new(0, 5, 0, 6 + ((idx - 1) * 25))
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.TextColor3 = Color3.fromRGB(170, 170, 170)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.SourceSansBold
+    btn.Text = gName
+    btn.Parent = NavFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    
+    btn.MouseButton1Click:Connect(function()
+        Flags.CurrentGame = gName
+        UpdateMenuVisuals()
+    end)
+    NavButtons[gName] = btn
+end
+
+-- [[ Global Fullbright Engine ]] --
+local function UpdateFullbright()
+    if Flags.Fullbright then
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+        Lighting.ClockTime = 12
+    else
+        Lighting.Ambient = OriginalAmbient
+        Lighting.OutdoorAmbient = OriginalOutdoorAmbient
+        Lighting.ClockTime = OriginalClockTime
+    end
+end
+
+task.spawn(function()
+    while task.wait(1) do
+        if Flags.Fullbright then UpdateFullbright() end
+    end
+end)
+
+-- [[ Core Pipeline Filtering Engine ]] --
+local function ClearHighlightFromModel(model)
+    if ActiveHighlights[model] then
+        ActiveHighlights[model]:Destroy()
+        ActiveHighlights[model] = nil
+    end
+end
+
+local function GetModelCFrame(model)
+    if model:IsA("Model") then
+        if model.PrimaryPart then return model.PrimaryPart.CFrame end
+        local bp = model:FindFirstChildWhichIsA("BasePart")
+        if bp then return bp.CFrame end
+    elseif model:IsA("BasePart") then
+        return model.CFrame
+    end
+    return nil
+end
+
+local function ProcessESPFiltering(model)
+    if not model:IsA("Model") and not model:IsA("Folder") and not model:IsA("BasePart") then return end
+    
+    local matchedColor = nil
+    local targetCleanName = model.Name
+    
+    -- Dynamic Teammate Registry Processor
+    if Flags.TeammateESP and model:IsA("Model") then
+        local p = Players:GetPlayerFromCharacter(model)
+        if p and p ~= Players.LocalPlayer then
+            if p.Team == Players.LocalPlayer.Team then
+                matchedColor = Color3.fromRGB(255, 255, 255) -- White for Allies
+            end
+        end
+    end
+    
+    -- Segment 1: FNaF 1 Profiles Processing
+    if GameESPStates["FNaF 1"] and model:IsA("Model") and not matchedColor then
+        if Fnaf1Configs[targetCleanName] then matchedColor = Fnaf1Configs[targetCleanName] end
+    end
+    
+    -- Segment 2: FNaF 2 Profiles Processing
+    if GameESPStates["FNaF 2"] and model:IsA("Model") and not matchedColor then
+        if Fnaf2Configs[targetCleanName] then matchedColor = Fnaf2Configs[targetCleanName] end
+    end
+    
+    -- Segment 3: FNaF 3 Real Movement Processing Track
+    if GameESPStates["FNaF 3"] and not matchedColor then
+        if Fnaf3TrackedThreats[model] and Fnaf3TrackedThreats[model].isReal then
+            local nLower = string.lower(targetCleanName)
+            matchedColor = string.find(nLower, "spring") and Color3.fromRGB(150, 140, 40) or Color3.fromRGB(0, 255, 100)
+        end
+    end
+    
+    -- Segment 4: FNaF 4 Strict NPC Target Extraction
+    if GameESPStates["FNaF 4"] and not matchedColor then
+        if string.find(targetCleanName, "NPC") then
+            if Fnaf4Configs[targetCleanName] then matchedColor = Fnaf4Configs[targetCleanName] end
+        end
+    end
+    
+    -- Segment 5: FNaF 5 Pure Keyword Parser Check
+    if GameESPStates["FNaF 5"] and not matchedColor and model:IsA("Model") then
+        local nameLower = string.lower(targetCleanName)
+        if string.find(nameLower, "npc") then
+            matchedColor = Color3.fromRGB(255, 255, 255)
+            for key, col in pairs(Fnaf5Configs) do
+                if string.find(nameLower, key) then matchedColor = col break end
+            end
+        end
+    end
+    
+    -- Segment 6: FNaF 6 Pizza Sim Registry Core
+    if GameESPStates["FNaF 6"] and not matchedColor then
+        if string.find(targetCleanName, "NPC") then
+            matchedColor = Fnaf6Configs[targetCleanName]
+            if not matchedColor then
+                local nl = string.lower(targetCleanName)
+                if string.find(nl, "baby") then matchedColor = Fnaf6Configs["ScrapBabyNPC"]
+                elseif string.find(nl, "molten") or string.find(nl, "molt") then matchedColor = Fnaf6Configs["MoltenFreddyNPC"]
+                elseif string.find(nl, "trap") or string.find(nl, "afton") then matchedColor = Fnaf6Configs["ScraptrapNPC"]
+                elseif string.find(nl, "lefty") then matchedColor = Fnaf6Configs["LeftyNPC"]
+                elseif string.find(nl, "helpy") then matchedColor = Fnaf6Configs["HelpyNPC"]
+                elseif string.find(nl, "puppet") then matchedColor = Fnaf6Configs["SecurityPuppetNPC"]
+                elseif string.find(nl, "cadet") then matchedColor = Fnaf6Configs["CandyCadetNPC"]
+                elseif string.find(nl, "chip") then matchedColor = Fnaf6Configs["ElChipNPC"]
+                elseif string.find(nl, "music") then matchedColor = Fnaf6Configs["MusicManNPC"]
+                else matchedColor = Color3.fromRGB(255, 255, 255)
+                end
+            end
+        end
+    end
+    
+    -- Execute Tracker Attachment Engine
+    if matchedColor then
+        if ActiveHighlights[model] then 
+            ActiveHighlights[model].FillColor = matchedColor
+            return 
+        end
+        
+        local Highlight = Instance.new("Highlight")
+        Highlight.Name = "MasterSuiteActiveESP"
+        Highlight.FillColor = matchedColor
+        Highlight.FillTransparency = 0.55
+        Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        Highlight.OutlineTransparency = 0
+        Highlight.Adornee = model
+        Highlight.Parent = model
+        
+        ActiveHighlights[model] = Highlight
+    else
+        ClearHighlightFromModel(model)
+    end
+end
+
+local function RunFullWorkspaceRefresh()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        ProcessESPFiltering(obj)
+    end
+    -- Append player character safety refresh checks
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then ProcessESPFiltering(p.Character) end
+    end
+end
+
+-- Dedicated FNaF 3 Position Verification Daemon Threads
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") or obj:IsA("BasePart") then
+                if not obj:IsDescendantOf(game.Players) and obj.Name ~= "Terrain" and obj.Name ~= "Workspace" then
+                    local cf = GetModelCFrame(obj)
+                    if cf then
+                        if not Fnaf3TrackedThreats[obj] then
+                            Fnaf3TrackedThreats[obj] = { pos = cf.Position, isReal = false }
+                        elseif not Fnaf3TrackedThreats[obj].isReal then
+                            if (Fnaf3TrackedThreats[obj].pos - cf.Position).Magnitude > 2 then
+                                Fnaf3TrackedThreats[obj].isReal = true
+                                if GameESPStates["FNaF 3"] then ProcessESPFiltering(obj) end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Fast-load runtime injector interface
+Workspace.DescendantAdded:Connect(function(descendant)
+    task.wait(0.4)
+    ProcessESPFiltering(descendant)
+end)
+
+-- Runtime listener threads for dynamic team swaps
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        if Flags.TeammateESP then ProcessESPFiltering(char) end
+    end)
+    player:GetPropertyChangedSignal("Team"):Connect(function()
+        if Flags.TeammateESP then RunFullWorkspaceRefresh() end
+    end)
+end)
+
+-- [[ Connect Interaction Triggers ]] --
+FullbrightBtn.MouseButton1Click:Connect(function()
+    Flags.Fullbright = not Flags.Fullbright
+    UpdateMenuVisuals()
+    UpdateFullbright()
+end)
+
+TeammateESPBtn.MouseButton1Click:Connect(function()
+    Flags.TeammateESP = not Flags.TeammateESP
+    UpdateMenuVisuals()
+    RunFullWorkspaceRefresh()
+end)
+
+GameESPBtn.MouseButton1Click:Connect(function()
+    if Flags.CurrentGame ~= "Misc" then
+        local cGame = Flags.CurrentGame
+        GameESPStates[cGame] = not GameESPStates[cGame]
+        UpdateMenuVisuals()
+        RunFullWorkspaceRefresh()
+    end
+end)
+
+MinBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    OpenBtn.Position = UDim2.new(0, MainFrame.AbsolutePosition.X + (MainFrame.AbsoluteSize.X/2) - 45, 0, MainFrame.AbsolutePosition.Y)
+    OpenBtn.Visible = true
+end)
+
+OpenBtn.MouseButton1Click:Connect(function()
+    OpenBtn.Visible = false
+    MainFrame.Visible = true
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.RightShift then
+        if OpenBtn.Visible then
+            OpenBtn.Visible = false
+        elseif MainFrame.Visible then
+            MainFrame.Visible = false
+        else
+            MainFrame.Visible = true
+        end
+    end
+end)
+
+-- Execute initialization sequence layout updates
+UpdateMenuVisuals()
