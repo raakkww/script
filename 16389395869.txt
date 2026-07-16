@@ -1,0 +1,808 @@
+--not protected by @nlzz :)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local Humanoid = Character:WaitForChild("Humanoid")
+
+local toggles = {
+    infHunger = false,
+    infStamina = false,
+    godMode = false,
+    noclip = false,
+    killAllToggle = false,
+    godGun = false,
+    noFog = false,
+    fullBright = false,
+    infGas = false,
+    infRadiator = false,
+    infOil = false,
+    nanAmmoSync = false,
+    carPhysicsToggle = false
+}
+
+-- Settings
+local settings = {
+    carTPDistance = 100,
+    boostActivationSpeed = 20,
+    pushStrength = 20,
+    buildUpTime = 2,
+    targetTopSpeed = 150
+}
+
+local currentWeapon = ""
+local currentWeaponHandle = nil
+local car = nil
+local lastTick = 0
+local currentBoost = 0
+local originalFogEnd = Lighting.FogEnd
+local originalBrightness = Lighting.Brightness
+local originalGlobalShadows = Lighting.GlobalShadows
+
+-- Item lists for bringing
+local itemLists = {
+    food = {
+        "Garlic", "Burger", "Pizza", "Chocolate", "Chips", "Bread", "Meat",
+        "Canned Food", "Snack", "Apple", "Corn", "Beans", "Soup", "MRE", "Ration Pack"
+    },
+    weapon = {
+        "Pistol", "Golden Pistol", "Luger Pistol", "CZ75 Machine Pistol", "Cap Gun",
+        "Banana Peel Gun", "Money Gun", "Icicle Gun", "Cryo Ray", "Xenoblaster",
+        "Chrono Blaster", "Glock", "Pro Glock", "Tec-9", "Sten SMG", "PP-19 Bizon",
+        "Minigun Crimson Attack", "Rocket Launcher", "LockOnLauncher", "Time Splicer",
+        "K-4.7", "Wave M4A1", "Majestic Attack", "Cosmic Attack", "Godly Deagle",
+        "DEAGLE", "Spooky Revolver", "High Caliber Revolver", "Ace Revolver",
+        "Gold Deagle", "Galactic Deagle", "Christmas Deagle", "Nailgun", "Healing Gun",
+        "Supreme Healing Gun", "Water Gun", "Blackhole Gun", "Space Rifle",
+        "British Rifle", "Explosive Rifle", "Burst Rifle", "Crossblade", "Flintlock"
+    },
+    caps = {
+        "Cap", "Caps", "Bottle Cap", "BottleCap", "Currency", "Token",
+        "Xeno Shard", "Lunar Money", "Easter Egg Currency", "10pile",
+        "15pile", "20pile", "5pile", "5stack"
+    },
+    carparts = {
+        "GasCan", "Gas", "OilCan", "Oil", "WaterCan", "Water", "radiator",
+        "Engine", "Wheel", "Tire", "Car Door", "Battery", "Axle",
+        "Fuel Can", "Jerry Can", "Carburetor"
+    },
+    mutant = {
+        "Mutant", "Zombie", "leprechaun", "CloverLord", "Enemy Mutant",
+        "Hostile Mutant", "Alien", "Buff", "Boss", "Bandit", "BuffMutant",
+        "BuffMutantExtendedDistance", "CowboyMutant", "Criminal", "EasterMutant",
+        "GunMutant", "LegacyMutant", "MutantBase", "NormalMutant", "QueenAlien",
+        "StalkerMutant", "TestBehaviorTreeMutant", "TestCitizen"
+    },
+    rare = {
+        "Balloon Gun", "Sherk Trophy", "Fire Potion", "Monster Mash Dance Potion",
+        "Devil Duck", "Rare Item", "Xeno Shard", "Lunar", "Easter", "Golden",
+        "Milestone Reward"
+    }
+}
+
+-- Helper functions
+local function isInList(list, name)
+    for _, item in ipairs(list) do
+        if string.lower(item) == string.lower(name) then
+            return true
+        end
+    end
+    return false
+end
+
+local function getCurrentVehicle()
+    local vehicleSeat = Humanoid.SeatPart
+    if vehicleSeat then
+        local vehicle = vehicleSeat.Parent
+        if vehicle:IsA("Model") and vehicle.PrimaryPart then
+            return vehicle
+        end
+    end
+    return nil
+end
+
+local function getNearestVehicle()
+    local nearest = nil
+    local nearestDist = math.huge
+    local rootPos = HumanoidRootPart.Position
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj.PrimaryPart then
+            -- Check if it's a vehicle (has attributes or matches patterns)
+            if obj:GetAttribute("Fuel") or obj:GetAttribute("Radiator") or 
+               obj:GetAttribute("Engine") or obj:GetAttribute("Wheels") or
+               string.match(obj.Name, "car") or string.match(obj.Name, "vehicle") then
+                
+                local dist = (obj.PrimaryPart.Position - rootPos).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearest = obj
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function getHumanoidFromPart(part)
+    local model = part.Parent
+    while model do
+        local hum = model:FindFirstChildWhichIsA("Humanoid")
+        if hum then
+            return hum, model
+        end
+        model = model.Parent
+    end
+    return nil
+end
+
+local function setupGodMode(char)
+    local hum = char:WaitForChild("Humanoid")
+    hum.MaxHealth = math.huge
+    hum.Health = math.huge
+    
+    hum.HealthChanged:Connect(function(health)
+        if toggles.godMode and health < math.huge then
+            hum.Health = math.huge
+        end
+    end)
+end
+
+local function killAllMutants()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        local hum = obj:FindFirstChildWhichIsA("Humanoid")
+        if hum and hum.Health > 0 then
+            if isInList(itemLists.mutant, obj.Name) or 
+               isInList(itemLists.mutant, obj.Parent.Name) then
+                hum:TakeDamage(hum.MaxHealth + 10)
+            end
+        end
+    end
+end
+
+local function syncNanAmmo()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            -- Check if it's a weapon drop
+            local magSize = obj:GetAttribute("MagSize") or 
+                           (obj:FindFirstChild("GunConfig") and 
+                            obj.GunConfig:GetAttribute("MagSize"))
+            
+            if magSize then
+                -- Send NaN ammo sync
+                ReplicatedStorage:FindFirstChild("GunFramework_AdjustAmount"):FireServer(
+                    obj, 0/0, 0/0, 0/0
+                )
+            end
+        end
+    end
+end
+
+local function bringItems(category)
+    local items = itemLists[category]
+    if not items or #items == 0 then return end
+    
+    local foundItems = {}
+    local rootPos = HumanoidRootPart.Position
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj.Parent and obj.Parent.Name ~= "Camera" then
+            local objName = obj.Name
+            
+            -- Check if this is in our list
+            for _, itemName in ipairs(items) do
+                if objName == itemName or string.find(objName, "^" .. itemName) then
+                    if obj:IsA("BasePart") or obj:IsA("Model") then
+                        table.insert(foundItems, obj)
+                    end
+                    break
+                end
+            end
+        end
+    end
+    
+    if #foundItems == 0 then return end
+    
+    local radius = math.clamp(#foundItems * 2, 12, 50)
+    local pi = math.pi
+    
+    for i, obj in ipairs(foundItems) do
+        local angle = (i - 1) * 2 * pi / #foundItems
+        
+        if obj:IsA("BasePart") then
+            obj.Anchored = false
+            obj.CFrame = CFrame.new(
+                rootPos + Vector3.new(0, 6, 0) + 
+                Vector3.new(
+                    math.cos(angle) * radius,
+                    math.sin(tick() + i) * 1.5,
+                    math.sin(angle) * radius
+                )
+            )
+        elseif obj:IsA("Model") and obj.PrimaryPart then
+            obj.PrimaryPart.Anchored = false
+            obj:SetPrimaryPartCFrame(
+                CFrame.new(rootPos + Vector3.new(0, 6, 0) + 
+                Vector3.new(
+                    math.cos(angle) * radius,
+                    math.sin(tick() + i) * 1.5,
+                    math.sin(angle) * radius
+                ))
+            )
+        end
+    end
+end
+
+local function teleportCarForward(distance)
+    local vehicle = car or getNearestVehicle()
+    if not vehicle or not vehicle.Parent then
+        vehicle = getNearestVehicle()
+        car = vehicle
+    end
+    
+    if not HumanoidRootPart then return end
+    if not vehicle then return end
+    
+    -- Move all vehicle parts
+    for _, part in ipairs(vehicle:GetDescendants()) do
+        if part:IsA("BasePart") then
+            -- Don't move wheels/tires
+            if not string.match(part.Name, "Wheel") and 
+               not string.match(part.Name, "Tire") then
+                part.Anchored = false
+            end
+        end
+    end
+    
+    local direction = HumanoidRootPart.CFrame.LookVector
+    
+    if vehicle.PrimaryPart then
+        vehicle:SetPrimaryPartCFrame(
+            vehicle.PrimaryPart.CFrame + direction * distance
+        )
+    else
+        for _, part in ipairs(vehicle:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CFrame = part.CFrame + direction * distance
+            end
+        end
+    end
+    
+    -- Move any players sitting in the vehicle
+    for _, part in ipairs(vehicle:GetDescendants()) do
+        if part:IsA("VehicleSeat") and part.Occupant then
+            local occupant = part.Occupant.Parent
+            if occupant then
+                local root = occupant:FindFirstChild("HumanoidRootPart")
+                if root then
+                    root.CFrame = root.CFrame + direction * distance
+                end
+            end
+        end
+    end
+    
+    -- Re-anchor body parts after a short delay
+    task.delay(0.5, function()
+        if vehicle and vehicle.Parent then
+            for _, part in ipairs(vehicle:GetDescendants()) do
+                if part:IsA("BasePart") and string.match(part.Name, "Body") then
+                    part.Anchored = true
+                end
+            end
+        end
+    end)
+    
+    -- Move the player too
+    HumanoidRootPart.CFrame = HumanoidRootPart.CFrame + direction * distance
+end
+
+local function applyGodGun()
+    if currentWeapon == "" or not currentWeaponHandle then return end
+    
+    -- Set weapon stats to infinite
+    if currentWeaponHandle:GetAttribute("MagSize") then
+        currentWeaponHandle:SetAttribute("MagSize", math.huge)
+        currentWeaponHandle:SetAttribute("CurrentMagSize", math.huge)
+        currentWeaponHandle:SetAttribute("ReserveAmmo", math.huge)
+    end
+    
+    -- Also try GunConfig
+    local gunConfig = currentWeaponHandle:FindFirstChild("GunConfig")
+    if gunConfig then
+        gunConfig:SetAttribute("MagSize", math.huge)
+        gunConfig:SetAttribute("CurrentMagSize", math.huge)
+        gunConfig:SetAttribute("ReserveAmmo", math.huge)
+    end
+end
+
+-- Main heartbeat loop
+RunService.Heartbeat:Connect(function(delta)
+    -- Infinite Hunger
+    if toggles.infHunger then
+        LocalPlayer:SetAttribute("Hunger", math.huge)
+        LocalPlayer:SetAttribute("hunger", math.huge)
+        if Character then
+            Character:SetAttribute("Hunger", math.huge)
+            Character:SetAttribute("hunger", math.huge)
+            if Humanoid then
+                Humanoid:SetAttribute("Hunger", math.huge)
+                Humanoid:SetAttribute("hunger", math.huge)
+            end
+        end
+    end
+    
+    -- Infinite Stamina
+    if toggles.infStamina and Humanoid then
+        if Humanoid:GetAttribute("Stamina") and Humanoid:GetAttribute("Stamina") < 1 then
+            Humanoid:SetAttribute("Stamina", 1)
+        end
+    end
+    
+    -- God Mode
+    if toggles.godMode and Humanoid and Humanoid.Health < math.huge then
+        Humanoid.Health = math.huge
+    end
+    
+    -- Noclip
+    if toggles.noclip and Character then
+        for _, part in ipairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+    
+    -- Car physics
+    local vehicle = getCurrentVehicle()
+    if vehicle then
+        local speed = vehicle.AssemblyLinearVelocity.Magnitude
+        local isAccelerating = UserInputService:IsKeyDown(Enum.KeyCode.W)
+        
+        if toggles.carPhysicsToggle and isAccelerating then
+            currentBoost = currentBoost + (settings.pushStrength - currentBoost) * delta / settings.buildUpTime
+            
+            if speed < settings.targetTopSpeed then
+                local direction = vehicle.AssemblyLinearVelocity.Unit
+                if direction ~= direction then -- NaN check
+                    direction = HumanoidRootPart.CFrame.LookVector
+                end
+                vehicle.AssemblyLinearVelocity = vehicle.AssemblyLinearVelocity + 
+                    direction * currentBoost * delta
+            end
+        else
+            currentBoost = currentBoost + (0 - currentBoost) * delta / (settings.buildUpTime * 0.5)
+        end
+    else
+        currentBoost = 0
+    end
+    
+    -- Periodic updates
+    local currentTime = tick()
+    if currentTime - lastTick >= 2.2 then
+        lastTick = currentTime
+        
+        if toggles.killAllToggle then
+            killAllMutants()
+        end
+        
+        if toggles.godGun then
+            applyGodGun()
+        end
+        
+        if toggles.nanAmmoSync then
+            syncNanAmmo()
+        end
+        
+        -- Update vehicle state
+        car = getNearestVehicle()
+        if car and car.Parent then
+            if toggles.infGas and car:GetAttribute("Fuel") then
+                car:SetAttribute("Fuel", math.huge)
+            end
+            
+            if toggles.infRadiator then
+                Workspace:SetAttribute("RadiatorDepleteSpeed", 0)
+                if car:GetAttribute("Radiator") then
+                    car:SetAttribute("Radiator", math.huge)
+                end
+            end
+            
+            if toggles.infOil and car:GetAttribute("Oil") then
+                car:SetAttribute("Oil", math.huge)
+            end
+        end
+    end
+    
+    -- Fog
+    if toggles.noFog then
+        Lighting.FogEnd = 999999
+    else
+        Lighting.FogEnd = originalFogEnd
+    end
+    
+    -- Brightness
+    if toggles.fullBright then
+        Lighting.Brightness = 10
+        Lighting.GlobalShadows = false
+    else
+        Lighting.Brightness = originalBrightness
+        Lighting.GlobalShadows = originalGlobalShadows
+    end
+end)
+
+-- Track held weapon
+LocalPlayer:WaitForChild("HoldingObjectValue").Changed:Connect(function()
+    task.wait(0.1)
+    local holding = LocalPlayer.HoldingObjectValue
+    if holding.Value then
+        currentWeaponHandle = holding.Value
+        currentWeapon = currentWeaponHandle.Name
+    else
+        currentWeapon = ""
+    end
+end)
+
+-- Character respawn handler
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    HumanoidRootPart = char:WaitForChild("HumanoidRootPart", 6)
+    Humanoid = char:WaitForChild("Humanoid", 6)
+    
+    if toggles.godMode then
+        task.delay(0.5, function()
+            if toggles.godMode then
+                setupGodMode(char)
+            end
+        end)
+    end
+end)
+
+-- Initialize UI
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+local Window = Rayfield:CreateWindow({
+    Name = "Dusty Trip Gui V2",
+    LoadingTitle = "Loading Features...",
+    LoadingSubtitle = "Made By Aoruen"
+})
+
+-- Player Tab
+local PlayerTab = Window:CreateTab("Player Menu")
+
+PlayerTab:CreateToggle({
+    Name = "Infinite Hunger",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.infHunger = value
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "Godmode (Infinite Health)",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.godMode = value
+        if value and Character then
+            setupGodMode(Character)
+        end
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.noclip = value
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "Infinite Stamina",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.infStamina = value
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Give Kill Tool",
+    Callback = function()
+        local tool = Instance.new("Tool")
+        tool.Name = "Kill Tool"
+        tool.RequiresHandle = false
+        tool.Parent = LocalPlayer.Backpack
+        
+        tool.Activated:Connect(function()
+            local target = LocalPlayer:GetMouse().Target
+            if target then
+                local hum = target.Parent:FindFirstChildWhichIsA("Humanoid")
+                if hum then
+                    hum:TakeDamage(hum.MaxHealth + 10)
+                end
+            end
+        end)
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Give Telekinesis Tool",
+    Callback = function()
+        local tool = Instance.new("Tool")
+        tool.Name = "Telekinesis"
+        tool.RequiresHandle = false
+        tool.Parent = LocalPlayer.Backpack
+        
+        local heldObject = nil
+        
+        tool.Activated:Connect(function()
+            local target = LocalPlayer:GetMouse().Target
+            if target and target:IsA("BasePart") and not target.Anchored then
+                heldObject = target
+            end
+        end)
+        
+        tool.Deactivated:Connect(function()
+            heldObject = nil
+        end)
+        
+        RunService.RenderStepped:Connect(function()
+            if heldObject and heldObject.Parent then
+                local root = Character and Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    heldObject.CFrame = root.CFrame * CFrame.new(0, 0, -12)
+                end
+            end
+        end)
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Give Delete Tool",
+    Callback = function()
+        local tool = Instance.new("Tool")
+        tool.Name = "Delete Tool"
+        tool.RequiresHandle = false
+        tool.Parent = LocalPlayer.Backpack
+        
+        tool.Activated:Connect(function()
+            local target = LocalPlayer:GetMouse().Target
+            if target then
+                local obj = target
+                while obj do
+                    if obj.Parent and obj.Parent ~= Workspace and 
+                       not obj:IsA("Model") and obj.Parent then
+                        obj = obj.Parent
+                    else
+                        break
+                    end
+                end
+                
+                if obj and obj ~= Character and obj ~= Character and obj.Parent then
+                    obj:Destroy()
+                end
+            end
+        end)
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "NaN Ammo Sync (Auto Loop)",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.nanAmmoSync = value
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Sync Ground Ammo (NaN) Now",
+    Callback = syncNanAmmo
+})
+
+-- Teleport Tab
+local TeleportTab = Window:CreateTab("Teleport Menu")
+
+TeleportTab:CreateButton({
+    Name = "Bring Food (ring)",
+    Callback = function()
+        bringItems("food")
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Bring Weapons (ring)",
+    Callback = function()
+        bringItems("weapon")
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Bring Caps (ring)",
+    Callback = function()
+        bringItems("caps")
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Bring Car Parts",
+    Callback = function()
+        bringItems("carparts")
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Bring Mutants (ring)",
+    Callback = function()
+        bringItems("mutant")
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Bring Rare Items (ring)",
+    Callback = function()
+        bringItems("rare")
+    end
+})
+
+-- Combat Tab
+local CombatTab = Window:CreateTab("Combat Menu")
+
+CombatTab:CreateToggle({
+    Name = "Kill All Toggle",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.killAllToggle = value
+    end
+})
+
+CombatTab:CreateButton({
+    Name = "Kill All Now",
+    Callback = killAllMutants
+})
+
+CombatTab:CreateToggle({
+    Name = "Local God Gun",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.godGun = value
+    end
+})
+
+-- Vehicle Tab
+local VehicleTab = Window:CreateTab("Vehicle Tab")
+
+VehicleTab:CreateSection("Master Switch")
+
+VehicleTab:CreateToggle({
+    Name = "Enable Tuning Physics",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.carPhysicsToggle = value
+    end
+})
+
+VehicleTab:CreateSection("Physics Tuning")
+
+VehicleTab:CreateSlider({
+    Name = "Boost Activation Speed",
+    Range = {0, 100},
+    Increment = 1,
+    CurrentValue = 20,
+    Callback = function(value)
+        settings.boostActivationSpeed = value
+    end
+})
+
+VehicleTab:CreateSlider({
+    Name = "Power (Push Strength)",
+    Range = {1, 150},
+    Increment = 1,
+    CurrentValue = 20,
+    Callback = function(value)
+        settings.pushStrength = value
+    end
+})
+
+VehicleTab:CreateSlider({
+    Name = "Build-up Time (Seconds)",
+    Range = {0.1, 10},
+    Increment = 0.1,
+    CurrentValue = 2,
+    Callback = function(value)
+        settings.buildUpTime = value
+    end
+})
+
+VehicleTab:CreateSlider({
+    Name = "Target Top Speed",
+    Range = {50, 2000},
+    Increment = 10,
+    CurrentValue = 150,
+    Callback = function(value)
+        settings.targetTopSpeed = value
+    end
+})
+
+VehicleTab:CreateButton({
+    Name = "🛑 EMERGENCY STOP",
+    Callback = function()
+        local vehicle = getCurrentVehicle()
+        if vehicle then
+            vehicle.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        end
+    end
+})
+
+-- Utility Tab
+local UtilityTab = Window:CreateTab("Utility Menu")
+
+UtilityTab:CreateInput({
+    Name = "Car TP Distance",
+    PlaceholderText = "Enter distance...",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(input)
+        local dist = tonumber(input)
+        if dist then
+            settings.carTPDistance = dist
+        end
+    end
+})
+
+UtilityTab:CreateButton({
+    Name = "Teleport Car + Everyone Forward",
+    Callback = function()
+        teleportCarForward(settings.carTPDistance)
+    end
+})
+
+UtilityTab:CreateToggle({
+    Name = "No Fog",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.noFog = value
+    end
+})
+
+UtilityTab:CreateToggle({
+    Name = "Full Bright",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.fullBright = value
+    end
+})
+
+UtilityTab:CreateToggle({
+    Name = "Infinite Gas",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.infGas = value
+    end
+})
+
+UtilityTab:CreateToggle({
+    Name = "Infinite Radiator",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.infRadiator = value
+    end
+})
+
+UtilityTab:CreateToggle({
+    Name = "Infinite Oil",
+    CurrentValue = false,
+    Callback = function(value)
+        toggles.infOil = value
+    end
+})
+
+-- Notification
+Rayfield:Notify({
+    Title = "",
+    Content = "enjoy!",
+    Duration = 8
+})
