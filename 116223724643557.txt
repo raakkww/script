@@ -1,0 +1,187 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+-- Targets
+local targetModel = workspace:FindFirstChild("Stages") 
+    and workspace.Stages:FindFirstChild("Stage31") 
+    and workspace.Stages.Stage31:FindFirstChild("WinButton")
+
+local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+local GainMagicPower = Remotes and Remotes:FindFirstChild("GainMagicPower")
+local RebirthRemote = Remotes and Remotes:FindFirstChild("Rebirth")
+
+local staffButtons = workspace:FindFirstChild("StaffButtons")
+local staffButton20 = staffButtons and staffButtons["Staff Button20"]
+local touchPart = staffButton20 and staffButton20:FindFirstChild("TouchPart")
+
+-- Warnings
+if not targetModel then warn("Teleport Target not found!") end
+if not GainMagicPower then warn("Remote 'GainMagicPower' not found!") end
+if not RebirthRemote then warn("Remote 'Rebirth' not found!") end
+if not touchPart then warn("Staff Button20 TouchPart not found!") end
+
+-- 1. Create UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ZERO HUB"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 240, 0, 240) -- Increased height for 4 buttons
+frame.Position = UDim2.new(0.5, -120, 0.5, -120)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Text = "ZERO HUB"
+title.Size = UDim2.new(1, 0, 0.1, 0)
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = frame
+
+-- Button Helper Function
+local function createButton(text, posY, callback)
+    local btn = Instance.new("TextButton")
+    btn.Text = text
+    btn.Size = UDim2.new(0.9, 0, 0.2, 0)
+    btn.Position = UDim2.new(0.05, 0, posY, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = frame
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 5)
+    btnCorner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+-- Buttons
+local tpButton = createButton("INF WINS: OFF", 0.12, function() end)
+local trainButton = createButton("Auto Train: OFF", 0.34, function() end)
+local staffButton = createButton("Equip Best Staff: OFF", 0.56, function() end)
+local rebirthButton = createButton("Auto Rebirth: OFF", 0.78, function() end)
+
+-- Draggable Logic
+local dragging, dragInput, mousePos, framePos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        mousePos = input.Position
+        framePos = frame.Position
+    end
+end)
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+frame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - mousePos
+        frame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+    end
+end)
+
+-- 2. Logic Variables
+local tpConnection, trainConnection, staffConnection, rebirthConnection
+local isTpOn, isTrainOn, isStaffOn, isRebirthOn = false, false, false, false
+
+-- Teleport Logic
+tpButton.MouseButton1Click:Connect(function()
+    if not targetModel then return end
+    isTpOn = not isTpOn
+    if isTpOn then
+        tpButton.Text = "inf wins: ON"
+        tpButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        tpConnection = RunService.Heartbeat:Connect(function()
+            local pivot = targetModel:GetPivot()
+            character:PivotTo(CFrame.new(pivot.Position + Vector3.new(0, 2, 0)))
+        end)
+    else
+        tpButton.Text = "INF WINS: OFF"
+        tpButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        if tpConnection then tpConnection:Disconnect() end
+    end
+end)
+
+-- Auto Train Logic
+trainButton.MouseButton1Click:Connect(function()
+    if not GainMagicPower then return end
+    isTrainOn = not isTrainOn
+    if isTrainOn then
+        trainButton.Text = "Auto Train: ON"
+        trainButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        trainConnection = RunService.Heartbeat:Connect(function()
+            GainMagicPower:FireServer()
+        end)
+    else
+        trainButton.Text = "Auto Train: OFF"
+        trainButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        if trainConnection then trainConnection:Disconnect() end
+    end
+end)
+
+-- Equip Best Staff Logic
+staffButton.MouseButton1Click:Connect(function()
+    if not touchPart or not rootPart then return end
+    isStaffOn = not isStaffOn
+    if isStaffOn then
+        staffButton.Text = "Equip Best Staff: ON"
+        staffButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        staffConnection = RunService.Heartbeat:Connect(function()
+            if rootPart and touchPart then
+                touchPart.CFrame = rootPart.CFrame * CFrame.new(0, 0, -3)
+            end
+        end)
+    else
+        staffButton.Text = "Equip Best Staff: OFF"
+        staffButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        if staffConnection then staffConnection:Disconnect() end
+    end
+end)
+
+-- Auto Rebirth Logic
+rebirthButton.MouseButton1Click:Connect(function()
+    if not RebirthRemote then 
+        warn("Rebirth Remote missing!")
+        return 
+    end
+    
+    isRebirthOn = not isRebirthOn
+    
+    if isRebirthOn then
+        rebirthButton.Text = "Auto Rebirth: ON"
+        rebirthButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Red
+        
+        rebirthConnection = RunService.Heartbeat:Connect(function()
+            RebirthRemote:FireServer()
+        end)
+    else
+        rebirthButton.Text = "Auto Rebirth: OFF"
+        rebirthButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215) -- Blue
+        
+        if rebirthConnection then
+            rebirthConnection:Disconnect()
+        end
+    end
+end)
+
+print("UI Loaded with Auto Rebirth.")
