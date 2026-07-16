@@ -1,0 +1,1056 @@
+--[[
+    Danny's Airport - Utility Hub
+    Clean Modern UI
+    Built from decompiled game analysis
+]]
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+-- References
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Resources = ReplicatedStorage:WaitForChild("Resources")
+local Events = Resources:WaitForChild("Events")
+local GlobalSettings = require(Resources:WaitForChild("GlobalSettings"))
+
+-- State
+local toggles = {
+    Speed = false,
+    InfSprint = false,
+    NPCESP = false,
+    ContrabandESP = false,
+    Noclip = false,
+    AutoArrest = false,
+}
+
+local connections = {}
+local espObjects = {}
+
+-- ═══════════════════════════════════════════════════
+-- UI FRAMEWORK
+-- ═══════════════════════════════════════════════════
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AirportHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
+
+-- Main Container
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "Main"
+MainFrame.Size = UDim2.new(0, 340, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -170, 0.5, -210)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(80, 60, 180)
+MainStroke.Thickness = 1.5
+MainStroke.Transparency = 0.3
+MainStroke.Parent = MainFrame
+
+-- Glow effect (shadow)
+local Shadow = Instance.new("ImageLabel")
+Shadow.Name = "Shadow"
+Shadow.Size = UDim2.new(1, 40, 1, 40)
+Shadow.Position = UDim2.new(0, -20, 0, -20)
+Shadow.BackgroundTransparency = 1
+Shadow.Image = "rbxassetid://5554236805"
+Shadow.ImageColor3 = Color3.fromRGB(40, 20, 100)
+Shadow.ImageTransparency = 0.6
+Shadow.ScaleType = Enum.ScaleType.Slice
+Shadow.SliceCenter = Rect.new(23, 23, 277, 277)
+Shadow.ZIndex = -1
+Shadow.Parent = MainFrame
+
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 48)
+TitleBar.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleBarCorner = Instance.new("UICorner")
+TitleBarCorner.CornerRadius = UDim.new(0, 12)
+TitleBarCorner.Parent = TitleBar
+
+-- Fix bottom corners of title bar
+local TitleBarFix = Instance.new("Frame")
+TitleBarFix.Size = UDim2.new(1, 0, 0, 12)
+TitleBarFix.Position = UDim2.new(0, 0, 1, -12)
+TitleBarFix.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+TitleBarFix.BorderSizePixel = 0
+TitleBarFix.Parent = TitleBar
+
+-- Accent line under title
+local AccentLine = Instance.new("Frame")
+AccentLine.Name = "AccentLine"
+AccentLine.Size = UDim2.new(1, 0, 0, 2)
+AccentLine.Position = UDim2.new(0, 0, 0, 48)
+AccentLine.BorderSizePixel = 0
+AccentLine.Parent = MainFrame
+
+local AccentGradient = Instance.new("UIGradient")
+AccentGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 60, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 80, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 120, 255)),
+})
+AccentGradient.Parent = AccentLine
+
+-- Title text
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "Title"
+TitleLabel.Size = UDim2.new(1, -80, 1, 0)
+TitleLabel.Position = UDim2.new(0, 16, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "✈  AIRPORT HUB"
+TitleLabel.TextColor3 = Color3.fromRGB(220, 210, 255)
+TitleLabel.TextSize = 16
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+-- Minimize button
+local MinBtn = Instance.new("TextButton")
+MinBtn.Name = "Minimize"
+MinBtn.Size = UDim2.new(0, 32, 0, 32)
+MinBtn.Position = UDim2.new(1, -76, 0, 8)
+MinBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+MinBtn.BorderSizePixel = 0
+MinBtn.Text = "—"
+MinBtn.TextColor3 = Color3.fromRGB(160, 150, 200)
+MinBtn.TextSize = 14
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.Parent = TitleBar
+
+local MinBtnCorner = Instance.new("UICorner")
+MinBtnCorner.CornerRadius = UDim.new(0, 8)
+MinBtnCorner.Parent = MinBtn
+
+-- Close button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Name = "Close"
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position = UDim2.new(1, -40, 0, 8)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 25, 30)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+CloseBtn.TextSize = 13
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = TitleBar
+
+local CloseBtnCorner = Instance.new("UICorner")
+CloseBtnCorner.CornerRadius = UDim.new(0, 8)
+CloseBtnCorner.Parent = CloseBtn
+
+-- Content area
+local Content = Instance.new("ScrollingFrame")
+Content.Name = "Content"
+Content.Size = UDim2.new(1, -16, 1, -60)
+Content.Position = UDim2.new(0, 8, 0, 56)
+Content.BackgroundTransparency = 1
+Content.BorderSizePixel = 0
+Content.ScrollBarThickness = 3
+Content.ScrollBarImageColor3 = Color3.fromRGB(100, 70, 200)
+Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Content.Parent = MainFrame
+
+local ContentLayout = Instance.new("UIListLayout")
+ContentLayout.Padding = UDim.new(0, 6)
+ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ContentLayout.Parent = Content
+
+local ContentPadding = Instance.new("UIPadding")
+ContentPadding.PaddingLeft = UDim.new(0, 4)
+ContentPadding.PaddingRight = UDim.new(0, 4)
+ContentPadding.PaddingTop = UDim.new(0, 4)
+ContentPadding.PaddingBottom = UDim.new(0, 4)
+ContentPadding.Parent = Content
+
+-- ═══════════════════════════════════════════════════
+-- UI COMPONENTS
+-- ═══════════════════════════════════════════════════
+
+local function CreateSection(name, layoutOrder)
+    local Section = Instance.new("Frame")
+    Section.Name = name
+    Section.Size = UDim2.new(1, 0, 0, 30)
+    Section.BackgroundTransparency = 1
+    Section.BorderSizePixel = 0
+    Section.LayoutOrder = layoutOrder
+    Section.Parent = Content
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, 0, 1, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = string.upper(name)
+    Label.TextColor3 = Color3.fromRGB(120, 100, 200)
+    Label.TextSize = 11
+    Label.Font = Enum.Font.GothamBold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Section
+
+    local Line = Instance.new("Frame")
+    Line.Size = UDim2.new(1, 0, 0, 1)
+    Line.Position = UDim2.new(0, 0, 1, -2)
+    Line.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+    Line.BorderSizePixel = 0
+    Line.Parent = Section
+
+    return Section
+end
+
+local function CreateToggle(name, description, layoutOrder, callback)
+    local Toggle = Instance.new("Frame")
+    Toggle.Name = name
+    Toggle.Size = UDim2.new(1, 0, 0, 42)
+    Toggle.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    Toggle.BorderSizePixel = 0
+    Toggle.LayoutOrder = layoutOrder
+    Toggle.Parent = Content
+
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 8)
+    ToggleCorner.Parent = Toggle
+
+    local Label = Instance.new("TextLabel")
+    Label.Name = "Label"
+    Label.Size = UDim2.new(1, -70, 0, 20)
+    Label.Position = UDim2.new(0, 12, 0, 4)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.TextColor3 = Color3.fromRGB(210, 205, 240)
+    Label.TextSize = 13
+    Label.Font = Enum.Font.GothamSemibold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Toggle
+
+    local Desc = Instance.new("TextLabel")
+    Desc.Name = "Desc"
+    Desc.Size = UDim2.new(1, -70, 0, 14)
+    Desc.Position = UDim2.new(0, 12, 0, 24)
+    Desc.BackgroundTransparency = 1
+    Desc.Text = description
+    Desc.TextColor3 = Color3.fromRGB(100, 95, 140)
+    Desc.TextSize = 10
+    Desc.Font = Enum.Font.Gotham
+    Desc.TextXAlignment = Enum.TextXAlignment.Left
+    Desc.Parent = Toggle
+
+    -- Toggle switch
+    local SwitchBG = Instance.new("Frame")
+    SwitchBG.Name = "SwitchBG"
+    SwitchBG.Size = UDim2.new(0, 44, 0, 22)
+    SwitchBG.Position = UDim2.new(1, -56, 0.5, -11)
+    SwitchBG.BackgroundColor3 = Color3.fromRGB(40, 38, 55)
+    SwitchBG.BorderSizePixel = 0
+    SwitchBG.Parent = Toggle
+
+    local SwitchBGCorner = Instance.new("UICorner")
+    SwitchBGCorner.CornerRadius = UDim.new(1, 0)
+    SwitchBGCorner.Parent = SwitchBG
+
+    local SwitchKnob = Instance.new("Frame")
+    SwitchKnob.Name = "Knob"
+    SwitchKnob.Size = UDim2.new(0, 16, 0, 16)
+    SwitchKnob.Position = UDim2.new(0, 3, 0.5, -8)
+    SwitchKnob.BackgroundColor3 = Color3.fromRGB(80, 75, 110)
+    SwitchKnob.BorderSizePixel = 0
+    SwitchKnob.Parent = SwitchBG
+
+    local SwitchKnobCorner = Instance.new("UICorner")
+    SwitchKnobCorner.CornerRadius = UDim.new(1, 0)
+    SwitchKnobCorner.Parent = SwitchKnob
+
+    local enabled = false
+
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Size = UDim2.new(1, 0, 1, 0)
+    ToggleBtn.BackgroundTransparency = 1
+    ToggleBtn.Text = ""
+    ToggleBtn.Parent = Toggle
+
+    ToggleBtn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+
+        local knobPos = enabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        local knobColor = enabled and Color3.fromRGB(140, 100, 255) or Color3.fromRGB(80, 75, 110)
+        local bgColor = enabled and Color3.fromRGB(60, 40, 120) or Color3.fromRGB(40, 38, 55)
+
+        TweenService:Create(SwitchKnob, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+            Position = knobPos,
+            BackgroundColor3 = knobColor
+        }):Play()
+
+        TweenService:Create(SwitchBG, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+            BackgroundColor3 = bgColor
+        }):Play()
+
+        callback(enabled)
+    end)
+
+    return Toggle
+end
+
+local function CreateButton(name, description, layoutOrder, callback)
+    local Btn = Instance.new("Frame")
+    Btn.Name = name
+    Btn.Size = UDim2.new(1, 0, 0, 42)
+    Btn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    Btn.BorderSizePixel = 0
+    Btn.LayoutOrder = layoutOrder
+    Btn.Parent = Content
+
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 8)
+    BtnCorner.Parent = Btn
+
+    local Label = Instance.new("TextLabel")
+    Label.Name = "Label"
+    Label.Size = UDim2.new(1, -70, 0, 20)
+    Label.Position = UDim2.new(0, 12, 0, 4)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.TextColor3 = Color3.fromRGB(210, 205, 240)
+    Label.TextSize = 13
+    Label.Font = Enum.Font.GothamSemibold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Btn
+
+    local Desc = Instance.new("TextLabel")
+    Desc.Name = "Desc"
+    Desc.Size = UDim2.new(1, -70, 0, 14)
+    Desc.Position = UDim2.new(0, 12, 0, 24)
+    Desc.BackgroundTransparency = 1
+    Desc.Text = description
+    Desc.TextColor3 = Color3.fromRGB(100, 95, 140)
+    Desc.TextSize = 10
+    Desc.Font = Enum.Font.Gotham
+    Desc.TextXAlignment = Enum.TextXAlignment.Left
+    Desc.Parent = Btn
+
+    -- Execute icon
+    local ExecIcon = Instance.new("TextLabel")
+    ExecIcon.Size = UDim2.new(0, 30, 0, 22)
+    ExecIcon.Position = UDim2.new(1, -42, 0.5, -11)
+    ExecIcon.BackgroundColor3 = Color3.fromRGB(50, 35, 90)
+    ExecIcon.BorderSizePixel = 0
+    ExecIcon.Text = "▶"
+    ExecIcon.TextColor3 = Color3.fromRGB(140, 100, 255)
+    ExecIcon.TextSize = 12
+    ExecIcon.Font = Enum.Font.GothamBold
+    ExecIcon.Parent = Btn
+
+    local ExecIconCorner = Instance.new("UICorner")
+    ExecIconCorner.CornerRadius = UDim.new(0, 6)
+    ExecIconCorner.Parent = ExecIcon
+
+    local ClickBtn = Instance.new("TextButton")
+    ClickBtn.Size = UDim2.new(1, 0, 1, 0)
+    ClickBtn.BackgroundTransparency = 1
+    ClickBtn.Text = ""
+    ClickBtn.Parent = Btn
+
+    ClickBtn.MouseButton1Click:Connect(function()
+        -- Flash effect
+        TweenService:Create(Btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(50, 40, 80)}):Play()
+        task.wait(0.1)
+        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(25, 25, 35)}):Play()
+        callback()
+    end)
+
+    return Btn
+end
+
+local function CreateSlider(name, description, min, max, default, layoutOrder, callback)
+    local Slider = Instance.new("Frame")
+    Slider.Name = name
+    Slider.Size = UDim2.new(1, 0, 0, 56)
+    Slider.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    Slider.BorderSizePixel = 0
+    Slider.LayoutOrder = layoutOrder
+    Slider.Parent = Content
+
+    local SliderCorner = Instance.new("UICorner")
+    SliderCorner.CornerRadius = UDim.new(0, 8)
+    SliderCorner.Parent = Slider
+
+    local Label = Instance.new("TextLabel")
+    Label.Name = "Label"
+    Label.Size = UDim2.new(1, -60, 0, 18)
+    Label.Position = UDim2.new(0, 12, 0, 4)
+    Label.BackgroundTransparency = 1
+    Label.Text = name
+    Label.TextColor3 = Color3.fromRGB(210, 205, 240)
+    Label.TextSize = 13
+    Label.Font = Enum.Font.GothamSemibold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Slider
+
+    local ValueLabel = Instance.new("TextLabel")
+    ValueLabel.Name = "Value"
+    ValueLabel.Size = UDim2.new(0, 45, 0, 18)
+    ValueLabel.Position = UDim2.new(1, -55, 0, 4)
+    ValueLabel.BackgroundTransparency = 1
+    ValueLabel.Text = tostring(default)
+    ValueLabel.TextColor3 = Color3.fromRGB(140, 100, 255)
+    ValueLabel.TextSize = 13
+    ValueLabel.Font = Enum.Font.GothamBold
+    ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    ValueLabel.Parent = Slider
+
+    local Desc = Instance.new("TextLabel")
+    Desc.Name = "Desc"
+    Desc.Size = UDim2.new(1, -24, 0, 12)
+    Desc.Position = UDim2.new(0, 12, 0, 21)
+    Desc.BackgroundTransparency = 1
+    Desc.Text = description
+    Desc.TextColor3 = Color3.fromRGB(100, 95, 140)
+    Desc.TextSize = 10
+    Desc.Font = Enum.Font.Gotham
+    Desc.TextXAlignment = Enum.TextXAlignment.Left
+    Desc.Parent = Slider
+
+    -- Track
+    local Track = Instance.new("Frame")
+    Track.Name = "Track"
+    Track.Size = UDim2.new(1, -24, 0, 6)
+    Track.Position = UDim2.new(0, 12, 0, 40)
+    Track.BackgroundColor3 = Color3.fromRGB(40, 38, 55)
+    Track.BorderSizePixel = 0
+    Track.Parent = Slider
+
+    local TrackCorner = Instance.new("UICorner")
+    TrackCorner.CornerRadius = UDim.new(1, 0)
+    TrackCorner.Parent = Track
+
+    -- Fill
+    local Fill = Instance.new("Frame")
+    Fill.Name = "Fill"
+    Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    Fill.BackgroundColor3 = Color3.fromRGB(110, 70, 220)
+    Fill.BorderSizePixel = 0
+    Fill.Parent = Track
+
+    local FillCorner = Instance.new("UICorner")
+    FillCorner.CornerRadius = UDim.new(1, 0)
+    FillCorner.Parent = Fill
+
+    local FillGradient = Instance.new("UIGradient")
+    FillGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 50, 180)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 100, 255)),
+    })
+    FillGradient.Parent = Fill
+
+    -- Knob
+    local Knob = Instance.new("Frame")
+    Knob.Name = "Knob"
+    Knob.Size = UDim2.new(0, 14, 0, 14)
+    Knob.Position = UDim2.new((default - min) / (max - min), -7, 0.5, -7)
+    Knob.BackgroundColor3 = Color3.fromRGB(180, 150, 255)
+    Knob.BorderSizePixel = 0
+    Knob.ZIndex = 2
+    Knob.Parent = Track
+
+    local KnobCorner = Instance.new("UICorner")
+    KnobCorner.CornerRadius = UDim.new(1, 0)
+    KnobCorner.Parent = Knob
+
+    -- Interaction
+    local dragging = false
+
+    local InputBtn = Instance.new("TextButton")
+    InputBtn.Size = UDim2.new(1, 0, 0, 20)
+    InputBtn.Position = UDim2.new(0, 0, 0, 33)
+    InputBtn.BackgroundTransparency = 1
+    InputBtn.Text = ""
+    InputBtn.Parent = Slider
+
+    local function updateSlider(input)
+        local trackAbsPos = Track.AbsolutePosition.X
+        local trackAbsSize = Track.AbsoluteSize.X
+        local relativeX = math.clamp((input.Position.X - trackAbsPos) / trackAbsSize, 0, 1)
+        local value = math.floor(min + (max - min) * relativeX)
+
+        Fill.Size = UDim2.new(relativeX, 0, 1, 0)
+        Knob.Position = UDim2.new(relativeX, -7, 0.5, -7)
+        ValueLabel.Text = tostring(value)
+
+        callback(value)
+    end
+
+    InputBtn.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    InputBtn.MouseButton1Click:Connect(function()
+        -- Also update on single click
+    end)
+
+    return Slider
+end
+
+-- ═══════════════════════════════════════════════════
+-- FEATURE IMPLEMENTATIONS
+-- ═══════════════════════════════════════════════════
+
+-- Helper: Get character humanoid
+local function getHumanoid()
+    local char = LocalPlayer.Character
+    if char then
+        return char:FindFirstChildOfClass("Humanoid")
+    end
+    return nil
+end
+
+-- Helper: Get HumanoidRootPart
+local function getHRP()
+    local char = LocalPlayer.Character
+    if char then
+        return char:FindFirstChild("HumanoidRootPart")
+    end
+    return nil
+end
+
+-- Helper: Get all NPCs in workspace
+local function getNPCs()
+    local npcs = {}
+    local npcWorkspace = Workspace:FindFirstChild("WorkspaceScriptable")
+    if npcWorkspace then
+        local storage = npcWorkspace:FindFirstChild("Storage")
+        if storage then
+            local normalStorage = storage:FindFirstChild("NormalStorage")
+            if normalStorage then
+                local npcFolder = normalStorage:FindFirstChild("NPCWorkspace")
+                if npcFolder then
+                    for _, npc in pairs(npcFolder:GetChildren()) do
+                        if npc:IsA("Model") and npc:FindFirstChild("Humanoid") then
+                            table.insert(npcs, npc)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return npcs
+end
+
+-- Helper: Check if NPC has contraband
+local function hasContraband(npc)
+    local props = npc:FindFirstChild("Properties")
+    if props then
+        local randVars = props:FindFirstChild("RandomVariables")
+        if randVars then
+            local real = randVars:FindFirstChild("ContrabandReal")
+            if real and real.Value == true then
+                return "real"
+            end
+            local fake = randVars:FindFirstChild("ContrabandFake")
+            if fake and fake.Value == true then
+                return "fake"
+            end
+            local passport = randVars:FindFirstChild("FakePassport")
+            if passport and passport.Value == true then
+                return "passport"
+            end
+        end
+    end
+    return nil
+end
+
+-- Clean up ESP
+local function clearESP()
+    for _, obj in pairs(espObjects) do
+        if obj and obj.Parent then
+            obj:Destroy()
+        end
+    end
+    espObjects = {}
+end
+
+-- Speed Hack
+local speedValue = GlobalSettings.PlayerRunSpeed
+local function setSpeed(enabled)
+    toggles.Speed = enabled
+    local hum = getHumanoid()
+    if hum then
+        if enabled then
+            hum.WalkSpeed = speedValue
+        else
+            hum.WalkSpeed = GlobalSettings.PlayerWalkSpeed
+        end
+    end
+end
+
+-- Infinite Sprint
+local function setInfSprint(enabled)
+    toggles.InfSprint = enabled
+    if enabled then
+        -- Use RenderStepped to run AFTER the game's sprint drain code every frame
+        connections.InfSprint = RunService.RenderStepped:Connect(function()
+            local hum = getHumanoid()
+            if not hum then return end
+
+            -- Force WalkSpeed to run speed (or custom speed if speed hack is on)
+            if toggles.Speed then
+                hum.WalkSpeed = speedValue
+            else
+                hum.WalkSpeed = GlobalSettings.PlayerRunSpeed
+            end
+
+            -- Keep sprint bar visually full
+            local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+            if playerGui then
+                local controlUI = playerGui:FindFirstChild("ControlUI")
+                if controlUI then
+                    local sprintBar = controlUI:FindFirstChild("SprintBarFrame")
+                    if sprintBar then
+                        local bar = sprintBar:FindFirstChild("Bar")
+                        if bar then
+                            bar.Size = UDim2.new(1, 0, 1, 0)
+                        end
+                        sprintBar.Visible = false
+                    end
+                end
+            end
+        end)
+    else
+        if connections.InfSprint then
+            connections.InfSprint:Disconnect()
+            connections.InfSprint = nil
+        end
+        -- Reset to normal walk speed if speed hack is off
+        if not toggles.Speed then
+            local hum = getHumanoid()
+            if hum then
+                hum.WalkSpeed = GlobalSettings.PlayerWalkSpeed
+            end
+        end
+    end
+end
+
+-- NPC ESP
+local function updateNPCESP()
+    clearESP()
+    if not toggles.NPCESP then return end
+
+    for _, npc in pairs(getNPCs()) do
+        local hrp = npc:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "HubESP"
+            highlight.FillTransparency = 0.7
+            highlight.OutlineTransparency = 0
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+            local contraband = hasContraband(npc)
+            if contraband == "real" then
+                highlight.FillColor = Color3.fromRGB(255, 50, 50)
+                highlight.OutlineColor = Color3.fromRGB(255, 80, 80)
+            elseif contraband == "fake" then
+                highlight.FillColor = Color3.fromRGB(255, 180, 30)
+                highlight.OutlineColor = Color3.fromRGB(255, 200, 50)
+            elseif contraband == "passport" then
+                highlight.FillColor = Color3.fromRGB(255, 120, 0)
+                highlight.OutlineColor = Color3.fromRGB(255, 140, 30)
+            else
+                highlight.FillColor = Color3.fromRGB(50, 200, 80)
+                highlight.OutlineColor = Color3.fromRGB(80, 255, 120)
+            end
+
+            highlight.Adornee = npc
+            highlight.Parent = npc
+            table.insert(espObjects, highlight)
+
+            -- Name + status billboard
+            local bb = Instance.new("BillboardGui")
+            bb.Name = "HubBB"
+            bb.Size = UDim2.new(0, 160, 0, 40)
+            bb.StudsOffset = Vector3.new(0, 3.5, 0)
+            bb.AlwaysOnTop = true
+            bb.Parent = hrp
+            table.insert(espObjects, bb)
+
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            nameLabel.TextStrokeTransparency = 0.5
+            nameLabel.TextSize = 12
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.Parent = bb
+
+            local statusLabel = Instance.new("TextLabel")
+            statusLabel.Size = UDim2.new(1, 0, 0.5, 0)
+            statusLabel.Position = UDim2.new(0, 0, 0.5, 0)
+            statusLabel.BackgroundTransparency = 1
+            statusLabel.TextStrokeTransparency = 0.5
+            statusLabel.TextSize = 10
+            statusLabel.Font = Enum.Font.GothamSemibold
+            statusLabel.Parent = bb
+
+            if contraband == "real" then
+                nameLabel.Text = "⚠ CONTRABAND"
+                statusLabel.Text = "REAL - ARREST"
+                statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+            elseif contraband == "fake" then
+                nameLabel.Text = "⚡ FAKE ITEM"
+                statusLabel.Text = "FALSE ALARM"
+                statusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+            elseif contraband == "passport" then
+                nameLabel.Text = "📄 FAKE PASSPORT"
+                statusLabel.Text = "ARREST"
+                statusLabel.TextColor3 = Color3.fromRGB(255, 140, 30)
+            else
+                nameLabel.Text = "✓ CLEAN"
+                statusLabel.Text = "SAFE"
+                statusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+            end
+
+            -- Distance label
+            local distLabel = Instance.new("TextLabel")
+            distLabel.Size = UDim2.new(1, 0, 0, 14)
+            distLabel.Position = UDim2.new(0, 0, 1, 2)
+            distLabel.BackgroundTransparency = 1
+            distLabel.TextColor3 = Color3.fromRGB(180, 170, 220)
+            distLabel.TextStrokeTransparency = 0.5
+            distLabel.TextSize = 9
+            distLabel.Font = Enum.Font.Gotham
+            distLabel.Parent = bb
+
+            -- Update distance
+            task.spawn(function()
+                while bb.Parent and toggles.NPCESP do
+                    local myHRP = getHRP()
+                    if myHRP and hrp.Parent then
+                        local dist = (myHRP.Position - hrp.Position).Magnitude
+                        distLabel.Text = string.format("[%.0f studs]", dist)
+                    end
+                    task.wait(0.5)
+                end
+            end)
+        end
+    end
+end
+
+-- Noclip
+local function setNoclip(enabled)
+    toggles.Noclip = enabled
+    if enabled then
+        connections.Noclip = RunService.Stepped:Connect(function()
+            local char = LocalPlayer.Character
+            if char then
+                for _, part in pairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    else
+        if connections.Noclip then
+            connections.Noclip:Disconnect()
+            connections.Noclip = nil
+        end
+    end
+end
+
+-- Teleport to nearest NPC with contraband
+local function tpToContraband()
+    local hrp = getHRP()
+    if not hrp then return end
+
+    local closest = nil
+    local closestDist = math.huge
+
+    for _, npc in pairs(getNPCs()) do
+        local contraband = hasContraband(npc)
+        if contraband == "real" or contraband == "passport" then
+            local npcHRP = npc:FindFirstChild("HumanoidRootPart")
+            if npcHRP then
+                local dist = (hrp.Position - npcHRP.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closest = npcHRP
+                end
+            end
+        end
+    end
+
+    if closest then
+        hrp.CFrame = closest.CFrame * CFrame.new(0, 0, 3)
+    end
+end
+
+-- Teleport to a specific location
+local function tpToSpawn()
+    local hrp = getHRP()
+    if not hrp then return end
+
+    local spawn = Workspace:FindFirstChild("Map")
+    if spawn then
+        local spawnLoc = spawn:FindFirstChildOfClass("SpawnLocation", true)
+        if spawnLoc then
+            hrp.CFrame = spawnLoc.CFrame + Vector3.new(0, 3, 0)
+        end
+    end
+
+    -- Fallback: find any SpawnLocation in workspace
+    if hrp then
+        for _, desc in pairs(Workspace:GetDescendants()) do
+            if desc:IsA("SpawnLocation") then
+                hrp.CFrame = desc.CFrame + Vector3.new(0, 3, 0)
+                break
+            end
+        end
+    end
+end
+
+-- ═══════════════════════════════════════════════════
+-- BUILD UI
+-- ═══════════════════════════════════════════════════
+
+-- Player Section
+CreateSection("⚡  Player", 1)
+
+CreateToggle("Speed Hack", "Override walk speed", 2, function(enabled)
+    setSpeed(enabled)
+end)
+
+CreateSlider("Walk Speed", "Adjust movement speed", 16, 150, 25, 3, function(value)
+    speedValue = value
+    if toggles.Speed then
+        local hum = getHumanoid()
+        if hum then
+            hum.WalkSpeed = value
+        end
+    end
+end)
+
+CreateToggle("Infinite Sprint", "Never run out of stamina", 4, function(enabled)
+    setInfSprint(enabled)
+end)
+
+CreateToggle("Noclip", "Walk through walls", 5, function(enabled)
+    setNoclip(enabled)
+end)
+
+-- ESP Section
+CreateSection("👁  ESP & Visuals", 10)
+
+CreateToggle("NPC ESP", "Highlight NPCs with status", 11, function(enabled)
+    toggles.NPCESP = enabled
+    if enabled then
+        updateNPCESP()
+        -- Auto-refresh ESP
+        connections.ESPRefresh = RunService.Heartbeat:Connect(function()
+            if not toggles.NPCESP then
+                if connections.ESPRefresh then
+                    connections.ESPRefresh:Disconnect()
+                    connections.ESPRefresh = nil
+                end
+                return
+            end
+        end)
+        -- Periodic refresh for new NPCs
+        task.spawn(function()
+            while toggles.NPCESP do
+                task.wait(3)
+                if toggles.NPCESP then
+                    updateNPCESP()
+                end
+            end
+        end)
+    else
+        clearESP()
+        if connections.ESPRefresh then
+            connections.ESPRefresh:Disconnect()
+            connections.ESPRefresh = nil
+        end
+    end
+end)
+
+-- Teleport Section
+CreateSection("🚀  Teleport", 20)
+
+CreateButton("TP to Contraband", "Teleport to nearest criminal NPC", 21, function()
+    tpToContraband()
+end)
+
+CreateButton("TP to Spawn", "Return to spawn location", 22, function()
+    tpToSpawn()
+end)
+
+-- Misc Section
+CreateSection("⚙  Miscellaneous", 30)
+
+CreateButton("Refresh ESP", "Force refresh NPC highlights", 31, function()
+    if toggles.NPCESP then
+        updateNPCESP()
+    end
+end)
+
+CreateButton("Reset Character", "Respawn your character", 32, function()
+    local hum = getHumanoid()
+    if hum then
+        hum.Health = 0
+    end
+end)
+
+-- ═══════════════════════════════════════════════════
+-- DRAGGING
+-- ═══════════════════════════════════════════════════
+
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ═══════════════════════════════════════════════════
+-- MINIMIZE & CLOSE
+-- ═══════════════════════════════════════════════════
+
+local minimized = false
+local originalSize = MainFrame.Size
+
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+            Size = UDim2.new(0, 340, 0, 50)
+        }):Play()
+        Content.Visible = false
+        AccentLine.Visible = false
+        MinBtn.Text = "+"
+    else
+        Content.Visible = true
+        AccentLine.Visible = true
+        TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
+            Size = originalSize
+        }):Play()
+        MinBtn.Text = "—"
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    -- Clean up
+    clearESP()
+    for k, conn in pairs(connections) do
+        if conn then conn:Disconnect() end
+    end
+    -- Reset walkspeed
+    local hum = getHumanoid()
+    if hum then
+        hum.WalkSpeed = GlobalSettings.PlayerWalkSpeed
+    end
+    ScreenGui:Destroy()
+end)
+
+-- ═══════════════════════════════════════════════════
+-- TOGGLE KEY (Right Shift to show/hide)
+-- ═══════════════════════════════════════════════════
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
+
+-- ═══════════════════════════════════════════════════
+-- ENTRANCE ANIMATION
+-- ═══════════════════════════════════════════════════
+
+MainFrame.Size = UDim2.new(0, 340, 0, 0)
+MainFrame.BackgroundTransparency = 1
+
+ScreenGui.Parent = game:GetService("CoreGui")
+
+task.wait(0.1)
+
+TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = originalSize,
+    BackgroundTransparency = 0
+}):Play()
+
+-- ═══════════════════════════════════════════════════
+-- AUTO-REAPPLY ON RESPAWN
+-- ═══════════════════════════════════════════════════
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(1)
+    if toggles.Speed then
+        local hum = char:WaitForChild("Humanoid", 5)
+        if hum then
+            hum.WalkSpeed = speedValue
+        end
+    end
+    if toggles.Noclip then
+        -- Re-enable noclip on new character
+        setNoclip(false)
+        setNoclip(true)
+    end
+    if toggles.NPCESP then
+        task.wait(2)
+        updateNPCESP()
+    end
+end)
+
+print("✈ Airport Hub loaded! Press Right Shift to toggle UI.")
