@@ -1,0 +1,127 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+-- =========================================================
+-- CONFIGURATION
+-- =========================================================
+local UpdateBidEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Auction"):WaitForChild("UpdateCurrentWinningBid")
+
+local MAX_BID_LIMIT = 50000 -- Change this to the absolute max you want to spend
+-- =========================================================
+
+-- Clean up any old UI leftover from previous executions
+if CoreGui:FindFirstChild("AutoBidderUI") then
+    CoreGui.AutoBidderUI:Destroy()
+end
+
+-- 1. Create Main UI Panel Window
+local sg = Instance.new("ScreenGui")
+sg.Name = "AutoBidderUI"
+sg.Parent = CoreGui
+sg.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", sg)
+frame.Size = UDim2.new(0, 160, 0, 65)
+frame.Position = UDim2.new(0, 20, 0, 200) -- Positioned slightly below your other menu
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.Active = true 
+
+local layout = Instance.new("UIListLayout", frame)
+layout.Padding = UDim.new(0, 6)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+local frameCorner = Instance.new("UICorner", frame)
+frameCorner.CornerRadius = UDim.new(0, 8)
+
+-- 2. Create the Toggle Button
+local bidBtn = Instance.new("TextButton", frame)
+bidBtn.Size = UDim2.new(0, 140, 0, 45)
+bidBtn.Text = "Auto-Bid: OFF"
+bidBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+bidBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50) -- Starts Red
+bidBtn.Font = Enum.Font.SourceSansBold
+bidBtn.TextSize = 13
+Instance.new("UICorner", bidBtn).CornerRadius = UDim.new(0, 6)
+
+-- =========================================================
+-- UI DRAGGING ENGINE (Makes the button frame moveable)
+-- =========================================================
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+-- =========================================================
+
+-- 3. Core Bidding Logic Hook
+local autoBidActive = false
+
+UpdateBidEvent.OnClientEvent:Connect(function(currentBid, currentHolderName, holderChar, nextRequiredBid, garageObject)
+    if not autoBidActive then return end
+    
+    -- Check if someone else currently holds the winning spot
+    if currentHolderName ~= LocalPlayer.Name then
+        print("Outbid! Next price required: " .. nextRequiredBid)
+        
+        -- Budget limit guardrail
+        if nextRequiredBid <= MAX_BID_LIMIT then
+            -- Attempting to automatically target the outbound RemoteEvent
+            local BidRemote = ReplicatedStorage.Events.Auction:FindFirstChild("PlaceBid") or ReplicatedStorage.Events.Auction:FindFirstChild("Bid")
+            
+            if BidRemote and BidRemote:IsA("RemoteEvent") then
+                BidRemote:FireServer(nextRequiredBid, garageObject)
+                print("Placed automated bid: " .. nextRequiredBid)
+            else
+                warn("Outbound bidding event could not be found under Events.Auction.")
+            end
+        else
+            print("Next bid is over your limit!")
+        end
+    end
+end)
+
+-- 4. Connect Button Interaction
+bidBtn.MouseButton1Click:Connect(function()
+    autoBidActive = not autoBidActive
+    
+    if autoBidActive then
+        bidBtn.Text = "Auto-Bid: ON"
+        bidBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50) -- Turns Green
+        print("Auto-Bidder Activated.")
+    else
+        bidBtn.Text = "Auto-Bid: OFF"
+        bidBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50) -- Turns Red
+        print("Auto-Bidder Deactivated.")
+    end
+end)
