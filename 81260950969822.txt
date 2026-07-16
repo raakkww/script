@@ -1,0 +1,612 @@
+-- Roblox Studio LocalScript (Place in StarterPlayerScripts or StarterGui)
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+--// CONFIGURATION
+local AIM_KEY = Enum.UserInputType.MouseButton2
+local TOGGLE_KEY = Enum.KeyCode.RightShift
+local CROSSHAIR_OFFSET = Vector2.new(0, -55) 
+local FOV_RADIUS = 80
+
+--// STATES
+local AimingEnabled = true
+local TargetLock = nil
+local AimMode = "Hold" 
+local IsAimingToggleState = false
+local IsUnloaded = false
+local ChamsTransparency = 0.5 
+local TeamCheckEnabled = true
+local PredictionEnabled = false
+local PredictionValue = 0.1
+local SmoothnessValue = 0.5
+local EspEnabled = true
+
+--// CONNECTIONS TRACKING
+local Connections = {}
+
+--// UI CREATION
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomAimUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 240, 0, 565) 
+MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local MainGradient = Instance.new("UIGradient")
+MainGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 115, 0)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30))
+})
+MainGradient.Rotation = 90
+MainGradient.Parent = MainFrame
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local Logo = Instance.new("ImageLabel")
+Logo.Size = UDim2.new(0, 48, 0, 32)
+Logo.Position = UDim2.new(0, 10, 0, 4)
+Logo.BackgroundTransparency = 1
+Logo.Image = "rbxassetid://113217904967714"
+Logo.ScaleType = Enum.ScaleType.Stretch
+Logo.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -65, 0, 40)
+Title.Position = UDim2.new(0, 64, 0, 0)
+Title.Text = "Fanta Hub"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundTransparency = 1
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Title.Parent = MainFrame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.9, 0, 0, 35)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0.08, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+ToggleBtn.Text = "Aim System: ON"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSans
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = MainFrame
+
+local ModeBtn = Instance.new("TextButton")
+ModeBtn.Size = UDim2.new(0.9, 0, 0, 35)
+ModeBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
+ModeBtn.BackgroundColor3 = Color3.fromRGB(142, 68, 173)
+ModeBtn.Text = "Aim Mode: HOLD"
+ModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ModeBtn.Font = Enum.Font.SourceSans
+ModeBtn.TextSize = 16
+ModeBtn.Parent = MainFrame
+
+local TeamCheckBtn = Instance.new("TextButton")
+TeamCheckBtn.Size = UDim2.new(0.9, 0, 0, 35)
+TeamCheckBtn.Position = UDim2.new(0.05, 0, 0.22, 0)
+TeamCheckBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+TeamCheckBtn.Text = "Team Check: ON"
+TeamCheckBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeamCheckBtn.Font = Enum.Font.SourceSans
+TeamCheckBtn.TextSize = 16
+TeamCheckBtn.Parent = MainFrame
+
+local PredictionBtn = Instance.new("TextButton")
+PredictionBtn.Size = UDim2.new(0.9, 0, 0, 35)
+PredictionBtn.Position = UDim2.new(0.05, 0, 0.29, 0)
+PredictionBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+PredictionBtn.Text = "Prediction: OFF"
+PredictionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PredictionBtn.Font = Enum.Font.SourceSans
+PredictionBtn.TextSize = 16
+PredictionBtn.Parent = MainFrame
+
+local EspToggleBtn = Instance.new("TextButton")
+EspToggleBtn.Size = UDim2.new(0.9, 0, 0, 35)
+EspToggleBtn.Position = UDim2.new(0.05, 0, 0.36, 0)
+EspToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+EspToggleBtn.Text = "ESP: ON"
+EspToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+EspToggleBtn.Font = Enum.Font.SourceSans
+EspToggleBtn.TextSize = 16
+EspToggleBtn.Parent = MainFrame
+
+local SwitchTargetBtn = Instance.new("TextButton")
+SwitchTargetBtn.Size = UDim2.new(0.9, 0, 0, 35)
+SwitchTargetBtn.Position = UDim2.new(0.05, 0, 0.43, 0)
+SwitchTargetBtn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+SwitchTargetBtn.Text = "Switch Target"
+SwitchTargetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SwitchTargetBtn.Font = Enum.Font.SourceSans
+SwitchTargetBtn.TextSize = 16
+SwitchTargetBtn.Parent = MainFrame
+
+local SliderContainer = Instance.new("Frame")
+SliderContainer.Size = UDim2.new(0.9, 0, 0, 45)
+SliderContainer.Position = UDim2.new(0.05, 0, 0.50, 0)
+SliderContainer.BackgroundTransparency = 1
+SliderContainer.Parent = MainFrame
+
+local SliderLabel = Instance.new("TextLabel")
+SliderLabel.Size = UDim2.new(1, 0, 0, 20)
+SliderLabel.Text = "Chams Visibility: 0.50"
+SliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SliderLabel.BackgroundTransparency = 1
+SliderLabel.Font = Enum.Font.SourceSans
+SliderLabel.TextSize = 14
+SliderLabel.Parent = SliderContainer
+
+local SliderBar = Instance.new("Frame")
+SliderBar.Size = UDim2.new(1, 0, 0, 6)
+SliderBar.Position = UDim2.new(0, 0, 0.6, 0)
+SliderBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+SliderBar.BorderSizePixel = 0
+SliderBar.Parent = SliderContainer
+
+local SliderFill = Instance.new("Frame")
+SliderFill.Size = UDim2.new(0.444, 0, 1, 0) 
+SliderFill.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+SliderFill.BorderSizePixel = 0
+SliderFill.Parent = SliderBar
+
+local SliderButton = Instance.new("TextButton")
+SliderButton.Size = UDim2.new(0, 12, 0, 12)
+SliderButton.Position = UDim2.new(0.444, -6, 0.5, -6)
+SliderButton.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
+SliderButton.Text = ""
+SliderButton.BorderSizePixel = 0
+SliderButton.Parent = SliderBar
+
+local PredSliderContainer = Instance.new("Frame")
+PredSliderContainer.Size = UDim2.new(0.9, 0, 0, 45)
+PredSliderContainer.Position = UDim2.new(0.05, 0, 0.59, 0)
+PredSliderContainer.BackgroundTransparency = 1
+PredSliderContainer.Parent = MainFrame
+
+local PredSliderLabel = Instance.new("TextLabel")
+PredSliderLabel.Size = UDim2.new(1, 0, 0, 20)
+PredSliderLabel.Text = "Prediction: 0.10"
+PredSliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+PredSliderLabel.BackgroundTransparency = 1
+PredSliderLabel.Font = Enum.Font.SourceSans
+PredSliderLabel.TextSize = 14
+PredSliderLabel.Parent = PredSliderContainer
+
+local PredSliderBar = Instance.new("Frame")
+PredSliderBar.Size = UDim2.new(1, 0, 0, 6)
+PredSliderBar.Position = UDim2.new(0, 0, 0.6, 0)
+PredSliderBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+PredSliderBar.BorderSizePixel = 0
+PredSliderBar.Parent = PredSliderContainer
+
+local PredSliderFill = Instance.new("Frame")
+PredSliderFill.Size = UDim2.new(0, 0, 1, 0) 
+PredSliderFill.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+PredSliderFill.BorderSizePixel = 0
+PredSliderFill.Parent = PredSliderBar
+
+local PredSliderButton = Instance.new("TextButton")
+PredSliderButton.Size = UDim2.new(0, 12, 0, 12)
+PredSliderButton.Position = UDim2.new(0, -6, 0.5, -6)
+PredSliderButton.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
+PredSliderButton.Text = ""
+PredSliderButton.BorderSizePixel = 0
+PredSliderButton.Parent = PredSliderBar
+
+local SmoothSliderContainer = Instance.new("Frame")
+SmoothSliderContainer.Size = UDim2.new(0.9, 0, 0, 45)
+SmoothSliderContainer.Position = UDim2.new(0.05, 0, 0.68, 0)
+SmoothSliderContainer.BackgroundTransparency = 1
+SmoothSliderContainer.Parent = MainFrame
+
+local SmoothSliderLabel = Instance.new("TextLabel")
+SmoothSliderLabel.Size = UDim2.new(1, 0, 0, 20)
+SmoothSliderLabel.Text = "Smoothness: 0.50"
+SmoothSliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SmoothSliderLabel.BackgroundTransparency = 1
+SmoothSliderLabel.Font = Enum.Font.SourceSans
+SmoothSliderLabel.TextSize = 14
+SmoothSliderLabel.Parent = SmoothSliderContainer
+
+local SmoothSliderBar = Instance.new("Frame")
+SmoothSliderBar.Size = UDim2.new(1, 0, 0, 6)
+SmoothSliderBar.Position = UDim2.new(0, 0, 0.6, 0)
+SmoothSliderBar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+SmoothSliderBar.BorderSizePixel = 0
+SmoothSliderBar.Parent = SmoothSliderContainer
+
+local SmoothSliderFill = Instance.new("Frame")
+SmoothSliderFill.Size = UDim2.new(0.5, 0, 1, 0) 
+SmoothSliderFill.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
+SmoothSliderFill.BorderSizePixel = 0
+SmoothSliderFill.Parent = SmoothSliderBar
+
+local SmoothSliderButton = Instance.new("TextButton")
+SmoothSliderButton.Size = UDim2.new(0, 12, 0, 12)
+SmoothSliderButton.Position = UDim2.new(0.5, -6, 0.5, -6)
+SmoothSliderButton.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
+SmoothSliderButton.Text = ""
+SmoothSliderButton.BorderSizePixel = 0
+SmoothSliderButton.Parent = SmoothSliderBar
+
+local UnloadBtn = Instance.new("TextButton")
+UnloadBtn.Size = UDim2.new(0.9, 0, 0, 35)
+UnloadBtn.Position = UDim2.new(0.05, 0, 0.81, 0)
+UnloadBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+UnloadBtn.Text = "Unload Script"
+UnloadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UnloadBtn.Font = Enum.Font.SourceSansBold
+UnloadBtn.TextSize = 16
+UnloadBtn.Parent = MainFrame
+
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(1, 0, 0, 25)
+InfoLabel.Position = UDim2.new(0, 0, 0.94, 0)
+InfoLabel.Text = "Press [RShift] to Hide/Show UI"
+InfoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Font = Enum.Font.SourceSansItalic
+InfoLabel.TextSize = 13
+InfoLabel.Parent = MainFrame
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = true
+FOVCircle.Thickness = 1.5
+FOVCircle.Color = Color3.fromRGB(46, 204, 113)
+FOVCircle.Filled = false
+FOVCircle.Radius = FOV_RADIUS
+
+--// DRAGGING SYSTEM LOGIC
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = MainFrame.Position
+		
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+--// ESP CHAMS SYSTEM
+local ChamsCache = {}
+
+local function applyChamProperties(highlight, player)
+	if not highlight then return end
+	local teamColor = player.TeamColor and player.TeamColor.Color or Color3.fromRGB(255, 255, 255)
+	highlight.FillColor = teamColor
+	highlight.OutlineColor = teamColor
+	highlight.FillTransparency = 1 - ChamsTransparency
+	highlight.OutlineTransparency = 0
+	highlight.Enabled = EspEnabled
+end
+
+local function createCham(player)
+	if ChamsCache[player] or player == LocalPlayer then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "EspCham_" .. player.Name
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	ChamsCache[player] = highlight
+
+	local function onCharacterAdded(char)
+		if IsUnloaded then return end
+		highlight.Adornee = char
+		highlight.Parent = char
+		applyChamProperties(highlight, player)
+	end
+
+	if player.Character then
+		onCharacterAdded(player.Character)
+	end
+	local charConn = player.CharacterAdded:Connect(onCharacterAdded)
+	table.insert(Connections, charConn)
+end
+
+local function removeCham(player)
+	if ChamsCache[player] then
+		ChamsCache[player]:Destroy()
+		ChamsCache[player] = nil
+	end
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+	createCham(player)
+end
+table.insert(Connections, Players.PlayerAdded:Connect(createCham))
+table.insert(Connections, Players.PlayerRemoving:Connect(removeCham))
+
+--// SLIDERS LOGIC
+local IsDraggingSlider = false
+local IsDraggingPredSlider = false
+local IsDraggingSmoothSlider = false
+
+local function UpdateSlider(inputPosition)
+	local barAbsolutePosition = SliderBar.AbsolutePosition.X
+	local barAbsoluteSize = SliderBar.AbsoluteSize.X
+	local percentage = math.clamp((inputPosition.X - barAbsolutePosition) / barAbsoluteSize, 0, 1)
+	
+	SliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+	SliderButton.Position = UDim2.new(percentage, -6, 0.5, -6)
+	
+	ChamsTransparency = 0.1 + (percentage * 0.9)
+	SliderLabel.Text = string.format("Chams Visibility: %.2f", ChamsTransparency)
+	
+	for player, highlight in pairs(ChamsCache) do
+		applyChamProperties(highlight, player)
+	end
+end
+
+local function UpdatePredSlider(inputPosition)
+	local barAbsolutePosition = PredSliderBar.AbsolutePosition.X
+	local barAbsoluteSize = PredSliderBar.AbsoluteSize.X
+	local percentage = math.clamp((inputPosition.X - barAbsolutePosition) / barAbsoluteSize, 0, 1)
+	
+	PredSliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+	PredSliderButton.Position = UDim2.new(percentage, -6, 0.5, -6)
+	
+	PredictionValue = 0.1 + (percentage * 0.4)
+	PredSliderLabel.Text = string.format("Prediction: %.2f", PredictionValue)
+end
+
+local function UpdateSmoothSlider(inputPosition)
+	local barAbsolutePosition = SmoothSliderBar.AbsolutePosition.X
+	local barAbsoluteSize = SmoothSliderBar.AbsoluteSize.X
+	local percentage = math.clamp((inputPosition.X - barAbsolutePosition) / barAbsoluteSize, 0, 1)
+	
+	SmoothSliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+	SmoothSliderButton.Position = UDim2.new(percentage, -6, 0.5, -6)
+	
+	SmoothnessValue = percentage
+	SmoothSliderLabel.Text = string.format("Smoothness: %.2f", SmoothnessValue)
+end
+
+SliderButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		IsDraggingSlider = true
+	end
+end)
+
+PredSliderButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		IsDraggingPredSlider = true
+	end
+end)
+
+SmoothSliderButton.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		IsDraggingSmoothSlider = true
+	end
+end)
+
+table.insert(Connections, UserInputService.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		if IsDraggingSlider then
+			UpdateSlider(input.Position)
+		elseif IsDraggingPredSlider then
+			UpdatePredSlider(input.Position)
+		elseif IsDraggingSmoothSlider then
+			UpdateSmoothSlider(input.Position)
+		end
+	end
+end))
+
+table.insert(Connections, UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		IsDraggingSlider = false
+		IsDraggingPredSlider = false
+		IsDraggingSmoothSlider = false
+	end
+end))
+
+--// HELPER FUNCTIONS
+local function getCrosshairCenter()
+	return (Camera.ViewportSize / 2) + CROSSHAIR_OFFSET
+end
+
+local function getClosestTarget(ignoreTarget)
+	local closestPlayer = nil
+	local shortestDistance = FOV_RADIUS
+	local crosshairPos = getCrosshairCenter()
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+			if ignoreTarget and player == ignoreTarget then continue end
+			if TeamCheckEnabled and player.Team == LocalPlayer.Team and LocalPlayer.Team ~= nil then continue end 
+			
+			local head = player.Character.Head
+			local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+			
+			if onScreen then
+				local magnitude = (Vector2.new(screenPos.X, screenPos.Y) - crosshairPos).Magnitude
+				if magnitude < shortestDistance then
+					shortestDistance = magnitude
+					closestPlayer = player
+				end
+			end
+		end
+	end
+	return closestPlayer
+end
+
+--// UI FUNCTIONALITY
+ToggleBtn.MouseButton1Click:Connect(function()
+	if IsUnloaded then return end
+	AimingEnabled = not AimingEnabled
+	ToggleBtn.Text = "Aim System: " .. (AimingEnabled and "ON" or "OFF")
+	ToggleBtn.BackgroundColor3 = AimingEnabled and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(231, 76, 60)
+	FOVCircle.Visible = AimingEnabled
+end)
+
+ModeBtn.MouseButton1Click:Connect(function()
+	if IsUnloaded then return end
+	if AimMode == "Hold" then
+		AimMode = "Toggle"
+		ModeBtn.Text = "Aim Mode: TOGGLE"
+		ModeBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+	else
+		AimMode = "Hold"
+		ModeBtn.Text = "Aim Mode: HOLD"
+		ModeBtn.BackgroundColor3 = Color3.fromRGB(142, 68, 173)
+	end
+	IsAimingToggleState = false
+end)
+
+TeamCheckBtn.MouseButton1Click:Connect(function()
+	if IsUnloaded then return end
+	TeamCheckEnabled = not TeamCheckEnabled
+	TeamCheckBtn.Text = "Team Check: " .. (TeamCheckEnabled and "ON" or "OFF")
+	TeamCheckBtn.BackgroundColor3 = TeamCheckEnabled and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(231, 76, 60)
+end)
+
+PredictionBtn.MouseButton1Click:Connect(function()
+	if IsUnloaded then return end
+	PredictionEnabled = not PredictionEnabled
+	PredictionBtn.Text = "Prediction: " .. (PredictionEnabled and "ON" or "OFF")
+	PredictionBtn.BackgroundColor3 = PredictionEnabled and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(231, 76, 60)
+end)
+
+EspToggleBtn.MouseButton1Click:Connect(function()
+	if IsUnloaded then return end
+	EspEnabled = not EspEnabled
+	EspToggleBtn.Text = "ESP: " .. (EspEnabled and "ON" or "OFF")
+	EspToggleBtn.BackgroundColor3 = EspEnabled and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(231, 76, 60)
+	
+	for player, highlight in pairs(ChamsCache) do
+		applyChamProperties(highlight, player)
+	end
+end)
+
+SwitchTargetBtn.MouseButton1Click:Connect(function()
+	if AimingEnabled and not IsUnloaded then
+		TargetLock = getClosestTarget(TargetLock)
+	end
+end)
+
+UnloadBtn.MouseButton1Click:Connect(function()
+	IsUnloaded = true
+	AimingEnabled = false
+	TargetLock = nil
+	IsAimingToggleState = false
+	FOVCircle:Remove()
+	
+	-- Disconnect all script connections
+	for _, conn in ipairs(Connections) do
+		if conn then conn:Disconnect() end
+	end
+	
+	-- Destroy highlights inside tracked cache
+	for player, _ in pairs(ChamsCache) do
+		removeCham(player)
+	end
+	
+	-- Workspace cleaning scan fallback to completely clear residual highlights
+	for _, descendant in ipairs(workspace:GetDescendants()) do
+		if descendant:IsA("Highlight") and string.sub(descendant.Name, 1, 8) == "EspCham_" then
+			descendant:Destroy()
+		end
+	end
+	
+	ScreenGui:Destroy()
+end)
+
+table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed or IsUnloaded then return end
+	if input.KeyCode == TOGGLE_KEY then
+		MainFrame.Visible = not MainFrame.Visible
+	end
+	
+	if AimingEnabled and input.UserInputType == AIM_KEY then
+		if AimMode == "Toggle" then
+			IsAimingToggleState = not IsAimingToggleState
+		end
+	end
+end))
+
+table.insert(Connections, UserInputService.InputEnded:Connect(function(input, gameProcessed)
+	if IsUnloaded then return end
+	if AimingEnabled and input.UserInputType == AIM_KEY then
+		if AimMode == "Hold" then
+			IsAimingToggleState = false
+		end
+	end
+end))
+
+--// MAIN LOOP
+table.insert(Connections, RunService.RenderStepped:Connect(function()
+	if IsUnloaded then return end
+
+	local crosshairPos = getCrosshairCenter()
+	FOVCircle.Position = crosshairPos
+
+	if not AimingEnabled then 
+		TargetLock = nil
+		IsAimingToggleState = false
+		FOVCircle.Visible = false
+		return 
+	end
+
+	local currentlyAiming = (AimMode == "Hold") and UserInputService:IsMouseButtonPressed(AIM_KEY) or IsAimingToggleState
+
+	if currentlyAiming then
+		if not TargetLock or not TargetLock.Character or not TargetLock.Character:FindFirstChild("Head") or TargetLock.Character:FindFirstChildOfClass("Humanoid").Health <= 0 or (TeamCheckEnabled and TargetLock.Team == LocalPlayer.Team and LocalPlayer.Team ~= nil) then
+			TargetLock = getClosestTarget()
+		end
+
+		if TargetLock and TargetLock.Character and TargetLock.Character:FindFirstChild("Head") then
+			local targetHead = TargetLock.Character.Head
+			local targetRoot = TargetLock.Character:FindFirstChild("HumanoidRootPart")
+			local targetPosition = targetHead.Position
+			
+			if PredictionEnabled and targetRoot then
+				targetPosition = targetPosition + (targetRoot.Velocity * PredictionValue)
+			end
+			
+			local camCFrame = Camera.CFrame
+			local screenPoint = Camera:WorldToViewportPoint(targetPosition)
+			local screenVector = Vector2.new(screenPoint.X, screenPoint.Y)
+			
+			local diff = screenVector - crosshairPos
+			
+			local fovRadians = math.rad(Camera.FieldOfView)
+			local angleY = (diff.Y / Camera.ViewportSize.Y) * (2 * math.tan(fovRadians / 2))
+			local angleX = (diff.X / Camera.ViewportSize.X) * (2 * math.tan(fovRadians / 2)) * (Camera.ViewportSize.X / Camera.ViewportSize.Y)
+			
+			local finalSmoothness = 1 + (SmoothnessValue * 9)
+			
+			Camera.CFrame = camCFrame * CFrame.Angles(-angleY / finalSmoothness, -angleX / finalSmoothness, 0)
+		end
+		FOVCircle.Visible = true
+	else
+		TargetLock = nil
+		FOVCircle.Visible = true
+	end
+end))
