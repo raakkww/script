@@ -1,0 +1,77 @@
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wall%20v3"))()
+local window = library:CreateWindow("auto")
+
+local main = window:CreateFolder("Auto Spin")
+
+getgenv().BloodlineSpin = false
+getgenv().ElementSpin = false
+
+-- Bloodline Auto Spin
+main:Toggle("Bloodline Auto Spin", function(state)
+    getgenv().BloodlineSpin = state
+
+    if state then
+        task.spawn(function()
+            while getgenv().BloodlineSpin do
+                game.Players.LocalPlayer.startevent:FireServer("spin", "kg1")
+                task.wait(0.5)
+                game.Players.LocalPlayer.startevent:FireServer("spin", "kg2")
+                task.wait(1.5)
+            end
+        end)
+    end
+end)
+
+-- Element Auto Spin
+main:Toggle("Element Auto Spin", function(state)
+    getgenv().ElementSpin = state
+
+    if state then
+        task.spawn(function()
+            while getgenv().ElementSpin do
+                game.Players.LocalPlayer.startevent:FireServer("spin", "element1")
+                task.wait(0.5)
+                game.Players.LocalPlayer.startevent:FireServer("spin", "element2")
+                task.wait(1.5)
+            end
+        end)
+    end
+end)local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wall%20v3"))()
+local window = library:CreateWindow("auto")
+
+local main = window:CreateFolder("Auto Spin")
+
+getgenv().BloodlineSpin = false
+getgenv().ElementSpin = false
+
+-- Bloodline Auto Spin
+main:Toggle("Bloodline Auto Spin", function(state)
+    getgenv().BloodlineSpin = state
+
+    if state then
+        task.spawn(function()
+            while getgenv().BloodlineSpin do
+                game.Players.LocalPlayer.startevent:FireServer("spin", "kg1")
+                task.wait(0.5)
+                game.Players.LocalPlayer.startevent:FireServer("spin", "kg2")
+                task.wait(1.5)
+            end
+        end)
+    end
+end)
+
+-- Element Auto Spin
+main:Toggle("Element Auto Spin", function(state)
+    getgenv().ElementSpin = state
+
+    if state then
+        task.spawn(function()
+            while getgenv().ElementSpin do
+                game.Players.LocalPlayer.startevent:FireServer("spin", "element1")
+                task.wait(0.5)
+                game.Players.LocalPlayer.startevent:FireServer("spin", "element2")
+                task.wait(1.5)
+            end
+        end)
+    end
+end)
