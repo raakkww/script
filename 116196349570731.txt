@@ -1,0 +1,239 @@
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "YukaaaHub V.1.0",
+    Icon = "lucide-crown",
+    Author = "@yukapissed",
+    Folder = "YukaaaHubConfig"
+})
+
+WindUI:Notify({
+    Title = "YukaaaHub Loaded Successfully!",
+    Description = "Welcome back! Premium script made by @yukapissed",
+    Context = "Success",
+    Duration = 5
+})
+
+local HomeTab = Window:Tab({
+    Title = "Home & Info",
+    Icon = "lucide-home"
+})
+
+local FarmTab = Window:Tab({
+    Title = "Manual Target",
+    Icon = "lucide-crosshair"
+})
+
+HomeTab:Button({
+    Title = "Script Owner / Developer",
+    Description = "Discord: @yukapissed (Click to copy)",
+    Callback = function()
+        setclipboard("@yukapissed")
+        WindUI:Notify({
+            Title = "Copied!",
+            Description = "Discord username copied to clipboard!",
+            Context = "Info",
+            Duration = 3
+        })
+    end
+})
+
+HomeTab:Button({
+    Title = "Status & Version",
+    Description = "Version: 1.0.0 [Stable Release]",
+    Callback = function() end
+})
+
+local itemData = {
+    ["Noobini Pizzanini"] = "Common",
+    ["Boneca Ambalabu"] = "Common",
+    ["Tim Cheese"] = "Common",
+    ["Br Br Batabim"] = "Common",
+    ["Brri Brri Bicus"] = "Common",
+    ["Cacto Hipopotamo"] = "Common",
+    ["Tric Trac Baraboom"] = "Common",
+    ["Trippi Troppi"] = "Common",
+    ["Bandito Bobritto"] = "Common",
+    ["Fluri Flura"] = "Uncommon",
+    ["Gangster Footera"] = "Uncommon",
+    ["Glorbo Fruitto Drillo"] = "Uncommon",
+    ["Avocadini Buffo"] = "Uncommon",
+    ["Salamino Penguino"] = "Uncommon",
+    ["Kiwi Pipi"] = "Uncommon",
+    ["Lirili Larila"] = "Uncommon",
+    ["Svinino"] = "Uncommon",
+    ["Tung Tung Tung Sahur"] = "Rare",
+    ["Talpa Di Ferro"] = "Rare",
+    ["Talpa Di Ferro Triple"] = "Rare",
+    ["Frigo Camelo"] = "Rare",
+    ["Lioneli Cactusini"] = "Rare",
+    ["Trulimero Truli"] = "Rare",
+    ["Tu Tu Tu Sahur"] = "Rare",
+    ["Octopus"] = "Epic",
+    ["Cameloni Meleloni"] = "Epic",
+    ["Cappoccino Assassino"] = "Epic",
+    ["Chimpanzini Bananini"] = "Epic",
+    ["Cocofanto Elefanto"] = "Epic",
+    ["Dolphinita"] = "Epic",
+    ["Elefanto Frigo"] = "Legendary",
+    ["Gorillo Watermelondrillo"] = "Legendary",
+    ["Melon Otter"] = "Legendary",
+    ["Avocadini Antilopini"] = "Legendary",
+    ["Ballerina Cappuccina"] = "Legendary",
+    ["Bambini Crostini"] = "Legendary",
+    ["Udin Din Din Dun"] = "Legendary",
+    ["Tralalero Tralala"] = "Mythic",
+    ["Bombardini Crocodilo"] = "Mythic",
+    ["Bombardini Gusini"] = "Mythic",
+    ["Blackhole Goat"] = "Mythic",
+    ["Garamararamararaman"] = "Mythic",
+    ["To To To Sahur"] = "Mythic",
+    ["Orangutini Ananasini"] = "Mythic",
+    ["Alessio"] = "Mythic",
+    ["Corn Sahur"] = "Mythic",
+    ["Torrtuginni Dragonfrutini"] = "Secret",
+    ["La Vacca Saturno Saturnita"] = "Secret",
+    ["Los Tralaleritos"] = "Secret",
+    ["Stoppo Luminino"] = "Secret",
+    ["Madung"] = "Secret",
+    ["Job Application"] = "Secret",
+    ["Las Vaquitas Saturnitas"] = "Secret",
+    ["Waterdino"] = "Celestial",
+    ["Calculino"] = "Celestial",
+    ["Mangolini Parrocini"] = "Celestial",
+    ["Bisonte Giuppitere"] = "Celestial",
+    ["Castlino Fortini"] = "Celestial",
+    ["67"] = "Celestial",
+    ["Cappuccino Clownino"] = "Cosmic",
+    ["Swag Soda"] = "Cosmic",
+    ["Chillin' Chilli"] = "Cosmic",
+    ["Burguro"] = "Cosmic",
+    ["Smurf Cat"] = "Cosmic",
+    ["Spaghetti Tualetti"] = "Hacker",
+    ["Nuclearo Dinossauro"] = "Hacker",
+    ["Rexosaurus"] = "Hacker",
+    ["Tic Tac Sahur"] = "Hacker",
+    ["Tuff Toucan"] = "Hacker",
+    ["Gattatino Nyanino"] = "OG",
+    ["Strawberry Elefant"] = "OG",
+    ["Skibi Toilet"] = "OG",
+    ["Dragon Cannelloni"] = "OG",
+    ["Meowl"] = "OG"
+}
+
+local blockMapping = {
+    ["Common"] = "Lucky Block",
+    ["Uncommon"] = "Uncommon Lucky Block",
+    ["Rare"] = "Rare Lucky Block",
+    ["Epic"] = "Epic Lucky Block",
+    ["Legendary"] = "Legendary Lucky Block",
+    ["Secret"] = "Secret Lucky Block",
+    ["Mythic"] = "Giant Mythic Lucky Block",
+    ["Celestial"] = "Giant Celestial Lucky Block",
+    ["Cosmic"] = "Giant Circuitry Lucky Block",
+    ["Hacker"] = "Giant Hacker Lucky Block",
+    ["OG"] = "Giant Strawberry Lucky Block"
+}
+
+local itemsList = {}
+local displayToName = {}
+local tempNames = {}
+
+for name, _ in pairs(itemData) do
+    table.insert(tempNames, name)
+end
+table.sort(tempNames)
+
+for _, name in ipairs(tempNames) do
+    local rarity = itemData[name]
+    local displayText = "[" .. rarity .. "] " .. name
+    table.insert(itemsList, displayText)
+    displayToName[displayText] = name
+end
+
+local mutationsList = {"Normal", "Golden", "Diamond", "Magma", "Disco", "Ruby", "Neon"}
+
+local selectedDisplay = itemsList[1]
+local selectedMutation = "Normal"
+
+local function getZonePosition(rarityName)
+    local targetPosition = Vector3.new(-29.859832763672, 4.5068635940552, -248.39669799805)
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") and v.Name:lower():find(rarityName:lower()) then
+            targetPosition = v.Position
+            break
+        end
+    end
+    return targetPosition
+end
+
+local function fireFarmEvent(itemName, mutation)
+    local player = game.Players.LocalPlayer
+    if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local storage = game:GetService("ReplicatedStorage")
+    local remotes = storage:WaitForChild("ThrowLuckyBlockRemotes", 5)
+    if not remotes then return end
+    
+    local ThrowStarted = remotes:WaitForChild("ThrowStarted", 5)
+    local LuckyBlockLanded = remotes:WaitForChild("LuckyBlockLanded", 5)
+    if not ThrowStarted or not LuckyBlockLanded then return end
+    
+    local rarity = itemData[itemName] or "Common"
+    local blockName = blockMapping[rarity] or "Lucky Block"
+    local calculatedPosition = getZonePosition(rarity)
+    
+    player.Character.HumanoidRootPart.CFrame = CFrame.new(16.4, 18.9, -499.9)
+    task.wait(0.05)
+    
+    ThrowStarted:FireServer()
+    LuckyBlockLanded:FireServer({
+        LandingPosition = calculatedPosition,
+        ItemName = itemName,
+        Rarity = rarity,
+        BlockName = blockName,
+        LandingRarity = rarity,
+        Mutation = mutation,
+        Power = 7.6680453638405
+    })
+    
+    task.wait(0.1)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(16.4, 18.9, -499.9)
+    end
+end
+
+FarmTab:Dropdown({
+    Title = "Target Brainrot Item",
+    Description = "Pilih item brainrot spesifik yang ingin dicari",
+    Values = itemsList,
+    Callback = function(value)
+        selectedDisplay = value
+    end
+})
+
+FarmTab:Dropdown({
+    Title = "Target Mutation",
+    Description = "Pilih jenis mutasi yang diinginkan",
+    Values = mutationsList,
+    Callback = function(value)
+        selectedMutation = value
+    end
+})
+
+FarmTab:Button({
+    Title = "Execute Sniper Target",
+    Description = "Klaim item target lalu otomatis kembali ke area racket",
+    Callback = function()
+        local selectedItem = displayToName[selectedDisplay]
+        if selectedItem then
+            fireFarmEvent(selectedItem, selectedMutation)
+            WindUI:Notify({
+                Title = "Target Acquired!",
+                Description = "Successfully generated " .. selectedItem .. " [" .. selectedMutation .. "]",
+                Context = "Success",
+                Duration = 3
+            })
+        end
+    end
+})
