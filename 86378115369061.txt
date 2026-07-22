@@ -1,0 +1,184 @@
+-- Tung Hub (bf obby) – WindUI only
+-- Author: @ | Tung1 |
+local player = game.Players.LocalPlayer
+
+-- ======== COORDINATES ========
+local teleportLoopPos = Vector3.new(21162, 113, -771)
+
+local speedFarmPositions = {
+    ["0 Rebirths"] = Vector3.new(789, 65, -678),
+    ["1 Rebirth"]  = Vector3.new(784, 65, -691),
+    ["3 Rebirths"] = Vector3.new(788, 83, -699),
+}
+local rebirthOptions = { "0 Rebirths", "1 Rebirth", "3 Rebirths" }
+
+-- ======== FARM WALK SETTINGS ========
+local FARM_DISTANCE = 50
+local FARM_FIXED_DIRECTION = Vector3.new(0, 0, 1) -- +Z
+
+-- ======== STATE VARIABLES ========
+local teleportLoopActive = false
+local farmLoopActive = false
+local teleportThread = nil
+local farmThread = nil
+local selectedRebirthOption = "0 Rebirths"
+
+-- ======== TELEPORT FUNCTIONS ========
+local function teleportTo(pos)
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(pos)
+        return true
+    end
+    return false
+end
+
+-- ======== LOOP TELEPORT ========
+local function doTeleportCycle()
+    return teleportTo(teleportLoopPos)
+end
+
+local function startTeleportLoop()
+    if teleportThread then return end
+    teleportLoopActive = true
+    teleportThread = coroutine.create(function()
+        while teleportLoopActive do
+            local ok = doTeleportCycle()
+            if not ok then wait(1) end
+            wait(3)
+        end
+        teleportThread = nil
+    end)
+    coroutine.resume(teleportThread)
+end
+
+local function stopTeleportLoop()
+    teleportLoopActive = false
+end
+
+-- ======== WALK LOOP ========
+local function walkToPoint(humanoid, root, targetPos, timeout)
+    timeout = timeout or 5
+    humanoid:MoveTo(targetPos)
+    local startTime = tick()
+    repeat
+        wait(0.1)
+        local dist = (root.Position - targetPos).Magnitude
+        if dist < 3 then return true end
+        if tick() - startTime > timeout then
+            root.CFrame = CFrame.new(targetPos)
+            return true
+        end
+        if not humanoid.Parent then return false end
+    until false
+    return false
+end
+
+local function doFarmCycle()
+    local char = player.Character
+    if not char then return false end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not root or not humanoid then return false end
+
+    local startPos = root.Position
+    local forward = FARM_FIXED_DIRECTION.Unit * FARM_DISTANCE
+    local targetPos = startPos + forward
+
+    if not walkToPoint(humanoid, root, targetPos) then return false end
+    if not walkToPoint(humanoid, root, startPos) then return false end
+    return true
+end
+
+local function startFarmLoop()
+    if farmThread then return end
+    farmLoopActive = true
+    farmThread = coroutine.create(function()
+        while farmLoopActive do
+            local ok = doFarmCycle()
+            if not ok then wait(1) end
+            wait(0.5)
+        end
+        farmThread = nil
+    end)
+    coroutine.resume(farmThread)
+end
+
+local function stopFarmLoop()
+    farmLoopActive = false
+end
+
+-- ======== SPEED FARM TELEPORT ========
+local function teleportSpeedFarm()
+    local pos = speedFarmPositions[selectedRebirthOption]
+    if pos then
+        local success = teleportTo(pos)
+        if success then
+            print("✅ Teleported to Speed Farm for " .. selectedRebirthOption)
+        else
+            print("⚠️ Could not teleport – character not ready")
+        end
+    end
+end
+
+-- ======== LOAD WINDUI ========
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+if not WindUI then
+    error("WindUI failed to load. Make sure you have internet access.")
+end
+
+local Window = WindUI:CreateWindow({
+    Title = "Tung Hub (bf obby)",
+    Author = "@ | Tung1 |",
+    Folder = "TungHub",
+    Icon = "send",
+    Theme = "Dark",
+    Size = UDim2.fromOffset(420, 450)
+})
+
+-- Main Tab
+local mainTab = Window:Tab({ Title = "Main", Icon = "home" })
+
+-- 1. Teleport Loop Toggle
+mainTab:Toggle({
+    Title = "Loop Teleport",
+    Description = "Teleport to (21162, 113, -771) every 3s",
+    Default = false,
+    Callback = function(state)
+        if state then startTeleportLoop() else stopTeleportLoop() end
+    end
+})
+
+-- 2. Walk Loop Toggle
+mainTab:Toggle({
+    Title = "Walk 50 Studs",
+    Description = "Walk forward 50 studs, then back",
+    Default = false,
+    Callback = function(state)
+        if state then startFarmLoop() else stopFarmLoop() end
+    end
+})
+
+-- 3. Speed Farm – Dropdown (FIXED: Default as index 1)
+mainTab:Dropdown({
+    Title = "Select Rebirth Count",
+    Description = "Choose your current rebirths",
+    Options = rebirthOptions,
+    Default = 1,   -- index, not string
+    Callback = function(option, index)
+        selectedRebirthOption = option
+        print("Selected: " .. option)
+    end
+})
+
+-- 4. Speed Farm – Teleport Button
+mainTab:Button({
+    Title = "Teleport to Speed Farm",
+    Description = "Go to the spot for your rebirth count",
+    Callback = function()
+        teleportSpeedFarm()
+    end
+})
+
+print("✅ Tung Hub (WindUI) loaded successfully!")
+print("📌 Dropdown should now show three options.")
