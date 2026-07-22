@@ -1,0 +1,180 @@
+-- ============================================
+-- +1 Looks Per Click - Hub
+-- ============================================
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local LocalPlayer = Players.LocalPlayer
+local mouse = LocalPlayer:GetMouse()
+
+-- Variables
+local autoclickerEnabled = false
+local antiAFKEnabled = false
+local speedHackEnabled = false
+local noclipEnabled = false
+
+local cps = 15
+local speedValue = 50
+local clickCounter = 0
+
+local clickConnection = nil
+local antiAFKConnection = nil
+
+-- AutoClicker
+local function performClick()
+    pcall(function()
+        local x, y = mouse.X, mouse.Y
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        task.wait(0.001)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        clickCounter += 1
+    end)
+end
+
+local function toggleAutoclicker()
+    autoclickerEnabled = not autoclickerEnabled
+    if autoclickerEnabled then
+        if clickConnection then clickConnection:Disconnect() end
+        clickConnection = RunService.Heartbeat:Connect(function()
+            if autoclickerEnabled then
+                performClick()
+                task.wait(1 / cps)
+            end
+        end)
+        Rayfield:Notify({Title = "Autoclicker", Content = "▶️ ENABLED", Duration = 2})
+    else
+        if clickConnection then clickConnection:Disconnect() clickConnection = nil end
+        Rayfield:Notify({Title = "Autoclicker", Content = "⏸️ DISABLED", Duration = 2})
+    end
+end
+
+-- Speed Hack
+local function toggleSpeedHack()
+    speedHackEnabled = not speedHackEnabled
+    if speedHackEnabled then
+        spawn(function()
+            while speedHackEnabled do
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                    LocalPlayer.Character.Humanoid.WalkSpeed = speedValue
+                end
+                task.wait(0.5)
+            end
+        end)
+    else
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = 16
+        end
+    end
+    Rayfield:Notify({Title = "Speed Hack", Content = speedHackEnabled and "⚡ ENABLED" or "⚡ DISABLED", Duration = 2})
+end
+
+-- Noclip
+local function toggleNoclip()
+    noclipEnabled = not noclipEnabled
+    Rayfield:Notify({Title = "Noclip", Content = noclipEnabled and "🕳️ ENABLED" or "🕳️ DISABLED", Duration = 2})
+end
+
+RunService.Stepped:Connect(function()
+    if noclipEnabled and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+end)
+
+-- GUI
+local Window = Rayfield:CreateWindow({
+    Name = "+1 Looks Per Click - Hub",
+    LoadingTitle = "+1 Looks Per Click",
+    LoadingSubtitle = "by Pooh",
+    ToggleUIKeybind = Enum.KeyCode.K,
+    ConfigurationSaving = { Enabled = true, FolderName = "LooksHub", FileName = "Config" }
+})
+
+-- ==================== MAIN TAB ====================
+local MainTab = Window:CreateTab("Main", "home")
+
+MainTab:CreateSection("🎮 Main Controls")
+MainTab:CreateButton({Name = "🔘 Toggle Autoclicker (F)", Callback = toggleAutoclicker})
+MainTab:CreateButton({Name = "🛡️ Toggle Anti-AFK", Callback = function() antiAFKEnabled = not antiAFKEnabled; Rayfield:Notify({Title="Anti-AFK", Content=antiAFKEnabled and "🛡️ ENABLED" or "🛡️ DISABLED", Duration=2}) end})
+
+MainTab:CreateSection("⚡ Exploits")
+MainTab:CreateButton({Name = "⚡ Toggle Speed Hack", Callback = toggleSpeedHack})
+MainTab:CreateButton({Name = "🕳️ Toggle Noclip", Callback = toggleNoclip})
+
+MainTab:CreateSection("📊 Live Status")
+local StatusParagraph = MainTab:CreateParagraph({Title = "Current Status", Content = "Loading..."})
+
+-- ==================== SETTINGS TAB ====================
+local SettingsTab = Window:CreateTab("Settings", "settings")
+
+SettingsTab:CreateSection("⚙️ Settings")
+SettingsTab:CreateSlider({
+    Name = "⚡ Autoclicker Speed (CPS)",
+    Range = {1, 60},
+    Increment = 1,
+    CurrentValue = 15,
+    Callback = function(Value) cps = Value end
+})
+
+SettingsTab:CreateSlider({
+    Name = "🏃 Speed Hack Value",
+    Range = {16, 100},
+    Increment = 2,
+    CurrentValue = 50,
+    Callback = function(Value) speedValue = Value end
+})
+
+SettingsTab:CreateParagraph({
+    Title = "⚠️ Note",
+    Content = "Move your mouse for the autoclicker to work properly."
+})
+
+-- ==================== HELP TAB ====================
+local HelpTab = Window:CreateTab("Help", "info")
+
+HelpTab:CreateParagraph({
+    Title = "📌 Controls",
+    Content = "• F = Toggle Autoclicker\n• K = Open/Close Menu\n• Move your mouse for the autoclicker to work"
+})
+
+HelpTab:CreateParagraph({
+    Title = "📧 Support",
+    Content = "Any problem or suggestion write to:\n@globalshopespana@gmail.com"
+})
+
+HelpTab:CreateParagraph({
+    Title = "⚠️ Warning",
+    Content = "Use at your own risk.\nSome servers may detect these methods."
+})
+
+-- Live Status Updater
+task.spawn(function()
+    while true do
+        StatusParagraph:Set({
+            Title = "Current Status",
+            Content = "Autoclicker: " .. (autoclickerEnabled and "🟢 ENABLED" or "🔴 DISABLED") ..
+                      "\nSpeed Hack: " .. (speedHackEnabled and "🟢 ENABLED" or "🔴 DISABLED") ..
+                      "\nNoclip: " .. (noclipEnabled and "🟢 ENABLED" or "🔴 DISABLED") ..
+                      "\nCPS: " .. cps
+        })
+        task.wait(0.8)
+    end
+end)
+
+-- Keybind F
+UserInputService.InputBegan:Connect(function(input, gp)
+    if not gp and input.KeyCode == Enum.KeyCode.F then
+        toggleAutoclicker()
+    end
+end)
+
+Rayfield:Notify({
+    Title = "+1 Looks Per Click - Hub",
+    Content = "Loaded successfully!",
+    Duration = 6
+})
