@@ -1,0 +1,92 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local localPlayer = Players.LocalPlayer
+local firefliesFolder = Workspace.WorldFireflies
+
+local rarityOrder = {
+	["Rainbow"] = 1,
+	["Purple"] = 2,
+	["Golden"] = 3
+}
+
+local function getPriority(objName)
+	for keyword, priority in pairs(rarityOrder) do
+		if string.find(objName, keyword) then
+			return priority
+		end
+	end
+	return nil
+end
+
+local function getTargetFireflies()
+	local list = {}
+	for _, obj in ipairs(firefliesFolder:GetChildren()) do
+		local priority = getPriority(obj.Name)
+		if priority then
+			local prompt = obj:FindFirstChildOfClass("ProximityPrompt") or obj:GetComponentInChildren("ProximityPrompt")
+			if not prompt then
+				for _, child in ipairs(obj:GetDescendants()) do
+					if child:IsA("ProximityPrompt") then
+						prompt = child
+						break
+					end
+				end
+			end
+			
+			local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
+			if not part and prompt then
+				part = prompt.Parent
+			end
+			
+			if prompt and part then
+				table.insert(list, {object = part, prompt = prompt, priority = priority, rawObject = obj})
+			end
+		end
+	end
+	
+	table.sort(list, function(a, b)
+		return a.priority < b.priority
+	end)
+	
+	return list
+end
+
+-- inf loop
+task.spawn(function()
+	print("sorry mom i like boys..")
+	
+	while true do
+		local character = localPlayer.Character
+		local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+		
+		if rootPart then
+			local targets = getTargetFireflies()
+			
+			if #targets > 0 then
+				for _, target in ipairs(targets) do
+					local rawObject = target.rawObject
+					local prompt = target.prompt
+					
+					if target.object and prompt and rawObject:IsDescendantOf(firefliesFolder) then
+						local keyCode = prompt.KeyboardKeyCode
+						prompt.HoldDuration = 0
+						
+						while rawObject:IsDescendantOf(firefliesFolder) and rawObject.Parent ~= nil do
+							rootPart.Velocity = Vector3.zero
+							rootPart.CFrame = target.object.CFrame + Vector3.new(0, 1, 0)
+							
+							VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+							task.wait(0.02)
+							VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+							
+							task.wait(0.03)
+						end
+					end
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+end)
