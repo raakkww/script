@@ -1,0 +1,91 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local TeleportService = game:GetService("TeleportService")
+
+local abilityRemote = ReplicatedStorage:WaitForChild("game_folder"):WaitForChild("remote"):WaitForChild("ability_remote")
+
+local isRunning = true
+local checkInterval = 5
+local minPlayerCount = 5
+
+local function executeAttack(targetChar)
+	local args = {
+		"Powerplex",
+		"M1",
+		targetChar,
+		"BoostCombatBlockBreaker",
+		1,
+		13275050218.687336
+	}
+	abilityRemote:FireServer(unpack(args))
+end
+
+local function attackAll()
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer then
+			local targetChar = plr.Character
+			if targetChar then
+				local humanoid = targetChar:FindFirstChild("Humanoid")
+				if humanoid and humanoid.Health > 0 then
+					executeAttack(targetChar)
+				end
+			end
+		end
+	end
+end
+
+local function teleportToMostPopulatedServer()
+	local success, servers = pcall(function()
+		return TeleportService:GetServerListAsync(game.PlaceId, 1, 100)
+	end)
+	
+	if not success or not servers or #servers == 0 then
+		return
+	end
+	
+	local bestServer = nil
+	local maxPlayers = 0
+	
+	for _, server in pairs(servers) do
+		if server.Id ~= game.JobId then
+			local count = server.PlayerCount or 0
+			if count > maxPlayers and count < server.MaxPlayers then
+				maxPlayers = count
+				bestServer = server
+			end
+		end
+	end
+	
+	if bestServer and bestServer.Id then
+		TeleportService:TeleportToPlaceInstance(game.PlaceId, bestServer.Id, LocalPlayer)
+	end
+end
+
+local function checkPlayerCount()
+	local currentPlayers = #Players:GetPlayers() - 1
+	
+	if currentPlayers <= minPlayerCount then
+		teleportToMostPopulatedServer()
+	end
+end
+
+task.spawn(function()
+	while isRunning do
+		attackAll()
+		task.wait(0.6)
+	end
+end)
+
+task.spawn(function()
+	while isRunning do
+		task.wait(checkInterval)
+		checkPlayerCount()
+	end
+end)
+
+LocalPlayer.OnTeleport:Connect(function(state)
+	if state == Enum.TeleportState.Failed then
+		isRunning = false
+	end
+end)
