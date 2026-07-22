@@ -1,0 +1,2259 @@
+-- took me 6 hours
+-- made by @2criminals on dc
+-- discord.gg/criminalcc
+
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
+
+local events = ReplicatedStorage:WaitForChild("Events")
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local skins = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Skins"))
+
+local customization = ReplicatedStorage:FindFirstChild("Customization")
+local hats = customization and customization:FindFirstChild("Hats")
+local backblings = customization and customization:FindFirstChild("Backblings")
+local melees = ReplicatedStorage:FindFirstChild("Items")
+
+local cleanConnections
+local findMelees
+local isBackbling
+local weldParts
+local weldByAttachments
+local weldCosmetic
+local redirectWelds
+local attachBackbling
+local attachAccessory
+local attachHat
+local getOrCreateFolder
+local getAppliedItems
+local getExpectedItems
+local loadSkinModel
+local checkNeedsReapply
+local applySkin
+local applyPickaxe
+local applyGlider
+local isMelee
+local isGlider
+local setMouseLock
+local toggleMouseLock
+local updatePlayerDataValue
+local setSkin
+local setPickaxe
+local setBackbling
+local setGlider
+local playKillEffect
+local setKillEffect
+local playEmoteTrack
+local setEmote
+local setWrap
+local setMusicPack
+local setLoadingScreen
+local removeViewportModel
+local renderViewportModel
+local renderPickaxeViewport
+local renderBackblingViewport
+local renderGliderViewport
+local updateConsoleStatus
+local initCharacterHook
+local initKillEffectListener
+local toggleMenu
+
+local RARITY_COLORS = {
+	Common = Color3.fromRGB(180, 180, 180),
+	Uncommon = Color3.fromRGB(96, 170, 58),
+	Rare = Color3.fromRGB(73, 172, 255),
+	Epic = Color3.fromRGB(180, 99, 255),
+	Legendary = Color3.fromRGB(255, 196, 64),
+	Mythic = Color3.fromRGB(255, 90, 90),
+	Admin = Color3.fromRGB(255, 80, 80),
+	Icon = Color3.fromRGB(255, 140, 0),
+}
+
+local CHARACTER_PARTS = {
+	"Head", "UpperTorso", "LowerTorso",
+	"LeftUpperArm", "LeftLowerArm", "LeftHand",
+	"RightUpperArm", "RightLowerArm", "RightHand",
+	"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+	"RightUpperLeg", "RightLowerLeg", "RightFoot",
+	"HumanoidRootPart",
+}
+
+local runtime = _G.ArtemisSkinChanger
+if not runtime then
+	runtime = { connections = {} }
+	_G.ArtemisSkinChanger = runtime
+end
+
+runtime.skinCache = runtime.skinCache or {}
+runtime.loadingQueue = runtime.loadingQueue or {}
+
+function cleanConnections()
+	for _, connection in ipairs(runtime.connections) do
+		pcall(function()
+			connection:Disconnect()
+		end)
+	end
+	table.clear(runtime.connections)
+	if runtime.mouseCheck then
+		runtime.mouseCheck:Disconnect()
+		runtime.mouseCheck = nil
+	end
+end
+cleanConnections()
+
+runtime.id = (runtime.id or 0) + 1
+local currentId = runtime.id
+
+runtime.state = runtime.state or {}
+local state = runtime.state
+state.previewModel = nil
+state.mouseUnlocked = false
+state.token = state.token or 0
+state.appliedSkinName = state.appliedSkinName
+state.selectedPickaxe = state.selectedPickaxe or nil
+state.selectedBackbling = state.selectedBackbling or nil
+state.selectedGlider = state.selectedGlider or nil
+state.selectedKillEffect = state.selectedKillEffect or nil
+state.currentEmoteTrack = state.currentEmoteTrack or nil
+
+local function track(connection)
+	table.insert(runtime.connections, connection)
+	return connection
+end
+
+local existingGui = playerGui:FindFirstChild("ArtemisSkinChanger")
+if existingGui then
+	existingGui:Destroy()
+end
+
+local skinList = {}
+for name, config in pairs(skins) do
+	table.insert(skinList, {
+		name = name,
+		rarity = config.Rarity or "Common",
+	})
+end
+table.sort(skinList, function(a, b)
+	return a.name:lower() < b.name:lower()
+end)
+
+function findMelees()
+	if not melees then return {} end
+	local list = {}
+	for _, child in ipairs(melees:GetChildren()) do
+		if child:IsA("Model") then
+			local verified = false
+			local config = child:FindFirstChild("Config")
+			if config and config:IsA("ModuleScript") then
+				local ok, data = pcall(require, config)
+				if ok and type(data) == "table" and data.Type == "Melee" then
+					verified = true
+				end
+			end
+			if not verified then
+				local searchName = child.Name:lower()
+				if searchName:find("pickaxe") or searchName:find("axe") or searchName:find("wand") or searchName:find("scythe") or searchName:find("hammer") or searchName:find("crowbar") or searchName:find("bat") or searchName:find("blade") or searchName:find("katana") or searchName:find("trident") or searchName:find("staff") or searchName:find("spear") or searchName:find("cleat") or searchName:find("scepter") or searchName:find("mallet") or searchName:find("wrench") or searchName:find("cutter") or searchName:find("claw") or searchName:find("spatula") or searchName:find("stick") or searchName:find("knife") or searchName:find("darksaber") or searchName:find("lightsaber") or searchName:find("foil") or searchName:find("machete") or searchName:find("chainsaw") then
+					if not child:FindFirstChild("Ammo") and not child:FindFirstChild("Attachments") then
+						verified = true
+					end
+				end
+			end
+			if verified then
+				table.insert(list, child)
+			end
+		end
+	end
+	return list
+end
+
+local pickaxeList = {}
+local pickaxeLookup = {}
+local meleeModels = findMelees()
+for _, model in ipairs(meleeModels) do
+	local name = model.Name
+	if not pickaxeLookup[name] then
+		pickaxeLookup[name] = true
+		table.insert(pickaxeList, {
+			name = name,
+			rarity = "Rare",
+		})
+	end
+end
+table.sort(pickaxeList, function(a, b)
+	return a.name:lower() < b.name:lower()
+end)
+
+local backblingList = { { name = "None", rarity = "Common" } }
+if backblings then
+	for _, child in ipairs(backblings:GetChildren()) do
+		table.insert(backblingList, {
+			name = child.Name,
+			rarity = "Rare"
+		})
+	end
+end
+table.sort(backblingList, function(a, b)
+	if a.name == "None" then return true end
+	if b.name == "None" then return false end
+	return a.name:lower() < b.name:lower()
+end)
+
+local gliderList = { { name = "None", rarity = "Common" } }
+local gliderLookup = {}
+local function registerGliders(folder)
+	if folder then
+		for _, child in ipairs(folder:GetChildren()) do
+			local name = child.Name
+			if not gliderLookup[name] then
+				gliderLookup[name] = true
+				table.insert(gliderList, {
+					name = name,
+					rarity = "Rare"
+				})
+			end
+		end
+	end
+end
+registerGliders(customization:FindFirstChild("GliderModels"))
+registerGliders(customization:FindFirstChild("Gliders"))
+table.sort(gliderList, function(a, b)
+	if a.name == "None" then return true end
+	if b.name == "None" then return false end
+	return a.name:lower() < b.name:lower()
+end)
+
+local killEffectList = { { name = "None", rarity = "Common" } }
+local effectsFolder = customization and customization:FindFirstChild("KillEffects")
+if effectsFolder then
+	for _, child in ipairs(effectsFolder:GetChildren()) do
+		table.insert(killEffectList, { name = child.Name, rarity = "Rare" })
+	end
+end
+table.sort(killEffectList, function(a, b)
+	if a.name == "None" then return true end
+	if b.name == "None" then return false end
+	return a.name:lower() < b.name:lower()
+end)
+
+local emoteList = { { name = "None", rarity = "Common" } }
+local emotesFolder = ReplicatedStorage:FindFirstChild("Emotes")
+if emotesFolder then
+	for _, child in ipairs(emotesFolder:GetChildren()) do
+		table.insert(emoteList, { name = child.Name, rarity = "Rare" })
+	end
+end
+table.sort(emoteList, function(a, b)
+	if a.name == "None" then return true end
+	if b.name == "None" then return false end
+	return a.name:lower() < b.name:lower()
+end)
+
+local wrapList = { { name = "None", rarity = "Common" } }
+local wrapsModule = ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("Wraps")
+if wrapsModule then
+	local ok, data = pcall(require, wrapsModule)
+	if ok and type(data) == "table" then
+		for name, _ in pairs(data) do
+			table.insert(wrapList, { name = name, rarity = "Rare" })
+		end
+	end
+end
+table.sort(wrapList, function(a, b)
+	if a.name == "None" then return true end
+	if b.name == "None" then return false end
+	return a.name:lower() < b.name:lower()
+end)
+
+local musicList = { { name = "None", rarity = "Common" } }
+local musicModule = ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("MusicPacks")
+if musicModule then
+	local ok, data = pcall(require, musicModule)
+	if ok and type(data) == "table" then
+		for name, _ in pairs(data) do
+			table.insert(musicList, { name = name, rarity = "Rare" })
+		end
+	end
+end
+table.sort(musicList, function(a, b)
+	if a.name == "None" then return true end
+	if b.name == "None" then return false end
+	return a.name:lower() < b.name:lower()
+end)
+
+local loadingScreenList = { { name = "None", rarity = "Common" } }
+local screensModule = ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("LoadingScreens")
+if screensModule then
+	local ok, data = pcall(require, screensModule)
+	if ok and type(data) == "table" then
+		for name, _ in pairs(data) do
+			table.insert(loadingScreenList, { name = name, rarity = "Rare" })
+		end
+	end
+end
+table.sort(loadingScreenList, function(a, b)
+	if a.name == "None" then return true end
+	if b.name == "None" then return false end
+	return a.name:lower() < b.name:lower()
+end)
+
+local function getEquippedSkin()
+	local data = ReplicatedStorage:FindFirstChild("PlayerData")
+	local playerFolder = data and data:FindFirstChild(localPlayer.Name)
+	local equipped = playerFolder and playerFolder:FindFirstChild("Equipped")
+	local skinVal = equipped and equipped:FindFirstChild("Skin")
+	return skinVal and skinVal.Value or "Default"
+end
+
+local function getEquippedMelee()
+	local data = ReplicatedStorage:FindFirstChild("PlayerData")
+	local playerFolder = data and data:FindFirstChild(localPlayer.Name)
+	local equipped = playerFolder and playerFolder:FindFirstChild("Equipped")
+	if not equipped then return "Default" end
+	local itemVal = equipped:FindFirstChild("Melee") or equipped:FindFirstChild("Pickaxe") or equipped:FindFirstChild("Pick")
+	return itemVal and itemVal.Value or "Default"
+end
+
+local function copyVisuals(target, source)
+	if not target or not source then return end
+	if target:IsA("BasePart") and source:IsA("BasePart") then
+		target.Color = source.Color
+		target.Material = source.Material
+		target.Transparency = source.Transparency
+		if target:IsA("MeshPart") and source:IsA("MeshPart") then
+			target.MeshId = source.MeshId
+			target.TextureID = source.TextureID
+		end
+	end
+end
+
+local function copyAttachments(target, source)
+	if not target or not source then return end
+	for _, child in ipairs(source:GetChildren()) do
+		if child:IsA("Attachment") then
+			local match = target:FindFirstChild(child.Name)
+			if not match then
+				local clone = child:Clone()
+				clone.Parent = target
+			else
+				match.CFrame = child.CFrame
+			end
+		end
+	end
+end
+
+local function copyFaceDecals(target, source)
+	if not target or not source then return end
+	copyVisuals(target, source)
+
+	for _, child in ipairs(target:GetChildren()) do
+		if child:IsA("Decal") or child:IsA("Texture") or child:IsA("SpecialMesh") or child:IsA("SurfaceAppearance") then
+			child:Destroy()
+		end
+	end
+
+	for _, child in ipairs(source:GetChildren()) do
+		if child:IsA("Decal") or child:IsA("Texture") or child:IsA("SpecialMesh") or child:IsA("SurfaceAppearance") then
+			child:Clone().Parent = target
+		end
+	end
+end
+
+local function syncFolderContent(target, source)
+	if not target or not source then return end
+	target:ClearAllChildren()
+	for _, child in ipairs(source:GetChildren()) do
+		child:Clone().Parent = target
+	end
+end
+
+local function stripPhysics(part)
+	part.Anchored = false
+	part.CanCollide = false
+	part.Massless = true
+end
+
+function isBackbling(child)
+	if not child:IsA("Model") then return false end
+	if backblings and backblings:FindFirstChild(child.Name) then
+		return true
+	end
+	if child:FindFirstChild("UpperTorso") then
+		return true
+	end
+	return false
+end
+
+function weldParts(rootModel, referencePart)
+	for _, child in ipairs(rootModel:GetDescendants()) do
+		if child:IsA("Weld") or child:IsA("WeldConstraint") or child:IsA("Motor6D") then
+			if child.Part0 and child.Part0:IsDescendantOf(rootModel) and child.Part1 and child.Part1:IsDescendantOf(rootModel) then
+				child:Destroy()
+			end
+		end
+	end
+
+	for _, part in ipairs(rootModel:GetDescendants()) do
+		if part:IsA("BasePart") and part ~= referencePart then
+			stripPhysics(part)
+			local weld = Instance.new("Weld")
+			weld.Part0 = referencePart
+			weld.Part1 = part
+			weld.C0 = referencePart.CFrame:ToObjectSpace(part.CFrame)
+			weld.C1 = CFrame.new()
+			weld.Parent = part
+		end
+	end
+end
+
+function weldByAttachments(cosmeticModel, character)
+	local targetAttachment = nil
+	local targetPart = nil
+	
+	for _, part in ipairs(cosmeticModel:GetDescendants()) do
+		if part:IsA("BasePart") then
+			local attachment = part:FindFirstChildOfClass("Attachment")
+			if attachment then
+				targetAttachment = attachment
+				targetPart = part
+				break
+			end
+		end
+	end
+
+	if not targetAttachment or not targetPart then
+		local anchorPart = character:FindFirstChild("Head")
+		if isBackbling(cosmeticModel) then
+			anchorPart = character:FindFirstChild("UpperTorso")
+		end
+		
+		if anchorPart then
+			local primary = cosmeticModel.PrimaryPart or cosmeticModel:FindFirstChildWhichIsA("BasePart", true)
+			if primary then
+				stripPhysics(primary)
+				local weld = Instance.new("Weld")
+				weld.Part0 = anchorPart
+				weld.Part1 = primary
+				if anchorPart.Name == "UpperTorso" then
+					weld.C0 = CFrame.new(0, 0, 0.65)
+				else
+					weld.C0 = CFrame.new()
+				end
+				weld.C1 = CFrame.new()
+				weld.Parent = primary
+				weldParts(cosmeticModel, primary)
+				return true
+			end
+		end
+		return false
+	end
+
+	local attachmentName = targetAttachment.Name
+	local bodyPart = nil
+	local bodyAttachment = nil
+	
+	for _, partName in ipairs(CHARACTER_PARTS) do
+		local part = character:FindFirstChild(partName)
+		if part and part:IsA("BasePart") then
+			local attachment = part:FindFirstChild(attachmentName)
+			if attachment and attachment:IsA("Attachment") then
+				bodyPart = part
+				bodyAttachment = attachment
+				break
+			end
+		end
+	end
+
+	if not bodyAttachment then
+		if attachmentName:lower():find("backpack") or cosmeticModel.Name:lower():find("back") or cosmeticModel.Name:lower():find("shield") or cosmeticModel.Name:lower():find("cape") or isBackbling(cosmeticModel) then
+			bodyPart = character:FindFirstChild("UpperTorso")
+			bodyAttachment = bodyPart and bodyPart:FindFirstChild("BodyBackAttachment")
+		else
+			bodyPart = character:FindFirstChild("Head")
+			bodyAttachment = bodyPart and bodyPart:FindFirstChild("HatAttachment")
+		end
+	end
+
+	if not bodyPart or not bodyAttachment then
+		local anchorPart = character:FindFirstChild("Head")
+		if isBackbling(cosmeticModel) then
+			anchorPart = character:FindFirstChild("UpperTorso")
+		end
+		
+		if anchorPart then
+			stripPhysics(targetPart)
+			local weld = Instance.new("Weld")
+			weld.Part0 = anchorPart
+			weld.Part1 = targetPart
+			if anchorPart.Name == "UpperTorso" then
+				weld.C0 = CFrame.new(0, 0, 0.65)
+			else
+				weld.C0 = CFrame.new()
+			end
+			weld.C1 = CFrame.new()
+			weld.Parent = targetPart
+
+			weldParts(cosmeticModel, targetPart)
+			return true
+		end
+		return false
+	end
+
+	stripPhysics(targetPart)
+	local weld = Instance.new("Weld")
+	weld.Part0 = bodyPart
+	weld.Part1 = targetPart
+	weld.C0 = bodyAttachment.CFrame
+	weld.C1 = targetAttachment.CFrame
+	weld.Parent = targetPart
+
+	weldParts(cosmeticModel, targetPart)
+	return true
+end
+
+function weldCosmetic(cosmeticModel, character)
+	for _, child in ipairs(cosmeticModel:GetDescendants()) do
+		if child:IsA("Weld") or child:IsA("WeldConstraint") or child:IsA("Motor6D") then
+			if child.Part0 and (child.Part0:IsDescendantOf(character) or child.Part0.Name == "UpperTorso" or child.Part0.Name == "Head") then
+				child:Destroy()
+			elseif child.Part1 and (child.Part1:IsDescendantOf(character) or child.Part1.Name == "UpperTorso" or child.Part1.Name == "Head") then
+				child:Destroy()
+			end
+		end
+	end
+
+	weldByAttachments(cosmeticModel, character)
+
+	local builtTag = cosmeticModel:FindFirstChild("VisualChangerWeldRebuilt")
+	if not builtTag then
+		builtTag = Instance.new("BoolValue")
+		builtTag.Name = "VisualChangerWeldRebuilt"
+		builtTag.Parent = cosmeticModel
+	end
+	return true
+end
+
+function redirectWelds(clonedModel, templateModel, character)
+	for _, child in ipairs(clonedModel:GetDescendants()) do
+		if child:IsA("Weld") or child:IsA("WeldConstraint") or child:IsA("Motor6D") then
+			if child.Part0 and (child.Part0 == templateModel or child.Part0:IsDescendantOf(templateModel)) then
+				local target = character:FindFirstChild(child.Part0.Name)
+				if target then
+					child.Part0 = target
+				end
+			end
+			if child.Part1 and (child.Part1 == templateModel or child.Part1:IsDescendantOf(templateModel)) then
+				local target = character:FindFirstChild(child.Part1.Name)
+				if target then
+					child.Part1 = target
+				end
+			end
+		end
+	end
+end
+
+function attachBackbling(backblingName, character, folder)
+	if not backblings or not folder then return false end
+
+	local sourceModel = backblings:FindFirstChild(backblingName)
+	if not sourceModel then return false end
+
+	local clone = sourceModel:Clone()
+	clone.Name = backblingName
+	clone.Parent = folder
+
+	weldCosmetic(clone, character)
+	return true
+end
+
+function attachAccessory(accessory, character)
+	local handle = accessory:FindFirstChild("Handle")
+	if handle and handle:IsA("BasePart") then
+		stripPhysics(handle)
+		handle.Transparency = 0
+
+		local cosmeticAttachment = handle:FindFirstChildOfClass("Attachment")
+		local attachmentName = cosmeticAttachment and cosmeticAttachment.Name or "HatAttachment"
+
+		local bodyPart = nil
+		local bodyAttachment = nil
+		for _, partName in ipairs(CHARACTER_PARTS) do
+			local part = character:FindFirstChild(partName)
+			if part and part:IsA("BasePart") then
+				local attachment = part:FindFirstChild(attachmentName)
+				if attachment and attachment:IsA("Attachment") then
+					bodyPart = part
+					bodyAttachment = attachment
+					break
+				end
+			end
+		end
+
+		if not bodyPart or not bodyAttachment then
+			bodyPart = character:FindFirstChild("Head")
+			bodyAttachment = bodyPart and bodyPart:FindFirstChild("HatAttachment")
+		end
+
+		if bodyPart and bodyAttachment then
+			for _, child in ipairs(accessory:GetDescendants()) do
+				if child:IsA("Weld") or child:IsA("WeldConstraint") or child:IsA("Motor6D") then
+					if child.Part0 == bodyPart or child.Part1 == bodyPart or (child.Part0 and child.Part0:IsDescendantOf(character)) or (child.Part1 and child.Part1:IsDescendantOf(character)) then
+						child:Destroy()
+					end
+				end
+			end
+
+			local weld = Instance.new("Weld")
+			weld.Part0 = bodyPart
+			weld.Part1 = handle
+			weld.C0 = bodyAttachment.CFrame
+			if cosmeticAttachment then
+				weld.C1 = cosmeticAttachment.CFrame
+			else
+				weld.C1 = CFrame.new()
+			end
+			weld.Parent = handle
+		end
+
+		local tag = accessory:FindFirstChild("VisualChangerWeldRebuilt")
+		if not tag then
+			tag = Instance.new("BoolValue")
+			tag.Name = "VisualChangerWeldRebuilt"
+			tag.Parent = accessory
+		end
+	end
+	accessory.Parent = character
+end
+
+function attachHat(hatName, character, folder)
+	if not hats or not folder then return false end
+
+	local sourceModel = hats:FindFirstChild(hatName)
+	if not sourceModel then return false end
+
+	local clone = sourceModel:Clone()
+	clone.Name = hatName
+
+	if clone:IsA("Model") then
+		clone.Parent = folder
+		weldCosmetic(clone, character)
+		return true
+	elseif clone:IsA("Accessory") then
+		attachAccessory(clone, character)
+		return true
+	end
+
+	clone:Destroy()
+	return false
+end
+
+function getOrCreateFolder(parent, name)
+	local folder = parent:FindFirstChild(name)
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = name
+		folder.Parent = parent
+	end
+	return folder
+end
+
+function getAppliedItems(character)
+	local items = {}
+	local folder = character:FindFirstChild("Attachments")
+	if folder then
+		for _, child in ipairs(folder:GetChildren()) do
+			table.insert(items, child.Name)
+		end
+	end
+
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("Accessory") then
+			table.insert(items, child.Name)
+		end
+	end
+
+	table.sort(items)
+	return items
+end
+
+function getExpectedItems(skinName, skinModel)
+	local items = {}
+	local folder = skinModel and skinModel:FindFirstChild("Attachments")
+	if folder then
+		for _, child in ipairs(folder:GetChildren()) do
+			table.insert(items, child.Name)
+		end
+	end
+
+	local config = skins[skinName]
+	if config then
+		if config.Hats then
+			for _, hatName in ipairs(config.Hats) do
+				local match = false
+				for _, name in ipairs(items) do
+					if name == hatName then
+						match = true
+						break
+					end
+				end
+				if not match then
+					table.insert(items, hatName)
+				end
+			end
+		end
+		
+		local backblingName = state.selectedBackbling or config.Backpack
+		if backblingName and backblingName ~= "None" then
+			local match = false
+			for _, name in ipairs(items) do
+				if name == backblingName then
+					match = true
+					break
+				end
+			end
+			if not match then
+				table.insert(items, backblingName)
+			end
+		end
+	end
+
+	table.sort(items)
+	return items
+end
+
+function loadSkinModel(skinName)
+	local cached = runtime.skinCache[skinName]
+	if cached then
+		return cached:Clone()
+	end
+
+	if runtime.loadingQueue[skinName] then
+		while runtime.loadingQueue[skinName] do
+			task.wait()
+		end
+		local cached = runtime.skinCache[skinName]
+		if cached then
+			return cached:Clone()
+		end
+		return nil
+	end
+
+	runtime.loadingQueue[skinName] = true
+	local ok, model = pcall(function()
+		return events.Character:Invoke(skinName, nil, true)
+	end)
+	runtime.loadingQueue[skinName] = nil
+
+	if ok and model then
+		if runtime.skinCache[skinName] then
+			pcall(function() runtime.skinCache[skinName]:Destroy() end)
+		end
+		model.Parent = nil
+		runtime.skinCache[skinName] = model
+		return model:Clone()
+	end
+
+	return nil
+end
+
+function checkNeedsReapply(character, skinName, skinModel)
+	if state.appliedSkinName ~= skinName then
+		return true
+	end
+
+	for _, partName in ipairs(CHARACTER_PARTS) do
+		local target = character:FindFirstChild(partName)
+		local source = skinModel:FindFirstChild(partName)
+		if source and target then
+			if target.Color ~= source.Color or target.Transparency ~= source.Transparency then
+				return true
+			end
+			if target:IsA("MeshPart") and source:IsA("MeshPart") then
+				if target.MeshId ~= source.MeshId or target.TextureID ~= source.TextureID then
+					return true
+				end
+			end
+		elseif source or target then
+			return true
+		end
+	end
+
+	local targetHead = character:FindFirstChild("Head")
+	local sourceHead = skinModel:FindFirstChild("Head")
+	if targetHead and sourceHead then
+		local targetDecals = {}
+		for _, child in ipairs(targetHead:GetChildren()) do
+			if child:IsA("Decal") or child:IsA("Texture") then
+				table.insert(targetDecals, child.Texture)
+			end
+		end
+		table.sort(targetDecals)
+
+		local sourceDecals = {}
+		for _, child in ipairs(sourceHead:GetChildren()) do
+			if child:IsA("Decal") or child:IsA("Texture") then
+				table.insert(sourceDecals, child.Texture)
+			end
+		end
+		table.sort(sourceDecals)
+
+		if #targetDecals ~= #sourceDecals then
+			return true
+		end
+		for index, texture in ipairs(sourceDecals) do
+			if targetDecals[index] ~= texture then
+				return true
+			end
+		end
+	end
+
+	local targetShirt = character:FindFirstChildOfClass("Shirt")
+	local sourceShirt = skinModel:FindFirstChildOfClass("Shirt")
+	if (targetShirt and not sourceShirt) or (not targetShirt and sourceShirt) then
+		return true
+	elseif targetShirt and sourceShirt then
+		if targetShirt.ShirtTemplate ~= sourceShirt.ShirtTemplate then
+			return true
+		end
+	end
+
+	local targetPants = character:FindFirstChildOfClass("Pants")
+	local sourcePants = skinModel:FindFirstChildOfClass("Pants")
+	if (targetPants and not sourcePants) or (not targetPants and sourcePants) then
+		return true
+	elseif targetPants and sourcePants then
+		if targetPants.PantsTemplate ~= sourcePants.PantsTemplate then
+			return true
+		end
+	end
+
+	local expected = getExpectedItems(skinName, skinModel)
+	local applied = getAppliedItems(character)
+	if #expected ~= #applied then
+		return true
+	end
+	for index, name in ipairs(expected) do
+		if applied[index] ~= name then
+			return true
+		end
+	end
+
+	local folder = character:FindFirstChild("Attachments")
+	if folder then
+		for _, cosmetic in ipairs(folder:GetChildren()) do
+			local matchedWeld = false
+			for _, child in ipairs(cosmetic:GetDescendants()) do
+				if child:IsA("Weld") then
+					matchedWeld = true
+					break
+				end
+			end
+			if not matchedWeld then
+				return true
+			end
+		end
+	end
+
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("Accessory") then
+			local matchedWeld = false
+			for _, desc in ipairs(child:GetDescendants()) do
+				if desc:IsA("Weld") or desc:IsA("WeldConstraint") or desc:IsA("Motor6D") then
+					matchedWeld = true
+					break
+				end
+			end
+			if not matchedWeld then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+function applySkin(skinName)
+	if runtime.id ~= currentId then
+		return false, "Old script instance"
+	end
+
+	if activeApplyTask == skinName then
+		return false, "Task already running"
+	end
+	activeApplyTask = skinName
+
+	local ok, err = pcall(function()
+		state.token += 1
+		local currentToken = state.token
+
+		local char = localPlayer.Character or workspace:FindFirstChild(localPlayer.Name)
+		if not char then error("No character") end
+
+		local model = loadSkinModel(skinName)
+		if not model then error("Model build failed") end
+
+		if currentToken ~= state.token or runtime.id ~= currentId then
+			model:Destroy()
+			error("Apply cancelled")
+		end
+
+		if not checkNeedsReapply(char, skinName, model) then
+			model:Destroy()
+			return
+		end
+
+		for _, child in ipairs(char:GetChildren()) do
+			if child:IsA("Accessory") then
+				child:Destroy()
+			end
+		end
+
+		for _, partName in ipairs(CHARACTER_PARTS) do
+			local target = char:FindFirstChild(partName)
+			local source = model:FindFirstChild(partName)
+			if partName == "Head" then
+				copyFaceDecals(target, source)
+			else
+				copyVisuals(target, source)
+			end
+			copyAttachments(target, source)
+		end
+
+		local sourceShirt = model:FindFirstChildOfClass("Shirt")
+		local targetShirt = char:FindFirstChildOfClass("Shirt")
+		if sourceShirt then
+			if not targetShirt then
+				targetShirt = Instance.new("Shirt")
+				targetShirt.Name = "Clothing"
+				targetShirt.Parent = char
+			end
+			targetShirt.ShirtTemplate = sourceShirt.ShirtTemplate
+		elseif targetShirt then
+			targetShirt.ShirtTemplate = ""
+		end
+
+		local sourcePants = model:FindFirstChildOfClass("Pants")
+		local targetPants = char:FindFirstChildOfClass("Pants")
+		if sourcePants then
+			if not targetPants then
+				targetPants = Instance.new("Pants")
+				targetPants.Name = "Clothing"
+				targetPants.Parent = char
+			end
+			targetPants.PantsTemplate = sourcePants.PantsTemplate
+		elseif targetPants then
+			targetPants.PantsTemplate = ""
+		end
+
+		local sourceColors = model:FindFirstChildOfClass("BodyColors")
+		local targetColors = char:FindFirstChildOfClass("BodyColors")
+		if sourceColors then
+			if not targetColors then
+				targetColors = Instance.new("BodyColors")
+				targetColors.Name = "Body Colors"
+				targetColors.Parent = char
+			end
+			targetColors.HeadColor3 = sourceColors.HeadColor3
+			targetColors.LeftArmColor3 = sourceColors.LeftArmColor3
+			targetColors.RightArmColor3 = sourceColors.RightArmColor3
+			targetColors.LeftLegColor3 = sourceColors.LeftLegColor3
+			targetColors.RightLegColor3 = sourceColors.RightLegColor3
+			targetColors.TorsoColor3 = sourceColors.TorsoColor3
+		end
+
+		for _, child in ipairs(model:GetChildren()) do
+			if child:IsA("Accessory") then
+				local clone = child:Clone()
+				for _, part in ipairs(clone:GetDescendants()) do
+					if part:IsA("BasePart") then
+						stripPhysics(part)
+					end
+				end
+				attachAccessory(clone, char)
+			end
+		end
+
+		local attachmentsFolder = getOrCreateFolder(char, "Attachments")
+		local config = skins[skinName]
+		for _, child in ipairs(attachmentsFolder:GetChildren()) do
+			if child:IsA("Model") then
+				local valid = false
+				
+				if child.Name == skinName then
+					valid = true
+				end
+				
+				if config and config.Hats then
+					for _, hatName in ipairs(config.Hats) do
+						if child.Name == hatName then
+							valid = true
+							break
+						end
+					end
+				end
+				
+				local expectedBackbling = state.selectedBackbling or (config and config.Backpack)
+				if expectedBackbling and expectedBackbling ~= "None" and child.Name == expectedBackbling then
+					valid = true
+				end
+				
+				if not valid then
+					child:Destroy()
+				end
+			end
+		end
+
+		local sourceAttachments = model:FindFirstChild("Attachments")
+		if sourceAttachments then
+			for _, cosmetic in ipairs(sourceAttachments:GetChildren()) do
+				local defaultBackbling = backblings and backblings:FindFirstChild(cosmetic.Name)
+				if not defaultBackbling or not state.selectedBackbling then
+					local existing = attachmentsFolder:FindFirstChild(cosmetic.Name)
+					if not existing or not existing:FindFirstChild("VisualChangerWeldRebuilt") then
+						if existing then existing:Destroy() end
+						local clone = cosmetic:Clone()
+						clone.Parent = attachmentsFolder
+						if clone:IsA("Model") then
+							if clone.Name == skinName then
+								redirectWelds(clone, model, char)
+							else
+								weldCosmetic(clone, char)
+							end
+						end
+					end
+				end
+			end
+		end
+
+		if state.selectedBackbling and state.selectedBackbling ~= "None" then
+			local existing = attachmentsFolder:FindFirstChild(state.selectedBackbling)
+			if not existing then
+				attachBackbling(state.selectedBackbling, char, attachmentsFolder)
+			end
+		end
+
+		if config and config.Hats then
+			for _, hatName in ipairs(config.Hats) do
+				local existing = attachmentsFolder:FindFirstChild(hatName) or char:FindFirstChild(hatName)
+				if not existing or not existing:FindFirstChild("VisualChangerWeldRebuilt") then
+					if existing then existing:Destroy() end
+					attachHat(hatName, char, attachmentsFolder)
+				end
+			end
+		end
+
+		for _, child in ipairs(attachmentsFolder:GetChildren()) do
+			if child:IsA("Model") then
+				if child.Name ~= skinName and not child:FindFirstChild("VisualChangerWeldRebuilt") then
+					weldCosmetic(child, char)
+				end
+			end
+		end
+
+		local targetEffects = getOrCreateFolder(char, "Effects")
+		local sourceEffects = model:FindFirstChild("Effects")
+		syncFolderContent(targetEffects, sourceEffects)
+
+		local sourceArmor = model:FindFirstChild("Armor")
+		local targetArmor = char:FindFirstChild("Armor")
+		if sourceArmor and targetArmor then
+			syncFolderContent(targetArmor, sourceArmor)
+		elseif targetArmor then
+			targetArmor:ClearAllChildren()
+		end
+
+		model:Destroy()
+
+		if currentToken ~= state.token or runtime.id ~= currentId then
+			error("Apply cancelled")
+		end
+
+		state.appliedSkinName = skinName
+	end)
+
+	activeApplyTask = nil
+	return ok, err or "Success"
+end
+
+function applyPickaxe(itemModel)
+	if not state.selectedPickaxe or not melees then return end
+
+	local sourceModel = melees:FindFirstChild(state.selectedPickaxe)
+	if not sourceModel then return end
+
+	local handle = itemModel:FindFirstChild("Handle")
+	if not handle or not handle:IsA("BasePart") then return end
+
+	handle.Size = Vector3.new(0.001, 0.001, 0.001)
+
+	local existing = itemModel:FindFirstChild("LocalPickaxeVisual")
+	if existing then
+		existing:Destroy()
+	end
+
+	local clone = sourceModel:Clone()
+	local cloneHandle = clone:FindFirstChild("Handle") or clone:FindFirstChildWhichIsA("BasePart", true)
+
+	local folder = Instance.new("Model")
+	folder.Name = "LocalPickaxeVisual"
+	folder.Parent = itemModel
+
+	local weldList = {}
+	local cframeOffsets = {}
+
+	if clone:IsA("Tool") or clone:IsA("Model") then
+		for _, child in ipairs(clone:GetChildren()) do
+			if child:IsA("BasePart") or child:IsA("Model") then
+				if child ~= cloneHandle then
+					local target = child:IsA("Model") and (child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart", true)) or child
+					if target and cloneHandle then
+						cframeOffsets[child] = cloneHandle.CFrame:ToObjectSpace(target.CFrame)
+					else
+						cframeOffsets[child] = CFrame.new()
+					end
+					child.Parent = folder
+					table.insert(weldList, child)
+				end
+			end
+		end
+		if cloneHandle then
+			cframeOffsets[cloneHandle] = CFrame.new()
+			cloneHandle.Parent = folder
+			table.insert(weldList, cloneHandle)
+		end
+		clone:Destroy()
+	elseif clone:IsA("BasePart") then
+		cframeOffsets[clone] = CFrame.new()
+		clone.Parent = folder
+		table.insert(weldList, clone)
+	else
+		clone:Destroy()
+		folder:Destroy()
+		return
+	end
+
+	for _, part in ipairs(weldList) do
+		local offset = cframeOffsets[part] or CFrame.new()
+		if part:IsA("BasePart") then
+			stripPhysics(part)
+			part.Transparency = 0
+			
+			local weld = Instance.new("Weld")
+			weld.Part0 = handle
+			weld.Part1 = part
+			weld.C0 = offset
+			weld.C1 = CFrame.new()
+			weld.Parent = part
+		elseif part:IsA("Model") then
+			local primary = part.PrimaryPart or part:FindFirstChild("Handle") or part:FindFirstChildWhichIsA("BasePart", true)
+			if primary then
+				stripPhysics(primary)
+				primary.Transparency = 0
+				local weld = Instance.new("Weld")
+				weld.Part0 = handle
+				weld.Part1 = primary
+				weld.C0 = offset
+				weld.C1 = CFrame.new()
+				weld.Parent = primary
+			end
+			for _, childPart in ipairs(part:GetDescendants()) do
+				if childPart:IsA("BasePart") then
+					stripPhysics(childPart)
+					childPart.Transparency = 0
+				end
+			end
+		end
+	end
+end
+
+function applyGlider(gliderModel)
+	if not state.selectedGlider or state.selectedGlider == "None" then return end
+
+	local sourceModel = customization:FindFirstChild("GliderModels") and customization.GliderModels:FindFirstChild(state.selectedGlider)
+		or customization:FindFirstChild("Gliders") and customization.Gliders:FindFirstChild(state.selectedGlider)
+	if not sourceModel then return end
+
+	local handle = gliderModel:FindFirstChild("Handle") or gliderModel.PrimaryPart or gliderModel:FindFirstChildWhichIsA("BasePart", true)
+	if not handle then return end
+
+	local existing = gliderModel:FindFirstChild("LocalGliderVisual")
+	if existing then existing:Destroy() end
+
+	local clone = sourceModel:Clone()
+	clone.Name = "LocalGliderVisual"
+
+	for _, part in ipairs(gliderModel:GetDescendants()) do
+		if part:IsA("BasePart") and part.Name ~= "Handle" and not part:IsDescendantOf(clone) then
+			part.Transparency = 1
+			part.Size = Vector3.new(0, 0, 0)
+		end
+	end
+	if handle:IsA("BasePart") then
+		handle.Transparency = 1
+	end
+
+	clone.Parent = gliderModel
+
+	local cloneHandle = clone:IsA("Model") and (clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)) or clone
+	if cloneHandle and cloneHandle:IsA("BasePart") then
+		stripPhysics(cloneHandle)
+		cloneHandle.Transparency = 0
+		local weld = Instance.new("Weld")
+		weld.Part0 = handle
+		weld.Part1 = cloneHandle
+		weld.C0 = CFrame.new()
+		weld.C1 = CFrame.new()
+		weld.Parent = cloneHandle
+
+		for _, part in ipairs(clone:GetDescendants()) do
+			if part:IsA("BasePart") and part ~= cloneHandle then
+				stripPhysics(part)
+				part.Transparency = 0
+				local innerWeld = Instance.new("Weld")
+				innerWeld.Part0 = cloneHandle
+				innerWeld.Part1 = part
+				innerWeld.C0 = cloneHandle.CFrame:ToObjectSpace(part.CFrame)
+				innerWeld.C1 = CFrame.new()
+				innerWeld.Parent = part
+			end
+		end
+	end
+end
+
+function isMelee(child)
+	if not child:IsA("Model") then return false end
+	local name = child.Name
+	if name == "Pickaxe" or name == "Melee" or name == "HarvestingTool" or name == "Harvest Tool" then
+		return true
+	end
+	if pickaxeLookup[name] then
+		return true
+	end
+	
+	local config = child:FindFirstChild("Config")
+	if config and config:IsA("ModuleScript") then
+		local ok, data = pcall(require, config)
+		if ok and type(data) == "table" and data.Type == "Melee" then
+			return true
+		end
+	end
+	
+	return false
+end
+
+function isGlider(child)
+	if not child:IsA("Model") and not child:IsA("Tool") then return false end
+	local name = child.Name
+	if name == "Glider" or name == "Umbrella" or name:find("Glider") or name:find("Umbrella") then
+		return true
+	end
+	if customization:FindFirstChild("GliderModels") and customization.GliderModels:FindFirstChild(name) then
+		return true
+	end
+	if customization:FindFirstChild("Gliders") and customization.Gliders:FindFirstChild(name) then
+		return true
+	end
+	return false
+end
+
+function setMouseLock(unlocked)
+	state.mouseUnlocked = unlocked
+	if runtime.mouseCheck then
+		runtime.mouseCheck:Disconnect()
+		runtime.mouseCheck = nil
+	end
+	if unlocked then
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
+		runtime.mouseCheck = RunService.RenderStepped:Connect(function()
+			if state.mouseUnlocked and runtime.id == currentId then
+				UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+				UserInputService.MouseIconEnabled = true
+			end
+		end)
+	else
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		UserInputService.MouseIconEnabled = false
+	end
+end
+
+function toggleMouseLock()
+	setMouseLock(not state.mouseUnlocked)
+	return state.mouseUnlocked
+end
+
+function updatePlayerDataValue(category, value)
+	pcall(function()
+		local data = ReplicatedStorage:FindFirstChild("PlayerData")
+		local playerFolder = data and data:FindFirstChild(localPlayer.Name)
+		local equipped = playerFolder and playerFolder:FindFirstChild("Equipped")
+		if equipped then
+			local val = equipped:FindFirstChild(category)
+			if val and val:IsA("StringValue") then
+				val.Value = value
+				print("[Artemis] Equipped " .. category .. " client value: " .. value)
+			end
+		end
+	end)
+end
+
+function setSkin(name)
+	state.selectedSkin = name
+	state.appliedSkinName = nil
+	
+	updatePlayerDataValue("Skin", name)
+	
+	local ok, err = applySkin(name)
+	return ok, err
+end
+
+function setPickaxe(name)
+	state.selectedPickaxe = name
+	updatePlayerDataValue("Pickaxe", name)
+	
+	local char = localPlayer.Character
+	if char then
+		local items = char:FindFirstChild("Items")
+		if items then
+			for _, child in ipairs(items:GetChildren()) do
+				if isMelee(child) then
+					applyPickaxe(child)
+				end
+			end
+		end
+	end
+	return true
+end
+
+function setBackbling(name)
+	state.selectedBackbling = name
+	updatePlayerDataValue("Backbling", name)
+	
+	local char = localPlayer.Character
+	if char then
+		local folder = getOrCreateFolder(char, "Attachments")
+		for _, child in ipairs(folder:GetChildren()) do
+			if isBackbling(child) then
+				child:Destroy()
+			end
+		end
+		if name ~= "None" then
+			attachBackbling(name, char, folder)
+		end
+	end
+	return true
+end
+
+function setGlider(name)
+	state.selectedGlider = name
+	updatePlayerDataValue("Glider", name)
+	return true
+end
+
+function playKillEffect(character, effectName)
+	if not effectName or effectName == "None" then return end
+	local effects = customization and customization:FindFirstChild("KillEffects")
+	local effectModule = effects and effects:FindFirstChild(effectName)
+	if effectModule and effectModule:IsA("ModuleScript") then
+		local ok, callback = pcall(require, effectModule)
+		if ok and type(callback) == "function" then
+			task.spawn(function()
+				pcall(callback, character)
+			end)
+		end
+	end
+end
+
+function setKillEffect(name)
+	state.selectedKillEffect = name
+	updatePlayerDataValue("KillEffect", name)
+	return true
+end
+
+function playEmoteTrack(name)
+	local char = localPlayer.Character
+	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+	if not humanoid then return end
+
+	local animFolder = ReplicatedStorage:FindFirstChild("Emotes")
+	local animation = animFolder and animFolder:FindFirstChild(name)
+	if animation and animation:IsA("Animation") then
+		if state.currentEmoteTrack then
+			pcall(function() state.currentEmoteTrack:Stop() end)
+			state.currentEmoteTrack = nil
+		end
+
+		local loader = (animator and animator.LoadAnimation) or humanoid.LoadAnimation
+		if loader then
+			local ok, trackInstance = pcall(loader, animator or humanoid, animation)
+			if ok and trackInstance then
+				trackInstance.Looped = true
+				trackInstance:Play()
+				state.currentEmoteTrack = trackInstance
+				updateConsoleStatus("Emote: " .. name, false)
+			else
+				updateConsoleStatus("Anim track error: " .. tostring(trackInstance), true)
+			end
+		else
+			updateConsoleStatus("Loader missing", true)
+		end
+	end
+end
+
+function setEmote(name)
+	local slots = { "Emote", "Emote2", "Emote3", "Emote4", "Emote5", "Emote6" }
+	for _, slot in ipairs(slots) do
+		updatePlayerDataValue(slot, name)
+	end
+	
+	if name ~= "None" then
+		task.spawn(playEmoteTrack, name)
+	else
+		if state.currentEmoteTrack then
+			state.currentEmoteTrack:Stop()
+			state.currentEmoteTrack = nil
+		end
+	end
+	return true
+end
+
+function setWrap(name)
+	local slots = { "Shotgun", "Heavy", "Medium", "Light", "Rocket" }
+	for _, slot in ipairs(slots) do
+		updatePlayerDataValue(slot, name)
+	end
+	return true
+end
+
+function setMusicPack(name)
+	updatePlayerDataValue("MusicPack", name)
+	return true
+end
+
+function setLoadingScreen(name)
+	updatePlayerDataValue("LoadingScreen", name)
+	return true
+end
+
+function removeViewportModel()
+	if state.previewModel then
+		state.previewModel:Destroy()
+		state.previewModel = nil
+	end
+end
+
+function renderViewportModel(skinName, viewport)
+	removeViewportModel()
+	local model = loadSkinModel(skinName)
+	if not model or not model.PrimaryPart then return end
+
+	model:SetPrimaryPartCFrame(CFrame.new(0, -1, 6))
+	model.Parent = viewport:FindFirstChild("World") or viewport
+
+	local camera = viewport.CurrentCamera
+	if camera then
+		local cf, size = model:GetBoundingBox()
+		local dist = math.max(size.X, size.Y, size.Z) * 1.8
+		camera.CFrame = cf * CFrame.new(0, 0.2, dist) * CFrame.Angles(0, math.pi, 0)
+	end
+
+	state.previewModel = model
+end
+
+function renderPickaxeViewport(name, viewport)
+	removeViewportModel()
+	if not melees then return end
+
+	local sourceModel = melees:FindFirstChild(name)
+	if not sourceModel then return end
+
+	local container = Instance.new("Model")
+	container.Name = name
+
+	local clone = sourceModel:Clone()
+	if clone:IsA("Tool") then
+		for _, child in ipairs(clone:GetChildren()) do
+			if child:IsA("BasePart") or child:IsA("Model") then
+				child.Parent = container
+			end
+		end
+		clone:Destroy()
+	elseif clone:IsA("Model") then
+		container:Destroy()
+		container = clone
+	elseif clone:IsA("BasePart") then
+		clone.Parent = container
+	else
+		clone:Destroy()
+		container:Destroy()
+		return
+	end
+
+	if not container.PrimaryPart then
+		container.PrimaryPart = container:FindFirstChild("Handle") or container:FindFirstChildWhichIsA("BasePart", true)
+	end
+
+	if not container.PrimaryPart then
+		container:Destroy()
+		return
+	end
+
+	container:SetPrimaryPartCFrame(CFrame.new(0, -1, 6) * CFrame.Angles(0, math.pi / 4, 0))
+	container.Parent = viewport:FindFirstChild("World") or viewport
+
+	local camera = viewport.CurrentCamera
+	if camera then
+		local cf, size = container:GetBoundingBox()
+		local dist = math.max(size.X, size.Y, size.Z) * 2.2
+		camera.CFrame = cf * CFrame.new(0, 0, dist)
+	end
+
+	state.previewModel = container
+end
+
+function renderBackblingViewport(name, viewport)
+	removeViewportModel()
+	if not backblings or name == "None" then return end
+	
+	local sourceModel = backblings:FindFirstChild(name)
+	if not sourceModel then return end
+
+	local clone = sourceModel:Clone()
+	clone.Parent = viewport:FindFirstChild("World") or viewport
+
+	local handle = clone:FindFirstChild("Handle") or clone:FindFirstChildWhichIsA("BasePart", true)
+	if handle then
+		clone.PrimaryPart = handle
+		clone:SetPrimaryPartCFrame(CFrame.new(0, -1, 6) * CFrame.Angles(0, math.pi, 0))
+	end
+
+	local camera = viewport.CurrentCamera
+	if camera then
+		local cf, size = clone:GetBoundingBox()
+		local dist = math.max(size.X, size.Y, size.Z) * 2
+		camera.CFrame = cf * CFrame.new(0, 0, dist)
+	end
+	state.previewModel = clone
+end
+
+function renderGliderViewport(name, viewport)
+	removeViewportModel()
+	if name == "None" then return end
+	
+	local sourceModel = customization:FindFirstChild("GliderModels") and customization.GliderModels:FindFirstChild(name)
+		or customization:FindFirstChild("Gliders") and customization.Gliders:FindFirstChild(name)
+	if not sourceModel then return end
+
+	local clone = sourceModel:Clone()
+	if clone:IsA("Tool") then
+		local container = Instance.new("Model")
+		container.Name = name
+		for _, child in ipairs(clone:GetChildren()) do
+			if child:IsA("BasePart") or child:IsA("Model") then
+				child.Parent = container
+			end
+		end
+		clone:Destroy()
+		clone = container
+	end
+
+	clone.Parent = viewport:FindFirstChild("World") or viewport
+
+	local handle = clone:FindFirstChild("Handle") or clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
+	if handle then
+		clone.PrimaryPart = handle
+		clone:SetPrimaryPartCFrame(CFrame.new(0, -1, 6) * CFrame.Angles(0, math.pi / 2, 0))
+	end
+
+	local camera = viewport.CurrentCamera
+	if camera then
+		local cf, size = clone:GetBoundingBox()
+		local dist = math.max(size.X, size.Y, size.Z) * 2.2
+		camera.CFrame = cf * CFrame.new(0, 0, dist)
+	end
+	state.previewModel = clone
+end
+
+-- Refined Monochrome UI Setup (criminal.cc Style)
+local gui = Instance.new("ScreenGui")
+gui.Name = "ArtemisSkinChanger"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder = 100
+gui.IgnoreGuiInset = true
+gui.Parent = playerGui
+
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.AnchorPoint = Vector2.new(0.5, 0.5)
+main.Position = UDim2.fromScale(0.5, 0.5)
+main.Size = UDim2.fromOffset(480, 500)
+main.BackgroundColor3 = Color3.fromRGB(8, 8, 8) -- Matte Black
+main.BorderSizePixel = 0
+main.Active = true
+main.Visible = true
+main.Parent = gui
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 4)
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(240, 240, 240) -- Pure White border stroke
+stroke.Thickness = 1
+
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+titleBar.BorderSizePixel = 0
+titleBar.Active = true
+titleBar.Parent = main
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 4)
+
+local divider = Instance.new("Frame")
+divider.Size = UDim2.new(1, 0, 0, 1)
+divider.Position = UDim2.new(0, 0, 1, -1)
+divider.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+divider.BorderSizePixel = 0
+divider.Parent = titleBar
+
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1
+title.Position = UDim2.fromOffset(15, 0)
+title.Size = UDim2.new(1, -90, 1, 0)
+title.Font = Enum.Font.RobotoMono
+title.Text = "criminal.cc"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 13
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.fromOffset(20, 20)
+closeBtn.Position = UDim2.new(1, -30, 0.5, -10)
+closeBtn.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+closeBtn.Text = "X"
+closeBtn.Font = Enum.Font.RobotoMono
+closeBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+closeBtn.TextSize = 12
+closeBtn.BorderSizePixel = 0
+closeBtn.AutoButtonColor = true
+closeBtn.Parent = titleBar
+
+local nav = Instance.new("ScrollingFrame")
+nav.Name = "Nav"
+nav.Position = UDim2.fromOffset(0, 35)
+nav.Size = UDim2.fromOffset(110, 440)
+nav.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+nav.BorderSizePixel = 0
+nav.ScrollBarThickness = 1
+nav.CanvasSize = UDim2.new()
+nav.Active = true
+nav.Parent = main
+
+local sLine = Instance.new("Frame")
+sLine.Size = UDim2.new(0, 1, 1, -35)
+sLine.Position = UDim2.new(0, 110, 0, 35)
+sLine.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+sLine.BorderSizePixel = 0
+sLine.Parent = main
+
+local navLayout = Instance.new("UIListLayout")
+navLayout.Padding = UDim.new(0, 0)
+navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+navLayout.Parent = nav
+
+local content = Instance.new("Frame")
+content.Name = "Content"
+content.Position = UDim2.fromOffset(120, 45)
+content.Size = UDim2.new(1, -130, 1, -95)
+content.BackgroundTransparency = 1
+content.Parent = main
+
+local searchBox = Instance.new("TextBox")
+searchBox.Size = UDim2.new(1, 0, 0, 26)
+searchBox.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+searchBox.BorderSizePixel = 0
+searchBox.ClearTextOnFocus = false
+searchBox.Font = Enum.Font.RobotoMono
+searchBox.PlaceholderText = "Search item..."
+searchBox.Text = ""
+searchBox.TextColor3 = Color3.fromRGB(240, 240, 240)
+searchBox.TextSize = 12
+searchBox.Parent = content
+Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 4)
+local searchStroke = Instance.new("UIStroke", searchBox)
+searchStroke.Color = Color3.fromRGB(30, 30, 30)
+searchStroke.Thickness = 1
+Instance.new("UIPadding", searchBox).PaddingLeft = UDim.new(0, 8)
+
+local preview = Instance.new("ViewportFrame")
+preview.Position = UDim2.fromOffset(0, 32)
+preview.Size = UDim2.new(1, 0, 0, 130)
+preview.BackgroundColor3 = Color3.fromRGB(6, 6, 6)
+preview.BorderSizePixel = 0
+preview.Parent = content
+Instance.new("UICorner", preview).CornerRadius = UDim.new(0, 4)
+local viewStroke = Instance.new("UIStroke", preview)
+viewStroke.Color = Color3.fromRGB(30, 30, 30)
+viewStroke.Thickness = 1
+
+local previewPlaceholder = Instance.new("TextLabel")
+previewPlaceholder.Size = UDim2.new(1, 0, 1, 0)
+previewPlaceholder.BackgroundTransparency = 1
+previewPlaceholder.Font = Enum.Font.RobotoMono
+previewPlaceholder.Text = "Preview N/A"
+previewPlaceholder.TextColor3 = Color3.fromRGB(120, 120, 120)
+previewPlaceholder.TextSize = 12
+previewPlaceholder.Visible = false
+previewPlaceholder.Parent = preview
+
+local world = Instance.new("WorldModel")
+world.Name = "World"
+world.Parent = preview
+
+local camera = Instance.new("Camera")
+camera.FieldOfView = 20
+preview.CurrentCamera = camera
+
+local selectedLabel = Instance.new("TextLabel")
+selectedLabel.BackgroundTransparency = 1
+selectedLabel.Position = UDim2.fromOffset(0, 168)
+selectedLabel.Size = UDim2.new(1, 0, 0, 16)
+selectedLabel.Font = Enum.Font.RobotoMono
+selectedLabel.Text = "Selected: none"
+selectedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+selectedLabel.TextSize = 11
+selectedLabel.TextXAlignment = Enum.TextXAlignment.Left
+selectedLabel.Parent = content
+
+local listFrame = Instance.new("ScrollingFrame")
+listFrame.Position = UDim2.fromOffset(0, 186)
+listFrame.Size = UDim2.new(1, 0, 1, -186)
+listFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+listFrame.BorderSizePixel = 0
+listFrame.ScrollBarThickness = 1
+listFrame.CanvasSize = UDim2.new()
+listFrame.Active = true
+listFrame.Parent = content
+Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0, 4)
+local listStroke = Instance.new("UIStroke", listFrame)
+listStroke.Color = Color3.fromRGB(30, 30, 30)
+listStroke.Thickness = 1
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 0)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = listFrame
+
+local applyBtn = Instance.new("TextButton")
+applyBtn.Position = UDim2.new(0, 120, 1, -45)
+applyBtn.Size = UDim2.new(1, -130, 0, 30)
+applyBtn.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
+applyBtn.Font = Enum.Font.RobotoMono
+applyBtn.Text = "Apply Selected"
+applyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+applyBtn.TextSize = 12
+applyBtn.BorderSizePixel = 0
+applyBtn.AutoButtonColor = false
+applyBtn.Parent = main
+Instance.new("UICorner", applyBtn).CornerRadius = UDim.new(0, 4)
+
+local status = Instance.new("TextLabel")
+status.BackgroundTransparency = 1
+status.Position = UDim2.new(0, 10, 1, -15)
+status.Size = UDim2.new(1, -20, 0, 12)
+status.Font = Enum.Font.RobotoMono
+status.Text = "RightShift to toggle menu | V to toggle mouse lock"
+status.TextColor3 = Color3.fromRGB(150, 150, 150)
+status.TextSize = 10
+status.Parent = main
+
+function updateConsoleStatus(text, isError)
+	status.Text = text
+	status.TextColor3 = isError and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(150, 150, 150)
+end
+
+local currentCategory = "Skins"
+local selectedItemName = nil
+local selectedBtn = nil
+local buttons = {}
+local navButtons = {}
+
+local categoryData = {
+	Skins = { index = skinList, hasPreview = true },
+	Pickaxes = { index = pickaxeList, hasPreview = true },
+	Backblings = { index = backblingList, hasPreview = true },
+	Gliders = { index = gliderList, hasPreview = true },
+	KillEffects = { index = killEffectList, hasPreview = false },
+	Emotes = { index = emoteList, hasPreview = false },
+	Wraps = { index = wrapList, hasPreview = false },
+	MusicPacks = { index = musicList, hasPreview = false },
+	LoadingScreens = { index = loadingScreenList, hasPreview = false }
+}
+
+function showItemPreview(name)
+	if not categoryData[currentCategory].hasPreview then
+		removeViewportModel()
+		previewPlaceholder.Visible = true
+		return
+	end
+	
+	previewPlaceholder.Visible = false
+	if currentCategory == "Skins" then
+		renderViewportModel(name, preview)
+	elseif currentCategory == "Pickaxes" then
+		renderPickaxeViewport(name, preview)
+	elseif currentCategory == "Backblings" then
+		renderBackblingViewport(name, preview)
+	elseif currentCategory == "Gliders" then
+		renderGliderViewport(name, preview)
+	end
+end
+
+function selectItem(btn, name)
+	selectedItemName = name
+	if selectedBtn then
+		selectedBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+		selectedBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+	end
+	selectedBtn = btn
+	if btn then
+		btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+	end
+	selectedLabel.Text = string.format("Selected %s: %s", currentCategory, name)
+	showItemPreview(name)
+end
+
+function rebuildList(filter)
+	for _, btn in ipairs(buttons) do
+		btn:Destroy()
+	end
+	table.clear(buttons)
+
+	local data = categoryData[currentCategory]
+	local query = string.lower(filter or "")
+	local y = 0
+
+	for i, entry in ipairs(data.index) do
+		if query == "" or string.find(string.lower(entry.name), query, 1, true) then
+			local btn = Instance.new("TextButton")
+			btn.Name = entry.name
+			btn.Size = UDim2.new(1, 0, 0, 26)
+			btn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+			btn.BorderSizePixel = 0
+			btn.Font = Enum.Font.RobotoMono
+			btn.Text = string.format("  %s", entry.name)
+			btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+			btn.TextSize = 11
+			btn.TextXAlignment = Enum.TextXAlignment.Left
+			btn.AutoButtonColor = false
+			btn.LayoutOrder = i
+			btn.Parent = listFrame
+
+			local itemName = entry.name
+			btn.MouseButton1Click:Connect(function()
+				selectItem(btn, itemName)
+			end)
+
+			if selectedItemName == itemName then
+				selectedBtn = btn
+				btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+			end
+
+			table.insert(buttons, btn)
+			y += 26
+		end
+	end
+
+	listFrame.CanvasSize = UDim2.fromOffset(0, y)
+end
+
+function selectCategory(catName)
+	currentCategory = catName
+	selectedItemName = nil
+	selectedBtn = nil
+	selectedLabel.Text = "Selected: none"
+	
+	for name, navBtn in pairs(navButtons) do
+		if name == catName then
+			navBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			navBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+		else
+			navBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+			navBtn.TextColor3 = Color3.fromRGB(120, 120, 120)
+		end
+	end
+
+	applyBtn.Text = "Apply Selected " .. catName
+	removeViewportModel()
+	rebuildList(searchBox.Text)
+	
+	if not categoryData[catName].hasPreview then
+		previewPlaceholder.Visible = true
+	else
+		previewPlaceholder.Visible = false
+	end
+end
+
+local navCategories = {
+	{ name = "Skins", display = "Skins" },
+	{ name = "Pickaxes", display = "Pickaxes" },
+	{ name = "Backblings", display = "Backblings" },
+	{ name = "Gliders", display = "Gliders" },
+	{ name = "KillEffects", display = "Kill Effects" },
+	{ name = "Emotes", display = "Emotes" },
+	{ name = "Wraps", display = "Wraps" },
+	{ name = "MusicPacks", display = "Lobby Music" },
+	{ name = "LoadingScreens", display = "Load Screens" }
+}
+
+local navY = 0
+for _, cat in ipairs(navCategories) do
+	local nBtn = Instance.new("TextButton")
+	nBtn.Name = cat.name
+	nBtn.Size = UDim2.new(1, 0, 0, 30)
+	nBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+	nBtn.BorderSizePixel = 0
+	nBtn.Font = Enum.Font.RobotoMono
+	nBtn.Text = cat.display
+	nBtn.TextColor3 = Color3.fromRGB(120, 120, 120)
+	nBtn.TextSize = 11
+	nBtn.AutoButtonColor = false
+	nBtn.Parent = nav
+
+	nBtn.MouseButton1Click:Connect(function()
+		selectCategory(cat.name)
+	end)
+	navButtons[cat.name] = nBtn
+	navY += 30
+end
+nav.CanvasSize = UDim2.fromOffset(0, navY)
+
+applyBtn.MouseButton1Click:Connect(function()
+	if not selectedItemName then
+		updateConsoleStatus("Please select an item first", true)
+		return
+	end
+
+	local name = selectedItemName
+	local success, err = false, nil
+
+	if currentCategory == "Skins" then
+		success, err = setSkin(name)
+	elseif currentCategory == "Pickaxes" then
+		success = setPickaxe(name)
+	elseif currentCategory == "Backblings" then
+		success = setBackbling(name)
+	elseif currentCategory == "Gliders" then
+		success = setGlider(name)
+	elseif currentCategory == "KillEffects" then
+		success = setKillEffect(name)
+	elseif currentCategory == "Emotes" then
+		success = setEmote(name)
+	elseif currentCategory == "Wraps" then
+		success = setWrap(name)
+	elseif currentCategory == "MusicPacks" then
+		success = setMusicPack(name)
+	elseif currentCategory == "LoadingScreens" then
+		success = setLoadingScreen(name)
+	end
+
+	if success then
+		updateConsoleStatus(string.format("Successfully equipped %s: %s!", currentCategory, name), false)
+	else
+		updateConsoleStatus(string.format("Failed to equip: %s", tostring(err)), true)
+	end
+end)
+
+searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+	rebuildList(searchBox.Text)
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+	main.Visible = false
+	removeViewportModel()
+	setMouseLock(false)
+end)
+
+function toggleMenu()
+	main.Visible = not main.Visible
+	if main.Visible then
+		setMouseLock(true)
+		updateConsoleStatus("Mouse unlocked", false)
+		showItemPreview(selectedItemName)
+	else
+		removeViewportModel()
+	end
+end
+
+local dragging = false
+local dragStart
+local startPos
+
+titleBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = main.Position
+	end
+end)
+
+titleBar.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		main.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if input.KeyCode == Enum.KeyCode.RightShift then
+		toggleMenu()
+		return
+	end
+
+	if input.KeyCode == Enum.KeyCode.V then
+		local unlocked = toggleMouseLock()
+		if unlocked then
+			updateConsoleStatus("Mouse unlocked", false)
+		else
+			updateConsoleStatus("Mouse locked", false)
+		end
+	end
+end)
+
+function initCharacterHook(character)
+	local function onItemsFolderAdded(folder)
+		track(folder.ChildAdded:Connect(function(child)
+			if isMelee(child) then
+				task.wait()
+				applyPickaxe(child)
+			end
+		end))
+
+		for _, child in ipairs(folder:GetChildren()) do
+			if isMelee(child) then
+				applyPickaxe(child)
+			end
+		end
+	end
+
+	track(character.ChildAdded:Connect(function(child)
+		if child.Name == "Items" and child:IsA("Folder") then
+			onItemsFolderAdded(child)
+		elseif isGlider(child) then
+			task.wait()
+			applyGlider(child)
+		end
+	end))
+
+	track(character.DescendantAdded:Connect(function(descendant)
+		if isGlider(descendant) then
+			task.wait()
+			applyGlider(descendant)
+		end
+	end))
+
+	local folder = character:FindFirstChild("Items")
+	if folder then
+		onItemsFolderAdded(folder)
+	end
+end
+
+function initKillEffectListener()
+	local function hookPlayer(player)
+		local function hookCharacter(character)
+			local humanoid = character:WaitForChild("Humanoid", 10)
+			if humanoid then
+				track(humanoid.Died:Connect(function()
+					local myCharacter = localPlayer.Character
+					if myCharacter and myCharacter.PrimaryPart and character.PrimaryPart then
+						local distance = (myCharacter.PrimaryPart.Position - character.PrimaryPart.Position).Magnitude
+						if distance < 150 then
+							playKillEffect(character, state.selectedKillEffect)
+						end
+					end
+				end))
+			end
+		end
+
+		track(player.CharacterAdded:Connect(hookCharacter))
+		if player.Character then
+			task.spawn(hookCharacter, player.Character)
+		end
+	end
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= localPlayer then
+			hookPlayer(player)
+		end
+	end
+	track(Players.PlayerAdded:Connect(function(player)
+		if player ~= localPlayer then
+			hookPlayer(player)
+		end
+	end))
+	
+	local killedEvent = events:FindFirstChild("Killed")
+	if killedEvent and killedEvent:IsA("BindableEvent") then
+		track(killedEvent.Event:Connect(function(victim, killer, weapon)
+			if killer == localPlayer.Name then
+				local targetPlayer = Players:FindFirstChild(victim)
+				local targetCharacter = targetPlayer and targetPlayer.Character or workspace:FindFirstChild(victim)
+				if targetCharacter then
+					playKillEffect(targetCharacter, state.selectedKillEffect)
+				end
+			end
+		end))
+	end
+
+	local killedRemote = remotes:FindFirstChild("Killed")
+	if killedRemote and killedRemote:IsA("RemoteEvent") then
+		track(killedRemote.OnClientEvent:Connect(function(killer, victim, weapon)
+			local killerName = (typeof(killer) == "Instance" and killer.Name) or tostring(killer)
+			local victimName = (typeof(victim) == "Instance" and victim.Name) or tostring(victim)
+			
+			if killerName == localPlayer.Name or killer == localPlayer then
+				local targetPlayer = Players:FindFirstChild(victimName)
+				local targetCharacter = targetPlayer and targetPlayer.Character or workspace:FindFirstChild(victimName)
+				if targetCharacter then
+					playKillEffect(targetCharacter, state.selectedKillEffect)
+				end
+			end
+		end))
+	end
+end
+
+track(RunService.Heartbeat:Connect(function()
+	if runtime.id ~= currentId or not state.selectedSkin then return end
+
+	local char = localPlayer.Character
+	if not char then return end
+
+	local cache = runtime.skinCache[state.selectedSkin]
+	local needsReapply = false
+	if cache then
+		needsReapply = checkNeedsReapply(char, state.selectedSkin, cache)
+	else
+		needsReapply = true
+	end
+
+	if not needsReapply then return end
+
+	local now = os.clock()
+	if not cache then
+		if state.lastReapply and now - state.lastReapply < 2 then return end
+		state.lastReapply = now
+	end
+
+	applySkin(state.selectedSkin)
+end))
+
+track(localPlayer.CharacterAdded:Connect(function(character)
+	if runtime.id ~= currentId or not state.selectedSkin then return end
+
+	character:WaitForChild("Humanoid", 5)
+	initCharacterHook(character)
+
+	task.wait()
+	if runtime.id ~= currentId or not state.selectedSkin then return end
+
+	state.appliedSkinName = nil
+	applySkin(state.selectedSkin)
+end))
+
+track(RunService.RenderStepped:Connect(function()
+	if runtime.id ~= currentId then return end
+	local char = localPlayer.Character
+	
+	if state.currentEmoteTrack and state.currentEmoteTrack.IsPlaying then
+		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.MoveDirection.Magnitude > 0.05 then
+			pcall(function() state.currentEmoteTrack:Stop() end)
+			state.currentEmoteTrack = nil
+			updateConsoleStatus("Stopped emote", false)
+		end
+	end
+	
+	local itemsFolder = char and char:FindFirstChild("Items")
+	if itemsFolder then
+		for _, child in ipairs(itemsFolder:GetChildren()) do
+			if isMelee(child) then
+				local handle = child:FindFirstChild("Handle")
+				local visual = child:FindFirstChild("LocalPickaxeVisual")
+				
+				if handle and handle:IsA("BasePart") then
+					local visible = handle.Transparency < 0.5
+					if visual then
+						for _, part in ipairs(visual:GetDescendants()) do
+							if part:IsA("BasePart") then
+								part.Transparency = visible and 0 or 1
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	if char then
+		for _, child in ipairs(char:GetChildren()) do
+			if isGlider(child) then
+				local handle = child:FindFirstChild("Handle") or child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart", true)
+				local visual = child:FindFirstChild("LocalGliderVisual")
+				
+				if handle and handle:IsA("BasePart") then
+					local visible = handle.Transparency < 0.5
+					handle.LocalTransparencyModifier = 1
+					
+					if visual then
+						for _, part in ipairs(visual:GetDescendants()) do
+							if part:IsA("BasePart") then
+								part.Transparency = visible and 0 or 1
+							end
+						end
+					end
+				end
+
+				for _, part in ipairs(child:GetChildren()) do
+					if part ~= handle and part.Name ~= "LocalGliderVisual" and part.Name ~= "Config" and part.Name ~= "Animations" then
+						if part:IsA("BasePart") then
+							part.LocalTransparencyModifier = 1
+						elseif part:IsA("Model") then
+							for _, subPart in ipairs(part:GetDescendants()) do
+								if subPart:IsA("BasePart") then
+									subPart.LocalTransparencyModifier = 1
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end))
+
+if localPlayer.Character then
+	initCharacterHook(localPlayer.Character)
+end
+
+initKillEffectListener()
+selectCategory("Skins")
+setMouseLock(true)
