@@ -1,0 +1,1105 @@
+--[[
+    Evomon Timesaver - Island Teleporter & Farming System
+    Inject this script into your game
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ContextActionService = game:GetService("ContextActionService")
+local player = Players.LocalPlayer
+local GuiService = game:GetService("GuiService")
+
+-- Variables
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- State variables
+local isFarming = false
+local farmingConnection = nil
+local isTeleporting = false
+local selectedIsland = nil
+local dropdownOpen = false
+local isMovingToTarget = false
+local lastEPressTime = 0
+local E_PRESS_INTERVAL = 0.3
+local isEPressed = false
+local currentTarget = nil
+local moveCheckConnection = nil
+local walkingIntoCreature = false
+local targetPosition = nil
+local moveStartTime = 0
+local ePressLoopConnection = nil
+local copyMessageTimer = nil
+
+-- Create GUI
+local function createGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "EvomonTimesaver"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 340, 0, 350)
+    mainFrame.Position = UDim2.new(0.5, -170, 0.4, -175)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    mainFrame.BackgroundTransparency = 0.05
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = mainFrame
+    
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+    titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    titleBar.BackgroundTransparency = 0
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 12)
+    titleCorner.Parent = titleBar
+    
+    local titleText = Instance.new("TextLabel")
+    titleText.Size = UDim2.new(1, -50, 1, 0)
+    titleText.Position = UDim2.new(0, 15, 0, 0)
+    titleText.BackgroundTransparency = 1
+    titleText.Text = "⚡ Evomon Timesaver"
+    titleText.TextColor3 = Color3.fromRGB(255, 215, 0)
+    titleText.TextSize = 16
+    titleText.TextXAlignment = Enum.TextXAlignment.Left
+    titleText.Font = Enum.Font.GothamBold
+    titleText.Parent = titleBar
+    
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -38, 0, 5)
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+    closeButton.BackgroundTransparency = 0.3
+    closeButton.BorderSizePixel = 0
+    closeButton.Text = "✕"
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.TextSize = 16
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Parent = titleBar
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 6)
+    closeCorner.Parent = closeButton
+    
+    closeButton.MouseEnter:Connect(function()
+        closeButton.BackgroundTransparency = 0
+    end)
+    
+    closeButton.MouseLeave:Connect(function()
+        closeButton.BackgroundTransparency = 0.3
+    end)
+    
+    closeButton.MouseButton1Click:Connect(function()
+        screenGui.Enabled = false
+    end)
+    
+    -- Dropdown Container
+    local dropdownContainer = Instance.new("Frame")
+    dropdownContainer.Size = UDim2.new(0.85, 0, 0, 38)
+    dropdownContainer.Position = UDim2.new(0.075, 0, 0.14, 0)
+    dropdownContainer.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    dropdownContainer.BackgroundTransparency = 0
+    dropdownContainer.BorderSizePixel = 0
+    dropdownContainer.ClipsDescendants = false
+    dropdownContainer.Parent = mainFrame
+    
+    local dropdownCorner = Instance.new("UICorner")
+    dropdownCorner.CornerRadius = UDim.new(0, 6)
+    dropdownCorner.Parent = dropdownContainer
+    
+    local dropdownButton = Instance.new("TextButton")
+    dropdownButton.Size = UDim2.new(1, 0, 1, 0)
+    dropdownButton.BackgroundTransparency = 1
+    dropdownButton.Text = "📋 Select Island..."
+    dropdownButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    dropdownButton.TextSize = 14
+    dropdownButton.TextXAlignment = Enum.TextXAlignment.Left
+    dropdownButton.Font = Enum.Font.Gotham
+    dropdownButton.Parent = dropdownContainer
+    
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.Parent = dropdownButton
+    
+    local dropdownArrow = Instance.new("TextLabel")
+    dropdownArrow.Size = UDim2.new(0, 25, 1, 0)
+    dropdownArrow.Position = UDim2.new(1, -30, 0, 0)
+    dropdownArrow.BackgroundTransparency = 1
+    dropdownArrow.Text = "▼"
+    dropdownArrow.TextColor3 = Color3.fromRGB(200, 200, 200)
+    dropdownArrow.TextSize = 12
+    dropdownArrow.TextXAlignment = Enum.TextXAlignment.Center
+    dropdownArrow.Font = Enum.Font.Gotham
+    dropdownArrow.Parent = dropdownContainer
+    
+    local dropdownList = Instance.new("Frame")
+    dropdownList.Size = UDim2.new(1, 0, 0, 0)
+    dropdownList.Position = UDim2.new(0, 0, 1, 2)
+    dropdownList.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    dropdownList.BackgroundTransparency = 0
+    dropdownList.BorderSizePixel = 0
+    dropdownList.ClipsDescendants = true
+    dropdownList.Visible = false
+    dropdownList.ZIndex = 10
+    dropdownList.Parent = dropdownContainer
+    
+    local listCorner = Instance.new("UICorner")
+    listCorner.CornerRadius = UDim.new(0, 6)
+    listCorner.Parent = dropdownList
+    
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, 0, 1, 0)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ClipsDescendants = true
+    scrollFrame.ScrollBarThickness = 4
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
+    scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.Parent = dropdownList
+    
+    local scrollPadding = Instance.new("UIPadding")
+    scrollPadding.PaddingTop = UDim.new(0, 5)
+    scrollPadding.PaddingBottom = UDim.new(0, 5)
+    scrollPadding.Parent = scrollFrame
+    
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 2)
+    listLayout.Parent = scrollFrame
+    
+    local teleportButton = Instance.new("TextButton")
+    teleportButton.Size = UDim2.new(0.85, 0, 0, 40)
+    teleportButton.Position = UDim2.new(0.075, 0, 0.28, 0)
+    teleportButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+    teleportButton.BackgroundTransparency = 0
+    teleportButton.BorderSizePixel = 0
+    teleportButton.Text = "🚀 Teleport"
+    teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    teleportButton.TextSize = 16
+    teleportButton.Font = Enum.Font.GothamBold
+    teleportButton.Parent = mainFrame
+    
+    local teleCorner = Instance.new("UICorner")
+    teleCorner.CornerRadius = UDim.new(0, 6)
+    teleCorner.Parent = teleportButton
+    
+    teleportButton.MouseEnter:Connect(function()
+        teleportButton.BackgroundColor3 = Color3.fromRGB(30, 150, 255)
+    end)
+    
+    teleportButton.MouseLeave:Connect(function()
+        teleportButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+    end)
+    
+    local farmingButton = Instance.new("TextButton")
+    farmingButton.Size = UDim2.new(0.85, 0, 0, 40)
+    farmingButton.Position = UDim2.new(0.075, 0, 0.43, 0)
+    farmingButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    farmingButton.BackgroundTransparency = 0
+    farmingButton.BorderSizePixel = 0
+    farmingButton.Text = "⚔️ Farming: OFF"
+    farmingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    farmingButton.TextSize = 16
+    farmingButton.Font = Enum.Font.GothamBold
+    farmingButton.Parent = mainFrame
+    
+    local farmCorner = Instance.new("UICorner")
+    farmCorner.CornerRadius = UDim.new(0, 6)
+    farmCorner.Parent = farmingButton
+    
+    farmingButton.MouseEnter:Connect(function()
+        farmingButton.BackgroundTransparency = 0.1
+    end)
+    
+    farmingButton.MouseLeave:Connect(function()
+        farmingButton.BackgroundTransparency = 0
+    end)
+    
+    -- Catch Button Status Indicator
+    local catchIndicatorFrame = Instance.new("Frame")
+    catchIndicatorFrame.Size = UDim2.new(0.85, 0, 0, 35)
+    catchIndicatorFrame.Position = UDim2.new(0.075, 0, 0.57, 0)
+    catchIndicatorFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    catchIndicatorFrame.BackgroundTransparency = 0
+    catchIndicatorFrame.BorderSizePixel = 0
+    catchIndicatorFrame.Parent = mainFrame
+    
+    local indicatorCorner = Instance.new("UICorner")
+    indicatorCorner.CornerRadius = UDim.new(0, 6)
+    indicatorCorner.Parent = catchIndicatorFrame
+    
+    local statusCircle = Instance.new("Frame")
+    statusCircle.Name = "StatusCircle"
+    statusCircle.Size = UDim2.new(0, 16, 0, 16)
+    statusCircle.Position = UDim2.new(0, 12, 0.5, -8)
+    statusCircle.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    statusCircle.BackgroundTransparency = 0
+    statusCircle.BorderSizePixel = 0
+    statusCircle.Parent = catchIndicatorFrame
+    
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(1, 0)
+    circleCorner.Parent = statusCircle
+    
+    local catchLabel = Instance.new("TextLabel")
+    catchLabel.Size = UDim2.new(1, -40, 1, 0)
+    catchLabel.Position = UDim2.new(0, 40, 0, 0)
+    catchLabel.BackgroundTransparency = 1
+    catchLabel.Text = "Catch: NOT PRESSED"
+    catchLabel.TextColor3 = Color3.fromRGB(255, 200, 200)
+    catchLabel.TextSize = 13
+    catchLabel.TextXAlignment = Enum.TextXAlignment.Left
+    catchLabel.Font = Enum.Font.GothamBold
+    catchLabel.Parent = catchIndicatorFrame
+    
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(0.85, 0, 0, 20)
+    statusLabel.Position = UDim2.new(0.075, 0, 0.70, 0)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "✅ Ready"
+    statusLabel.TextColor3 = Color3.fromRGB(150, 150, 170)
+    statusLabel.TextSize = 12
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.Parent = mainFrame
+    
+    -- Reminder Text
+    local reminderLabel = Instance.new("TextLabel")
+    reminderLabel.Size = UDim2.new(0.9, 0, 0, 20)
+    reminderLabel.Position = UDim2.new(0.05, 0, 0.78, 0)
+    reminderLabel.BackgroundTransparency = 1
+    reminderLabel.Text = "💡 Reminder: Turn on Auto Battling in the battle menu!"
+    reminderLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    reminderLabel.TextSize = 11
+    reminderLabel.TextXAlignment = Enum.TextXAlignment.Center
+    reminderLabel.Font = Enum.Font.GothamBold
+    reminderLabel.Parent = mainFrame
+    
+    -- ============================================
+    -- TWITCH SECTION (FIXED)
+    -- ============================================
+    
+    local twitchFrame = Instance.new("Frame")
+    twitchFrame.Size = UDim2.new(0.9, 0, 0, 30)
+    twitchFrame.Position = UDim2.new(0.05, 0, 0.84, 0)
+    twitchFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    twitchFrame.BackgroundTransparency = 0.5
+    twitchFrame.BorderSizePixel = 0
+    twitchFrame.Parent = mainFrame
+    
+    local twitchCorner = Instance.new("UICorner")
+    twitchCorner.CornerRadius = UDim.new(0, 6)
+    twitchCorner.Parent = twitchFrame
+    
+    -- Profile Icon (TextLabel instead of ImageLabel for reliability)
+    local profileIcon = Instance.new("TextLabel")
+    profileIcon.Size = UDim2.new(0, 24, 0, 24)
+    profileIcon.Position = UDim2.new(0, 5, 0.5, -12)
+    profileIcon.BackgroundTransparency = 1
+    profileIcon.Text = "🎮" -- Controller emoji
+    profileIcon.TextColor3 = Color3.fromRGB(150, 100, 255)
+    profileIcon.TextSize = 18
+    profileIcon.TextXAlignment = Enum.TextXAlignment.Center
+    profileIcon.TextYAlignment = Enum.TextYAlignment.Center
+    profileIcon.Font = Enum.Font.GothamBold
+    profileIcon.Parent = twitchFrame
+    
+    -- Twitch Name Label
+    local twitchLabel = Instance.new("TextLabel")
+    twitchLabel.Size = UDim2.new(0.65, 0, 1, 0)
+    twitchLabel.Position = UDim2.new(0, 35, 0, 0)
+    twitchLabel.BackgroundTransparency = 1
+    twitchLabel.Text = "🎮 Valkress_Foxglove"
+    twitchLabel.TextColor3 = Color3.fromRGB(150, 100, 255)
+    twitchLabel.TextSize = 12
+    twitchLabel.TextXAlignment = Enum.TextXAlignment.Left
+    twitchLabel.Font = Enum.Font.GothamBold
+    twitchLabel.Parent = twitchFrame
+    
+    -- "Copy Link" Button
+    local copyButton = Instance.new("TextButton")
+    copyButton.Size = UDim2.new(0, 60, 1, 0)
+    copyButton.Position = UDim2.new(0.65, 0, 0, 0)
+    copyButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    copyButton.BackgroundTransparency = 0
+    copyButton.BorderSizePixel = 0
+    copyButton.Text = "Copy Link"
+    copyButton.TextColor3 = Color3.fromRGB(200, 200, 255)
+    copyButton.TextSize = 10
+    copyButton.Font = Enum.Font.GothamBold
+    copyButton.Parent = twitchFrame
+    
+    local copyCorner = Instance.new("UICorner")
+    copyCorner.CornerRadius = UDim.new(0, 4)
+    copyCorner.Parent = copyButton
+    
+    copyButton.MouseEnter:Connect(function()
+        copyButton.BackgroundColor3 = Color3.fromRGB(80, 80, 110)
+    end)
+    
+    copyButton.MouseLeave:Connect(function()
+        copyButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    end)
+    
+    -- "Link Copied!" Popup Label (initially hidden)
+    local copiedLabel = Instance.new("TextLabel")
+    copiedLabel.Size = UDim2.new(0.3, 0, 1, 0)
+    copiedLabel.Position = UDim2.new(0.65, 0, 0, 0)
+    copiedLabel.BackgroundTransparency = 1
+    copiedLabel.Text = "✅ Copied!"
+    copiedLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    copiedLabel.TextSize = 11
+    copiedLabel.TextXAlignment = Enum.TextXAlignment.Center
+    copiedLabel.Font = Enum.Font.GothamBold
+    copiedLabel.Visible = false
+    copiedLabel.Parent = twitchFrame
+    
+    -- Copy functionality (FIXED)
+    copyButton.MouseButton1Click:Connect(function()
+        local link = "https://www.twitch.tv/valkress_foxglove"
+        local success = false
+        
+        -- Method 1: Try setclipboard (common in executors)
+        pcall(function()
+            if setclipboard then
+                setclipboard(link)
+                success = true
+            end
+        end)
+        
+        -- Method 2: Try GuiService
+        if not success then
+            pcall(function()
+                if GuiService and GuiService.SetClipboard then
+                    GuiService:SetClipboard(link)
+                    success = true
+                end
+            end)
+        end
+        
+        -- Method 3: Try toclipboard
+        if not success then
+            pcall(function()
+                if toclipboard then
+                    toclipboard(link)
+                    success = true
+                end
+            end)
+        end
+        
+        -- Show feedback
+        copyButton.Visible = false
+        copiedLabel.Visible = true
+        
+        if copyMessageTimer then
+            copyMessageTimer:Disconnect()
+            copyMessageTimer = nil
+        end
+        
+        copyMessageTimer = task.delay(2, function()
+            copyButton.Visible = true
+            copiedLabel.Visible = false
+            copyMessageTimer = nil
+        end)
+    end)
+    
+    -- Also make clicking the profile/name copy the link
+    local twitchClick = Instance.new("TextButton")
+    twitchClick.Size = UDim2.new(0.65, 0, 1, 0)
+    twitchClick.Position = UDim2.new(0, 0, 0, 0)
+    twitchClick.BackgroundTransparency = 1
+    twitchClick.Text = ""
+    twitchClick.Parent = twitchFrame
+    
+    twitchClick.MouseButton1Click:Connect(function()
+        local link = "https://www.twitch.tv/valkress_foxglove"
+        
+        -- Try to copy using the same methods
+        pcall(function()
+            if setclipboard then
+                setclipboard(link)
+            elseif GuiService and GuiService.SetClipboard then
+                GuiService:SetClipboard(link)
+            elseif toclipboard then
+                toclipboard(link)
+            end
+        end)
+        
+        -- Show feedback
+        copyButton.Visible = false
+        copiedLabel.Visible = true
+        
+        if copyMessageTimer then
+            copyMessageTimer:Disconnect()
+            copyMessageTimer = nil
+        end
+        
+        copyMessageTimer = task.delay(2, function()
+            copyButton.Visible = true
+            copiedLabel.Visible = false
+            copyMessageTimer = nil
+        end)
+    end)
+    
+    -- Made by label
+    local madeBy = Instance.new("TextLabel")
+    madeBy.Size = UDim2.new(1, 0, 0, 20)
+    madeBy.Position = UDim2.new(0, 0, 0.93, 0)
+    madeBy.BackgroundTransparency = 1
+    madeBy.Text = "✨ Evomon Timesaver ✨"
+    madeBy.TextColor3 = Color3.fromRGB(80, 80, 100)
+    madeBy.TextSize = 11
+    madeBy.TextXAlignment = Enum.TextXAlignment.Center
+    madeBy.Font = Enum.Font.Gotham
+    madeBy.Parent = mainFrame
+    
+    -- Make draggable
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+        end
+    end)
+    
+    titleBar.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    titleBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    return {
+        ScreenGui = screenGui,
+        MainFrame = mainFrame,
+        DropdownContainer = dropdownContainer,
+        DropdownButton = dropdownButton,
+        DropdownList = dropdownList,
+        ScrollFrame = scrollFrame,
+        DropdownArrow = dropdownArrow,
+        TeleportButton = teleportButton,
+        FarmingButton = farmingButton,
+        StatusLabel = statusLabel,
+        CloseButton = closeButton,
+        StatusCircle = statusCircle,
+        CatchLabel = catchLabel,
+        catchIndicatorFrame = catchIndicatorFrame,
+        ReminderLabel = reminderLabel
+    }
+end
+
+-- Create the GUI
+local GUI = createGUI()
+
+-- Populate dropdown with islands
+local function populateIslands()
+    for _, child in ipairs(GUI.ScrollFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local scene = workspace:FindFirstChild("Scene")
+    if not scene then
+        GUI.StatusLabel.Text = "❌ Scene folder not found!"
+        return
+    end
+    
+    local islandFolder = scene:FindFirstChild("Island")
+    if not islandFolder then
+        GUI.StatusLabel.Text = "❌ Island folder not found!"
+        return
+    end
+    
+    local count = 0
+    for _, island in ipairs(islandFolder:GetChildren()) do
+        if island:IsA("Model") then
+            count = count + 1
+            
+            local itemButton = Instance.new("TextButton")
+            itemButton.Size = UDim2.new(1, -10, 0, 32)
+            itemButton.BackgroundTransparency = 0.9
+            itemButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+            itemButton.BorderSizePixel = 0
+            itemButton.Text = "  🏝️ " .. island.Name
+            itemButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            itemButton.TextSize = 14
+            itemButton.TextXAlignment = Enum.TextXAlignment.Left
+            itemButton.TextYAlignment = Enum.TextYAlignment.Center
+            itemButton.Font = Enum.Font.GothamBold
+            itemButton.ZIndex = 11
+            itemButton.Parent = GUI.ScrollFrame
+            
+            local itemCorner = Instance.new("UICorner")
+            itemCorner.CornerRadius = UDim.new(0, 4)
+            itemCorner.Parent = itemButton
+            
+            itemButton.MouseEnter:Connect(function()
+                itemButton.BackgroundTransparency = 0.3
+                itemButton.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+            end)
+            
+            itemButton.MouseLeave:Connect(function()
+                itemButton.BackgroundTransparency = 0.9
+                itemButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+            end)
+            
+            itemButton.MouseButton1Click:Connect(function()
+                selectedIsland = island.Name
+                GUI.DropdownButton.Text = "📍 " .. island.Name
+                GUI.DropdownList.Visible = false
+                GUI.DropdownArrow.Text = "▼"
+                dropdownOpen = false
+                GUI.DropdownList.Size = UDim2.new(1, 0, 0, 0)
+                GUI.StatusLabel.Text = "✅ Selected: " .. island.Name
+            end)
+        end
+    end
+    
+    if count > 0 then
+        GUI.StatusLabel.Text = "✅ Found " .. count .. " islands"
+        local firstIsland = islandFolder:GetChildren()[1]
+        if firstIsland and firstIsland:IsA("Model") then
+            selectedIsland = firstIsland.Name
+            GUI.DropdownButton.Text = "📍 " .. firstIsland.Name
+        end
+    else
+        GUI.StatusLabel.Text = "❌ No islands found!"
+    end
+end
+
+-- Dropdown toggle
+GUI.DropdownButton.MouseButton1Click:Connect(function()
+    dropdownOpen = not dropdownOpen
+    GUI.DropdownList.Visible = dropdownOpen
+    
+    if dropdownOpen then
+        GUI.DropdownArrow.Text = "▲"
+        GUI.DropdownList.Size = UDim2.new(1, 0, 0, 150)
+        populateIslands()
+    else
+        GUI.DropdownArrow.Text = "▼"
+        GUI.DropdownList.Size = UDim2.new(1, 0, 0, 0)
+    end
+end)
+
+task.wait(1)
+populateIslands()
+
+-- Teleport function
+local function teleportToIsland(islandName)
+    if isTeleporting then return end
+    if not islandName then
+        GUI.StatusLabel.Text = "⚠️ No island selected!"
+        return
+    end
+    
+    isTeleporting = true
+    GUI.StatusLabel.Text = "🔄 Teleporting to " .. islandName .. "..."
+    
+    local scene = workspace:FindFirstChild("Scene")
+    if not scene then
+        GUI.StatusLabel.Text = "❌ Scene not found!"
+        isTeleporting = false
+        return
+    end
+    
+    local islandFolder = scene:FindFirstChild("Island")
+    if not islandFolder then
+        GUI.StatusLabel.Text = "❌ Island folder not found!"
+        isTeleporting = false
+        return
+    end
+    
+    local targetIsland = islandFolder:FindFirstChild(islandName)
+    if not targetIsland then
+        GUI.StatusLabel.Text = "❌ Island not found: " .. islandName
+        isTeleporting = false
+        return
+    end
+    
+    local destination = nil
+    for _, child in ipairs(targetIsland:GetDescendants()) do
+        if child:IsA("BasePart") then
+            destination = child
+            break
+        end
+    end
+    
+    if not destination then
+        GUI.StatusLabel.Text = "❌ No parts found in island!"
+        isTeleporting = false
+        return
+    end
+    
+    local teleportPosition = destination.Position + Vector3.new(0, 5, 0)
+    
+    local success, err = pcall(function()
+        rootPart.CFrame = CFrame.new(teleportPosition)
+    end)
+    
+    if success then
+        GUI.StatusLabel.Text = "✅ Teleported to " .. islandName
+    else
+        GUI.StatusLabel.Text = "❌ Teleport failed!"
+    end
+    
+    task.wait(0.5)
+    isTeleporting = false
+end
+
+GUI.TeleportButton.MouseButton1Click:Connect(function()
+    teleportToIsland(selectedIsland)
+end)
+
+-- ============================================
+-- FIND CREATURES
+-- ============================================
+
+local function findNearestCreature()
+    local nearest = nil
+    local nearestDist = math.huge
+    local charPos = rootPart.Position
+    
+    local creatureCache = workspace:FindFirstChild("RuntimeCache")
+    if creatureCache then
+        creatureCache = creatureCache:FindFirstChild("RuntimeCacheServer")
+        if creatureCache then
+            creatureCache = creatureCache:FindFirstChild("CreatureModelCache")
+        end
+    end
+    
+    if not creatureCache then
+        GUI.StatusLabel.Text = "❌ CreatureModelCache not found!"
+        return nil
+    end
+    
+    for _, outerModel in ipairs(creatureCache:GetChildren()) do
+        if outerModel:IsA("Model") then
+            if string.match(outerModel.Name, "^%d%d%d%d$") then
+                for _, innerModel in ipairs(outerModel:GetChildren()) do
+                    if innerModel:IsA("Model") then
+                        local creatureHumanoid = innerModel:FindFirstChild("Humanoid")
+                        if creatureHumanoid and creatureHumanoid:IsA("Humanoid") and creatureHumanoid.Health > 0 then
+                            local targetPart = innerModel:FindFirstChild("HumanoidRootPart")
+                            if not targetPart then
+                                for _, child in ipairs(innerModel:GetChildren()) do
+                                    if child:IsA("BasePart") then
+                                        targetPart = child
+                                        break
+                                    end
+                                end
+                            end
+                            
+                            if targetPart and targetPart:IsA("BasePart") then
+                                local dist = (targetPart.Position - charPos).Magnitude
+                                if dist < 1 then continue end -- Skip self
+                                
+                                if dist < nearestDist and dist < 200 then
+                                    nearestDist = dist
+                                    nearest = {
+                                        OuterModel = outerModel,
+                                        InnerModel = innerModel,
+                                        Humanoid = creatureHumanoid,
+                                        Part = targetPart,
+                                        Distance = dist,
+                                        ID = outerModel.Name
+                                    }
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    if nearest then
+        GUI.StatusLabel.Text = "🎯 " .. nearest.ID .. " (" .. math.floor(nearest.Distance) .. " studs)"
+    else
+        GUI.StatusLabel.Text = "🔍 No creatures found!"
+    end
+    
+    return nearest
+end
+
+-- ============================================
+-- UPDATE CATCH BUTTON STATUS
+-- ============================================
+
+local function updateCatchButtonStatus(pressed)
+    if pressed then
+        GUI.StatusCircle.BackgroundColor3 = Color3.fromRGB(0, 255, 50)
+        GUI.CatchLabel.Text = "Catch: PRESSED ✓"
+        GUI.CatchLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    else
+        GUI.StatusCircle.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        GUI.CatchLabel.Text = "Catch: NOT PRESSED"
+        GUI.CatchLabel.TextColor3 = Color3.fromRGB(255, 200, 200)
+    end
+end
+
+-- ============================================
+-- PRESS E KEY
+-- ============================================
+
+local function pressE()
+    if not isFarming then return end
+    
+    local currentTime = tick()
+    if currentTime - lastEPressTime < E_PRESS_INTERVAL then return end
+    
+    lastEPressTime = currentTime
+    isEPressed = true
+    
+    updateCatchButtonStatus(true)
+    GUI.StatusLabel.Text = "⌨️ Catch pressed!"
+    
+    if VirtualInputManager then
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end)
+    end
+    
+    pcall(function()
+        ContextActionService:FireKeyPress(Enum.KeyCode.E)
+        task.wait(0.05)
+        ContextActionService:FireKeyRelease(Enum.KeyCode.E)
+    end)
+    
+    pcall(function()
+        local keyDownEvent = {
+            KeyCode = Enum.KeyCode.E,
+            UserInputType = Enum.UserInputType.Keyboard,
+            Position = Vector2.new(0, 0),
+            Delta = Vector2.new(0, 0)
+        }
+        UserInputService:SetKeyDown(keyDownEvent)
+        task.wait(0.05)
+        UserInputService:SetKeyUp(keyDownEvent)
+    end)
+    
+    task.spawn(function()
+        task.wait(0.5)
+        isEPressed = false
+        if isFarming then
+            updateCatchButtonStatus(false)
+        end
+    end)
+end
+
+-- ============================================
+-- E PRESS LOOP
+-- ============================================
+
+local function startEPressLoop()
+    if ePressLoopConnection then
+        ePressLoopConnection:Disconnect()
+        ePressLoopConnection = nil
+    end
+    
+    ePressLoopConnection = RunService.Heartbeat:Connect(function()
+        if isFarming then
+            pressE()
+        end
+    end)
+end
+
+local function stopEPressLoop()
+    if ePressLoopConnection then
+        ePressLoopConnection:Disconnect()
+        ePressLoopConnection = nil
+    end
+end
+
+-- ============================================
+-- MOVEMENT - WALKS THROUGH CREATURES
+-- ============================================
+
+local function moveToCreature(creatureData)
+    if not creatureData or not creatureData.Part then
+        return false
+    end
+    
+    local targetPos = creatureData.Part.Position
+    local currentPos = rootPart.Position
+    local distance = (targetPos - currentPos).Magnitude
+    
+    isMovingToTarget = true
+    currentTarget = creatureData
+    walkingIntoCreature = false
+    targetPosition = targetPos
+    moveStartTime = tick()
+    
+    GUI.StatusLabel.Text = "🚶 Moving to " .. creatureData.ID
+    
+    -- Calculate position WELL PAST the creature (8 studs beyond)
+    local directionToTarget = (targetPos - currentPos).Unit
+    local walkThroughPos = targetPos + (directionToTarget * 8)
+    
+    humanoid:MoveTo(walkThroughPos)
+    
+    if moveCheckConnection then
+        moveCheckConnection:Disconnect()
+        moveCheckConnection = nil
+    end
+    
+    moveCheckConnection = RunService.Heartbeat:Connect(function()
+        if not isFarming or not isMovingToTarget then
+            if moveCheckConnection then
+                moveCheckConnection:Disconnect()
+                moveCheckConnection = nil
+            end
+            return
+        end
+        
+        if not creatureData or not creatureData.Part or not creatureData.Part.Parent then
+            isMovingToTarget = false
+            if moveCheckConnection then
+                moveCheckConnection:Disconnect()
+                moveCheckConnection = nil
+            end
+            return
+        end
+        
+        if creatureData.Humanoid and creatureData.Humanoid.Health <= 0 then
+            isMovingToTarget = false
+            if moveCheckConnection then
+                moveCheckConnection:Disconnect()
+                moveCheckConnection = nil
+            end
+            local nextTarget = findNearestCreature()
+            if nextTarget then
+                moveToCreature(nextTarget)
+            else
+                isMovingToTarget = false
+                GUI.StatusLabel.Text = "🔍 No more creatures found"
+            end
+            return
+        end
+        
+        local currentPos = rootPart.Position
+        local targetPos = creatureData.Part.Position
+        local dist = (targetPos - currentPos).Magnitude
+        
+        -- Keep moving toward the walk-through position
+        local direction = (targetPos - currentPos).Unit
+        local newWalkThrough = targetPos + (direction * 8)
+        humanoid:MoveTo(newWalkThrough)
+        
+        -- If we're very close to the creature, press E and keep walking
+        if dist < 2.5 then
+            walkingIntoCreature = true
+            GUI.StatusLabel.Text = "💥 Fighting " .. creatureData.ID
+            
+            if VirtualInputManager then
+                pcall(function()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+                end)
+            end
+            
+            pressE()
+            
+            local directionPast = (targetPos - currentPos).Unit
+            local pastPos = targetPos + (directionPast * 10)
+            humanoid:MoveTo(pastPos)
+            
+            task.wait(0.3)
+            isMovingToTarget = false
+            
+            if moveCheckConnection then
+                moveCheckConnection:Disconnect()
+                moveCheckConnection = nil
+            end
+            
+            local nextTarget = findNearestCreature()
+            if nextTarget then
+                moveToCreature(nextTarget)
+            else
+                isMovingToTarget = false
+                GUI.StatusLabel.Text = "🔍 No more creatures found"
+            end
+            return
+        end
+        
+        if dist < 8 then
+            if VirtualInputManager then
+                pcall(function()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+                end)
+            end
+        end
+    end)
+    
+    return true
+end
+
+-- ============================================
+-- FARMING SYSTEM
+-- ============================================
+
+local function startFarming()
+    if isFarming then return end
+    
+    if not character or not character.Parent then
+        GUI.StatusLabel.Text = "❌ Character not found!"
+        return
+    end
+    
+    isFarming = true
+    isMovingToTarget = false
+    lastEPressTime = tick()
+    walkingIntoCreature = false
+    
+    startEPressLoop()
+    
+    GUI.FarmingButton.BackgroundColor3 = Color3.fromRGB(0, 200, 50)
+    GUI.FarmingButton.Text = "⚔️ Farming: ON"
+    GUI.StatusLabel.Text = "🔍 Searching for creatures..."
+    updateCatchButtonStatus(false)
+    
+    print("⚔️ FARMING STARTED - Walking THROUGH creatures")
+    
+    local initialTarget = findNearestCreature()
+    if initialTarget then
+        moveToCreature(initialTarget)
+    else
+        GUI.StatusLabel.Text = "⚠️ No creatures found!"
+    end
+    
+    if farmingConnection then
+        farmingConnection:Disconnect()
+    end
+    
+    farmingConnection = RunService.Heartbeat:Connect(function()
+        if not isFarming then return end
+        
+        if not character or not character.Parent then
+            stopFarming()
+            return
+        end
+        
+        if not isMovingToTarget then
+            if currentTarget and currentTarget.Part and currentTarget.Part.Parent then
+                local dist = (currentTarget.Part.Position - rootPart.Position).Magnitude
+                if dist > 30 then
+                    local newTarget = findNearestCreature()
+                    if newTarget then
+                        moveToCreature(newTarget)
+                    end
+                elseif dist < 3 then
+                    pressE()
+                end
+            else
+                local newTarget = findNearestCreature()
+                if newTarget then
+                    moveToCreature(newTarget)
+                end
+            end
+        end
+    end)
+end
+
+local function stopFarming()
+    isFarming = false
+    isMovingToTarget = false
+    currentTarget = nil
+    walkingIntoCreature = false
+    targetPosition = nil
+    
+    stopEPressLoop()
+    
+    if moveCheckConnection then
+        moveCheckConnection:Disconnect()
+        moveCheckConnection = nil
+    end
+    
+    GUI.FarmingButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    GUI.FarmingButton.Text = "⚔️ Farming: OFF"
+    GUI.StatusLabel.Text = "⏹️ Farming stopped - E presses stopped"
+    updateCatchButtonStatus(false)
+    
+    humanoid:MoveTo(rootPart.Position)
+    
+    if farmingConnection then
+        farmingConnection:Disconnect()
+        farmingConnection = nil
+    end
+    
+    print("⏹️ FARMING STOPPED - E presses stopped")
+end
+
+-- Farming button
+GUI.FarmingButton.MouseButton1Click:Connect(function()
+    if isFarming then
+        stopFarming()
+    else
+        startFarming()
+    end
+end)
+
+-- Handle character respawn
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = character:WaitForChild("Humanoid")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    
+    task.wait(2)
+    
+    if isFarming then
+        stopFarming()
+        task.wait(1)
+        startFarming()
+    end
+end)
+
+-- Handle character death
+player.CharacterRemoving:Connect(function()
+    if isFarming then
+        stopFarming()
+    end
+end)
+
+-- Show GUI
+GUI.ScreenGui.Enabled = true
+
+print("⚡ Evomon Timesaver loaded!")
+print("📁 Looking for creatures in: RuntimeCache > RuntimeCacheServer > CreatureModelCache")
+print("👣 Walking THROUGH creatures to trigger fights")
+print("⚔️ Toggle Farming to hunt creatures")
+print("⌨️ E key pressed constantly while farming is ON")
+print("🔴🟢 Circle shows Catch button status")
+print("🎮 Click Twitch name or 'Copy Link' to copy twitch.tv/valkress_foxglove")
