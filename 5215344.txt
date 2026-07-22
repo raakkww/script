@@ -1,0 +1,49 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character
+local RootPart = Character.HumanoidRootPart
+
+local stages = workspace.stages
+local currentstage = LocalPlayer.leaderstats.Stage
+
+local function FindNextPortal()
+	for i,v in pairs(workspace:GetChildren()) do
+		if v.Name == "Stage Teleport" and #v:GetChildren() == 4 then
+			local enter = v:FindFirstChild("enter")
+			if enter ~= nil then
+				return enter
+			end
+		end
+	end
+end
+
+local function Touch(Part)
+	firetouchinterest(RootPart, Part, 0)
+	firetouchinterest(RootPart, Part, 1)
+end
+while task.wait() do
+	local CurrentStage = stages:FindFirstChild(tostring(currentstage.Value))
+	local NextStage = stages:FindFirstChild(tostring(currentstage.Value + 1))
+	local NextNextStage = stages:FindFirstChild(tostring(currentstage.Value + 1))
+	RootPart.CFrame = CurrentStage.CFrame * CFrame.new(0,3,0)
+	if NextStage then
+		Touch(NextStage)
+		--Potential Speed Gain?
+		if NextNextStage then
+			Touch(NextNextStage)
+		end
+	else
+		local NextPortal = FindNextPortal()
+		if NextPortal then
+			RootPart.CFrame = NextPortal.CFrame
+		else
+			RootPart.CFrame = CurrentStage.CFrame
+		end
+		task.wait(1)
+	end
+end
+for i,v in pairs(workspace.badges:GetChildren()) do
+	if v.Name == "Platform" then
+		Touch(v)
+	end
+end
