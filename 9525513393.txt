@@ -1,0 +1,22 @@
+local function destacar(gameLight)
+	if gameLight.Name ~= "GameLight" then
+		return
+	end
+
+	local modelo = gameLight.Parent
+	if modelo and not modelo:FindFirstChild("ESPHighlight") then
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "ESPHighlight"
+		highlight.FillColor = Color3.fromRGB(255, 255, 0)
+		highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+		highlight.FillTransparency = 0.5
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.Parent = modelo
+	end
+end
+
+for _, obj in ipairs(workspace:GetDescendants()) do
+	destacar(obj)
+end
+
+workspace.DescendantAdded:Connect(destacar)
