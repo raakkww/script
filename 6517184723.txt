@@ -1,0 +1,744 @@
+if _G.PV_CLEANUP then pcall(_G.PV_CLEANUP) end
+
+local rep = game:GetService("ReplicatedStorage")
+local World = game:GetService("Workspace")
+local rs = game:GetService("RunService")
+local input = game:GetService("UserInputService")
+local plrs = game:GetService("Players")
+local TS = game:GetService("TweenService")
+local http = game:GetService("HttpService")
+local GuiService = game:GetService("GuiService")
+
+-- knit holds the game's controllers/services -- grab the ones we poke at
+local knit = require(rep.Packages.Knit)
+repeat task.wait() until knit.Player
+local Pitch = knit.GetController("PitchingController")
+local AnimController = knit.GetController("AnimationController")
+local LocalPlr = knit.Player
+
+local hitRF = rep.Packages.Knit.Services.BattingService.RF:WaitForChild("RequestHit")
+local realInvoke = hitRF.InvokeServer  -- cached so auto-swing skips the namecall path
+
+-- Auto-swing presets. Timing we send = pctScale*bestT + pctBase -- the perfect
+-- window slides with pitch speed, so this scales instead of using one flat value.
+-- aimY nudges contact a hair under the ball for loft. Want more options on the
+-- chip? Just drop another line in here.
+local presets = {
+	{ name = "Straight HR", pctScale = 1.3553, pctBase = -0.3619, aimX = 0.0, aimY = -0.25 },
+}
+local activePreset = 1
+local function currentPreset() return presets[activePreset] end
+local function presetTiming(bestT)
+	local p = currentPreset()
+	return (p.pctScale or 1) * bestT + (p.pctBase or 0)
+end
+
+-- persisted colors
+local saveFile = "pv_tracker_colors.json"
+local col = { zone = Color3.fromRGB(120, 135, 160), ball = Color3.fromRGB(70, 90, 120) }
+
+local function writeSaved()
+	pcall(function()
+		if not writefile then return end
+		writefile(saveFile, http:JSONEncode({
+			zone = { math.floor(col.zone.R*255), math.floor(col.zone.G*255), math.floor(col.zone.B*255) },
+			ball = { math.floor(col.ball.R*255), math.floor(col.ball.G*255), math.floor(col.ball.B*255) },
+		}))
+	end)
+end
+
+pcall(function()
+	if readfile and isfile and isfile(saveFile) then
+		local p = http:JSONDecode(readfile(saveFile))
+		if p.zone then col.zone = Color3.fromRGB(p.zone[1], p.zone[2], p.zone[3]) end
+		if p.ball then col.ball = Color3.fromRGB(p.ball[1], p.ball[2], p.ball[3]) end
+	end
+end)
+
+local stale = World:FindFirstChild("TrajectoryVisuals")
+if stale then stale:Destroy() end
+local bin = Instance.new("Folder")
+bin.Name = "TrajectoryVisuals"
+bin.Parent = World
+
+local sz = World.Repository.Strikezone.Strikezone
+
+local opt = { zoneOn = true, dotOn = true, callOn = true, autoOn = false }
+local keys = { zone = Enum.KeyCode.Z, dot = Enum.KeyCode.X, call = Enum.KeyCode.C, auto = Enum.KeyCode.V, menu = Enum.KeyCode.RightShift }
+
+local hooks = {}
+local function keep(c) hooks[#hooks+1] = c return c end
+
+-- ── strike-zone box ────────────────────────────────────────────────────────
+local function mkEdge()
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+	part.Material = Enum.Material.SmoothPlastic
+	part.Color = col.zone
+	part.Transparency = 0.5
+	part.Parent = bin
+	return part
+end
+
+local border = { mkEdge(), mkEdge(), mkEdge(), mkEdge() }
+local thin = 0.04
+
+keep(rs.RenderStepped:Connect(function()
+	if not opt.zoneOn then
+		for _, p in ipairs(border) do p.Transparency = 1 end
+		return
+	end
+	local frame = sz.CFrame
+	local hx, hy = sz.Size.X / 2, sz.Size.Y / 2
+	border[1].Size = Vector3.new(sz.Size.X, thin, thin)
+	border[1].CFrame = frame * CFrame.new(0, hy, 0)
+	border[2].Size = Vector3.new(sz.Size.X, thin, thin)
+	border[2].CFrame = frame * CFrame.new(0, -hy, 0)
+	border[3].Size = Vector3.new(thin, sz.Size.Y, thin)
+	border[3].CFrame = frame * CFrame.new(-hx, 0, 0)
+	border[4].Size = Vector3.new(thin, sz.Size.Y, thin)
+	border[4].CFrame = frame * CFrame.new(hx, 0, 0)
+	for _, p in ipairs(border) do
+		p.Transparency = 0.5
+		p.Color = col.zone
+	end
+end))
+
+-- ── landing-point marker ───────────────────────────────────────────────────
+local marker = Instance.new("Part")
+marker.Anchored = true
+marker.CanCollide = false
+marker.Material = Enum.Material.SmoothPlastic
+marker.Color = col.ball
+marker.Shape = Enum.PartType.Ball
+marker.Size = Vector3.new(0.3, 0.3, 0.3)
+marker.Transparency = 1
+marker.Parent = bin
+
+local function curve(p0, p1, p2, t)
+	local inv = 1 - t
+	return inv*inv*p0 + 2*inv*t*p1 + t*t*p2
+end
+
+local pending = nil
+local autoState = nil
+
+-- The pitch is a quadratic bezier (start / control / end points live in info).
+-- We hook ThrowPitch so the moment one's thrown we can walk the curve, find where
+-- it crosses the plate, drop the marker there, call strike/ball, and arm auto-hit.
+local realThrow
+realThrow = hookfunction(Pitch.ThrowPitch, function(s, who, info, kind)
+	marker.Transparency = 1
+	autoState = nil
+	if info and info[2] and info[3] and info[4] then
+		local r, ctrl, fin = info[2], info[3], info[4]
+		local depth = sz.Position.Z
+		-- march along the curve and keep the t whose Z lands closest to the plate
+		local bestT, gap = 1, math.huge
+		for i = 0, 1000 do
+			local t = i / 1000
+			local diff = math.abs(curve(r, ctrl, fin, t).Z - depth)
+			if diff < gap then gap = diff bestT = t end
+		end
+		local hit = curve(r, ctrl, fin, bestT)
+		if opt.dotOn then
+			marker.CFrame = CFrame.new(hit)
+			marker.Color = col.ball
+			marker.Transparency = 0
+		end
+		if opt.callOn then
+			-- inside the box on both axes = strike, otherwise ball
+			local rel = sz.CFrame:PointToObjectSpace(hit)
+			local inZone = math.abs(rel.X) <= sz.Size.X/2 and math.abs(rel.Y) <= sz.Size.Y/2
+			pending = inZone and "STRIKE" or "BALL"
+		end
+		if opt.autoOn then
+			autoState = { bestT = bestT, worldPos = hit, fired = false }
+		end
+	end
+	return realThrow(s, who, info, kind)
+end)
+
+-- ── screen GUI ─────────────────────────────────────────────────────────────
+local screen = Instance.new("ScreenGui")
+screen.Name = "PVPanel"
+screen.ResetOnSpawn = false
+screen.IgnoreGuiInset = true
+screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() screen.Parent = game:GetService("CoreGui") end)
+if not screen.Parent then screen.Parent = plrs.LocalPlayer:WaitForChild("PlayerGui") end
+
+-- strike/ball call popup
+local callLabel = Instance.new("TextLabel")
+callLabel.Size = UDim2.fromOffset(260, 70)
+callLabel.Position = UDim2.new(0.5, -130, 0.2, 0)
+callLabel.BackgroundTransparency = 1
+callLabel.Font = Enum.Font.GothamBold
+callLabel.TextSize = 44
+callLabel.TextStrokeTransparency = 0.3
+callLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+callLabel.Text = ""
+callLabel.TextTransparency = 1
+callLabel.Parent = screen
+
+local fadeStart = nil
+keep(rs.RenderStepped:Connect(function()
+	if pending then
+		callLabel.Text = pending
+		callLabel.TextColor3 = pending == "STRIKE" and Color3.fromRGB(80,220,120) or Color3.fromRGB(230,90,90)
+		callLabel.TextTransparency = 0
+		fadeStart = os.clock()
+		pending = nil
+	end
+	if fadeStart then
+		local e = os.clock() - fadeStart
+		callLabel.TextTransparency = math.clamp(e / 1.4, 0, 1)
+		if e >= 1.4 then fadeStart = nil end
+	end
+end))
+
+-- ── auto-swing ─────────────────────────────────────────────────────────────
+-- WorldToViewportPoint drops the top GUI inset; OS mouse calls use full pixels,
+-- so add the inset back to land the cursor on the dot.
+local function worldToCursor(worldPos)
+	local cam = World.CurrentCamera
+	if not cam then return nil end
+	local v, on = cam:WorldToViewportPoint(worldPos)
+	if not on then return nil end
+	local inset = GuiService:GetGuiInset()
+	return v.X + inset.X, v.Y + inset.Y
+end
+
+-- The game calls RequestHit(Vector2(worldHit.X, worldHit.Y), timing) on a swing,
+-- so that's all we do: send the aim (nudged slightly under the ball) plus our
+-- timing value. The swing animation is fired right after -- if you play it before
+-- the hit registers it eats the contact, learned that one the hard way.
+local function fireSwing(st, livePct)
+	local p = currentPreset()
+	local aim = Vector2.new(st.worldPos.X + (p.aimX or 0), st.worldPos.Y + (p.aimY or 0))
+	pcall(realInvoke, hitRF, aim, livePct)
+	task.spawn(function()
+		pcall(function()
+			-- "MM" = middle zone; needs a valid one or the anim call throws
+			AnimController:Play(LocalPlr, "Batter", "Swing", "MM")
+		end)
+	end)
+end
+
+keep(rs.RenderStepped:Connect(function()
+	if not opt.autoOn or not autoState or autoState.fired then return end
+	-- park the cursor on the landing dot. mousemoveabs sets the target, but some
+	-- executors only apply it once the OS mouse "wakes" -- a 0px relative move
+	-- forces the cursor to update without needing a manual nudge.
+	local cx, cy = worldToCursor(autoState.worldPos)
+	if cx and mousemoveabs then
+		pcall(mousemoveabs, math.floor(cx), math.floor(cy))
+		if mousemoverel then pcall(mousemoverel, 0, 0) end
+	end
+	-- fire the instant the live ball crosses the plate plane
+	local ball = Pitch.CurrentBall
+	if not ball or not ball.Parent then return end
+	local ballZ = ball.Position.Z
+	local plateZ = sz.Position.Z
+	local prevZ = autoState.prevBallZ
+	autoState.prevBallZ = ballZ
+	if prevZ == nil then return end
+	if (prevZ - plateZ) * (ballZ - plateZ) <= 0 and prevZ ~= ballZ then
+		autoState.fired = true
+		fireSwing(autoState, math.clamp(presetTiming(autoState.bestT), 0, 1))
+	end
+end))
+
+-- ── panel ──────────────────────────────────────────────────────────────────
+local W = 290
+
+local panel = Instance.new("Frame")
+panel.Size = UDim2.fromOffset(W, 0)
+panel.Position = UDim2.new(0, 24, 0.5, -90)
+panel.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
+panel.BorderSizePixel = 0
+panel.Parent = screen
+local rnd = Instance.new("UICorner") rnd.CornerRadius = UDim.new(0, 10) rnd.Parent = panel
+local lineStroke = Instance.new("UIStroke")
+lineStroke.Color = Color3.fromRGB(30, 52, 92)
+lineStroke.Thickness = 1
+lineStroke.Transparency = 0.2
+lineStroke.Parent = panel
+local sheen = Instance.new("UIGradient")
+sheen.Rotation = 90
+sheen.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(16, 20, 32)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 10, 16)),
+})
+sheen.Parent = panel
+
+local clipper = Instance.new("Frame")
+clipper.Size = UDim2.fromScale(1, 1)
+clipper.BackgroundTransparency = 1
+clipper.ClipsDescendants = true
+clipper.Parent = panel
+
+local bar = Instance.new("Frame")
+bar.Size = UDim2.new(1, 0, 0, 52)
+bar.BackgroundColor3 = Color3.fromRGB(14, 18, 30)
+bar.BorderSizePixel = 0
+bar.Parent = clipper
+local bc = Instance.new("UICorner") bc.CornerRadius = UDim.new(0, 10) bc.Parent = bar
+
+local accent = Instance.new("Frame")
+accent.Size = UDim2.fromOffset(3, 18)
+accent.Position = UDim2.fromOffset(8, 12)
+accent.BackgroundColor3 = Color3.fromRGB(58, 120, 220)
+accent.BorderSizePixel = 0
+accent.Parent = bar
+local tkc = Instance.new("UICorner") tkc.CornerRadius = UDim.new(1, 0) tkc.Parent = accent
+
+-- title -- per-character wave, same treatment as the credit line below it
+local titleBox = Instance.new("Frame")
+titleBox.Size = UDim2.new(1, -90, 0, 28)
+titleBox.Position = UDim2.fromOffset(18, 4)
+titleBox.BackgroundTransparency = 1
+titleBox.Parent = bar
+local tlist = Instance.new("UIListLayout")
+tlist.FillDirection = Enum.FillDirection.Horizontal
+tlist.VerticalAlignment = Enum.VerticalAlignment.Center
+tlist.SortOrder = Enum.SortOrder.LayoutOrder
+tlist.Parent = titleBox
+
+local titleGlyphs = {}
+local titleText = "Bonker"
+for idx = 1, #titleText do
+	local ch = titleText:sub(idx, idx)
+	local cell = Instance.new("Frame")
+	cell.Size = UDim2.fromOffset(ch == " " and 6 or 12, 28)
+	cell.BackgroundTransparency = 1
+	cell.LayoutOrder = idx
+	cell.Parent = titleBox
+	local g = Instance.new("TextLabel")
+	g.Size = UDim2.fromScale(1, 1)
+	g.BackgroundTransparency = 1
+	g.Font = Enum.Font.GothamBold
+	g.Text = ch
+	g.TextSize = 18
+	g.TextColor3 = Color3.fromRGB(90, 150, 240)
+	g.Parent = cell
+	titleGlyphs[idx] = g
+end
+
+-- animated credit line
+local credit = Instance.new("Frame")
+credit.Size = UDim2.new(1, -90, 0, 16)
+credit.Position = UDim2.fromOffset(18, 30)
+credit.BackgroundTransparency = 1
+credit.Parent = bar
+local clist = Instance.new("UIListLayout")
+clist.FillDirection = Enum.FillDirection.Horizontal
+clist.VerticalAlignment = Enum.VerticalAlignment.Center
+clist.SortOrder = Enum.SortOrder.LayoutOrder
+clist.Parent = credit
+
+local glyphs = {}
+local line = "made by connor2673 - discord"
+for idx = 1, #line do
+	local ch = line:sub(idx, idx)
+	local cell = Instance.new("Frame")
+	cell.Size = UDim2.fromOffset(ch == " " and 4 or 7, 16)
+	cell.BackgroundTransparency = 1
+	cell.LayoutOrder = idx
+	cell.Parent = credit
+	local g = Instance.new("TextLabel")
+	g.Size = UDim2.fromScale(1, 1)
+	g.BackgroundTransparency = 1
+	g.Font = Enum.Font.GothamBold
+	g.Text = ch
+	g.TextSize = 11
+	g.TextColor3 = Color3.fromRGB(90, 150, 240)
+	g.Parent = cell
+	glyphs[idx] = g
+end
+
+-- drive the wave on both the title and the credit so they shimmer together
+keep(rs.RenderStepped:Connect(function()
+	local t = os.clock()
+	for idx, g in ipairs(titleGlyphs) do
+		local phase = t * 3.5 - idx * 0.45
+		g.Position = UDim2.fromOffset(0, math.sin(phase) * 2.5)
+		local shade = (math.sin(phase) + 1) * 0.5
+		g.TextColor3 = Color3.fromRGB(60 + shade * 40, 120 + shade * 70, 210 + shade * 45)
+	end
+	for idx, g in ipairs(glyphs) do
+		local phase = t * 3.5 - idx * 0.45
+		g.Position = UDim2.fromOffset(0, math.sin(phase) * 2.5)
+		local shade = (math.sin(phase) + 1) * 0.5
+		g.TextColor3 = Color3.fromRGB(60 + shade * 40, 120 + shade * 70, 210 + shade * 45)
+	end
+end))
+
+local killBtn = Instance.new("TextButton")
+killBtn.Size = UDim2.fromOffset(28, 28)
+killBtn.Position = UDim2.new(1, -68, 0, 12)
+killBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 26)
+killBtn.Text = "×"
+killBtn.Font = Enum.Font.GothamBold
+killBtn.TextColor3 = Color3.fromRGB(220, 130, 140)
+killBtn.TextSize = 16
+killBtn.AutoButtonColor = false
+killBtn.Parent = bar
+local kbc = Instance.new("UICorner") kbc.CornerRadius = UDim.new(0, 6) kbc.Parent = killBtn
+
+local fold = Instance.new("TextButton")
+fold.Size = UDim2.fromOffset(28, 28)
+fold.Position = UDim2.new(1, -36, 0, 12)
+fold.BackgroundColor3 = Color3.fromRGB(22, 28, 44)
+fold.Text = "–"
+fold.Font = Enum.Font.GothamBold
+fold.TextColor3 = Color3.fromRGB(170, 185, 210)
+fold.TextSize = 16
+fold.AutoButtonColor = false
+fold.Parent = bar
+local fcr = Instance.new("UICorner") fcr.CornerRadius = UDim.new(0, 6) fcr.Parent = fold
+
+local content = Instance.new("Frame")
+content.Name = "Body"
+content.Size = UDim2.new(1, 0, 0, 0)
+content.AutomaticSize = Enum.AutomaticSize.Y
+content.Position = UDim2.fromOffset(0, 52)
+content.BackgroundTransparency = 1
+content.Parent = clipper
+local pad = Instance.new("UIPadding")
+pad.PaddingTop = UDim.new(0, 10)
+pad.PaddingBottom = UDim.new(0, 12)
+pad.PaddingLeft = UDim.new(0, 12)
+pad.PaddingRight = UDim.new(0, 12)
+pad.Parent = content
+local stack = Instance.new("UIListLayout")
+stack.Padding = UDim.new(0, 8)
+stack.SortOrder = Enum.SortOrder.LayoutOrder
+stack.Parent = content
+
+local rebinding = nil
+local openPicker = nil
+local shadeOf = {}
+
+local function closePicker(p)
+	p.Visible = false
+	if shadeOf[p] then shadeOf[p].Visible = false end
+	if openPicker == p then openPicker = nil end
+end
+
+-- color swatch popup
+local function buildPicker(apply)
+	local shade = Instance.new("TextButton")
+	shade.Size = UDim2.fromScale(1, 1)
+	shade.BackgroundTransparency = 1
+	shade.Text = ""
+	shade.AutoButtonColor = false
+	shade.Visible = false
+	shade.ZIndex = 19
+	shade.Parent = screen
+
+	local pop = Instance.new("Frame")
+	pop.Size = UDim2.fromOffset(160, 110)
+	pop.BackgroundColor3 = Color3.fromRGB(14, 18, 30)
+	pop.BorderSizePixel = 0
+	pop.Visible = false
+	pop.ZIndex = 20
+	pop.Parent = screen
+	local pcr = Instance.new("UICorner") pcr.CornerRadius = UDim.new(0, 8) pcr.Parent = pop
+	local pst = Instance.new("UIStroke") pst.Color = Color3.fromRGB(40, 56, 90) pst.Parent = pop
+
+	local cols, rows, cw, chh, gp = 12, 6, 12, 12, 4
+	for ry = 0, rows - 1 do
+		for cx = 0, cols - 1 do
+			local c = Color3.fromHSV(cx / cols, 0.55, 1 - (ry / (rows - 1)) * 0.85)
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.fromOffset(cw, chh)
+			btn.Position = UDim2.fromOffset(gp + cx*cw, gp + ry*chh)
+			btn.BackgroundColor3 = c
+			btn.Text = ""
+			btn.AutoButtonColor = false
+			btn.BorderSizePixel = 0
+			btn.ZIndex = 21
+			btn.Parent = pop
+			keep(btn.MouseButton1Click:Connect(function() apply(c) writeSaved() end))
+		end
+	end
+	for gx = 0, cols - 1 do
+		local v = gx / (cols - 1)
+		local c = Color3.fromRGB(v*255, v*255, v*255)
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.fromOffset(cw, chh)
+		btn.Position = UDim2.fromOffset(gp + gx*cw, gp + rows*chh + 3)
+		btn.BackgroundColor3 = c
+		btn.Text = ""
+		btn.AutoButtonColor = false
+		btn.BorderSizePixel = 0
+		btn.ZIndex = 21
+		btn.Parent = pop
+		keep(btn.MouseButton1Click:Connect(function() apply(c) writeSaved() end))
+	end
+
+	keep(shade.MouseButton1Click:Connect(function() closePicker(pop) end))
+	return pop, shade
+end
+
+-- one settings row: caption, optional preset chip, optional color swatch, keybind
+-- chip, and an on/off toggle.
+local function row(text, flag, bindId, k, colorKey, withPreset)
+	local r = Instance.new("Frame")
+	r.Size = UDim2.new(1, 0, 0, 38)
+	r.BackgroundColor3 = Color3.fromRGB(16, 20, 32)
+	r.BorderSizePixel = 0
+	r.Parent = content
+	local rc = Instance.new("UICorner") rc.CornerRadius = UDim.new(0, 7) rc.Parent = r
+	local rstroke = Instance.new("UIStroke") rstroke.Color = Color3.fromRGB(26, 36, 58) rstroke.Transparency = 0.4 rstroke.Parent = r
+
+	local cap = Instance.new("TextLabel")
+	cap.Size = UDim2.fromOffset(withPreset and 60 or 96, 38)
+	cap.Position = UDim2.fromOffset(12, 0)
+	cap.BackgroundTransparency = 1
+	cap.Font = Enum.Font.Gotham
+	cap.Text = text
+	cap.TextColor3 = Color3.fromRGB(205, 214, 230)
+	cap.TextSize = 13
+	cap.TextXAlignment = Enum.TextXAlignment.Left
+	cap.Parent = r
+
+	if withPreset then
+		local presetBtn = Instance.new("TextButton")
+		presetBtn.Size = UDim2.fromOffset(84, 22)
+		presetBtn.Position = UDim2.fromOffset(76, 8)
+		presetBtn.BackgroundColor3 = Color3.fromRGB(30, 40, 64)
+		presetBtn.Font = Enum.Font.GothamMedium
+		presetBtn.Text = currentPreset().name
+		presetBtn.TextColor3 = Color3.fromRGB(150, 200, 255)
+		presetBtn.TextSize = 10
+		presetBtn.TextTruncate = Enum.TextTruncate.AtEnd
+		presetBtn.AutoButtonColor = false
+		presetBtn.Parent = r
+		local pbc = Instance.new("UICorner") pbc.CornerRadius = UDim.new(0, 5) pbc.Parent = presetBtn
+		local pbs = Instance.new("UIStroke") pbs.Color = Color3.fromRGB(50, 90, 140) pbs.Parent = presetBtn
+
+		keep(presetBtn.MouseButton1Click:Connect(function()
+			activePreset = (activePreset % #presets) + 1
+			presetBtn.Text = currentPreset().name
+		end))
+		keep(presetBtn.MouseEnter:Connect(function()
+			TS:Create(presetBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 54, 84)}):Play()
+		end))
+		keep(presetBtn.MouseLeave:Connect(function()
+			TS:Create(presetBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(30, 40, 64)}):Play()
+		end))
+	end
+
+	if colorKey then
+		local swatch = Instance.new("TextButton")
+		swatch.Size = UDim2.fromOffset(20, 20)
+		swatch.Position = UDim2.fromOffset(116, 9)
+		swatch.BackgroundColor3 = col[colorKey]
+		swatch.Text = ""
+		swatch.AutoButtonColor = false
+		swatch.Parent = r
+		local swc = Instance.new("UICorner") swc.CornerRadius = UDim.new(0, 5) swc.Parent = swatch
+		local sws = Instance.new("UIStroke") sws.Color = Color3.fromRGB(50, 64, 96) sws.Parent = swatch
+
+		local picker, pickerShade = buildPicker(function(c)
+			col[colorKey] = c
+			swatch.BackgroundColor3 = c
+		end)
+		shadeOf[picker] = pickerShade
+
+		keep(swatch.MouseButton1Click:Connect(function()
+			if openPicker and openPicker ~= picker then closePicker(openPicker) end
+			picker.Visible = not picker.Visible
+			pickerShade.Visible = picker.Visible
+			openPicker = picker.Visible and picker or nil
+			if picker.Visible then
+				picker.Position = UDim2.new(panel.Position.X.Scale, panel.Position.X.Offset + W + 8, panel.Position.Y.Scale, panel.Position.Y.Offset + 60)
+			end
+		end))
+	end
+
+	local chip = Instance.new("TextButton")
+	chip.Size = UDim2.fromOffset(46, 22)
+	chip.Position = UDim2.new(1, -104, 0.5, -11)
+	chip.BackgroundColor3 = Color3.fromRGB(24, 30, 48)
+	chip.Font = Enum.Font.GothamMedium
+	chip.Text = k.Name
+	chip.TextColor3 = Color3.fromRGB(150, 170, 205)
+	chip.TextSize = 11
+	chip.AutoButtonColor = false
+	chip.Parent = r
+	local chc = Instance.new("UICorner") chc.CornerRadius = UDim.new(0, 5) chc.Parent = chip
+	local chs = Instance.new("UIStroke") chs.Color = Color3.fromRGB(40, 56, 90) chs.Parent = chip
+
+	local toggle = Instance.new("TextButton")
+	toggle.Size = UDim2.fromOffset(42, 22)
+	toggle.Position = UDim2.new(1, -50, 0.5, -11)
+	toggle.BackgroundColor3 = opt[flag] and Color3.fromRGB(40, 90, 200) or Color3.fromRGB(28, 34, 52)
+	toggle.Text = ""
+	toggle.AutoButtonColor = false
+	toggle.Parent = r
+	local tc = Instance.new("UICorner") tc.CornerRadius = UDim.new(1, 0) tc.Parent = toggle
+
+	local pip = Instance.new("Frame")
+	pip.Size = UDim2.fromOffset(16, 16)
+	pip.Position = opt[flag] and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+	pip.BackgroundColor3 = Color3.fromRGB(235, 240, 250)
+	pip.BorderSizePixel = 0
+	pip.Parent = toggle
+	local pipc = Instance.new("UICorner") pipc.CornerRadius = UDim.new(1, 0) pipc.Parent = pip
+
+	local function sync()
+		local on = opt[flag]
+		TS:Create(toggle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+			BackgroundColor3 = on and Color3.fromRGB(40, 90, 200) or Color3.fromRGB(28, 34, 52)
+		}):Play()
+		TS:Create(pip, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+			Position = on and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+		}):Play()
+	end
+
+	keep(toggle.MouseButton1Click:Connect(function()
+		opt[flag] = not opt[flag]
+		if flag == "dotOn" and not opt.dotOn then marker.Transparency = 1 end
+		if flag == "callOn" and not opt.callOn then callLabel.TextTransparency = 1 fadeStart = nil pending = nil end
+		if flag == "autoOn" and not opt.autoOn then autoState = nil end
+		sync()
+	end))
+
+	keep(chip.MouseButton1Click:Connect(function()
+		rebinding = { btn = chip, id = bindId }
+		chip.Text = "..."
+		chip.TextColor3 = Color3.fromRGB(90, 150, 240)
+	end))
+
+	keep(r.MouseEnter:Connect(function()
+		TS:Create(rstroke, TweenInfo.new(0.15), {Transparency = 0.1}):Play()
+	end))
+	keep(r.MouseLeave:Connect(function()
+		TS:Create(rstroke, TweenInfo.new(0.15), {Transparency = 0.4}):Play()
+	end))
+
+	return { sync = sync, btn = chip }
+end
+
+local zoneRow = row("Strike Zone", "zoneOn", "zone", keys.zone, "zone")
+local dotRow = row("Landing Dot", "dotOn", "dot", keys.dot, "ball")
+local callRow = row("Strike Call", "callOn", "call", keys.call, nil)
+local autoRow = row("Auto Hit", "autoOn", "auto", keys.auto, nil, true)
+
+-- ── fold / sizing ──────────────────────────────────────────────────────────
+local folded = false
+local function foldTo(v)
+	folded = v
+	fold.Text = v and "+" or "–"
+	local h = v and 52 or (52 + content.AbsoluteSize.Y)
+	TS:Create(panel, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Size = UDim2.fromOffset(W, h)
+	}):Play()
+end
+
+task.defer(function()
+	panel.Size = UDim2.fromOffset(W, 52 + content.AbsoluteSize.Y)
+end)
+keep(content:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	if not folded then
+		panel.Size = UDim2.fromOffset(W, 52 + content.AbsoluteSize.Y)
+	end
+end))
+
+keep(fold.MouseButton1Click:Connect(function() foldTo(not folded) end))
+keep(fold.MouseEnter:Connect(function()
+	TS:Create(fold, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(30, 40, 64)}):Play()
+end))
+keep(fold.MouseLeave:Connect(function()
+	TS:Create(fold, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(22, 28, 44)}):Play()
+end))
+keep(killBtn.MouseEnter:Connect(function()
+	TS:Create(killBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(58, 26, 34)}):Play()
+end))
+keep(killBtn.MouseLeave:Connect(function()
+	TS:Create(killBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 20, 26)}):Play()
+end))
+
+-- drag by the title bar
+do
+	local held, anchor, grab
+	keep(bar.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 then
+			held = true anchor = panel.Position grab = i.Position
+		end
+	end))
+	keep(input.InputChanged:Connect(function(i)
+		if held and i.UserInputType == Enum.UserInputType.MouseMovement then
+			local off = i.Position - grab
+			panel.Position = UDim2.new(anchor.X.Scale, anchor.X.Offset + off.X, anchor.Y.Scale, anchor.Y.Offset + off.Y)
+		end
+	end))
+	keep(input.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 then held = false end
+	end))
+end
+
+-- ── keybinds ───────────────────────────────────────────────────────────────
+local stowed = false
+keep(input.InputBegan:Connect(function(i, typed)
+	if i.UserInputType ~= Enum.UserInputType.Keyboard then return end
+	if rebinding then
+		keys[rebinding.id] = i.KeyCode
+		rebinding.btn.Text = i.KeyCode.Name
+		rebinding.btn.TextColor3 = Color3.fromRGB(150, 170, 205)
+		rebinding = nil
+		return
+	end
+	if typed then return end
+	if i.KeyCode == keys.zone then
+		opt.zoneOn = not opt.zoneOn
+		zoneRow.sync()
+	elseif i.KeyCode == keys.dot then
+		opt.dotOn = not opt.dotOn
+		if not opt.dotOn then marker.Transparency = 1 end
+		dotRow.sync()
+	elseif i.KeyCode == keys.call then
+		opt.callOn = not opt.callOn
+		if not opt.callOn then callLabel.TextTransparency = 1 fadeStart = nil pending = nil end
+		callRow.sync()
+	elseif i.KeyCode == keys.auto then
+		opt.autoOn = not opt.autoOn
+		if not opt.autoOn then autoState = nil end
+		autoRow.sync()
+	elseif i.KeyCode == keys.menu then
+		stowed = not stowed
+		if openPicker then closePicker(openPicker) end
+		TS:Create(panel, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+			Position = stowed and UDim2.new(0, -W - 40, 0.5, -90) or UDim2.new(0, 24, 0.5, -90)
+		}):Play()
+	end
+end))
+
+-- ── teardown ───────────────────────────────────────────────────────────────
+local function teardown()
+	pcall(function() if realThrow then hookfunction(Pitch.ThrowPitch, realThrow) end end)
+	for _, c in ipairs(hooks) do pcall(function() c:Disconnect() end) end
+	pcall(function() bin:Destroy() end)
+	pcall(function() screen:Destroy() end)
+	_G.PV_CLEANUP = nil
+end
+_G.PV_CLEANUP = teardown
+
+keep(killBtn.MouseButton1Click:Connect(function()
+	if openPicker then closePicker(openPicker) end
+	TS:Create(panel, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+		Position = UDim2.new(0, -W - 40, 0.5, -90), BackgroundTransparency = 1
+	}):Play()
+	task.delay(0.26, teardown)
+end))
+
+-- entrance
+panel.BackgroundTransparency = 1
+panel.Position = UDim2.new(0, 24, 0.5, -70)
+TS:Create(panel, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+	BackgroundTransparency = 0, Position = UDim2.new(0, 24, 0.5, -90)
+}):Play()
